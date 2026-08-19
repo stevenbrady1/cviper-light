@@ -72,3 +72,55 @@ export {
   toIsoDateOrNull,
   unescapeHtmlEntities,
 } from './text';
+
+// ── Running a search ─────────────────────────────────────────────────────────
+
+export {
+  searchJobs,
+  type JobSearchOutcome,
+  type JobSearchRequest,
+  type ProviderOutcome,
+} from './search';
+
+// ── Cross-post detection: FLAG, never merge ──────────────────────────────────
+
+export { findCrossPostClusters, type DuplicateCluster } from './clusters';
+
+export {
+  FINGERPRINT_BITS,
+  FINGERPRINT_VERSION,
+  MERGE_MAX_HAMMING,
+  MIN_FINGERPRINT_TOKENS,
+  SHINGLE_SIZE,
+  computeFingerprint,
+  fingerprintFromStorage,
+  fingerprintToStorage,
+  hammingDistance,
+  isDuplicateMatch,
+  normaliseTokens,
+  shingles,
+} from './fingerprint';
+
+// ── Keyless browser links: no key, no scraper, no account ────────────────────
+
+export { buildIndeedSearchUrl, buildLinkedInSearchUrl, type BrowserSearchInput } from './links';
+
+// ── The daily request budget ─────────────────────────────────────────────────
+
+export {
+  PROVIDER_DAILY_LIMIT,
+  QUOTA_BLOCK_AT,
+  QUOTA_RESERVE,
+  QUOTA_WARN_AT,
+  REED_DAILY_LIMIT,
+  emptyQuota,
+  parseQuotaState,
+  quotaVerdict,
+  recordProviderRequest,
+  rollOverQuota,
+  utcDateOf,
+  type QuotaCounts,
+  type QuotaState,
+  type QuotaStatus,
+  type QuotaVerdict,
+} from './quota';
