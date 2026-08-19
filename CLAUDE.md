@@ -82,6 +82,8 @@ start with a reproducing test — no exceptions. Code that handles user input
 ships with at least one negative test and one boundary test, never happy-path
 only.
 
-Vitest currently runs with `passWithNoTests: true` because Phase 0 packages are
-stubs. **That makes `pnpm test` a vacuous gate right now.** The first package to
-gain real logic must gain real tests with it.
+Vitest still runs with `passWithNoTests: true`. It is no longer a vacuous gate —
+every package with logic has tests, and `packages/ui` is the only one left
+without — but the flag means a package whose tests stop being COLLECTED reports
+green rather than red. If a suite's count drops, look at the collection glob
+before believing the tests were deleted.

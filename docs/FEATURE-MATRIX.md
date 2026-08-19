@@ -3,13 +3,24 @@
 Where each feature lives. The Light column records the _intent_; the State
 column records the truth.
 
-**Built so far**: the shared data model and export/import format below, the
-local SQLite data-access layer, CV text extraction, the provider adapters and
-their Rust transport, the keyword-only scorer, the app shell, the application
-tracker, the CV analysis view, the job-board clients — Adzuna and Reed request
-building, response normalisation, cross-post detection, keyless browser links
-and the daily request budget — the job search view that renders them, and the
-API-key setup wizard in Settings. There are no placeholder views left.
+**Built**: everything in the Light column below that is not marked otherwise —
+the shared data model and export/import format, the local SQLite data-access
+layer, CV text extraction, the provider adapters and their Rust transport, the
+keyword-only scorer, the app shell, the application tracker, the CV analysis
+view, the job-board clients (Adzuna and Reed request building, response
+normalisation, cross-post detection, keyless browser links and the daily request
+budget), the job search view, the API-key setup wizard, the manual update check,
+the first-run introduction and the app icon. There are no placeholder views
+left.
+
+**Not built, and marked as such below**: accounts, sync and telemetry — all
+three deliberate — and the CV parsing column, where extraction is done and
+structured parsing is not.
+
+**Needs a human before it ships**: the updater is wired and tested but the
+signing key in `tauri.conf.json` is a placeholder, so no release can currently
+be verified by an installed copy. See
+[`apps/light/src-tauri/RELEASE-SIGNING.md`](../apps/light/src-tauri/RELEASE-SIGNING.md).
 
 `apps/cloud` is an empty stub directory. There is no cloud code of any kind.
 
@@ -23,11 +34,13 @@ API-key setup wizard in Settings. There are no placeholder views left.
 | CV parsing                   | Yes — fully local                          | Yes — server-side                  | Extraction built |
 | CV analysis (BYO key)        | Yes — user's own provider key              | Not applicable                     | Built            |
 | CV analysis (local Ollama)   | Yes — offline, no key, no network          | No                                 | Built            |
-| Keyword-only analysis        | Yes — no AI, no key, always available      | Yes                                | Scoring built    |
-| Data export/import           | Yes — user-initiated file in/out           | Yes — plus migration to/from Light | Format built     |
+| Keyword-only analysis        | Yes — no AI, no key, always available      | Yes                                | Built            |
+| Data export/import           | Yes — user-initiated file in/out           | Yes — plus migration to/from Light | Built            |
+| App updates                  | Yes — manual check only, never on launch   | Not applicable                     | Built, unsigned  |
+| First-run introduction       | Yes — three cards, reopenable in Settings  | Not applicable                     | Built            |
 | Accounts                     | No — no login, no identity                 | Yes                                | Not built        |
 | Sync                         | No — single device by design               | Yes                                | Not built        |
-| Telemetry                    | No — none, ever                            | Opt-in                             | Not built        |
+| Telemetry                    | No — none, ever                            | Opt-in                             | Absent, guarded  |
 
 ## Notes
 
@@ -37,6 +50,28 @@ API-key setup wizard in Settings. There are no placeholder views left.
   keyless path, so the app is useful before the user configures anything.
 - **"No" in the Light column is a product decision, not a gap** — accounts,
   sync, and telemetry are deliberately absent.
+- **"Absent, guarded" is stronger than "not built".** There is one telemetry
+  flag, it is the literal `false`, and `telemetry.contract.test.ts` fails the
+  build if any code branches on it, if anything that can reach a network so much
+  as names it, or if the Settings copy stops saying no data is sent. Saying
+  nothing about telemetry is also what an app WITH telemetry does; this is
+  checkable in a second instead.
+- **"Built, unsigned" means the feature works and the key does not exist yet.**
+  The updater checks, reports and installs, and every state is tested against a
+  fake port. `plugins.updater.pubkey` is a placeholder, so a real check against a
+  real release fails signature verification — which is the correct outcome for
+  an unsigned build, and is shown to the user as a sentence rather than a
+  silence.
+- **Nothing is checked at launch.** No update check, no version ping, no
+  analytics. Two guards keep it that way: one asserts the updater plugin has a
+  single import site, and one mounts the whole app and asserts zero calls before
+  a button is pressed.
+- **An embedding model is never offered as a chat model.** `/api/tags` does not
+  report model capabilities, so the filter works off the architecture the daemon
+  DOES report — every Ollama embedding model is a BERT derivative and no chat
+  model is one. A daemon running with nothing chat-capable installed gets a
+  sentence naming the command that fixes it; a machine with no Ollama at all is
+  told nothing, because that is an advert rather than an answer.
 - **Outbound apply links carry no tracking.** The CViper web application appends
   `utm_source` / `utm_medium` / `utm_campaign` to every job URL it hands out
   (`_tag_affiliate_url` in `backend/job_sites_api.py`). Light deliberately does
