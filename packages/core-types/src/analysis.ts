@@ -49,11 +49,53 @@ export type CvAnalysis = {
 
 // --- Zod representation -----------------------------------------------------
 
-// PHASE 1a RED: placeholder. The real shape lands in the GREEN commit.
-export const CvAnalysisSuggestionSchema = z.object({});
+const suggestionShape = {
+  section: z.string(),
+  issue: z.string(),
+  recommendation: z.string(),
+  priority: z.enum(['high', 'medium', 'low']),
+};
 
-// PHASE 1a RED: placeholder. The real shape lands in the GREEN commit.
-export const CvAnalysisSchema = z.object({});
+const cvAnalysisShape = {
+  match_score: z.number().int().min(0).max(100),
+  verdict: z.enum(['strong', 'possible', 'weak']),
+  summary: z.string(),
+  matched_skills: z.array(z.string()),
+  missing_skills: z.array(z.string()),
+  keyword_gaps: z.array(z.string()),
+  matched_keywords: z.array(z.string()),
+  suggestions: z.array(z.looseObject(suggestionShape)),
+  ats_notes: z.array(z.string()),
+};
+
+/**
+ * BOTH SCHEMAS ARE DELIBERATELY LOOSE while the JSON Schema below sets
+ * `additionalProperties: false`. That looks like a contradiction and is not:
+ *
+ *   - The JSON Schema constrains what we ASK a model to produce. Closing it is
+ *     mandatory (Anthropic rejects open schemas) and keeps small models on the
+ *     rails.
+ *   - The Zod schema validates what came BACK, including from a bigger cloud
+ *     model or a backup file written by a future version. Its job is to prove
+ *     the required fields are present and correctly typed, not to delete
+ *     fields it does not recognise. Stripping here would silently eat a richer
+ *     result on its way into the user's export file.
+ */
+export const CvAnalysisSuggestionSchema = z.looseObject(suggestionShape);
+
+export const CvAnalysisSchema = z.looseObject(cvAnalysisShape);
+
+/** Fails to compile if the Zod schema and the hand-written type drift apart. */
+type AssertAssignable<TActual extends TExpected, TExpected> = TActual;
+
+export type _CvAnalysisSchemaMatchesType = AssertAssignable<
+  z.infer<typeof CvAnalysisSchema>,
+  CvAnalysis
+>;
+export type _CvAnalysisTypeMatchesSchema = AssertAssignable<
+  CvAnalysis,
+  z.infer<typeof CvAnalysisSchema>
+>;
 
 // --- Hand-written JSON Schema representation --------------------------------
 
@@ -73,11 +115,91 @@ export interface JsonSchemaNode {
   readonly maximum?: number;
 }
 
-// PHASE 1a RED: placeholder. The real schema lands in the GREEN commit.
+/**
+ * Sent verbatim to Ollama's `format` parameter and to the cloud providers'
+ * structured-output fields.
+ *
+ * HAND-TUNED. Descriptions are short imperatives because a 3B model treats
+ * them as instructions, not documentation, and a long one derails it. Keep
+ * every object closed with `additionalProperties: false` — Anthropic's
+ * structured outputs reject a schema without it. No `$defs`, no `$ref`: small
+ * models cannot follow an indirection.
+ */
 export const CV_ANALYSIS_JSON_SCHEMA = {
   type: 'object',
-  properties: {},
-  required: [],
+  additionalProperties: false,
+  required: [
+    'match_score',
+    'verdict',
+    'summary',
+    'matched_skills',
+    'missing_skills',
+    'keyword_gaps',
+    'matched_keywords',
+    'suggestions',
+    'ats_notes',
+  ],
+  properties: {
+    match_score: {
+      type: 'integer',
+      minimum: 0,
+      maximum: 100,
+      description: 'How well the CV fits the job, 0 to 100.',
+    },
+    verdict: {
+      type: 'string',
+      enum: ['strong', 'possible', 'weak'],
+      description: 'Overall call on the fit.',
+    },
+    summary: {
+      type: 'string',
+      description: 'Two sentences on the fit, addressed to the candidate.',
+    },
+    matched_skills: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Skills the job asks for that the CV already shows.',
+    },
+    missing_skills: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Skills the job asks for that the CV does not show.',
+    },
+    keyword_gaps: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Words in the advert that an ATS would look for and not find.',
+    },
+    matched_keywords: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Words in the advert that the CV already uses.',
+    },
+    suggestions: {
+      type: 'array',
+      description: 'Specific edits to make to the CV.',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['section', 'issue', 'recommendation', 'priority'],
+        properties: {
+          section: { type: 'string', description: 'CV section to change.' },
+          issue: { type: 'string', description: 'What is wrong there.' },
+          recommendation: { type: 'string', description: 'The change to make.' },
+          priority: {
+            type: 'string',
+            enum: ['high', 'medium', 'low'],
+            description: 'How much this change matters.',
+          },
+        },
+      },
+    },
+    ats_notes: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Formatting problems that could break CV parsing software.',
+    },
+  },
 } as const satisfies JsonSchemaNode;
 
 // --- Verdict ----------------------------------------------------------------
@@ -92,6 +214,10 @@ export const CV_ANALYSIS_JSON_SCHEMA = {
  * schema so the model still reasons about it) and then thrown away: this
  * function is the only thing that decides.
  */
-export function deriveVerdict(_matchScore: number): Verdict {
-  throw new Error('NOT_IMPLEMENTED: deriveVerdict');
+export function deriveVerdict(matchScore: number): Verdict {
+  if (matchScore >= 75) return 'strong';
+  if (matchScore >= 60) return 'possible';
+  // Anything else, INCLUDING NaN, lands here. A score we cannot read is not
+  // evidence of a good match, so the safe answer is the pessimistic one.
+  return 'weak';
 }

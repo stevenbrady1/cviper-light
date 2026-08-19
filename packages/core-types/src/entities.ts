@@ -20,7 +20,7 @@
  */
 import { z } from 'zod';
 
-import { type CvAnalysis } from './analysis';
+import { CvAnalysisSchema, type CvAnalysis } from './analysis';
 
 /** ISO-8601 UTC instant, e.g. `2026-08-19T09:00:00.000Z`. Never a `Date`. */
 export type IsoTimestamp = string;
@@ -146,8 +146,78 @@ export interface Analysis {
 // this entity have" — the exporter is checked against these shapes by a test,
 // so a column added here can never be silently dropped on the way out.
 
-// PHASE 1a RED: placeholders. The real shapes land in the GREEN commit.
-export const JobSchema = z.object({});
-export const ApplicationSchema = z.object({});
-export const CvSchema = z.object({});
-export const AnalysisSchema = z.object({});
+/**
+ * `z.iso.datetime()` accepts `2026-08-19T09:00:00Z` and `...T09:00:00.000Z`
+ * and REJECTS an offset such as `+01:00`. That is the point: UTC-only is the
+ * stated convention, and quietly accepting a local-time string would give the
+ * cloud app a timestamp it cannot compare against the rest.
+ */
+const isoTimestamp = z.iso.datetime();
+
+/** Strict `YYYY-MM-DD`. Rejects `2026-8-9` and impossible dates like `2026-02-30`. */
+const isoDate = z.iso.date();
+
+export const JobSchema = z.object({
+  id: z.string(),
+  source: z.enum(['adzuna', 'reed', 'manual', 'linkedin', 'indeed']),
+  external_id: z.string().nullable(),
+  title: z.string(),
+  company: z.string(),
+  location: z.string().nullable(),
+  salary_min: z.number().nullable(),
+  salary_max: z.number().nullable(),
+  salary_currency: z.string().nullable(),
+  salary_period: z.enum(['year', 'day', 'hour']).nullable(),
+  description: z.string().nullable(),
+  url: z.string().nullable(),
+  posted_date: isoDate.nullable(),
+  created_at: isoTimestamp,
+});
+
+export const ApplicationSchema = z.object({
+  id: z.string(),
+  job_id: z.string(),
+  status: z.enum(['saved', 'applied', 'interviewing', 'offer', 'rejected']),
+  applied_date: isoDate.nullable(),
+  notes: z.string().nullable(),
+  next_action: z.string().nullable(),
+  next_action_date: isoDate.nullable(),
+  updated_at: isoTimestamp,
+});
+
+export const CvSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  file_path: z.string().nullable(),
+  extracted_text: z.string().nullable(),
+  created_at: isoTimestamp,
+});
+
+export const AnalysisSchema = z.object({
+  id: z.string(),
+  cv_id: z.string(),
+  job_id: z.string().nullable(),
+  provider: z.string(),
+  model: z.string(),
+  match_score: z.number().int().min(0).max(100),
+  result_json: CvAnalysisSchema,
+  created_at: isoTimestamp,
+});
+
+/** Fails to compile if a schema and its hand-written interface drift apart. */
+type AssertAssignable<TActual extends TExpected, TExpected> = TActual;
+
+export type _JobSchemaMatchesType = AssertAssignable<z.infer<typeof JobSchema>, Job>;
+export type _JobTypeMatchesSchema = AssertAssignable<Job, z.infer<typeof JobSchema>>;
+export type _ApplicationSchemaMatchesType = AssertAssignable<
+  z.infer<typeof ApplicationSchema>,
+  Application
+>;
+export type _ApplicationTypeMatchesSchema = AssertAssignable<
+  Application,
+  z.infer<typeof ApplicationSchema>
+>;
+export type _CvSchemaMatchesType = AssertAssignable<z.infer<typeof CvSchema>, Cv>;
+export type _CvTypeMatchesSchema = AssertAssignable<Cv, z.infer<typeof CvSchema>>;
+export type _AnalysisSchemaMatchesType = AssertAssignable<z.infer<typeof AnalysisSchema>, Analysis>;
+export type _AnalysisTypeMatchesSchema = AssertAssignable<Analysis, z.infer<typeof AnalysisSchema>>;
