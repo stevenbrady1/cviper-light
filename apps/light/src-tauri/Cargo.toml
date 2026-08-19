@@ -1,0 +1,38 @@
+[package]
+name = "light"
+version = "0.1.0"
+description = "CViper Light — local-first CV and job-search desktop app"
+authors = ["CViper"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "light_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# `tauri add sql` installs this WITHOUT a database backend feature, which leaves
+# the plugin inert at runtime. The "sqlite" feature is mandatory — do not remove.
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-process = "2"
+# Secret storage. We write our own Tauri commands over this in Phase 1 — there is
+# no official Tauri keyring plugin, and the crates.io lookalike is abandoned.
+# Default features (= "v1") pull in the OS-native stores, incl. windows-native.
+keyring = "4.1.6"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+

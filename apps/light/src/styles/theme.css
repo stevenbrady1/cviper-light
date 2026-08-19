@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+
+/*
+ * CViper Light design tokens.
+ *
+ * Tailwind 4 has no tailwind.config.js — theme customisation happens here, in
+ * CSS, via @theme. Left empty in Phase 0 and populated in a later phase.
+ */
+@theme {
+}
