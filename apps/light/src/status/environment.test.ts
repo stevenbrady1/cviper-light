@@ -12,7 +12,8 @@ const tauri = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 
-const { QUERIED_SECRET_KEYS, readEnvironmentStatus, SECRET_KEYS } = await import('./environment');
+const { QUERIED_SECRET_KEYS, readEnvironmentStatus, readJobKeyStates, SECRET_KEYS } =
+  await import('./environment');
 
 const NOW = new Date(2026, 7, 19, 9, 0, 0);
 
@@ -142,5 +143,40 @@ describe('readEnvironmentStatus — provider keys', () => {
     respond({ keys: { reed_api_key: 'yes' as unknown as boolean } });
 
     await expect(readEnvironmentStatus(NOW)).resolves.toMatchObject({ reed: 'unreadable' });
+  });
+});
+
+describe('readJobKeyStates — what the search screen asks', () => {
+  it('reports both boards, and asks about nothing else', async () => {
+    respond({ keys: { reed_api_key: true, adzuna_app_id: true, adzuna_app_key: true } });
+
+    await expect(readJobKeyStates()).resolves.toEqual({ adzuna: 'configured', reed: 'configured' });
+
+    // No Ollama probe. The search screen does not care whether a language model
+    // is running, and a loopback request per visit for a fact nobody draws is
+    // a request nobody asked for.
+    const commands = tauri.invoke.mock.calls.map((call) => call[0]);
+    expect(commands).toEqual(['secret_status', 'secret_status', 'secret_status']);
+  });
+
+  it('boundary: one Adzuna credential of two is incomplete, not missing', async () => {
+    respond({ keys: { adzuna_app_id: true } });
+
+    await expect(readJobKeyStates()).resolves.toEqual({ adzuna: 'incomplete', reed: 'missing' });
+  });
+
+  it('negative: a store that will not answer is unreadable, never missing', async () => {
+    respond({ keys: { reed_api_key: new Error('locked') } });
+
+    await expect(readJobKeyStates()).resolves.toMatchObject({ reed: 'unreadable' });
+  });
+
+  it('negative: nothing rejects, whatever the credential store does', async () => {
+    tauri.invoke.mockRejectedValue(new Error('IPC is broken'));
+
+    await expect(readJobKeyStates()).resolves.toEqual({
+      adzuna: 'unreadable',
+      reed: 'unreadable',
+    });
   });
 });

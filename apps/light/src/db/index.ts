@@ -26,7 +26,7 @@ export {
   type TableName,
 } from './rows';
 
-export { getJob, listJobs, upsertJob, deleteJob } from './jobs';
+export { findJobByExternalId, getJob, listJobs, upsertJob, deleteJob } from './jobs';
 export {
   getApplication,
   listApplications,

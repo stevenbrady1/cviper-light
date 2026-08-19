@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Analysis, type AnalysisProps } from '../features/analysis/Analysis';
+import { Search, type SearchProps } from '../features/search/Search';
 import { Settings, type SettingsProps } from '../features/settings/Settings';
 import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
 import { readEnvironmentStatus, type EnvironmentStatus } from '../status/environment';
 
-import { PlaceholderView } from './PlaceholderView';
 import { Sidebar } from './Sidebar';
-import { DEFAULT_VIEW, viewById, viewForShortcut, type ViewId } from './views';
+import { DEFAULT_VIEW, viewForShortcut, type ViewId } from './views';
 
 /**
  * The application shell: a fixed navy rail on the left, one view to the right.
@@ -55,6 +55,12 @@ export interface AppProps {
   readonly keyPort?: SettingsProps['keyPort'];
   /** Injected by tests: the real one opens the user's browser. */
   readonly browser?: SettingsProps['browser'];
+  /** Injected by tests, for the same reason as `trackerPort`. */
+  readonly searchPort?: SearchProps['port'];
+  /** Injected by tests so no credential store is read for the provider toggles. */
+  readonly readKeyStates?: SearchProps['readKeyStates'];
+  /** Injected by tests so advert and application ids are deterministic. */
+  readonly newId?: SearchProps['newId'];
   /** Injected by tests so every age, due date and stored timestamp is deterministic. */
   readonly now?: Date | undefined;
 }
@@ -67,6 +73,9 @@ export default function App({
   backupPort,
   keyPort,
   browser,
+  searchPort,
+  readKeyStates,
+  newId,
   now,
 }: AppProps = {}) {
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
@@ -121,6 +130,17 @@ export default function App({
 
       <main className="flex min-h-0 min-w-0 flex-1">
         {renderView(activeView, {
+          search: {
+            port: searchPort,
+            browser,
+            readKeyStates,
+            newId,
+            now,
+            // The search screen cannot navigate: the shell owns which view is
+            // showing, so "no Adzuna key — open Settings" has to come back here
+            // to be acted on.
+            onOpenSettings: () => setActiveView('settings'),
+          },
           tracker: { port: trackerPort, now },
           analysis: { port: analysisPort, filePort, createTransport, now },
           settings: { port: backupPort, filePort, keyPort, browser, now },
@@ -130,11 +150,9 @@ export default function App({
   );
 }
 
-/**
- * Every unbuilt view says so and then points at something that works, rather
- * than showing an empty shell the user cannot distinguish from a broken one.
- */
+/** The props each view needs, gathered in one place the switch below reads. */
 interface ViewProps {
+  readonly search: SearchProps;
   readonly tracker: TrackerProps;
   readonly analysis: AnalysisProps;
   readonly settings: SettingsProps;
@@ -143,12 +161,7 @@ interface ViewProps {
 function renderView(id: ViewId, props: ViewProps) {
   switch (id) {
     case 'search':
-      return (
-        <PlaceholderView
-          view={viewById('search')}
-          insteadTry="Job search arrives in a later phase. Until then you can add an application to the tracker by hand — nothing here needs an API key."
-        />
-      );
+      return <Search {...props.search} />;
     case 'tracker':
       return <Tracker {...props.tracker} />;
     case 'analysis':

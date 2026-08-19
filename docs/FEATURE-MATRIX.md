@@ -6,29 +6,28 @@ column records the truth.
 **Built so far**: the shared data model and export/import format below, the
 local SQLite data-access layer, CV text extraction, the provider adapters and
 their Rust transport, the keyword-only scorer, the app shell, the application
-tracker, and the job-board clients — Adzuna and Reed request building, response
-normalisation, cross-post detection, keyless browser links and the daily request
-budget, with their Rust transport. The Search and Analysis views exist as shells
-that say plainly that they are not built yet — the keyword scorer produces a
-`CvAnalysis` but nothing renders one, and `searchJobs` returns adverts but no
-screen shows them.
+tracker, the CV analysis view, the job-board clients — Adzuna and Reed request
+building, response normalisation, cross-post detection, keyless browser links
+and the daily request budget — the job search view that renders them, and the
+API-key setup wizard in Settings. There are no placeholder views left.
 
 `apps/cloud` is an empty stub directory. There is no cloud code of any kind.
 
-| Feature                      | Light                                   | Cloud (future)                     | State            |
-| ---------------------------- | --------------------------------------- | ---------------------------------- | ---------------- |
-| Job search (Adzuna/Reed)     | Yes — user's own API keys, direct calls | Yes — server-side, shared keys     | Clients built    |
-| Cross-post detection         | Yes — flags duplicates, never merges    | Yes — merges, with a server undo   | Built            |
-| Keyless browser search links | Yes — no key needed, opens in browser   | Not applicable                     | Built            |
-| Application tracker          | Yes — local SQLite                      | Yes — synced                       | Built            |
-| CV parsing                   | Yes — fully local                       | Yes — server-side                  | Extraction built |
-| CV analysis (BYO key)        | Yes — user's own provider key           | Not applicable                     | Not built        |
-| CV analysis (local Ollama)   | Yes — offline, no key, no network       | No                                 | Not built        |
-| Keyword-only analysis        | Yes — no AI, no key, always available   | Yes                                | Scoring built    |
-| Data export/import           | Yes — user-initiated file in/out        | Yes — plus migration to/from Light | Format built     |
-| Accounts                     | No — no login, no identity              | Yes                                | Not built        |
-| Sync                         | No — single device by design            | Yes                                | Not built        |
-| Telemetry                    | No — none, ever                         | Opt-in                             | Not built        |
+| Feature                      | Light                                      | Cloud (future)                     | State            |
+| ---------------------------- | ------------------------------------------ | ---------------------------------- | ---------------- |
+| Job search (Adzuna/Reed)     | Yes — user's own API keys, direct calls    | Yes — server-side, shared keys     | Built            |
+| Cross-post detection         | Yes — flags duplicates, never merges       | Yes — merges, with a server undo   | Built            |
+| Keyless browser search links | Yes — no key needed, opens in browser      | Not applicable                     | Built            |
+| API key setup                | Yes — tested before saved, never read back | Not applicable                     | Built            |
+| Application tracker          | Yes — local SQLite                         | Yes — synced                       | Built            |
+| CV parsing                   | Yes — fully local                          | Yes — server-side                  | Extraction built |
+| CV analysis (BYO key)        | Yes — user's own provider key              | Not applicable                     | Built            |
+| CV analysis (local Ollama)   | Yes — offline, no key, no network          | No                                 | Built            |
+| Keyword-only analysis        | Yes — no AI, no key, always available      | Yes                                | Scoring built    |
+| Data export/import           | Yes — user-initiated file in/out           | Yes — plus migration to/from Light | Format built     |
+| Accounts                     | No — no login, no identity                 | Yes                                | Not built        |
+| Sync                         | No — single device by design               | Yes                                | Not built        |
+| Telemetry                    | No — none, ever                            | Opt-in                             | Not built        |
 
 ## Notes
 
@@ -56,6 +55,14 @@ screen shows them.
   guest endpoint. Light ports only the URL construction. A scraper inside an
   installed binary points LinkedIn's rate limiting at the user's own home IP and
   breaks on LinkedIn's schedule, with no way to patch it that afternoon.
+- **A key is proved before it is stored.** The setup wizard runs a real
+  one-result search with the credentials the user just typed
+  (`job_test_credentials` in `src-tauri/src/jobs.rs`) and writes nothing to the
+  credential store unless the board answers. Saving first and deleting on
+  failure would have already overwritten the working key it was replacing, and a
+  crash mid-rollback would leave the broken one in place with nothing to say so.
+  There is no way to read a saved key back — `secret_get` is Rust-only and
+  unregistered — so a forgotten key is re-pasted, and the wizard says so.
 - **Reed's free tier is 100 requests a day** and reports no remaining balance,
   so the count is kept locally: a warning at 75, and searching pauses at 90 to
   keep ten back for a key test and one urgent search. Adzuna is counted but

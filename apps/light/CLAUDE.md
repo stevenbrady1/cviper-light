@@ -87,6 +87,18 @@ are not made to pay for a browser they do not use.
 ## Status
 
 Built: the data model and export format, the SQLite data-access layer, CV text
-extraction, the provider adapters and their Rust transport, the app shell, and
-the application tracker. Search and Analysis are honest placeholder shells. See
+extraction, the provider adapters and their Rust transport, the app shell, the
+application tracker, the CV analysis view, the job search view and the API-key
+setup wizard. There are no placeholder views left. See
 [../../docs/FEATURE-MATRIX.md](../../docs/FEATURE-MATRIX.md).
+
+## Two rules the search and key screens depend on
+
+- **A key is TESTED before it is saved.** `job_test_credentials` runs a real
+  one-result search with the values the user just typed and writes nothing.
+  Only a green answer leads to `secret_set`. Saving first and rolling back on
+  failure would have already overwritten the working key it was replacing.
+- **A search happens because somebody pressed a button.** No search-as-you-type,
+  no polling, no refetch on focus, nothing on mount. Reed's free tier is 100
+  requests a DAY. The only debounce on the search screen writes the draft to
+  `localStorage` and touches no network.

@@ -246,6 +246,39 @@ describe('jobs', () => {
     expect(isErr(result) && result.error.table).toBe('jobs');
   });
 
+  it('finds an advert by its provider identity, through bound parameters', async () => {
+    const { findJobByExternalId } = await import('./jobs');
+
+    await findJobByExternalId('reed', '55512345');
+
+    // Matches the partial unique index `(source, external_id)`, and binds both
+    // values rather than concatenating them into the statement.
+    expect(reads()[0]?.query).toMatch(/FROM jobs WHERE source = \$1 AND external_id = \$2$/);
+    expect(reads()[0]?.values).toEqual(['reed', '55512345']);
+  });
+
+  it('reports an advert that is not saved as null, not as an error', async () => {
+    sql.select.mockResolvedValue([]);
+
+    const { findJobByExternalId } = await import('./jobs');
+    const result = await findJobByExternalId('reed', '404');
+
+    // "This advert is not in the tracker" is an ANSWER. Reporting it as a
+    // failure would put a red banner over the ordinary case.
+    expect(isOk(result) && result.value).toBeNull();
+  });
+
+  it('negative: refuses a lookup with no external id rather than matching NULLs', async () => {
+    const { findJobByExternalId } = await import('./jobs');
+    const result = await findJobByExternalId('manual', '');
+
+    // Every manually entered job has `external_id IS NULL`, and the partial
+    // index deliberately excludes them. A lookup that matched them would report
+    // one hand-typed job as the duplicate of another.
+    expect(isOk(result) && result.value).toBeNull();
+    expect(reads()).toHaveLength(0);
+  });
+
   it('deletes by id', async () => {
     const { deleteJob } = await import('./jobs');
 

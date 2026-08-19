@@ -111,6 +111,31 @@ export function combineKeyState(answers: readonly (boolean | null)[]): KeyState 
 }
 
 /**
+ * Just the two job boards, for the search screen's provider toggles.
+ *
+ * A strict subset of `readEnvironmentStatus`, and deliberately not a call to
+ * it: that one also probes Ollama, and a loopback request every time the search
+ * screen opens — for a fact this screen does not draw — is a request nobody
+ * asked for.
+ *
+ * The three credential reads run concurrently and independently, and nothing
+ * here rejects. A screen that showed no toggles because one keychain was locked
+ * would be worse than one that shows both and says why one cannot be used.
+ */
+export async function readJobKeyStates(): Promise<Record<'adzuna' | 'reed', KeyState>> {
+  const [adzunaAppId, adzunaAppKey, reedApiKey] = await Promise.all([
+    secretStatus('adzuna_app_id'),
+    secretStatus('adzuna_app_key'),
+    secretStatus('reed_api_key'),
+  ]);
+
+  return {
+    adzuna: combineKeyState([adzunaAppId, adzunaAppKey]),
+    reed: combineKeyState([reedApiKey]),
+  };
+}
+
+/**
  * Read the whole strip in one pass.
  *
  * Every probe runs concurrently and independently: one locked credential must
