@@ -55,6 +55,8 @@ export interface AppProps {
   readonly keyPort?: SettingsProps['keyPort'];
   /** Injected by tests: the real one opens the user's browser. */
   readonly browser?: SettingsProps['browser'];
+  /** Injected by tests: the real one talks to the updater plugin. */
+  readonly updatePort?: SettingsProps['updatePort'];
   /** Injected by tests, for the same reason as `trackerPort`. */
   readonly searchPort?: SearchProps['port'];
   /** Injected by tests so no credential store is read for the provider toggles. */
@@ -73,6 +75,7 @@ export default function App({
   backupPort,
   keyPort,
   browser,
+  updatePort,
   searchPort,
   readKeyStates,
   newId,
@@ -143,7 +146,7 @@ export default function App({
           },
           tracker: { port: trackerPort, now },
           analysis: { port: analysisPort, filePort, createTransport, now },
-          settings: { port: backupPort, filePort, keyPort, browser, now },
+          settings: { port: backupPort, filePort, keyPort, browser, updatePort, now },
         })}
       </main>
     </div>

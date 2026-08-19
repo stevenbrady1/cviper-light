@@ -15,6 +15,8 @@ import { createTauriFilePort, type FilePort } from '../../platform/files';
 
 import { KeySetup } from './keys/KeySetup';
 import { type KeyPort } from './keys/port';
+import { UpdateCheck } from './updates/UpdateCheck';
+import { type UpdatePort } from './updates/port';
 
 import {
   APP_NAME,
@@ -68,6 +70,13 @@ export interface SettingsProps {
   readonly keyPort?: KeyPort | undefined;
   /** Injected by tests: the real one opens the user's browser. */
   readonly browser?: BrowserPort | undefined;
+  /**
+   * Injected by tests: the real one talks to the updater plugin.
+   *
+   * Passed down rather than built inside `UpdateCheck` so `launch.test.tsx` can
+   * mount the whole app and prove nothing checks for an update on its own.
+   */
+  readonly updatePort?: UpdatePort | undefined;
   /** Injected by tests so the suggested filename is deterministic. */
   readonly now?: Date | undefined;
 }
@@ -93,7 +102,14 @@ function countsOf(source: {
   };
 }
 
-export function Settings({ port, filePort, keyPort, browser, now }: SettingsProps = {}) {
+export function Settings({
+  port,
+  filePort,
+  keyPort,
+  browser,
+  updatePort,
+  now,
+}: SettingsProps = {}) {
   const backupPort = useMemo(() => port ?? createDbBackupPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
 
@@ -320,6 +336,8 @@ export function Settings({ port, filePort, keyPort, browser, now }: SettingsProp
           ) : null}
 
           <KeySetup port={keyPort} browser={browser} />
+
+          <UpdateCheck port={updatePort} />
         </div>
       </div>
     </section>
