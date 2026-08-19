@@ -25,6 +25,8 @@ import {
 } from '@cviper/ai-providers';
 import { err, ok, type Result } from '@cviper/core-types';
 
+import { recordRequest } from '../status/requestLog';
+
 /** The command names registered in `generate_handler!`. */
 const CHAT_COMMAND = 'provider_chat';
 const LIST_MODELS_COMMAND = 'provider_list_models';
@@ -118,6 +120,19 @@ async function call(
   command: string,
   args: Record<string, unknown>,
 ): Promise<Result<ProviderHttpResponse, ProviderError>> {
+  // Counted BEFORE the call, and counted whatever the outcome. A 401 or a
+  // timeout still consumed the provider's rate limit, so counting only
+  // successes would under-report the number precisely when the user needs it.
+  //
+  // Wrapped because a diagnostic must never be able to fail a real request:
+  // `recordRequest` already swallows storage failures internally, and this is
+  // the second layer, in case a future counter learns how to throw.
+  try {
+    recordRequest();
+  } catch {
+    // Nothing to do and nothing to tell the user. The request continues.
+  }
+
   try {
     return toHttpResponse(provider, await invoke(command, args));
   } catch (thrown) {
@@ -146,6 +161,11 @@ export function createTauriTransport(): ChatTransport {
  * in providers.rs. Anything that throws here (a missing command, a broken IPC)
  * is also `null`, because a failed probe and an absent daemon lead to exactly
  * the same UI: offer the cloud providers instead.
+ *
+ * Deliberately NOT counted by `recordRequest`. The probe is the app asking a
+ * daemon on loopback whether it is switched on: it costs the user nothing, it
+ * is not something they asked for, and counting it would make "requests today"
+ * climb on its own while the app sat idle.
  */
 export async function probeOllama(): Promise<string | null> {
   try {

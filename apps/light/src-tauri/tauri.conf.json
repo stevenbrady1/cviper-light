@@ -15,8 +15,8 @@
         "title": "CViper Light",
         "width": 1280,
         "height": 800,
-        "minWidth": 900,
-        "minHeight": 600
+        "minWidth": 1000,
+        "minHeight": 700
       }
     ],
     "security": {

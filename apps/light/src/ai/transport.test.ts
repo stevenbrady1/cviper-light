@@ -12,10 +12,15 @@ const tauri = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 
+const requestLog = vi.hoisted(() => ({ recordRequest: vi.fn() }));
+
+vi.mock('../status/requestLog', () => ({ recordRequest: requestLog.recordRequest }));
+
 const { createTauriTransport, probeOllama } = await import('./transport');
 
 beforeEach(() => {
   tauri.invoke.mockReset();
+  requestLog.recordRequest.mockReset();
 });
 
 function envelope(status: number, body: string): string {
@@ -155,6 +160,59 @@ describe('createTauriTransport — failures from Rust', () => {
     });
 
     await expect(createTauriTransport().chat('ollama', '{}')).resolves.toMatchObject({ ok: false });
+  });
+});
+
+describe('createTauriTransport — the request counter', () => {
+  // The status strip's third row is "requests today". This is the only place
+  // in the app that knows a request has left the process, so it is the only
+  // place that can honestly count one.
+  it('counts a chat request', async () => {
+    tauri.invoke.mockResolvedValue(envelope(200, '{}'));
+
+    await createTauriTransport().chat('ollama', '{}');
+
+    expect(requestLog.recordRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts a model listing — it costs the user the same call', async () => {
+    tauri.invoke.mockResolvedValue(envelope(200, '{}'));
+
+    await createTauriTransport().listModels('openai');
+
+    expect(requestLog.recordRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts a request that FAILED — the provider was still called', async () => {
+    // Counting only successes would under-report exactly when the user most
+    // needs the number: a run of 401s still burns rate limit.
+    tauri.invoke.mockRejectedValue(JSON.stringify({ kind: 'no-key', message: 'No key.' }));
+
+    await createTauriTransport().chat('anthropic', '{}');
+
+    expect(requestLog.recordRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT count the Ollama probe', async () => {
+    // The probe is the app asking a local daemon whether it is there. It costs
+    // nothing, it is not something the user asked for, and counting it would
+    // make the number tick up on its own while the app sat idle.
+    tauri.invoke.mockResolvedValue('{"models":[]}');
+
+    await probeOllama();
+
+    expect(requestLog.recordRequest).not.toHaveBeenCalled();
+  });
+
+  it('never lets a broken counter break a request', async () => {
+    requestLog.recordRequest.mockImplementation(() => {
+      throw new Error('storage is full');
+    });
+    tauri.invoke.mockResolvedValue(envelope(200, '{"ok":true}'));
+
+    const result = await createTauriTransport().chat('ollama', '{}');
+
+    expect(result).toMatchObject({ ok: true, value: { status: 200 } });
   });
 });
 

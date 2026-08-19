@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+import App from './app/App';
 import { configurePdfJsAssets } from './parsing/pdfjs-assets';
 // Tailwind + design tokens. Imported first so utility layers precede component CSS.
 import './styles/theme.css';
