@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
 import { readEnvironmentStatus, type EnvironmentStatus } from '../status/environment';
 
 import { PlaceholderView } from './PlaceholderView';
@@ -34,7 +35,17 @@ import { DEFAULT_VIEW, viewById, viewForShortcut, type ViewId } from './views';
  * moving a user somewhere they did not ask to go is worse than doing nothing.
  */
 
-export default function App() {
+export interface AppProps {
+  /**
+   * Injected by tests. The tracker otherwise builds its own SQLite-backed port,
+   * which needs a Tauri runtime that a Vitest process does not have.
+   */
+  readonly trackerPort?: TrackerProps['port'];
+  /** Injected by tests so every age and due date on the board is deterministic. */
+  readonly now?: Date | undefined;
+}
+
+export default function App({ trackerPort, now }: AppProps = {}) {
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
   const [status, setStatus] = useState<EnvironmentStatus | null>(null);
 
@@ -85,7 +96,9 @@ export default function App() {
     <div className="flex h-full min-h-0 bg-canvas text-ink">
       <Sidebar activeView={activeView} onSelect={onSelect} status={status} />
 
-      <main className="flex min-h-0 min-w-0 flex-1">{renderView(activeView)}</main>
+      <main className="flex min-h-0 min-w-0 flex-1">
+        {renderView(activeView, { port: trackerPort, now })}
+      </main>
     </div>
   );
 }
@@ -94,7 +107,7 @@ export default function App() {
  * Every unbuilt view says so and then points at something that works, rather
  * than showing an empty shell the user cannot distinguish from a broken one.
  */
-function renderView(id: ViewId) {
+function renderView(id: ViewId, tracker: TrackerProps) {
   switch (id) {
     case 'search':
       return (
@@ -104,12 +117,7 @@ function renderView(id: ViewId) {
         />
       );
     case 'tracker':
-      return (
-        <PlaceholderView
-          view={viewById('tracker')}
-          insteadTry="The board arrives with the next change in this phase."
-        />
-      );
+      return <Tracker {...tracker} />;
     case 'analysis':
       return (
         <PlaceholderView

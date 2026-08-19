@@ -21,10 +21,20 @@ import { useEffect, type ReactNode } from 'react';
  * ============================================================================
  * ESCAPE CLOSES IT
  * ============================================================================
- * Listened for on `document`, in the bubble phase, and SKIPPED if something
- * nearer the event has already called `preventDefault()`. That is how the
- * delete confirmation can take Escape for itself without the pane vanishing out
- * from underneath it.
+ * Listened for on `document`, and skipped in two cases:
+ *
+ *   * something nearer the event already called `preventDefault()`, and
+ *   * A MODAL DIALOG IS OPEN.
+ *
+ * The second is not belt-and-braces. Both listeners are on `document`, so which
+ * one runs first is decided by REGISTRATION ORDER — and the pane is always
+ * mounted before the dialog inside it, so the pane's handler wins the race and
+ * `preventDefault` arrives too late to stop it. One Escape would then cancel
+ * the delete confirmation AND throw away the selection behind it, which is a
+ * punishment for changing your mind.
+ *
+ * Asking whether a modal is open is order-independent, and it states the actual
+ * rule: while a modal is up, it owns Escape.
  */
 
 interface DetailPaneProps {
@@ -39,10 +49,12 @@ interface DetailPaneProps {
 export function DetailPane({ title, subtitle = null, onClose, children }: DetailPaneProps) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
-      // Something closer to the event — the delete confirmation — has already
-      // decided what Escape means here.
-      if (event.defaultPrevented) return;
       if (event.key !== 'Escape') return;
+      // Something closer to the event has already decided what Escape means.
+      if (event.defaultPrevented) return;
+      // A modal is up, and a modal owns Escape. See the note above for why
+      // `defaultPrevented` alone does not cover this.
+      if (document.querySelector('[role="dialog"][aria-modal="true"]') !== null) return;
 
       event.preventDefault();
       onClose();

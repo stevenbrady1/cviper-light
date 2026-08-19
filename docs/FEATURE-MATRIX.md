@@ -1,24 +1,28 @@
 # Feature Matrix — Light vs Cloud
 
 Where each feature lives. The Light column records the _intent_; the State
-column records the truth. **Phase 1a is the only part built so far**: the shared
-data model and the export/import format below.
+column records the truth.
+
+**Built so far**: the shared data model and export/import format below, the
+local SQLite data-access layer, CV text extraction, the provider adapters and
+their Rust transport, the app shell, and the application tracker. The Search and
+Analysis views exist as shells that say plainly that they are not built yet.
 
 `apps/cloud` is an empty stub directory. There is no cloud code of any kind.
 
-| Feature                      | Light                                   | Cloud (future)                     | State        |
-| ---------------------------- | --------------------------------------- | ---------------------------------- | ------------ |
-| Job search (Adzuna/Reed)     | Yes — user's own API keys, direct calls | Yes — server-side, shared keys     | Not built    |
-| Keyless browser search links | Yes — no key needed, opens in browser   | Not applicable                     | Not built    |
-| Application tracker          | Yes — local SQLite                      | Yes — synced                       | Not built    |
-| CV parsing                   | Yes — fully local                       | Yes — server-side                  | Not built    |
-| CV analysis (BYO key)        | Yes — user's own provider key           | Not applicable                     | Not built    |
-| CV analysis (local Ollama)   | Yes — offline, no key, no network       | No                                 | Not built    |
-| Keyword-only analysis        | Yes — no AI, no key, always available   | Yes                                | Not built    |
-| Data export/import           | Yes — user-initiated file in/out        | Yes — plus migration to/from Light | Format built |
-| Accounts                     | No — no login, no identity              | Yes                                | Not built    |
-| Sync                         | No — single device by design            | Yes                                | Not built    |
-| Telemetry                    | No — none, ever                         | Opt-in                             | Not built    |
+| Feature                      | Light                                   | Cloud (future)                     | State            |
+| ---------------------------- | --------------------------------------- | ---------------------------------- | ---------------- |
+| Job search (Adzuna/Reed)     | Yes — user's own API keys, direct calls | Yes — server-side, shared keys     | Not built        |
+| Keyless browser search links | Yes — no key needed, opens in browser   | Not applicable                     | Not built        |
+| Application tracker          | Yes — local SQLite                      | Yes — synced                       | Built            |
+| CV parsing                   | Yes — fully local                       | Yes — server-side                  | Extraction built |
+| CV analysis (BYO key)        | Yes — user's own provider key           | Not applicable                     | Not built        |
+| CV analysis (local Ollama)   | Yes — offline, no key, no network       | No                                 | Not built        |
+| Keyword-only analysis        | Yes — no AI, no key, always available   | Yes                                | Not built        |
+| Data export/import           | Yes — user-initiated file in/out        | Yes — plus migration to/from Light | Format built     |
+| Accounts                     | No — no login, no identity              | Yes                                | Not built        |
+| Sync                         | No — single device by design            | Yes                                | Not built        |
+| Telemetry                    | No — none, ever                         | Opt-in                             | Not built        |
 
 ## Notes
 

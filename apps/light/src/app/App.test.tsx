@@ -18,6 +18,19 @@ const tauri = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 
 const { default: App } = await import('./App');
+const { createFakeTrackerPort } = await import('../features/tracker/test/fakePort');
+
+/**
+ * A fixed clock and an in-memory tracker port.
+ *
+ * The port matters: without one the tracker builds the real SQLite-backed port,
+ * `Database.load()` finds no Tauri runtime, and the board correctly raises "the
+ * database could not be opened". That is the RIGHT behaviour and it is asserted
+ * in the tracker's own tests — but it is not what these tests are about, and it
+ * would make "no errors on an unconfigured machine" fail for a reason that has
+ * nothing to do with keys.
+ */
+const NOW = new Date(2026, 7, 19, 9, 0, 0);
 
 beforeEach(() => {
   localStorage.clear();
@@ -35,7 +48,7 @@ afterEach(() => {
 
 /** Render and wait for the rail's first status read to land. */
 async function renderApp() {
-  const result = render(<App />);
+  const result = render(<App trackerPort={createFakeTrackerPort()} now={NOW} />);
   await screen.findByTestId('status-strip');
   // The status read is three IPC promises; let them settle so no assertion
   // races the first paint.

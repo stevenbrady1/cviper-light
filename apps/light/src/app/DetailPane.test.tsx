@@ -85,6 +85,61 @@ describe('DetailPane', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it('negative: stands down while a modal dialog is open', () => {
+    // REGRESSION. Both listeners live on `document`, so registration order
+    // decides which runs first — and the pane always mounts before a dialog
+    // inside it, so `preventDefault` from the dialog arrives too late. One
+    // Escape then cancelled the dialog AND threw away the selection behind it.
+    const onClose = vi.fn();
+    render(
+      <DetailPane title="Quant Developer" onClose={onClose}>
+        <div role="dialog" aria-modal="true">
+          Really delete?
+        </div>
+      </DetailPane>,
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('takes Escape back once the dialog has gone', () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <DetailPane title="Quant Developer" onClose={onClose}>
+        <div role="dialog" aria-modal="true">
+          Really delete?
+        </div>
+      </DetailPane>,
+    );
+
+    rerender(
+      <DetailPane title="Quant Developer" onClose={onClose}>
+        <p>Body</p>
+      </DetailPane>,
+    );
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('negative: a non-modal dialog does not claim Escape', () => {
+    // `aria-modal="true"` is the whole condition. A popover or a non-modal
+    // dialog does not stop the rest of the app working, so it must not steal
+    // the key either.
+    const onClose = vi.fn();
+    render(
+      <DetailPane title="Quant Developer" onClose={onClose}>
+        <div role="dialog">A hint</div>
+      </DetailPane>,
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('negative: ignores every other key', () => {
     const onClose = vi.fn();
     render(

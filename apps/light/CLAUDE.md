@@ -55,7 +55,31 @@ From the repo root — all four must pass:
 pnpm tsc && pnpm lint && pnpm test && pnpm cargo:check
 ```
 
+## Design tokens are the only place a value is written down
+
+`src/styles/theme.css` holds one `@theme` block: every colour, radius,
+elevation and font. Components use SEMANTIC utilities only — `bg-navy`,
+`text-ink-muted`, `rounded-card`, `shadow-raised` — never a hex literal, never
+an arbitrary `rounded-[...]`/`shadow-[...]`, and never Tailwind's numeric colour
+scales. `src/styles/tokens.contract.test.ts` reads every `.tsx` file and fails
+the build on all four.
+
+There are exactly three radii and two elevations. Adding a fourth or a third is
+a design decision, not a styling tweak.
+
+Fonts are self-hosted in `public/fonts/` (Inter + IBM Plex Mono, SIL OFL,
+licences shipped alongside). Never link a font CDN: this app promises nothing
+leaves the user's machine.
+
+## Testing components
+
+Vitest runs in the `node` environment by default. Component tests opt into jsdom
+with `// @vitest-environment jsdom` as the first line of the file, so pure tests
+are not made to pay for a browser they do not use.
+
 ## Status
 
-Phase 0: this is the unmodified scaffold screen plus wiring. No CViper features
-are implemented. See [../../docs/FEATURE-MATRIX.md](../../docs/FEATURE-MATRIX.md).
+Built: the data model and export format, the SQLite data-access layer, CV text
+extraction, the provider adapters and their Rust transport, the app shell, and
+the application tracker. Search and Analysis are honest placeholder shells. See
+[../../docs/FEATURE-MATRIX.md](../../docs/FEATURE-MATRIX.md).
