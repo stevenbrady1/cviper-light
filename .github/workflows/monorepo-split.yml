@@ -1,0 +1,82 @@
+name: Monorepo split
+
+# ============================================================================
+# PUBLISHING ONE PACKAGE OUT OF THE MONOREPO, AS ITS OWN READ-ONLY REPOSITORY.
+# ============================================================================
+# The packages under `packages/` are consumed here from source and have no build
+# step. If any of them is ever published for use outside this repository, it
+# needs its own repository with its own history — this is that mechanism.
+#
+# It is a ONE-WAY mirror. The split repositories are read-only; every change is
+# made here and pushed outward. A commit made directly in a split repository is
+# lost on the next run.
+#
+# ORG AND REPOSITORY NAMES BELOW ARE PLACEHOLDERS. Nothing is published until a
+# human replaces them and adds the token.
+on:
+  push:
+    branches:
+      - main
+  # Tags come through too, so a released package version exists as a tag in the
+  # split repository as well. Without this the split has commits but nothing
+  # a consumer can pin to.
+  create:
+
+permissions:
+  contents: read
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - local: packages/core-types
+            repository: cviper-core-types
+          - local: packages/keyword-scoring
+            repository: cviper-keyword-scoring
+          - local: packages/job-apis
+            repository: cviper-job-apis
+
+    steps:
+      # `fetch-depth: 0` is mandatory, not an optimisation. The split action
+      # rewrites history for one subdirectory, and a shallow clone gives it one
+      # commit to rewrite — the split repository then arrives with no history at
+      # all, which is silent and permanent.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: danharrin/monorepo-split-github-action@v2.3.0
+        env:
+          # A personal access token with push rights to the split repository.
+          # Named here and set in the repository secrets; never a value in a
+          # file. `GITHUB_TOKEN` cannot be used — it has no rights outside this
+          # repository.
+          GITHUB_TOKEN: ${{ secrets.MONOREPO_SPLIT_TOKEN }}
+        with:
+          package_directory: ${{ matrix.package.local }}
+          repository_organization: PLACEHOLDER-ORG
+          repository_name: ${{ matrix.package.repository }}
+          user_name: 'cviper-bot'
+          user_email: 'bot@example.invalid'
+          branch: main
+
+      # The same action, run with `tag` set, on a tag push. Two steps rather
+      # than one conditional set of inputs, because passing an empty `tag`
+      # makes the action tag the split commit with an empty string.
+      - if: "startsWith(github.ref, 'refs/tags/')"
+        uses: danharrin/monorepo-split-github-action@v2.3.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.MONOREPO_SPLIT_TOKEN }}
+        with:
+          tag: ${{ github.ref_name }}
+          package_directory: ${{ matrix.package.local }}
+          repository_organization: PLACEHOLDER-ORG
+          repository_name: ${{ matrix.package.repository }}
+          user_name: 'cviper-bot'
+          user_email: 'bot@example.invalid'
+          branch: main

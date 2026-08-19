@@ -1,0 +1,94 @@
+name: CI
+
+# Every push and every pull request. There is no path filter: a change-detection
+# rule that skips the frontend job on a "backend-only" commit is how latent
+# failures end up sitting on a green main.
+on:
+  push:
+  pull_request:
+
+# Least privilege, and `contents: read` is named explicitly. A job with a
+# `permissions:` block that omits it cannot check the repository out.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Corepack asks, interactively, before downloading a package manager it has
+  # not seen. On a runner that prompt is an eleven-minute hang ending in a
+  # timeout with no useful log.
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+jobs:
+  verify:
+    # ==========================================================================
+    # WINDOWS, NOT UBUNTU. THIS IS THE WHOLE POINT OF THE JOB.
+    # ==========================================================================
+    # The app ships as a Windows desktop binary. Ubuntu is faster and cheaper
+    # and hides exactly the three things that break this codebase: path
+    # separators (`relative()` returns backslashes, which several guards
+    # normalise), line endings, and the MSVC toolchain the Tauri side is
+    # actually compiled with.
+    #
+    # A green Linux build of a Windows app is a green build of something else.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Before setup-node, because `cache: pnpm` needs a pnpm binary to ask
+      # where the store lives.
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Keyed on the Cargo.lock under src-tauri. Without it every run rebuilds
+      # the whole Tauri dependency tree, which is the difference between a
+      # three-minute check and a twenty-minute one.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/light/src-tauri
+
+      # ------------------------------------------------------------------
+      # The five checks, individually rather than through `pnpm verify`, so a
+      # failure names itself in the job summary instead of being reported as
+      # "verify failed".
+      # ------------------------------------------------------------------
+      - name: Typecheck
+        run: pnpm tsc
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Cargo check
+        run: pnpm cargo:check
+
+      # `cargo check` does not compile `#[cfg(test)]` code, so without this line
+      # every Rust test in the repository is a guard that looks green because
+      # nothing ever asked it a question.
+      - name: Cargo test
+        run: pnpm cargo:test
+
+      # The Vite build only. NEVER `tauri build` — a release bundle is a signed
+      # artefact produced by release.yml, and running it here would fail on the
+      # placeholder signing key while burning ten minutes to say so.
+      - name: Build the frontend
+        run: pnpm --filter @cviper/light build
+
+      - name: Check formatting
+        run: pnpm format:check

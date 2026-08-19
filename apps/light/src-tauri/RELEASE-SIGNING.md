@@ -37,12 +37,12 @@ release, so the endpoint is never edited again.
 
 ## What the placeholder does today
 
-| Operation                          | With the placeholder in place                                             |
-| ---------------------------------- | ------------------------------------------------------------------------- |
-| `cargo check`, `cargo test`        | Pass. The pubkey is an opaque string to the build.                        |
-| `pnpm tauri dev`                   | Runs. The plugin registers; nothing parses the key until a check is made. |
-| **Check for updates** in Settings  | Returns an error, which Settings shows. Correct for an unsigned build.    |
-| `tauri build` with updater artifacts | Fails outright. Also correct — an unsigned update is not shippable.      |
+| Operation                            | With the placeholder in place                                             |
+| ------------------------------------ | ------------------------------------------------------------------------- |
+| `cargo check`, `cargo test`          | Pass. The pubkey is an opaque string to the build.                        |
+| `pnpm tauri dev`                     | Runs. The plugin registers; nothing parses the key until a check is made. |
+| **Check for updates** in Settings    | Returns an error, which Settings shows. Correct for an unsigned build.    |
+| `tauri build` with updater artifacts | Fails outright. Also correct — an unsigned update is not shippable.       |
 
 ## Why `installMode` is `passive`
 
