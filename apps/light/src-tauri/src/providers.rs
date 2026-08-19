@@ -172,7 +172,7 @@ fn transport_error(kind: &'static str, message: String) -> String {
 /// A hand-rolled enum rather than `reqwest::Error` so the message table below
 /// is a pure function that can be tested exhaustively WITHOUT a network.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RequestFailure {
+pub(crate) enum RequestFailure {
     Timeout,
     Connect,
     Body,
@@ -230,7 +230,7 @@ fn failure_kind(provider: ProviderId, failure: RequestFailure) -> &'static str {
 ///
 /// Only the predicates are consulted. The error value itself is dropped at the
 /// end of this function and never formatted.
-fn classify(error: &reqwest::Error) -> RequestFailure {
+pub(crate) fn classify(error: &reqwest::Error) -> RequestFailure {
     if error.is_timeout() {
         RequestFailure::Timeout
     } else if error.is_connect() {
@@ -248,7 +248,7 @@ fn classify(error: &reqwest::Error) -> RequestFailure {
 ///
 /// Per-request timeouts rather than a client-wide one, because the probe wants
 /// 500ms and a chat wants 180 seconds from the same connection pool.
-fn client() -> Result<&'static reqwest::Client, String> {
+pub(crate) fn client() -> Result<&'static reqwest::Client, String> {
     static CLIENT: OnceLock<Option<reqwest::Client>> = OnceLock::new();
 
     // `build()` can fail if no rustls crypto provider is installed — see the

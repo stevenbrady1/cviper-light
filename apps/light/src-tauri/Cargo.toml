@@ -46,7 +46,17 @@ keyring = "4.1.6"
 # `client()` reports that as a clean error rather than panicking, but the fix is
 # to add `rustls = { version = "0.23", features = ["ring"] }` as a direct
 # dependency here.
-reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+#
+# The "query" feature is what `RequestBuilder::query()` lives behind in reqwest
+# 0.13, and it is required rather than convenient: the job-board transport
+# (src/jobs.rs) puts user-typed keywords into a query string, and hand-rolling
+# percent-encoding is exactly the kind of code that lets an `&` in a job title
+# start a parameter of its own. The feature pulls in `serde_urlencoded` and
+# `serde`, both of which are already in the tree.
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls-no-provider",
+  "query",
+] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"

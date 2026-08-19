@@ -5,17 +5,21 @@ column records the truth.
 
 **Built so far**: the shared data model and export/import format below, the
 local SQLite data-access layer, CV text extraction, the provider adapters and
-their Rust transport, the keyword-only scorer, the app shell, and the
-application tracker. The Search and Analysis views exist as shells that say
-plainly that they are not built yet — the keyword scorer produces a
-`CvAnalysis` but nothing renders one.
+their Rust transport, the keyword-only scorer, the app shell, the application
+tracker, and the job-board clients — Adzuna and Reed request building, response
+normalisation, cross-post detection, keyless browser links and the daily request
+budget, with their Rust transport. The Search and Analysis views exist as shells
+that say plainly that they are not built yet — the keyword scorer produces a
+`CvAnalysis` but nothing renders one, and `searchJobs` returns adverts but no
+screen shows them.
 
 `apps/cloud` is an empty stub directory. There is no cloud code of any kind.
 
 | Feature                      | Light                                   | Cloud (future)                     | State            |
 | ---------------------------- | --------------------------------------- | ---------------------------------- | ---------------- |
-| Job search (Adzuna/Reed)     | Yes — user's own API keys, direct calls | Yes — server-side, shared keys     | Not built        |
-| Keyless browser search links | Yes — no key needed, opens in browser   | Not applicable                     | Not built        |
+| Job search (Adzuna/Reed)     | Yes — user's own API keys, direct calls | Yes — server-side, shared keys     | Clients built    |
+| Cross-post detection         | Yes — flags duplicates, never merges    | Yes — merges, with a server undo   | Built            |
+| Keyless browser search links | Yes — no key needed, opens in browser   | Not applicable                     | Built            |
 | Application tracker          | Yes — local SQLite                      | Yes — synced                       | Built            |
 | CV parsing                   | Yes — fully local                       | Yes — server-side                  | Extraction built |
 | CV analysis (BYO key)        | Yes — user's own provider key           | Not applicable                     | Not built        |
@@ -42,6 +46,21 @@ plainly that they are not built yet — the keyword scorer produces a
   from a desktop binary they cannot inspect or patch. The omission is asserted
   by a test in `packages/job-apis/src/normalise.test.ts` so it cannot creep back
   in as a "missing feature".
+- **Duplicate adverts are flagged, never merged.** The web application
+  auto-merges two postings whose descriptions fingerprint within three bits.
+  Light shows them as a group and keeps every advert and every apply link. The
+  web app can afford a wrong merge because a support engineer can undo it
+  server-side; a local SQLite file on one machine has no undo, and a wrong merge
+  deletes a real job with no error and nothing for the user to notice.
+- **No LinkedIn scraper.** The web application parses LinkedIn's unauthenticated
+  guest endpoint. Light ports only the URL construction. A scraper inside an
+  installed binary points LinkedIn's rate limiting at the user's own home IP and
+  breaks on LinkedIn's schedule, with no way to patch it that afternoon.
+- **Reed's free tier is 100 requests a day** and reports no remaining balance,
+  so the count is kept locally: a warning at 75, and searching pauses at 90 to
+  keep ten back for a key test and one urgent search. Adzuna is counted but
+  never blocked — its allowance depends on the plan the user bought and cannot
+  be queried, so any threshold would be invented.
 
 ## Export format v1 — additive only, forever
 

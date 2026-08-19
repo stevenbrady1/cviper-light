@@ -1,5 +1,6 @@
 mod db;
 mod files;
+mod jobs;
 mod providers;
 mod secrets;
 
@@ -51,6 +52,11 @@ pub fn run() {
             providers::provider_chat,
             providers::provider_list_models,
             providers::ollama_probe,
+            // The job-board transport. Same shape: Rust owns both base URLs,
+            // reads Adzuna's two keys and Reed's one from the keyring, and
+            // enforces the minimum gap between submits — a disabled button
+            // cannot, and Reed's free tier is 100 requests a day.
+            jobs::job_search,
             // Reading a CV the user picked, and reading or writing a backup.
             // Each one opens the dialog ITSELF and touches only what came back
             // out of it: there is no command here that takes a path, so there

@@ -865,9 +865,10 @@ mod tests {
     /// A command can live in any of them, so the guard reads all of them.
     /// `the_scanned_sources_are_every_module_in_the_crate` stops this list
     /// going stale the moment somebody adds a module.
-    const CRATE_SOURCES: [(&str, &str); 5] = [
+    const CRATE_SOURCES: [(&str, &str); 6] = [
         ("db", include_str!("db.rs")),
         ("files", include_str!("files.rs")),
+        ("jobs", include_str!("jobs.rs")),
         ("providers", include_str!("providers.rs")),
         ("secrets", include_str!("secrets.rs")),
         ("lib", include_str!("lib.rs")),
