@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Analysis, type AnalysisProps } from '../features/analysis/Analysis';
+import { Settings, type SettingsProps } from '../features/settings/Settings';
 import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
 import { readEnvironmentStatus, type EnvironmentStatus } from '../status/environment';
 
@@ -48,6 +49,8 @@ export interface AppProps {
   readonly filePort?: AnalysisProps['filePort'];
   /** Injected by tests so a fake provider can answer without a socket. */
   readonly createTransport?: AnalysisProps['createTransport'];
+  /** Injected by tests, for the same reason as `trackerPort`. */
+  readonly backupPort?: SettingsProps['port'];
   /** Injected by tests so every age, due date and stored timestamp is deterministic. */
   readonly now?: Date | undefined;
 }
@@ -57,6 +60,7 @@ export default function App({
   analysisPort,
   filePort,
   createTransport,
+  backupPort,
   now,
 }: AppProps = {}) {
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
@@ -113,6 +117,7 @@ export default function App({
         {renderView(activeView, {
           tracker: { port: trackerPort, now },
           analysis: { port: analysisPort, filePort, createTransport, now },
+          settings: { port: backupPort, filePort, now },
         })}
       </main>
     </div>
@@ -126,6 +131,7 @@ export default function App({
 interface ViewProps {
   readonly tracker: TrackerProps;
   readonly analysis: AnalysisProps;
+  readonly settings: SettingsProps;
 }
 
 function renderView(id: ViewId, props: ViewProps) {
@@ -142,11 +148,6 @@ function renderView(id: ViewId, props: ViewProps) {
     case 'analysis':
       return <Analysis {...props.analysis} />;
     case 'settings':
-      return (
-        <PlaceholderView
-          view={viewById('settings')}
-          insteadTry="Key entry arrives with the search view. Export and import land next; the rail already shows what is saved on this machine."
-        />
-      );
+      return <Settings {...props.settings} />;
   }
 }

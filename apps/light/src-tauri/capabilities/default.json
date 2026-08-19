@@ -16,6 +16,8 @@
     "dialog:default",
     "dialog:allow-ask",
     "dialog:allow-confirm",
+    "dialog:allow-open",
+    "dialog:allow-save",
 
     "process:default",
 
