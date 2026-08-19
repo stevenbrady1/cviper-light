@@ -158,7 +158,11 @@ importers:
         specifier: ^0.8.3
         version: 0.8.3
 
-  packages/job-apis: {}
+  packages/job-apis:
+    dependencies:
+      '@cviper/core-types':
+        specifier: workspace:*
+        version: link:../core-types
 
   packages/keyword-scoring:
     dependencies:

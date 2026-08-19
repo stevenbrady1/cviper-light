@@ -1,0 +1,72 @@
+{
+  "__comment__": "Recorded from GET https://api.adzuna.com/v1/api/jobs/gb/search/1 and trimmed to three results. Ids, employer names, coordinates and redirect tokens are SCRUBBED — no real advert, employer or affiliate token appears here. The first result is deliberately the same underlying role as the first result in reed-search.json, reworded the way an agency reposts it, so the cross-post fingerprint tests run against realistic text rather than a string built to pass.",
+  "count": 1284,
+  "mean": 71250.5,
+  "__CLASS__": "Adzuna::API::Response::JobSearchResults",
+  "results": [
+    {
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "id": "1000000001",
+      "created": "2026-08-14T09:12:33Z",
+      "title": "Credit Risk Analyst",
+      "description": "Our client, a leading investment bank in the City of London, is looking for a Credit Risk Analyst to join its wholesale credit team. You will review counterparty exposures across the trading book, prepare annual credit reviews for corporate and financial institution clients, and work closely with the front office on new transaction approvals. Strong SQL and Python skills are expected, along with a good understanding of Basel III capital requirements and IFRS 9 provisioning. Candidates should hold a relevant degree and ideally be studying towards a professional qualification.",
+      "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/1000000001?se=SCRUBBED&utm_medium=api",
+      "salary_min": 65000,
+      "salary_max": 85000,
+      "salary_is_predicted": "0",
+      "company": {
+        "__CLASS__": "Adzuna::API::Response::Company",
+        "display_name": "Example Bank plc"
+      },
+      "location": {
+        "__CLASS__": "Adzuna::API::Response::Location",
+        "display_name": "City of London, London",
+        "area": ["UK", "London", "City of London"]
+      },
+      "category": {
+        "__CLASS__": "Adzuna::API::Response::Category",
+        "label": "Accounting & Finance Jobs",
+        "tag": "accounting-finance-jobs"
+      },
+      "contract_type": "permanent",
+      "contract_time": "full_time",
+      "latitude": 51.5142,
+      "longitude": -0.0931
+    },
+    {
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "id": "1000000002",
+      "created": "2026-08-11T14:45:00Z",
+      "title": "Regulatory Reporting Manager",
+      "description": "A global asset manager seeks a Regulatory Reporting Manager to own COREP and FINREP submissions. Experience with the PRA reporting framework is essential. &amp; strong Excel skills required.",
+      "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/1000000002?se=SCRUBBED&utm_medium=api",
+      "salary_min": 90000,
+      "salary_max": null,
+      "salary_is_predicted": "1",
+      "company": {
+        "__CLASS__": "Adzuna::API::Response::Company",
+        "display_name": "Example Asset Management"
+      },
+      "location": {
+        "__CLASS__": "Adzuna::API::Response::Location",
+        "display_name": "London",
+        "area": ["UK", "London"]
+      },
+      "contract_type": "contract",
+      "contract_time": "full_time",
+      "latitude": 51.5074,
+      "longitude": -0.1278
+    },
+    {
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "id": "1000000003",
+      "created": "2026-08-09T08:00:00Z",
+      "title": "  Junior Operations Analyst  ",
+      "description": "Support the settlements desk of a mid-sized brokerage. Full training given.",
+      "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/1000000003?se=SCRUBBED&utm_medium=api",
+      "salary_is_predicted": "0",
+      "location": { "__CLASS__": "Adzuna::API::Response::Location", "area": ["UK", "London"] },
+      "contract_time": "part_time"
+    }
+  ]
+}

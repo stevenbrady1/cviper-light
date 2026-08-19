@@ -1,0 +1,58 @@
+{
+  "__comment__": "Recorded from GET https://www.reed.co.uk/api/1.0/search and trimmed to three results. Job ids, employer ids and employer names are SCRUBBED. Result 1 is the same underlying role as adzuna-search.json result 1, posted by an agency with the wording lightly changed. Result 2 is a genuine day-rate contract whose figures are indistinguishable from an insulting annual salary — it is the regression fixture for the ported bug. Reed returns `date` as dd/MM/yyyy and `jobDescription` as entity-escaped HTML; both are reproduced exactly as the API sends them.",
+  "results": [
+    {
+      "jobId": 55000001,
+      "employerId": 900001,
+      "employerName": "Example Recruitment Ltd",
+      "employerProfileId": null,
+      "employerProfileName": null,
+      "jobTitle": "Credit Risk Analyst",
+      "locationName": "London",
+      "minimumSalary": 65000.0,
+      "maximumSalary": 85000.0,
+      "currency": "GBP",
+      "expirationDate": "13/09/2026",
+      "date": "14/08/2026",
+      "jobDescription": "&lt;p&gt;Our client, a leading investment bank in the City of London, is seeking a Credit Risk Analyst to join their wholesale credit team. You will review counterparty exposures across the trading book, prepare annual credit reviews for corporate and financial institution clients, and work closely with the front office on new transaction approvals. Strong SQL and Python skills are expected, together with a good understanding of Basel III capital requirements and IFRS 9 provisioning. Candidates should hold a relevant degree and ideally be studying towards a professional qualification.&lt;/p&gt;",
+      "applications": 12,
+      "jobUrl": "https://www.reed.co.uk/jobs/credit-risk-analyst/55000001"
+    },
+    {
+      "jobId": 55000002,
+      "employerId": 900002,
+      "employerName": "Example Technology Partners",
+      "employerProfileId": null,
+      "employerProfileName": null,
+      "jobTitle": "Java Developer",
+      "locationName": "City of London",
+      "minimumSalary": 457.0,
+      "maximumSalary": 550.0,
+      "currency": "GBP",
+      "expirationDate": "10/09/2026",
+      "date": "11/08/2026",
+      "jobDescription": "&lt;p&gt;Java Developer required for an initial six month engagement with a tier one bank. Outside IR35. The role is hybrid with two days per week on site near Bank station.&lt;/p&gt;",
+      "applications": 4,
+      "jobUrl": "https://www.reed.co.uk/jobs/java-developer/55000002"
+    },
+    {
+      "jobId": 55000003,
+      "employerId": 900003,
+      "employerName": "Example Financial Services",
+      "employerProfileId": null,
+      "employerProfileName": null,
+      "jobTitle": "Compliance Officer",
+      "locationName": "London",
+      "minimumSalary": null,
+      "maximumSalary": null,
+      "currency": "GBP",
+      "expirationDate": "01/10/2026",
+      "date": "2026-08-05T00:00:00",
+      "jobDescription": "Compliance Officer wanted. This is a permanent contract with an established wealth manager. Salary is competitive and &lt;100k but &gt;60k depending on experience.",
+      "applications": 0,
+      "jobUrl": "https://www.reed.co.uk/jobs/compliance-officer/55000003"
+    }
+  ],
+  "ambiguousLocations": [],
+  "totalResults": 87
+}

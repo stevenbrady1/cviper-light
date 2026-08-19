@@ -34,6 +34,14 @@ plainly that they are not built yet — the keyword scorer produces a
   keyless path, so the app is useful before the user configures anything.
 - **"No" in the Light column is a product decision, not a gap** — accounts,
   sync, and telemetry are deliberately absent.
+- **Outbound apply links carry no tracking.** The CViper web application appends
+  `utm_source` / `utm_medium` / `utm_campaign` to every job URL it hands out
+  (`_tag_affiliate_url` in `backend/job_sites_api.py`). Light deliberately does
+  not port that. The product promise is that nothing leaves the user's machine,
+  and a tagged link announces them to a third party the moment they click it —
+  from a desktop binary they cannot inspect or patch. The omission is asserted
+  by a test in `packages/job-apis/src/normalise.test.ts` so it cannot creep back
+  in as a "missing feature".
 
 ## Export format v1 — additive only, forever
 
