@@ -14,6 +14,7 @@ import { type BrowserPort } from '../../platform/browser';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
 
 import { KeySetup } from './keys/KeySetup';
+import { TELEMETRY_ENABLED, TELEMETRY_NOTE } from './telemetry';
 import { type KeyPort } from './keys/port';
 import { UpdateCheck } from './updates/UpdateCheck';
 import { type UpdatePort } from './updates/port';
@@ -338,6 +339,39 @@ export function Settings({
           <KeySetup port={keyPort} browser={browser} />
 
           <UpdateCheck port={updatePort} />
+
+          {/*
+            ============================================================
+            A SWITCH THAT IS OFF, VISIBLE, AND CANNOT BE TURNED ON.
+            ============================================================
+            Saying nothing about telemetry is what an app WITH telemetry
+            also does. This says the opposite, in the place a suspicious
+            person looks first, and `telemetry.contract.test.ts` makes the
+            claim checkable rather than merely written down.
+          */}
+          <section>
+            <h2 className="font-medium text-ink">Privacy</h2>
+
+            <label className="mt-2 flex items-start gap-2">
+              <input
+                type="checkbox"
+                data-testid="settings-telemetry"
+                checked={TELEMETRY_ENABLED}
+                disabled
+                readOnly
+                className="mt-1"
+              />
+              <span data-testid="settings-telemetry-note" className="text-ink-muted">
+                {TELEMETRY_NOTE}
+              </span>
+            </label>
+
+            <p className="mt-1 text-xs text-ink-faint">
+              There is no analytics library in this application, no crash reporter and no account.
+              The only requests it ever makes are the ones you start: a job search, a CV check
+              against a provider you chose, and an update check you press.
+            </p>
+          </section>
         </div>
       </div>
     </section>
