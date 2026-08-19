@@ -1,4 +1,5 @@
 mod db;
+mod providers;
 mod secrets;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -43,6 +44,12 @@ pub fn run() {
             secrets::secret_set,
             secrets::secret_delete,
             secrets::secret_status,
+            // The provider transport. Rust owns every base URL and injects the
+            // API key from the keyring, so a compromised frontend can still
+            // only reach the three APIs named in providers.rs.
+            providers::provider_chat,
+            providers::provider_list_models,
+            providers::ollama_probe,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

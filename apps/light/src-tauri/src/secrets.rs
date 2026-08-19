@@ -111,7 +111,7 @@ impl SecretKey {
 /// crate update can add a variant, and the safe default for an unknown error is
 /// to say nothing about it.
 /// ============================================================================
-fn describe(error: &KeyErr) -> String {
+pub(crate) fn describe(error: &KeyErr) -> String {
     match error {
         KeyErr::NoEntry => "No key is saved for this service.",
         KeyErr::NoDefaultStore => {
@@ -223,7 +223,6 @@ pub(crate) fn secret_status(key: SecretKey) -> Result<bool, String> {
 /// Unused until the provider clients land in a later phase. It is written now so
 /// the whole secret surface — what goes in, what comes out, and what JavaScript
 /// can reach — can be reviewed as one piece.
-#[allow(dead_code)]
 pub(crate) fn secret_get(key: SecretKey) -> Result<String, KeyErr> {
     entry(key).and_then(|entry| entry.get_password())
 }
@@ -306,7 +305,10 @@ mod tests {
     #[test]
     fn an_empty_value_is_refused() {
         for blank in ["", "   ", "\t\n"] {
-            assert!(validate_secret(blank).is_err(), "{blank:?} should be refused");
+            assert!(
+                validate_secret(blank).is_err(),
+                "{blank:?} should be refused"
+            );
         }
     }
 

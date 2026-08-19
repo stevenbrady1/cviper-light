@@ -2426,6 +2426,7 @@ name = "light"
 version = "0.1.0"
 dependencies = [
  "keyring",
+ "reqwest",
  "serde",
  "serde_json",
  "tauri",

@@ -32,6 +32,21 @@ tauri-plugin-process = "2"
 # no official Tauri keyring plugin, and the crates.io lookalike is abandoned.
 # Default features (= "v1") pull in the OS-native stores, incl. windows-native.
 keyring = "4.1.6"
+# HTTP for the provider transport commands (src/providers.rs). Already in the
+# tree via tauri-plugin-updater; named here because we call it directly.
+#
+# `default-features = false` avoids pulling reqwest's `default-tls`, which would
+# add the aws-lc-rs crypto backend (a cmake/nasm build) on top of the rustls
+# stack the updater already brings. `rustls-no-provider` is the same feature the
+# updater selects, so the two unify to one TLS stack rather than two.
+#
+# NOTE: `rustls-no-provider` deliberately selects NO crypto provider. The
+# process-default one currently comes from tauri-plugin-updater enabling
+# `rustls/ring`. If the updater is ever removed, HTTPS here loses its provider —
+# `client()` reports that as a clean error rather than panicking, but the fix is
+# to add `rustls = { version = "0.23", features = ["ring"] }` as a direct
+# dependency here.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
