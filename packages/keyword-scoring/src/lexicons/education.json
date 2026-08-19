@@ -1,0 +1,92 @@
+{
+  "_comment": "CV-705e Phase 4 — Education / teaching lexicon. 'safeguarding' lives in healthcare.json (not redefined here).",
+  "related_terms": {
+    "teaching": [
+      "teacher",
+      "classroom teaching",
+      "qts",
+      "pgce",
+      "lesson delivery"
+    ],
+    "lesson planning": [
+      "curriculum planning",
+      "schemes of work",
+      "lesson preparation"
+    ],
+    "curriculum development": [
+      "curriculum design",
+      "syllabus design"
+    ],
+    "classroom management": [
+      "behaviour management",
+      "classroom behaviour"
+    ],
+    "assessment": [
+      "marking",
+      "grading",
+      "student assessment",
+      "formative assessment"
+    ],
+    "special educational needs": [
+      "sen",
+      "senco",
+      "send",
+      "learning support"
+    ],
+    "tutoring": [
+      "tutor",
+      "private tuition",
+      "one to one tuition"
+    ],
+    "lecturing": [
+      "lecturer",
+      "higher education teaching",
+      "seminars"
+    ],
+    "e-learning": [
+      "online learning",
+      "virtual learning environment",
+      "vle",
+      "edtech"
+    ]
+  },
+  "skill_title_map": [
+    [
+      [
+        "teaching",
+        "lesson planning",
+        "classroom management"
+      ],
+      "Teacher"
+    ],
+    [
+      [
+        "special educational needs",
+        "learning support"
+      ],
+      "SEN Teaching Assistant"
+    ],
+    [
+      [
+        "lecturing",
+        "curriculum development"
+      ],
+      "Lecturer"
+    ],
+    [
+      [
+        "tutoring",
+        "teaching"
+      ],
+      "Tutor"
+    ]
+  ],
+  "skill_weights": {},
+  "common_skills": [
+    "lesson planning",
+    "curriculum development",
+    "classroom management",
+    "special educational needs",
+    "safeguarding"
+  ]
+}

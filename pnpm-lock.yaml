@@ -157,6 +157,12 @@ importers:
 
   packages/job-apis: {}
 
+  packages/keyword-scoring:
+    dependencies:
+      '@cviper/core-types':
+        specifier: workspace:*
+        version: link:../core-types
+
   packages/ui: {}
 
 packages:

@@ -1,0 +1,101 @@
+{
+  "_comment": "CV-705c Phase 2 — Healthcare / clinical lexicon.",
+  "related_terms": {
+    "nursing": [
+      "registered nurse",
+      "staff nurse",
+      "rn",
+      "rgn",
+      "clinical nursing"
+    ],
+    "patient care": [
+      "clinical care",
+      "patient-centred care",
+      "direct patient care",
+      "patient safety"
+    ],
+    "clinical governance": [
+      "clinical audit",
+      "clinical quality",
+      "clinical effectiveness"
+    ],
+    "safeguarding": [
+      "child protection",
+      "vulnerable adults",
+      "safeguarding adults"
+    ],
+    "medication administration": [
+      "drug administration",
+      "medicines management",
+      "dispensing"
+    ],
+    "care planning": [
+      "care plans",
+      "individual care plans",
+      "care coordination"
+    ],
+    "infection control": [
+      "infection prevention",
+      "ipc"
+    ],
+    "phlebotomy": [
+      "venepuncture",
+      "venipuncture",
+      "blood draw"
+    ],
+    "mental health": [
+      "mental health nursing",
+      "rmn",
+      "psychiatric care"
+    ],
+    "clinical documentation": [
+      "patient records",
+      "clinical notes",
+      "electronic health records",
+      "ehr"
+    ]
+  },
+  "skill_title_map": [
+    [
+      [
+        "nursing",
+        "patient care",
+        "medication administration",
+        "care planning"
+      ],
+      "Registered Nurse"
+    ],
+    [
+      [
+        "patient care",
+        "safeguarding",
+        "care planning"
+      ],
+      "Healthcare Assistant"
+    ],
+    [
+      [
+        "mental health",
+        "nursing"
+      ],
+      "Mental Health Nurse"
+    ],
+    [
+      [
+        "clinical governance",
+        "clinical audit",
+        "infection control"
+      ],
+      "Clinical Governance Lead"
+    ]
+  ],
+  "skill_weights": {},
+  "common_skills": [
+    "patient care",
+    "medication administration",
+    "infection control",
+    "mental health",
+    "safeguarding",
+    "nursing"
+  ]
+}

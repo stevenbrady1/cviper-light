@@ -1,0 +1,108 @@
+{
+  "_comment": "CV-705e Phase 4 — Science / pharma / lab / R&D lexicon. Uses 'statistical analysis' (not the base 'data analysis' key).",
+  "related_terms": {
+    "laboratory": [
+      "lab",
+      "laboratory techniques",
+      "bench work",
+      "lab technician"
+    ],
+    "research and development": [
+      "r&d",
+      "scientific research",
+      "experimental design"
+    ],
+    "clinical research": [
+      "clinical trials",
+      "cra",
+      "gcp",
+      "clinical research associate"
+    ],
+    "regulatory affairs": [
+      "regulatory submissions",
+      "mhra",
+      "fda",
+      "ema"
+    ],
+    "assay development": [
+      "assays",
+      "bioassay",
+      "analytical methods"
+    ],
+    "chromatography": [
+      "hplc",
+      "gc",
+      "lc-ms",
+      "mass spectrometry"
+    ],
+    "microbiology": [
+      "microbiological testing",
+      "cell culture",
+      "aseptic technique"
+    ],
+    "formulation": [
+      "formulation development",
+      "formulation scientist",
+      "drug formulation"
+    ],
+    "gmp": [
+      "good manufacturing practice",
+      "glp",
+      "good laboratory practice"
+    ],
+    "statistical analysis": [
+      "statistics",
+      "biostatistics",
+      "spss",
+      "data interpretation"
+    ]
+  },
+  "skill_title_map": [
+    [
+      [
+        "research and development",
+        "laboratory",
+        "assay development"
+      ],
+      "Research Scientist"
+    ],
+    [
+      [
+        "laboratory",
+        "chromatography",
+        "microbiology"
+      ],
+      "Lab Technician"
+    ],
+    [
+      [
+        "clinical research",
+        "gcp"
+      ],
+      "Clinical Research Associate"
+    ],
+    [
+      [
+        "regulatory affairs",
+        "gmp"
+      ],
+      "Regulatory Affairs Officer"
+    ],
+    [
+      [
+        "formulation",
+        "gmp"
+      ],
+      "Formulation Scientist"
+    ]
+  ],
+  "skill_weights": {},
+  "common_skills": [
+    "laboratory",
+    "clinical research",
+    "chromatography",
+    "microbiology",
+    "regulatory affairs",
+    "formulation"
+  ]
+}

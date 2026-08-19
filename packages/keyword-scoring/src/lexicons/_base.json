@@ -1,0 +1,750 @@
+{
+  "_comment": "CV-705a base lexicon: tech + finance + BA/PM/change/finance-ops, migrated verbatim from keywords.py (CV-700..704). Domain phases add sibling files. Loader merges *.json by sorted name (this _base sorts first).",
+  "related_terms": {
+    "business analyst": [
+      "business analysis",
+      "ba",
+      "business systems analyst"
+    ],
+    "business analysis": [
+      "business analyst",
+      "ba",
+      "requirements elicitation",
+      "requirements analysis",
+      "gap analysis"
+    ],
+    "project manager": [
+      "project management",
+      "pm",
+      "programme manager"
+    ],
+    "project management": [
+      "project manager",
+      "pm",
+      "programme management",
+      "pmo",
+      "raid log",
+      "raid",
+      "project planning"
+    ],
+    "stakeholder management": [
+      "stakeholder engagement",
+      "stakeholder relations"
+    ],
+    "product manager": [
+      "product management",
+      "product owner"
+    ],
+    "product owner": [
+      "product manager",
+      "po",
+      "product lead"
+    ],
+    "scrum master": [
+      "agile coach",
+      "scrum"
+    ],
+    "change management": [
+      "change manager",
+      "transformation",
+      "organisational change",
+      "target operating model",
+      "business change",
+      "change delivery"
+    ],
+    "programme manager": [
+      "program manager",
+      "delivery manager"
+    ],
+    "delivery manager": [
+      "programme manager",
+      "release manager"
+    ],
+    "data analyst": [
+      "data analysis",
+      "data analytics",
+      "analytics"
+    ],
+    "data analysis": [
+      "data analyst",
+      "data analytics"
+    ],
+    "data engineer": [
+      "data engineering",
+      "etl",
+      "data pipeline"
+    ],
+    "data science": [
+      "data scientist",
+      "machine learning"
+    ],
+    "data scientist": [
+      "data science",
+      "ml engineer"
+    ],
+    "business intelligence": [
+      "bi",
+      "bi developer",
+      "bi analyst"
+    ],
+    "power bi": [
+      "powerbi",
+      "power bi developer"
+    ],
+    "tableau": [
+      "tableau developer",
+      "data visualization"
+    ],
+    "etl": [
+      "extract transform load",
+      "data pipeline",
+      "data integration"
+    ],
+    "software engineer": [
+      "software engineering",
+      "software developer",
+      "swe"
+    ],
+    "software developer": [
+      "software development",
+      "software engineer",
+      "programmer"
+    ],
+    "full stack": [
+      "fullstack",
+      "full-stack",
+      "full stack developer"
+    ],
+    "frontend": [
+      "front-end",
+      "front end",
+      "ui developer"
+    ],
+    "backend": [
+      "back-end",
+      "back end",
+      "server-side"
+    ],
+    "web developer": [
+      "web development",
+      "web engineer"
+    ],
+    "mobile developer": [
+      "mobile development",
+      "ios developer",
+      "android developer"
+    ],
+    "site reliability": [
+      "sre",
+      "site reliability engineer"
+    ],
+    "platform engineer": [
+      "platform engineering",
+      "infrastructure engineer"
+    ],
+    "devops": [
+      "devops engineer",
+      "dev ops",
+      "devsecops"
+    ],
+    "ci/cd": [
+      "continuous integration",
+      "continuous delivery",
+      "cicd",
+      "pipeline"
+    ],
+    "docker": [
+      "containerization",
+      "containers",
+      "container"
+    ],
+    "kubernetes": [
+      "k8s",
+      "container orchestration",
+      "openshift"
+    ],
+    "terraform": [
+      "infrastructure as code",
+      "iac",
+      "pulumi"
+    ],
+    "aws": [
+      "amazon web services",
+      "aws cloud"
+    ],
+    "azure": [
+      "microsoft azure",
+      "azure cloud"
+    ],
+    "gcp": [
+      "google cloud",
+      "google cloud platform"
+    ],
+    "cloud": [
+      "cloud computing",
+      "cloud infrastructure",
+      "cloud engineer"
+    ],
+    "python": [
+      "python developer",
+      "python engineer",
+      "django",
+      "flask",
+      "fastapi"
+    ],
+    "java": [
+      "java developer",
+      "java engineer",
+      "spring",
+      "spring boot"
+    ],
+    "javascript": [
+      "js",
+      "ecmascript",
+      "es6"
+    ],
+    "typescript": [
+      "ts",
+      "typescript developer"
+    ],
+    "c#": [
+      "csharp",
+      ".net",
+      "dotnet"
+    ],
+    ".net": [
+      "dotnet",
+      "c#",
+      "asp.net"
+    ],
+    "go": [
+      "golang",
+      "go developer"
+    ],
+    "rust": [
+      "rust developer",
+      "rust engineer"
+    ],
+    "scala": [
+      "scala developer",
+      "akka"
+    ],
+    "kotlin": [
+      "kotlin developer",
+      "android kotlin"
+    ],
+    "ruby": [
+      "ruby on rails",
+      "rails",
+      "ror"
+    ],
+    "php": [
+      "php developer",
+      "laravel",
+      "symfony"
+    ],
+    "react": [
+      "reactjs",
+      "react.js",
+      "react developer"
+    ],
+    "angular": [
+      "angularjs",
+      "angular developer"
+    ],
+    "vue": [
+      "vuejs",
+      "vue.js",
+      "vue developer"
+    ],
+    "node.js": [
+      "nodejs",
+      "node",
+      "express.js"
+    ],
+    "django": [
+      "django rest framework",
+      "python django"
+    ],
+    "spring boot": [
+      "spring",
+      "java spring"
+    ],
+    "sql": [
+      "mysql",
+      "postgresql",
+      "sql server",
+      "oracle sql",
+      "t-sql"
+    ],
+    "nosql": [
+      "mongodb",
+      "cassandra",
+      "dynamodb",
+      "couchdb"
+    ],
+    "postgresql": [
+      "postgres",
+      "psql"
+    ],
+    "mongodb": [
+      "mongo",
+      "nosql"
+    ],
+    "redis": [
+      "redis cache",
+      "in-memory cache"
+    ],
+    "elasticsearch": [
+      "elastic",
+      "elk stack",
+      "opensearch"
+    ],
+    "qa": [
+      "quality assurance",
+      "testing",
+      "qa engineer"
+    ],
+    "quality assurance": [
+      "qa",
+      "testing",
+      "test engineer"
+    ],
+    "test automation": [
+      "automated testing",
+      "test automation engineer"
+    ],
+    "selenium": [
+      "webdriver",
+      "browser automation"
+    ],
+    "machine learning": [
+      "ml",
+      "deep learning",
+      "ml engineer"
+    ],
+    "artificial intelligence": [
+      "ai",
+      "machine learning"
+    ],
+    "nlp": [
+      "natural language processing",
+      "text analytics"
+    ],
+    "computer vision": [
+      "cv",
+      "image recognition",
+      "opencv"
+    ],
+    "tensorflow": [
+      "tf",
+      "keras"
+    ],
+    "pytorch": [
+      "torch"
+    ],
+    "cybersecurity": [
+      "cyber security",
+      "information security",
+      "infosec"
+    ],
+    "penetration testing": [
+      "pen testing",
+      "ethical hacking",
+      "pentesting"
+    ],
+    "soc analyst": [
+      "security analyst",
+      "security operations"
+    ],
+    "agile": [
+      "scrum",
+      "kanban",
+      "lean"
+    ],
+    "scrum": [
+      "agile",
+      "scrum master",
+      "sprint"
+    ],
+    "kanban": [
+      "agile",
+      "lean"
+    ],
+    "waterfall": [
+      "traditional sdlc"
+    ],
+    "risk management": [
+      "risk analysis",
+      "risk assessment",
+      "risk modelling"
+    ],
+    "compliance": [
+      "regulatory compliance",
+      "compliance officer",
+      "kyc",
+      "aml"
+    ],
+    "financial analyst": [
+      "financial analysis",
+      "financial modelling"
+    ],
+    "investment banking": [
+      "ib",
+      "investment banker"
+    ],
+    "trading": [
+      "trader",
+      "trading systems",
+      "electronic trading"
+    ],
+    "quantitative analyst": [
+      "quant",
+      "quantitative developer",
+      "quant developer"
+    ],
+    "solutions architect": [
+      "solution architect",
+      "enterprise architect"
+    ],
+    "technical architect": [
+      "tech architect",
+      "system architect"
+    ],
+    "microservices": [
+      "micro services",
+      "distributed systems"
+    ],
+    "api": [
+      "rest api",
+      "restful",
+      "web services",
+      "graphql"
+    ],
+    "system design": [
+      "systems design",
+      "architecture"
+    ],
+    "requirements gathering": [
+      "requirements analysis",
+      "requirements engineering",
+      "requirements elicitation",
+      "brd",
+      "business requirements document",
+      "requirements"
+    ],
+    "ux": [
+      "user experience",
+      "ux design",
+      "ux designer"
+    ],
+    "ui": [
+      "user interface",
+      "ui design",
+      "ui developer"
+    ],
+    "technical writing": [
+      "technical writer",
+      "documentation"
+    ],
+    "process mapping": [
+      "process improvement",
+      "as-is",
+      "to-be",
+      "process design",
+      "business process mapping",
+      "bpmn",
+      "process modelling"
+    ],
+    "process improvement": [
+      "process mapping",
+      "continuous improvement",
+      "process optimisation",
+      "lean",
+      "process re-engineering"
+    ],
+    "uat": [
+      "user acceptance testing",
+      "acceptance testing"
+    ],
+    "user acceptance testing": [
+      "uat",
+      "acceptance testing"
+    ],
+    "gap analysis": [
+      "as-is to-be",
+      "current state future state",
+      "fit gap analysis"
+    ],
+    "target operating model": [
+      "tom",
+      "operating model",
+      "future state model"
+    ],
+    "business process": [
+      "process mapping",
+      "process improvement",
+      "bpmn"
+    ],
+    "programme management": [
+      "program management",
+      "programme manager",
+      "pmo",
+      "programme office",
+      "portfolio management",
+      "raid log",
+      "raid",
+      "delivery management"
+    ],
+    "benefits realisation": [
+      "benefits realization",
+      "benefits management",
+      "value realisation"
+    ],
+    "governance": [
+      "project governance",
+      "controls",
+      "assurance"
+    ],
+    "reconciliation": [
+      "reconciliations",
+      "nostro",
+      "nostro reconciliation",
+      "breaks",
+      "recs",
+      "cash reconciliation"
+    ],
+    "settlements": [
+      "settlement",
+      "trade settlement",
+      "trade settlements",
+      "clearing",
+      "dvp"
+    ],
+    "regulatory reporting": [
+      "regulatory reports",
+      "transaction reporting",
+      "emir",
+      "mifid"
+    ],
+    "swift": [
+      "swift messaging",
+      "mt messages",
+      "iso 20022"
+    ],
+    "trade lifecycle": [
+      "trade life cycle",
+      "trade processing",
+      "post-trade"
+    ]
+  },
+  "skill_title_map": [
+    [
+      [
+        "python",
+        "django",
+        "flask",
+        "fastapi"
+      ],
+      "Python Developer"
+    ],
+    [
+      [
+        "javascript",
+        "react",
+        "vue",
+        "angular",
+        "typescript"
+      ],
+      "Frontend Developer"
+    ],
+    [
+      [
+        "node.js",
+        "express",
+        "nestjs"
+      ],
+      "Node.js Developer"
+    ],
+    [
+      [
+        "java",
+        "spring",
+        "spring boot"
+      ],
+      "Java Developer"
+    ],
+    [
+      [
+        "c#",
+        ".net",
+        "asp.net"
+      ],
+      ".NET Developer"
+    ],
+    [
+      [
+        "docker",
+        "kubernetes",
+        "ci/cd",
+        "linux",
+        "azure",
+        "gcp",
+        "cloud",
+        "devops"
+      ],
+      "DevOps Engineer"
+    ],
+    [
+      [
+        "sql",
+        "nosql",
+        "mongodb",
+        "postgresql",
+        "mysql",
+        "elasticsearch",
+        "redis",
+        "database"
+      ],
+      "Database Developer"
+    ],
+    [
+      [
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "data science",
+        "ai"
+      ],
+      "Data Scientist"
+    ],
+    [
+      [
+        "data analysis",
+        "pandas",
+        "tableau",
+        "power bi",
+        "excel"
+      ],
+      "Data Analyst"
+    ],
+    [
+      [
+        "project management",
+        "agile",
+        "scrum",
+        "jira",
+        "confluence"
+      ],
+      "Project Manager"
+    ],
+    [
+      [
+        "security",
+        "penetration testing",
+        "cybersecurity",
+        "siem"
+      ],
+      "Security Engineer"
+    ],
+    [
+      [
+        "html",
+        "css",
+        "javascript",
+        "react"
+      ],
+      "Full Stack Developer"
+    ],
+    [
+      [
+        "api",
+        "microservices",
+        "backend"
+      ],
+      "Backend Developer"
+    ],
+    [
+      [
+        "qa",
+        "testing",
+        "selenium",
+        "junit",
+        "pytest",
+        "uat"
+      ],
+      "QA Engineer"
+    ],
+    [
+      [
+        "business analyst",
+        "product manager"
+      ],
+      "Business Analyst"
+    ],
+    [
+      [
+        "fx",
+        "market risk",
+        "derivative",
+        "equity",
+        "trading",
+        "bloomberg"
+      ],
+      "Quantitative Analyst"
+    ],
+    [
+      [
+        "investment bank",
+        "front office",
+        "back office"
+      ],
+      "Investment Banking Analyst"
+    ],
+    [
+      [
+        "settlements",
+        "swift",
+        "cls",
+        "rtgs",
+        "central bank"
+      ],
+      "Operations Analyst"
+    ],
+    [
+      [
+        "accounting",
+        "financial reporting",
+        "audit"
+      ],
+      "Financial Analyst"
+    ]
+  ],
+  "skill_weights": {
+    "agile": 0.4,
+    "scrum": 0.4,
+    "kanban": 0.4,
+    "jira": 0.4,
+    "confluence": 0.4,
+    "git": 0.4,
+    "github": 0.4,
+    "communication": 0.4,
+    "teamwork": 0.4,
+    "collaboration": 0.4,
+    "interpersonal": 0.4,
+    "leadership": 0.4,
+    "problem solving": 0.4,
+    "problem-solving": 0.4,
+    "time management": 0.4,
+    "attention to detail": 0.4,
+    "organisation": 0.4,
+    "organization": 0.4,
+    "microsoft office": 0.4,
+    "ms office": 0.4,
+    "office": 0.4,
+    "excel": 0.4,
+    "word": 0.4,
+    "powerpoint": 0.4,
+    "outlook": 0.4
+  }
+}

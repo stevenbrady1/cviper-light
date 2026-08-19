@@ -1,0 +1,99 @@
+{
+  "_comment": "CV-705b Phase 1 — HR / people lexicon.",
+  "related_terms": {
+    "recruitment": [
+      "talent acquisition",
+      "recruiting",
+      "resourcing",
+      "hiring",
+      "recruiter"
+    ],
+    "employee relations": [
+      "er",
+      "employee engagement",
+      "workforce relations"
+    ],
+    "talent management": [
+      "talent development",
+      "succession planning"
+    ],
+    "learning and development": [
+      "l&d",
+      "training and development",
+      "training",
+      "learning & development"
+    ],
+    "hr business partner": [
+      "hrbp",
+      "people partner",
+      "hr partner"
+    ],
+    "payroll": [
+      "payroll administration",
+      "compensation and benefits",
+      "reward",
+      "comp and ben"
+    ],
+    "performance management": [
+      "appraisals",
+      "performance reviews",
+      "performance appraisals"
+    ],
+    "hris": [
+      "hr information system",
+      "workday",
+      "successfactors",
+      "bamboohr"
+    ],
+    "onboarding": [
+      "induction",
+      "employee onboarding",
+      "new starter"
+    ],
+    "people operations": [
+      "people ops",
+      "hr operations"
+    ]
+  },
+  "skill_title_map": [
+    [
+      [
+        "recruitment",
+        "talent acquisition",
+        "onboarding"
+      ],
+      "Talent Acquisition Specialist"
+    ],
+    [
+      [
+        "hr business partner",
+        "employee relations",
+        "performance management"
+      ],
+      "HR Business Partner"
+    ],
+    [
+      [
+        "learning and development",
+        "training"
+      ],
+      "Learning & Development Manager"
+    ],
+    [
+      [
+        "payroll",
+        "hris",
+        "employee relations"
+      ],
+      "HR Manager"
+    ]
+  ],
+  "skill_weights": {},
+  "common_skills": [
+    "talent acquisition",
+    "employee relations",
+    "learning and development",
+    "onboarding",
+    "recruitment"
+  ]
+}

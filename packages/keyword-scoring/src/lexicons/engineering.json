@@ -1,0 +1,108 @@
+{
+  "_comment": "CV-705d Phase 3 — Engineering (mechanical/civil/electrical, non-software) lexicon.",
+  "related_terms": {
+    "mechanical engineering": [
+      "mechanical engineer",
+      "mechanical design",
+      "thermodynamics",
+      "mechatronics"
+    ],
+    "civil engineering": [
+      "civil engineer",
+      "structural engineering",
+      "structural engineer",
+      "geotechnical"
+    ],
+    "electrical engineering": [
+      "electrical engineer",
+      "power systems",
+      "electronics engineering",
+      "circuit design"
+    ],
+    "cad": [
+      "autocad",
+      "solidworks",
+      "computer aided design",
+      "revit",
+      "catia"
+    ],
+    "fea": [
+      "finite element analysis",
+      "stress analysis",
+      "simulation"
+    ],
+    "design engineering": [
+      "design engineer",
+      "product design",
+      "r&d engineering"
+    ],
+    "hvac": [
+      "heating ventilation air conditioning",
+      "building services"
+    ],
+    "project engineering": [
+      "project engineer",
+      "engineering project management"
+    ],
+    "maintenance engineering": [
+      "maintenance engineer",
+      "reliability engineering",
+      "preventive maintenance",
+      "planned maintenance"
+    ],
+    "cae": [
+      "computer aided engineering",
+      "ansys"
+    ],
+    "gd&t": [
+      "geometric dimensioning and tolerancing",
+      "tolerancing"
+    ]
+  },
+  "skill_title_map": [
+    [
+      [
+        "mechanical engineering",
+        "cad",
+        "fea"
+      ],
+      "Mechanical Engineer"
+    ],
+    [
+      [
+        "civil engineering",
+        "structural engineering"
+      ],
+      "Civil Engineer"
+    ],
+    [
+      [
+        "electrical engineering",
+        "power systems"
+      ],
+      "Electrical Engineer"
+    ],
+    [
+      [
+        "design engineering",
+        "cad"
+      ],
+      "Design Engineer"
+    ],
+    [
+      [
+        "maintenance engineering",
+        "reliability engineering"
+      ],
+      "Maintenance Engineer"
+    ]
+  ],
+  "skill_weights": {},
+  "common_skills": [
+    "mechanical engineering",
+    "civil engineering",
+    "electrical engineering",
+    "autocad",
+    "solidworks"
+  ]
+}

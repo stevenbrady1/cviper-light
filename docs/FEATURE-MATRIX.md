@@ -5,8 +5,10 @@ column records the truth.
 
 **Built so far**: the shared data model and export/import format below, the
 local SQLite data-access layer, CV text extraction, the provider adapters and
-their Rust transport, the app shell, and the application tracker. The Search and
-Analysis views exist as shells that say plainly that they are not built yet.
+their Rust transport, the keyword-only scorer, the app shell, and the
+application tracker. The Search and Analysis views exist as shells that say
+plainly that they are not built yet — the keyword scorer produces a
+`CvAnalysis` but nothing renders one.
 
 `apps/cloud` is an empty stub directory. There is no cloud code of any kind.
 
@@ -18,7 +20,7 @@ Analysis views exist as shells that say plainly that they are not built yet.
 | CV parsing                   | Yes — fully local                       | Yes — server-side                  | Extraction built |
 | CV analysis (BYO key)        | Yes — user's own provider key           | Not applicable                     | Not built        |
 | CV analysis (local Ollama)   | Yes — offline, no key, no network       | No                                 | Not built        |
-| Keyword-only analysis        | Yes — no AI, no key, always available   | Yes                                | Not built        |
+| Keyword-only analysis        | Yes — no AI, no key, always available   | Yes                                | Scoring built    |
 | Data export/import           | Yes — user-initiated file in/out        | Yes — plus migration to/from Light | Format built     |
 | Accounts                     | No — no login, no identity              | Yes                                | Not built        |
 | Sync                         | No — single device by design            | Yes                                | Not built        |

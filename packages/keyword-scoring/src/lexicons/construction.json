@@ -1,0 +1,98 @@
+{
+  "_comment": "CV-705d Phase 3 — Construction / trades / facilities lexicon. 'civil engineering' lives in engineering.json (not redefined here).",
+  "related_terms": {
+    "construction": [
+      "construction management",
+      "building construction",
+      "civils",
+      "groundworks"
+    ],
+    "quantity surveying": [
+      "quantity surveyor",
+      "qs",
+      "cost estimating",
+      "cost management",
+      "commercial management"
+    ],
+    "site management": [
+      "site manager",
+      "site supervision",
+      "site coordination"
+    ],
+    "estimating": [
+      "estimator",
+      "tendering",
+      "bills of quantities",
+      "boq"
+    ],
+    "building surveying": [
+      "building surveyor",
+      "building inspection",
+      "dilapidations"
+    ],
+    "health and safety": [
+      "cdm",
+      "nebosh",
+      "cscs",
+      "site safety",
+      "hse"
+    ],
+    "facilities management": [
+      "fm",
+      "facilities manager",
+      "building maintenance",
+      "hard fm",
+      "soft fm"
+    ],
+    "mep": [
+      "mechanical electrical plumbing",
+      "building services engineering"
+    ]
+  },
+  "skill_title_map": [
+    [
+      [
+        "construction",
+        "site management",
+        "health and safety"
+      ],
+      "Site Manager"
+    ],
+    [
+      [
+        "quantity surveying",
+        "estimating",
+        "cost management"
+      ],
+      "Quantity Surveyor"
+    ],
+    [
+      [
+        "estimating",
+        "tendering"
+      ],
+      "Estimator"
+    ],
+    [
+      [
+        "building surveying"
+      ],
+      "Building Surveyor"
+    ],
+    [
+      [
+        "facilities management",
+        "building maintenance"
+      ],
+      "Facilities Manager"
+    ]
+  ],
+  "skill_weights": {},
+  "common_skills": [
+    "quantity surveying",
+    "health and safety",
+    "facilities management",
+    "site management",
+    "construction management"
+  ]
+}

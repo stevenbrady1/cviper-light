@@ -1,0 +1,99 @@
+{
+  "_comment": "CV-705e Phase 4 — Creative / design / media lexicon. Avoids the base 'ui'/'ux' keys; uses 'user experience design'.",
+  "related_terms": {
+    "graphic design": [
+      "graphic designer",
+      "visual design",
+      "adobe creative suite",
+      "photoshop",
+      "illustrator",
+      "indesign"
+    ],
+    "user experience design": [
+      "ux research",
+      "wireframing",
+      "prototyping",
+      "user research",
+      "figma"
+    ],
+    "branding": [
+      "brand identity",
+      "visual identity",
+      "logo design"
+    ],
+    "motion graphics": [
+      "animation",
+      "after effects",
+      "video editing",
+      "video production"
+    ],
+    "copywriting": [
+      "copywriter",
+      "content writing",
+      "creative writing"
+    ],
+    "art direction": [
+      "art director",
+      "creative direction"
+    ],
+    "web design": [
+      "web designer",
+      "responsive design",
+      "ui design"
+    ],
+    "illustration": [
+      "digital illustration",
+      "vector illustration"
+    ],
+    "product design": [
+      "product designer",
+      "digital product design",
+      "ux/ui"
+    ]
+  },
+  "skill_title_map": [
+    [
+      [
+        "graphic design",
+        "branding"
+      ],
+      "Graphic Designer"
+    ],
+    [
+      [
+        "user experience design",
+        "product design"
+      ],
+      "UX Designer"
+    ],
+    [
+      [
+        "copywriting",
+        "content writing"
+      ],
+      "Copywriter"
+    ],
+    [
+      [
+        "motion graphics",
+        "video editing"
+      ],
+      "Video Editor"
+    ],
+    [
+      [
+        "art direction",
+        "graphic design"
+      ],
+      "Art Director"
+    ]
+  ],
+  "skill_weights": {},
+  "common_skills": [
+    "graphic design",
+    "copywriting",
+    "motion graphics",
+    "art direction",
+    "user experience design"
+  ]
+}
