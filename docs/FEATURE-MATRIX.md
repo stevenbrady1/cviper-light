@@ -66,12 +66,15 @@ be verified by an installed copy. See
   analytics. Two guards keep it that way: one asserts the updater plugin has a
   single import site, and one mounts the whole app and asserts zero calls before
   a button is pressed.
-- **An embedding model is never offered as a chat model.** `/api/tags` does not
-  report model capabilities, so the filter works off the architecture the daemon
-  DOES report — every Ollama embedding model is a BERT derivative and no chat
-  model is one. A daemon running with nothing chat-capable installed gets a
-  sentence naming the command that fixes it; a machine with no Ollama at all is
-  told nothing, because that is an advert rather than an answer.
+- **An embedding model is never offered as a chat model.** Current daemons say
+  so themselves — `/api/tags` returns `capabilities: ["embedding"]`, verified
+  against a live daemon — and that answer always wins. Older daemons omit the
+  field entirely, so the filter falls back to the architecture, which has always
+  been reported: every Ollama embedding model is a BERT derivative and no chat
+  model is one. That is what catches `all-minilm` and `bge-m3`, whose names say
+  nothing. A daemon running with nothing chat-capable installed gets a sentence
+  naming the command that fixes it; a machine with no Ollama at all is told
+  nothing, because that would be an advert rather than an answer.
 - **Outbound apply links carry no tracking.** The CViper web application appends
   `utm_source` / `utm_medium` / `utm_campaign` to every job URL it hands out
   (`_tag_affiliate_url` in `backend/job_sites_api.py`). Light deliberately does

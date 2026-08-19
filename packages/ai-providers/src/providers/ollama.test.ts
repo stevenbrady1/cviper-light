@@ -208,15 +208,14 @@ describe('ollama listModels', () => {
   });
 
   it('hides an embedding model whose name does not contain "embed"', async () => {
-    // THE REAL PRODUCTION PATH. `/api/tags` does NOT carry `capabilities` — that
-    // field only appears on `/api/show` — so on every live daemon the fallback
-    // below is the ONLY filter that runs. A name check alone lets `all-minilm`
-    // and `bge-m3` into a chat picker, where choosing one returns a vector and
-    // the analysis fails with something nobody can act on.
+    // The OLD-DAEMON path: `capabilities` is a recent addition to `/api/tags`,
+    // and an entry without it carries only `details`. A name check alone then
+    // lets `all-minilm` and `bge-m3` into a chat picker, where choosing one
+    // returns a vector and the analysis fails with something nobody can act on.
     //
-    // The architecture is the honest signal, and `/api/tags` does report it:
-    // every embedding model in Ollama's library is a BERT variant, and no chat
-    // model is.
+    // The architecture is the signal that has always been there: every
+    // embedding model in Ollama's library is a BERT variant, and no chat model
+    // is one.
     const tags = JSON.stringify({
       models: [
         { name: 'all-minilm:latest', model: 'all-minilm:latest', details: { family: 'bert' } },

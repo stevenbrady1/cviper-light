@@ -64,18 +64,24 @@ const DONE_REASON_LENGTH = 'length';
  * Model architectures that cannot chat.
  *
  * ============================================================================
- * THIS IS THE FILTER THAT ACTUALLY RUNS. `capabilities` USUALLY IS NOT THERE.
+ * THE FALLBACK, AND WHY IT IS NOT DEAD CODE.
  * ============================================================================
- * `/api/tags` — the endpoint this adapter reads, and the one `ollama_probe`
- * already has in hand — does NOT carry `capabilities`. That field belongs to
- * `/api/show`, which is one request per installed model. So on a live daemon
- * the code below is not a legacy fallback: it is the whole filter.
+ * A CORRECTION, recorded because the first version of this comment asserted the
+ * opposite: current daemons DO return `capabilities` on `/api/tags`. Checked
+ * against a live daemon rather than from memory —
+ * `nomic-embed-text` came back with `capabilities: ["embedding"]` and
+ * `llama3.2` with `["completion","tools"]`. So the branch above is the one that
+ * normally runs, and this is genuinely a fallback.
  *
- * `details.family` and `details.families` ARE in every `/api/tags` reply, and
- * they are the honest signal. Every embedding model in Ollama's library is a
- * BERT derivative, and no chat model is one — a generative model is a llama,
- * qwen, gemma, phi or mistral. Matching on the architecture therefore catches
- * `all-minilm` and `bge-m3`, whose names say nothing at all.
+ * It still earns its place. `capabilities` is a recent addition; a daemon that
+ * predates it returns entries with `details` and nothing else, and on those the
+ * ONLY signal left is the architecture. `details.family` and `details.families`
+ * have been in `/api/tags` for far longer — the same live reply gives
+ * `nomic-bert`, `qwen2` and `llama` — and every embedding model in Ollama's
+ * library is a BERT derivative while no chat model is one.
+ *
+ * That is what catches `all-minilm` and `bge-m3`, whose names say nothing at
+ * all, on a daemon too old to answer the question directly.
  */
 const EMBEDDING_FAMILIES = new Set([
   'bert',
