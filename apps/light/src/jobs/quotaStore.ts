@@ -24,7 +24,14 @@
  * way to keep a diagnostic honest is to make sure there is nothing in it worth
  * leaking in the first place.
  */
-import { emptyQuota, parseQuotaState, utcDateOf, type QuotaState } from '@cviper/job-apis';
+import {
+  emptyQuota,
+  parseQuotaState,
+  recordProviderRequest,
+  utcDateOf,
+  type JobProviderId,
+  type QuotaState,
+} from '@cviper/job-apis';
 
 /** Exported so tests assert against the real key rather than a copy of it. */
 export const QUOTA_STORAGE_KEY = 'cviper.light.jobQuota';
@@ -96,4 +103,24 @@ export function writeQuota(state: QuotaState): void {
     // Storage full, or private mode. The user loses a warning, not their
     // search.
   }
+}
+
+/**
+ * Count one request that was made OUTSIDE a search, and return the new state.
+ *
+ * `searchJobs` does its own counting and hands the updated state back, so the
+ * search screen never needs this. The key-setup screen does: testing a key is a
+ * real request to a real board, it spends one of Reed's hundred, and a counter
+ * that ignored it would read low by exactly the number of times somebody
+ * struggled to get their key working.
+ *
+ * The reserve exists for this. `QUOTA_RESERVE` holds ten requests back from the
+ * block point specifically so a key can still be tested on a day that is
+ * otherwise spent — which only makes sense if a key test is counted.
+ */
+export function countProviderRequest(provider: JobProviderId, now: Date = new Date()): QuotaState {
+  const date = today(now);
+  const next = recordProviderRequest(readQuota(now), provider, date);
+  writeQuota(next);
+  return next;
 }

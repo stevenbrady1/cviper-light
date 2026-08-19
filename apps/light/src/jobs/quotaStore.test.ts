@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { QUOTA_BLOCK_AT } from '@cviper/job-apis';
 
-import { QUOTA_STORAGE_KEY, readQuota, writeQuota } from './quotaStore';
+import { QUOTA_STORAGE_KEY, countProviderRequest, readQuota, writeQuota } from './quotaStore';
 
 const NINE_AM = new Date('2026-08-19T09:00:00.000Z');
 const NEXT_DAY = new Date('2026-08-20T00:00:00.000Z');
@@ -106,5 +106,44 @@ describe('writeQuota', () => {
     const raw = localStorage.getItem(QUOTA_STORAGE_KEY) ?? '';
     expect(JSON.parse(raw)).toEqual({ date: '2026-08-19', counts: { reed: 1, adzuna: 2 } });
     expect(raw).not.toMatch(/london|analyst|http/i);
+  });
+});
+
+describe('countProviderRequest', () => {
+  it('counts one request against one provider and leaves the other alone', () => {
+    expect(countProviderRequest('reed', NINE_AM)).toEqual({
+      date: '2026-08-19',
+      counts: { reed: 1, adzuna: 0 },
+    });
+
+    expect(readQuota(NINE_AM).counts).toEqual({ reed: 1, adzuna: 0 });
+  });
+
+  it('accumulates across calls, because each one really was a request', () => {
+    countProviderRequest('adzuna', NINE_AM);
+    countProviderRequest('adzuna', NINE_AM);
+
+    expect(readQuota(NINE_AM).counts.adzuna).toBe(2);
+  });
+
+  it('boundary: a request on the next UTC day starts the count again', () => {
+    writeQuota({ date: '2026-08-19', counts: { reed: QUOTA_BLOCK_AT, adzuna: 4 } });
+
+    // The roll-over is what makes "it resets at midnight UTC" true without a
+    // restart. Reed's own counter resets then, so ours has to as well.
+    expect(countProviderRequest('reed', NEXT_DAY)).toEqual({
+      date: '2026-08-20',
+      counts: { reed: 1, adzuna: 0 },
+    });
+  });
+
+  it('negative: never throws when the store refuses to be written', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+
+    // The count is lost; the request it was counting still happened, and
+    // refusing to make it because a diagnostic failed would be the wrong trade.
+    expect(() => countProviderRequest('reed', NINE_AM)).not.toThrow();
   });
 });

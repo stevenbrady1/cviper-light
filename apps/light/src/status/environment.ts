@@ -96,8 +96,14 @@ async function secretStatus(key: SecretKeyName): Promise<boolean | null> {
   }
 }
 
-/** Collapse the answers for one provider's credentials into a single state. */
-function combine(answers: readonly (boolean | null)[]): KeyState {
+/**
+ * Collapse the answers for one provider's credentials into a single state.
+ *
+ * Exported because the Settings key cards need exactly this rule and a second
+ * copy of it would be a second place for `incomplete` to be got wrong. The rail
+ * and the setup screen must never disagree about what this machine has.
+ */
+export function combineKeyState(answers: readonly (boolean | null)[]): KeyState {
   if (answers.some((answer) => answer === null)) return 'unreadable';
   if (answers.every((answer) => answer === true)) return 'configured';
   if (answers.some((answer) => answer === true)) return 'incomplete';
@@ -121,8 +127,8 @@ export async function readEnvironmentStatus(now: Date = new Date()): Promise<Env
 
   return {
     ollama: tags === null ? 'absent' : 'running',
-    adzuna: combine([adzunaAppId, adzunaAppKey]),
-    reed: combine([reedApiKey]),
+    adzuna: combineKeyState([adzunaAppId, adzunaAppKey]),
+    reed: combineKeyState([reedApiKey]),
     requestsToday: requestsToday(now),
   };
 }

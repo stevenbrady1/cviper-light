@@ -51,7 +51,7 @@ const SERVICE: &str = "cviper-light";
 ///
 /// Every real key is far smaller than this — the longest provider key in use is
 /// under 200 characters — so the limit only ever catches a paste accident.
-const MAX_SECRET_BYTES: usize = 1024;
+pub(crate) const MAX_SECRET_BYTES: usize = 1024;
 
 /// Which secret. A CLOSED SET, on purpose.
 ///
@@ -60,7 +60,7 @@ const MAX_SECRET_BYTES: usize = 1024;
 /// has under this service — and `secret_status` would happily confirm whether it
 /// existed. An enum makes the set of addressable credentials exactly these five,
 /// enforced by serde before our code runs at all.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SecretKey {
     AdzunaAppId,

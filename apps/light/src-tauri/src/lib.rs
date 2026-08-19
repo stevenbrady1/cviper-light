@@ -57,6 +57,11 @@ pub fn run() {
             // enforces the minimum gap between submits — a disabled button
             // cannot, and Reed's free tier is 100 requests a day.
             jobs::job_search,
+            // Testing a key the user has just typed and has NOT saved: one
+            // result, the candidate credentials passed straight in, nothing
+            // written anywhere. See the command's own comment for why a key is
+            // proved before it is stored rather than after.
+            jobs::job_test_credentials,
             // Reading a CV the user picked, and reading or writing a backup.
             // Each one opens the dialog ITSELF and touches only what came back
             // out of it: there is no command here that takes a path, so there

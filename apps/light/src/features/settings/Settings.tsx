@@ -10,7 +10,11 @@ import {
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
+import { type BrowserPort } from '../../platform/browser';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
+
+import { KeySetup } from './keys/KeySetup';
+import { type KeyPort } from './keys/port';
 
 import {
   APP_NAME,
@@ -60,6 +64,10 @@ export interface SettingsProps {
   readonly port?: BackupPort | undefined;
   /** Injected by tests. Defaults to the OS dialog plus the Rust file commands. */
   readonly filePort?: FilePort | undefined;
+  /** Injected by tests. Defaults to the real keyring-and-transport port. */
+  readonly keyPort?: KeyPort | undefined;
+  /** Injected by tests: the real one opens the user's browser. */
+  readonly browser?: BrowserPort | undefined;
   /** Injected by tests so the suggested filename is deterministic. */
   readonly now?: Date | undefined;
 }
@@ -85,7 +93,7 @@ function countsOf(source: {
   };
 }
 
-export function Settings({ port, filePort, now }: SettingsProps = {}) {
+export function Settings({ port, filePort, keyPort, browser, now }: SettingsProps = {}) {
   const backupPort = useMemo(() => port ?? createDbBackupPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
 
@@ -311,14 +319,7 @@ export function Settings({ port, filePort, now }: SettingsProps = {}) {
             </div>
           ) : null}
 
-          <section>
-            <h2 className="font-medium text-ink">API keys</h2>
-            <p className="mt-1 text-ink-muted">
-              Key entry is not built yet. Until it is, the app works without one: the tracker is
-              entirely offline, and the analysis screen offers a basic keyword match that needs no
-              account and no key. The rail on the left already shows what this machine has saved.
-            </p>
-          </section>
+          <KeySetup port={keyPort} browser={browser} />
         </div>
       </div>
     </section>

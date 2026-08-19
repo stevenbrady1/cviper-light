@@ -33,6 +33,7 @@
 //! second, so the user would silently get half a search whenever both boxes
 //! were ticked.
 
+use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -77,6 +78,14 @@ const ADZUNA_RESULT_CAP: u32 = 50;
 const REED_RESULT_CAP: u32 = 100;
 const MAX_QUERY_CHARS: usize = 200;
 const SUBMIT_MIN_INTERVAL: Duration = Duration::from_millis(1500);
+
+/// The largest credential a key test will carry.
+///
+/// Aliased to `secrets::MAX_SECRET_BYTES` rather than written out again, so the
+/// two can never disagree. A key that passes the test and is then refused by
+/// `secret_set` for being too long is precisely the outcome the test-before-save
+/// flow exists to prevent.
+const MAX_CANDIDATE_BYTES: usize = secrets::MAX_SECRET_BYTES;
 const ADZUNA_TIMEOUT: Duration = Duration::from_secs(15);
 const REED_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -366,17 +375,84 @@ fn read_secrets(provider: JobProvider) -> Result<Vec<String>, String> {
     Ok(values)
 }
 
-/// One search against one board.
+/// The one search a key test performs: ONE result, and terms Rust chose.
 ///
-/// Ordering matters and is deliberate: validate first (free, and a rejected
-/// search must not burn the submit slot), then claim the slot, then read the
-/// keys, then send.
-#[tauri::command]
-pub(crate) async fn job_search(
+/// Built here rather than taken from the caller, for two reasons. The frontend
+/// cannot turn "test this key" into "run me a search" — the probe spends one
+/// result out of the user's daily allowance and nothing JavaScript says can
+/// make it spend more. And the terms are ordinary enough that both boards will
+/// certainly answer, so a failure means the KEY is wrong rather than the query.
+fn probe_params() -> JobSearchParams {
+    JobSearchParams {
+        keywords: "developer".to_string(),
+        location: "London".to_string(),
+        limit: 1,
+        distance_miles: None,
+        salary_min: None,
+        employment_type: None,
+    }
+}
+
+/// Put the just-typed credentials in the order the request builder reads them.
+///
+/// ============================================================================
+/// THE ORDER IS `provider.secrets()`, NOT THE ORDER THEY WERE SUPPLIED IN.
+/// ============================================================================
+/// `send_search` reads Adzuna's two values out of a `Vec` POSITIONALLY — app id
+/// first, app key second. A `HashMap` has no order of its own, so pulling the
+/// values in iteration order would send the id as the key roughly half the time
+/// and tell the user their perfectly good key had been rejected.
+///
+/// A credential this board does not need is IGNORED rather than sent: a Reed
+/// test that happens to carry an Adzuna id must not put the Adzuna id on the
+/// wire to Reed. That falls out of iterating `provider.secrets()` rather than
+/// the map, which is the reason it is written this way round.
+///
+/// The two guards are the same ones `secret_set` applies, aliased rather than
+/// re-decided (see `MAX_CANDIDATE_BYTES`): a key that passes the test and is
+/// then refused by the save is exactly the failure this flow exists to prevent.
+///
+/// NOTHING is interpolated into any message here. The values ARE the secrets.
+fn candidate_credentials(
     provider: JobProvider,
-    params: JobSearchParams,
-) -> Result<String, String> {
-    validate_params(&params).map_err(|message| transport_error("bad-request", message))?;
+    supplied: &HashMap<SecretKey, String>,
+) -> Result<Vec<String>, String> {
+    let mut values = Vec::new();
+
+    for key in provider.secrets() {
+        let value = match supplied.get(key) {
+            Some(value) if !value.trim().is_empty() => value,
+            // Absent and blank are the same answer to the user: this board
+            // cannot be tested until every box it needs has something in it.
+            _ => {
+                return Err(transport_error(
+                    "no-key",
+                    provider.missing_key_message().to_string(),
+                ))
+            }
+        };
+
+        if value.len() > MAX_CANDIDATE_BYTES {
+            return Err(transport_error(
+                "bad-request",
+                "That key is too long to save. Check it was pasted correctly.".to_string(),
+            ));
+        }
+
+        values.push(value.clone());
+    }
+
+    Ok(values)
+}
+
+/// Validate, then take this board's submit slot — or say how long is left.
+///
+/// Ordering matters and is deliberate: validate first, because it is free and a
+/// rejected search must not burn the slot. Shared by both commands below, so a
+/// key test is throttled on exactly the same terms as a search — it is a real
+/// request to a real board and the board does not care why we sent it.
+fn validate_and_claim(provider: JobProvider, params: &JobSearchParams) -> Result<(), String> {
+    validate_params(params).map_err(|message| transport_error("bad-request", message))?;
 
     if let Some(wait) = claim_submit_slot(provider, Instant::now()) {
         // Rounded up to whole seconds so the message is never "wait 0 seconds".
@@ -390,8 +466,23 @@ pub(crate) async fn job_search(
         ));
     }
 
-    let credentials = read_secrets(provider)?;
-    let mut query = query_pairs(provider, &params);
+    Ok(())
+}
+
+/// Send one already-validated search, with the credentials already in hand.
+///
+/// Extracted so `job_search` (credentials from the keyring) and
+/// `job_test_credentials` (credentials the user just typed) cannot drift apart
+/// in HOW they authenticate. There is exactly one place that decides Adzuna's
+/// two values go in the query string and Reed's one goes in Basic auth.
+///
+/// The credentials are MOVED in and dropped with the request builder.
+async fn send_search(
+    provider: JobProvider,
+    params: &JobSearchParams,
+    credentials: Vec<String>,
+) -> Result<String, String> {
+    let mut query = query_pairs(provider, params);
 
     let mut request = providers::client()?
         .get(provider.base_url())
@@ -433,6 +524,59 @@ pub(crate) async fn job_search(
             "The reply from this job board could not be read.".to_string(),
         )
     })
+}
+
+/// One search against one board, using the keys this machine has saved.
+#[tauri::command]
+pub(crate) async fn job_search(
+    provider: JobProvider,
+    params: JobSearchParams,
+) -> Result<String, String> {
+    validate_and_claim(provider, &params)?;
+
+    // Read at the last possible moment, and dropped with the request.
+    let credentials = read_secrets(provider)?;
+    send_search(provider, &params, credentials).await
+}
+
+/// Does this key actually work? A real one-result search, with nothing saved.
+///
+/// ============================================================================
+/// THIS COMMAND CANNOT SAVE ANYTHING, AND THAT IS THE WHOLE POINT.
+/// ============================================================================
+/// A key is only worth saving once it is known to work. Both of the other
+/// shapes are worse:
+///
+///   * Save first, test afterwards. A mistyped key is then already in the
+///     credential store — and, the part that actually hurts, it has already
+///     overwritten the working key it was meant to replace.
+///   * Save, test, delete on failure. Same window, plus a crash or a power cut
+///     mid-test leaves the bad key in place with nothing to say so.
+///
+/// So the candidate travels in as an argument, is used to build one request,
+/// and is dropped. `testing_a_key_cannot_save_one` asserts that nothing in this
+/// file can reach `secret_set`, so the save can only happen afterwards, from the
+/// frontend, once this has come back green.
+///
+/// The key does NOT come back out, and this is not a weakening of `secret_get`.
+/// A value the user typed thirty seconds ago, into a box they are still looking
+/// at, is already in the frontend's memory. What stays impossible is reading a
+/// SAVED key back — which is what `secret_get` protects, and which this leaves
+/// exactly as it was.
+#[tauri::command]
+pub(crate) async fn job_test_credentials(
+    provider: JobProvider,
+    supplied: HashMap<SecretKey, String>,
+) -> Result<String, String> {
+    // Checked BEFORE the submit slot is claimed: a half-filled form is a
+    // mistake to point at rather than a request, and it must not make the user
+    // wait a second and a half before they can correct it.
+    let credentials = candidate_credentials(provider, &supplied)?;
+
+    let params = probe_params();
+    validate_and_claim(provider, &params)?;
+
+    send_search(provider, &params, credentials).await
 }
 
 static ADZUNA_LAST_SUBMIT: Mutex<Option<Instant>> = Mutex::new(None);
@@ -979,6 +1123,182 @@ mod tests {
                 "a command appears to take a URL from the caller: {forbidden}"
             );
         }
+    }
+
+    // ── Testing a key that has NOT been saved ────────────────────────────
+
+    #[test]
+    fn a_key_test_asks_for_exactly_one_result() {
+        let probe = probe_params();
+
+        // ONE. A key test that pulled a full page would spend twenty of Reed's
+        // hundred daily requests to answer a yes/no question.
+        assert_eq!(probe.limit, 1);
+        assert_eq!(probe.distance_miles, None);
+        assert_eq!(probe.salary_min, None);
+        assert_eq!(probe.employment_type, None);
+
+        // It has to be a search the boards will actually accept, or a failing
+        // test would mean "our probe is malformed" rather than "your key is
+        // wrong" - and the user would be told to re-check a perfectly good key.
+        assert!(validate_params(&probe).is_ok());
+    }
+
+    #[test]
+    fn the_probe_asks_each_board_for_one_result_in_that_board_s_own_words() {
+        for (provider, name) in [
+            (JobProvider::Adzuna, "results_per_page"),
+            (JobProvider::Reed, "resultsToTake"),
+        ] {
+            let pairs = query_pairs(provider, &probe_params());
+            assert_eq!(value_of(&pairs, name), Some("1"));
+        }
+    }
+
+    #[test]
+    fn candidate_credentials_come_back_in_the_order_the_request_builder_reads_them() {
+        // Inserted app_key FIRST, on purpose. A HashMap has no order of its
+        // own, and `job_search` reads the two Adzuna values out positionally -
+        // so if this returned them the other way round the app id would be sent
+        // as the app key and the user would be told their key was wrong.
+        let mut supplied = HashMap::new();
+        supplied.insert(SecretKey::AdzunaAppKey, "the-key".to_string());
+        supplied.insert(SecretKey::AdzunaAppId, "the-id".to_string());
+
+        assert_eq!(
+            candidate_credentials(JobProvider::Adzuna, &supplied).unwrap(),
+            vec!["the-id".to_string(), "the-key".to_string()]
+        );
+    }
+
+    #[test]
+    fn half_an_adzuna_credential_is_refused_before_anything_is_sent() {
+        let mut supplied = HashMap::new();
+        supplied.insert(SecretKey::AdzunaAppId, "the-id".to_string());
+
+        let refused = candidate_credentials(JobProvider::Adzuna, &supplied).unwrap_err();
+        let parsed: serde_json::Value = serde_json::from_str(&refused).unwrap();
+
+        assert_eq!(parsed["kind"], "no-key");
+        // Adzuna answers half a credential with a 401, which reads as "your key
+        // is wrong" when the truth is "you only filled in one box".
+        assert!(parsed["message"]
+            .as_str()
+            .unwrap()
+            .contains("App ID and an App Key"));
+    }
+
+    #[test]
+    fn a_blank_candidate_is_refused() {
+        for blank in ["", "   ", "	
+"] {
+            let mut supplied = HashMap::new();
+            supplied.insert(SecretKey::ReedApiKey, blank.to_string());
+            assert!(
+                candidate_credentials(JobProvider::Reed, &supplied).is_err(),
+                "{blank:?} should be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn a_candidate_at_the_size_limit_is_accepted_and_one_byte_over_is_not() {
+        // The same boundary `secret_set` enforces. Testing a key that could
+        // never be saved would pass and then fail at the save, which is the one
+        // outcome this whole flow exists to prevent.
+        let mut supplied = HashMap::new();
+        supplied.insert(SecretKey::ReedApiKey, "k".repeat(MAX_CANDIDATE_BYTES));
+        assert!(candidate_credentials(JobProvider::Reed, &supplied).is_ok());
+
+        let mut oversized = HashMap::new();
+        oversized.insert(SecretKey::ReedApiKey, "k".repeat(MAX_CANDIDATE_BYTES + 1));
+        assert!(candidate_credentials(JobProvider::Reed, &oversized).is_err());
+    }
+
+    #[test]
+    fn a_credential_for_another_board_is_ignored_rather_than_sent() {
+        let mut supplied = HashMap::new();
+        supplied.insert(SecretKey::ReedApiKey, "reed-key".to_string());
+        supplied.insert(SecretKey::AdzunaAppId, "adzuna-id".to_string());
+
+        assert_eq!(
+            candidate_credentials(JobProvider::Reed, &supplied).unwrap(),
+            vec!["reed-key".to_string()]
+        );
+    }
+
+    #[test]
+    fn an_ai_credential_can_never_be_used_as_a_job_board_credential() {
+        let mut supplied = HashMap::new();
+        supplied.insert(SecretKey::AnthropicApiKey, "sk-ant-nope".to_string());
+        supplied.insert(SecretKey::OpenaiApiKey, "sk-nope".to_string());
+
+        for provider in ALL {
+            assert!(
+                candidate_credentials(provider, &supplied).is_err(),
+                "an AI key was accepted as a {provider:?} credential"
+            );
+        }
+    }
+
+    #[test]
+    fn a_rejected_candidate_never_appears_in_the_message() {
+        let secret = "sk-do-not-log-me";
+
+        let mut supplied = HashMap::new();
+        supplied.insert(SecretKey::AdzunaAppId, secret.to_string());
+        let refused = candidate_credentials(JobProvider::Adzuna, &supplied).unwrap_err();
+        assert!(!refused.contains(secret), "the message echoed the key back");
+
+        let mut oversized = HashMap::new();
+        oversized.insert(
+            SecretKey::ReedApiKey,
+            format!("{secret}{}", "x".repeat(MAX_CANDIDATE_BYTES)),
+        );
+        let too_long = candidate_credentials(JobProvider::Reed, &oversized).unwrap_err();
+        assert!(!too_long.contains(secret), "the message echoed the key back");
+    }
+
+    #[test]
+    fn testing_a_key_cannot_save_one() {
+        // The structural half of "never persist an untested key". The command
+        // that tests a candidate has no route to the credential store at all,
+        // so the save can only happen afterwards, from the frontend, once the
+        // test has come back green.
+        let whole = without_comments(include_str!("jobs.rs"));
+        let source = production_slice(&whole);
+
+        for forbidden in ["secret_set", "set_password", "secret_delete"] {
+            assert!(
+                !source.contains(forbidden),
+                "the job transport can write to the credential store: {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_frontend_calls_the_key_test_by_this_name() {
+        const PORT_TS: &str = include_str!("../../src/features/settings/keys/port.ts");
+        assert!(
+            PORT_TS.contains("'job_test_credentials'"),
+            "the key wizard does not invoke job_test_credentials"
+        );
+        // The argument keys must be the Rust parameter names exactly. Both are
+        // one word, so Tauri's snake_case-to-camelCase conversion cannot change
+        // them - but a rename on either side would break silently otherwise.
+        assert!(
+            PORT_TS.contains("{ provider, supplied }"),
+            "the key wizard no longer passes `provider` and `supplied`"
+        );
+    }
+
+    #[test]
+    fn the_key_test_command_is_registered_for_javascript() {
+        let handler = without_comments(include_str!("lib.rs"));
+        assert!(
+            handler.contains("jobs::job_test_credentials,"),
+            "job_test_credentials is not registered in generate_handler!"
+        );
     }
 
     #[test]

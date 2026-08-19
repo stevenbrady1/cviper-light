@@ -119,30 +119,51 @@ function toHttpResponse(
   return ok({ status, body });
 }
 
+/**
+ * Send one job-board command into Rust and read its envelope back.
+ *
+ * Shared by the search transport below and by the key-setup screen's "test this
+ * key" button (`features/settings/keys/port.ts`), which invokes a DIFFERENT
+ * command with the same envelope, the same error format and the same request
+ * counter. Two copies of this would be two places for a Rust-side rejection to
+ * be classified differently — and the key screen is exactly where a
+ * misclassified 401 does the most damage.
+ *
+ * The command name is a caller-supplied string and that is not a hole: it names
+ * a Tauri command, never a URL, and both commands it can name are in this file.
+ */
+export async function invokeJobCommand(
+  provider: JobProviderId,
+  command: string,
+  args: Record<string, unknown>,
+): Promise<Result<JobApiHttpResponse, JobApiError>> {
+  // Counted BEFORE the call, and counted whatever the outcome. A 401 or a
+  // timeout still consumed the provider's daily allowance, so counting only
+  // successes would under-report precisely when the user needs the number.
+  //
+  // Wrapped because a diagnostic must never be able to fail a real request.
+  try {
+    recordRequest();
+  } catch {
+    // Nothing to do and nothing to tell the user. The request continues.
+  }
+
+  try {
+    return toHttpResponse(provider, await invoke(command, args));
+  } catch (thrown) {
+    // Never swallowed: every failure becomes a typed error the caller must
+    // narrow on before it can reach the value.
+    return err(toJobApiError(provider, thrown));
+  }
+}
+
 export function createTauriJobTransport(): JobSearchTransport {
   return {
-    async search(
+    search(
       provider: JobProviderId,
       params: JobSearchParams,
     ): Promise<Result<JobApiHttpResponse, JobApiError>> {
-      // Counted BEFORE the call, and counted whatever the outcome. A 401 or a
-      // timeout still consumed the provider's daily allowance, so counting only
-      // successes would under-report precisely when the user needs the number.
-      //
-      // Wrapped because a diagnostic must never be able to fail a real request.
-      try {
-        recordRequest();
-      } catch {
-        // Nothing to do and nothing to tell the user. The search continues.
-      }
-
-      try {
-        return toHttpResponse(provider, await invoke(SEARCH_COMMAND, { provider, params }));
-      } catch (thrown) {
-        // Never swallowed: every failure becomes a typed error the caller must
-        // narrow on before it can reach the value.
-        return err(toJobApiError(provider, thrown));
-      }
+      return invokeJobCommand(provider, SEARCH_COMMAND, { provider, params });
     },
   };
 }

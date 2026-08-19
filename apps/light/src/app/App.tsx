@@ -51,6 +51,10 @@ export interface AppProps {
   readonly createTransport?: AnalysisProps['createTransport'];
   /** Injected by tests, for the same reason as `trackerPort`. */
   readonly backupPort?: SettingsProps['port'];
+  /** Injected by tests: the real one reads and writes the OS credential store. */
+  readonly keyPort?: SettingsProps['keyPort'];
+  /** Injected by tests: the real one opens the user's browser. */
+  readonly browser?: SettingsProps['browser'];
   /** Injected by tests so every age, due date and stored timestamp is deterministic. */
   readonly now?: Date | undefined;
 }
@@ -61,6 +65,8 @@ export default function App({
   filePort,
   createTransport,
   backupPort,
+  keyPort,
+  browser,
   now,
 }: AppProps = {}) {
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
@@ -117,7 +123,7 @@ export default function App({
         {renderView(activeView, {
           tracker: { port: trackerPort, now },
           analysis: { port: analysisPort, filePort, createTransport, now },
-          settings: { port: backupPort, filePort, now },
+          settings: { port: backupPort, filePort, keyPort, browser, now },
         })}
       </main>
     </div>
