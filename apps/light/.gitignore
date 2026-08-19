@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# pdf.js runtime assets, copied out of node_modules at build time by the
+# cviper-copy-pdfjs-assets plugin in vite.config.ts. Generated, never edited,
+# and deliberately not committed — 2.3 MB of vendored binaries in git is not a
+# thing anyone wants to review or merge.
+public/pdfjs
