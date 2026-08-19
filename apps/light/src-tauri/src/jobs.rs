@@ -718,6 +718,68 @@ mod tests {
     }
 
     #[test]
+    fn the_built_url_is_the_one_that_goes_on_the_wire() {
+        // Builds a real `reqwest::Request` and reads its URL WITHOUT sending
+        // it. Everything above tests the pairs; this tests what those pairs
+        // actually become, which is the only form an attacker cares about.
+        //
+        // Built through the SHARED client, which is the one the command uses -
+        // a local `Client::new()` here would test a client the app never
+        // builds, and would miss the crypto-provider install that
+        // `providers::client()` performs.
+        let mut hostile = params();
+        hostile.keywords = "M&A analyst&app_key=stolen".to_string();
+        hostile.location = "Zürich #1".to_string();
+        hostile.limit = 9_999;
+
+        let request = providers::client()
+            .unwrap()
+            .get(JobProvider::Reed.base_url())
+            .query(&query_pairs(JobProvider::Reed, &hostile))
+            .build()
+            .unwrap();
+        let built = request.url().as_str();
+
+        assert_eq!(
+            built,
+            "https://www.reed.co.uk/api/1.0/search\
+             ?keywords=M%26A+analyst%26app_key%3Dstolen\
+             &locationName=Z%C3%BCrich+%231\
+             &resultsToTake=100"
+        );
+
+        // The host and path are untouched, and the injected `app_key` is a
+        // percent-encoded part of a VALUE rather than a parameter of its own.
+        assert_eq!(request.url().host_str(), Some("www.reed.co.uk"));
+        assert_eq!(request.url().path(), "/api/1.0/search");
+        assert_eq!(
+            request
+                .url()
+                .query_pairs()
+                .map(|(name, _)| name.into_owned())
+                .collect::<Vec<_>>(),
+            vec!["keywords", "locationName", "resultsToTake"]
+        );
+    }
+
+    #[test]
+    fn the_adzuna_url_keeps_its_country_and_page_path_segments() {
+        let request = providers::client()
+            .unwrap()
+            .get(JobProvider::Adzuna.base_url())
+            .query(&query_pairs(JobProvider::Adzuna, &params()))
+            .build()
+            .unwrap();
+
+        assert_eq!(request.url().host_str(), Some("api.adzuna.com"));
+        assert_eq!(request.url().path(), "/v1/api/jobs/gb/search/1");
+        assert!(request
+            .url()
+            .as_str()
+            .contains("what=credit+risk+analyst&where=London"));
+    }
+
+    #[test]
     fn an_empty_search_is_refused_before_anything_is_sent() {
         let mut empty = params();
         empty.keywords = "   ".to_string();

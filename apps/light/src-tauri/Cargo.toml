@@ -40,12 +40,9 @@ keyring = "4.1.6"
 # stack the updater already brings. `rustls-no-provider` is the same feature the
 # updater selects, so the two unify to one TLS stack rather than two.
 #
-# NOTE: `rustls-no-provider` deliberately selects NO crypto provider. The
-# process-default one currently comes from tauri-plugin-updater enabling
-# `rustls/ring`. If the updater is ever removed, HTTPS here loses its provider —
-# `client()` reports that as a clean error rather than panicking, but the fix is
-# to add `rustls = { version = "0.23", features = ["ring"] }` as a direct
-# dependency here.
+# NOTE: `rustls-no-provider` deliberately selects NO crypto provider, so one is
+# installed explicitly in `providers::client()`. See the `rustls` dependency
+# below for what went wrong when that was left to a plugin's side effect.
 #
 # The "query" feature is what `RequestBuilder::query()` lives behind in reqwest
 # 0.13, and it is required rather than convenient: the job-board transport
@@ -57,6 +54,25 @@ reqwest = { version = "0.13", default-features = false, features = [
   "rustls-no-provider",
   "query",
 ] }
+
+# The crypto provider for the TLS stack above, and a DIRECT dependency on
+# purpose.
+#
+# `rustls-no-provider` selects no provider at all, and reqwest 0.13 does not
+# report that as an error — `default_rustls_crypto_provider()` is an
+# unconditional `panic!` reached from inside `ClientBuilder::build()`, so
+# `.build().ok()` cannot catch it and a panic in a Tauri command takes the whole
+# window with it.
+#
+# An earlier note here said the process-default provider "comes from
+# tauri-plugin-updater enabling rustls/ring". The FEATURE does come from there,
+# but the feature is not the installation: the updater calls
+# `install_default()` inside its `check()` function, so until an update check
+# has run there is no default provider and the first AI or job-board request
+# kills the window. `providers::client()` now installs it explicitly, and
+# `the_shared_client_builds_without_an_update_check_first` is the test that
+# would have caught this.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"

@@ -244,6 +244,32 @@ pub(crate) fn classify(error: &reqwest::Error) -> RequestFailure {
     }
 }
 
+/// Make sure rustls has a crypto provider before any client is built.
+///
+/// ============================================================================
+/// WITHOUT THIS, THE FIRST HTTPS REQUEST PANICS THE WHOLE WINDOW.
+/// ============================================================================
+/// reqwest's `rustls-no-provider` feature selects no crypto provider, and
+/// reqwest does NOT report the absence as an error:
+/// `default_rustls_crypto_provider()` is an unconditional `panic!` reached from
+/// inside `ClientBuilder::build()`. So `build().ok()` catches nothing, and a
+/// panic inside a Tauri command takes the window with it.
+///
+/// The provider used to arrive by accident. `tauri-plugin-updater` calls
+/// `install_default()` — but it does so inside its `check()` function, not at
+/// plugin registration, so until the user had triggered an update check there
+/// was no default provider and the first AI request killed the app. Enabling
+/// the `rustls/ring` FEATURE, which the updater also does, is not the same
+/// thing as installing the provider.
+///
+/// `install_default` returns `Err` if one is already installed, which is a
+/// success for our purposes: something else got there first.
+fn install_crypto_provider() {
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+}
+
 /// One shared client, built once.
 ///
 /// Per-request timeouts rather than a client-wide one, because the probe wants
@@ -251,12 +277,12 @@ pub(crate) fn classify(error: &reqwest::Error) -> RequestFailure {
 pub(crate) fn client() -> Result<&'static reqwest::Client, String> {
     static CLIENT: OnceLock<Option<reqwest::Client>> = OnceLock::new();
 
-    // `build()` can fail if no rustls crypto provider is installed — see the
-    // note on the reqwest dependency in Cargo.toml. Reported as a clean error
-    // rather than an `unwrap()` panic, because a panic in a Tauri command takes
-    // the whole window with it.
     CLIENT
-        .get_or_init(|| reqwest::Client::builder().build().ok())
+        .get_or_init(|| {
+            // BEFORE `build()`, always: see `install_crypto_provider`.
+            install_crypto_provider();
+            reqwest::Client::builder().build().ok()
+        })
         .as_ref()
         .ok_or_else(|| {
             transport_error(
@@ -428,6 +454,43 @@ mod tests {
         (ProviderId::Openai, "openai"),
         (ProviderId::Ollama, "ollama"),
     ];
+
+    #[test]
+    fn the_shared_client_builds_without_an_update_check_first() {
+        // ====================================================================
+        // THE TEST THAT WAS MISSING, AND WHAT IT COSTS TO NOT HAVE IT.
+        // ====================================================================
+        // Nothing here opens a socket — `build()` only assembles the client.
+        // But assembling it is where reqwest reaches for a rustls crypto
+        // provider, and with `rustls-no-provider` and none installed that is an
+        // unconditional `panic!` inside reqwest, not an `Err`. So this test
+        // fails by taking the test process down, exactly as the real app failed
+        // by taking the window down.
+        //
+        // It went unnoticed because `cargo check` does not run tests and
+        // nothing else in the suite ever called `client()`: every other test
+        // here exercises the pure functions around it.
+        assert!(
+            client().is_ok(),
+            "the shared HTTP client could not be built"
+        );
+        assert!(
+            rustls::crypto::CryptoProvider::get_default().is_some(),
+            "no rustls crypto provider is installed, so the first HTTPS \
+             request will panic the window"
+        );
+
+        // Idempotence is asserted HERE and not in a test of its own, and that
+        // is not tidiness. Rust tests share one process: a separate test that
+        // called `install_crypto_provider()` would install the provider for the
+        // whole binary, and the assertions above would then pass even with the
+        // call deleted from `client()` — a guard that cannot fail. That is
+        // exactly what happened, and deleting the call and watching this test
+        // stay green is how it was found.
+        install_crypto_provider();
+        install_crypto_provider();
+        assert!(client().is_ok(), "installing twice broke the shared client");
+    }
 
     #[test]
     fn provider_ids_travel_as_snake_case_strings() {
