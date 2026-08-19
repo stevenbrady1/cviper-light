@@ -1,4 +1,5 @@
 mod db;
+mod files;
 mod providers;
 mod secrets;
 
@@ -50,6 +51,12 @@ pub fn run() {
             providers::provider_chat,
             providers::provider_list_models,
             providers::ollama_probe,
+            // Reading a CV the user picked, and reading or writing a backup.
+            // Narrow by extension and by size — see the module comment in
+            // files.rs for why there is no general-purpose file command.
+            files::read_cv_file,
+            files::read_backup_file,
+            files::write_backup_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

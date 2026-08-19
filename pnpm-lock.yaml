@@ -49,6 +49,9 @@ importers:
       '@cviper/job-apis':
         specifier: workspace:*
         version: link:../../packages/job-apis
+      '@cviper/keyword-scoring':
+        specifier: workspace:*
+        version: link:../../packages/keyword-scoring
       '@cviper/ui':
         specifier: workspace:*
         version: link:../../packages/ui

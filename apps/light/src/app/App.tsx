@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { Analysis, type AnalysisProps } from '../features/analysis/Analysis';
 import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
 import { readEnvironmentStatus, type EnvironmentStatus } from '../status/environment';
 
@@ -41,11 +42,23 @@ export interface AppProps {
    * which needs a Tauri runtime that a Vitest process does not have.
    */
   readonly trackerPort?: TrackerProps['port'];
-  /** Injected by tests so every age and due date on the board is deterministic. */
+  /** Injected by tests, for the same reason as `trackerPort`. */
+  readonly analysisPort?: AnalysisProps['port'];
+  /** Injected by tests: the real one opens an OS dialog and calls into Rust. */
+  readonly filePort?: AnalysisProps['filePort'];
+  /** Injected by tests so a fake provider can answer without a socket. */
+  readonly createTransport?: AnalysisProps['createTransport'];
+  /** Injected by tests so every age, due date and stored timestamp is deterministic. */
   readonly now?: Date | undefined;
 }
 
-export default function App({ trackerPort, now }: AppProps = {}) {
+export default function App({
+  trackerPort,
+  analysisPort,
+  filePort,
+  createTransport,
+  now,
+}: AppProps = {}) {
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
   const [status, setStatus] = useState<EnvironmentStatus | null>(null);
 
@@ -97,7 +110,10 @@ export default function App({ trackerPort, now }: AppProps = {}) {
       <Sidebar activeView={activeView} onSelect={onSelect} status={status} />
 
       <main className="flex min-h-0 min-w-0 flex-1">
-        {renderView(activeView, { port: trackerPort, now })}
+        {renderView(activeView, {
+          tracker: { port: trackerPort, now },
+          analysis: { port: analysisPort, filePort, createTransport, now },
+        })}
       </main>
     </div>
   );
@@ -107,7 +123,12 @@ export default function App({ trackerPort, now }: AppProps = {}) {
  * Every unbuilt view says so and then points at something that works, rather
  * than showing an empty shell the user cannot distinguish from a broken one.
  */
-function renderView(id: ViewId, tracker: TrackerProps) {
+interface ViewProps {
+  readonly tracker: TrackerProps;
+  readonly analysis: AnalysisProps;
+}
+
+function renderView(id: ViewId, props: ViewProps) {
   switch (id) {
     case 'search':
       return (
@@ -117,19 +138,14 @@ function renderView(id: ViewId, tracker: TrackerProps) {
         />
       );
     case 'tracker':
-      return <Tracker {...tracker} />;
+      return <Tracker {...props.tracker} />;
     case 'analysis':
-      return (
-        <PlaceholderView
-          view={viewById('analysis')}
-          insteadTry="CV analysis arrives in a later phase. It will run against a local model if you have one, so it will not need a key either."
-        />
-      );
+      return <Analysis {...props.analysis} />;
     case 'settings':
       return (
         <PlaceholderView
           view={viewById('settings')}
-          insteadTry="Key entry arrives with the search and analysis views. The rail already shows what is saved on this machine."
+          insteadTry="Key entry arrives with the search view. Export and import land next; the rail already shows what is saved on this machine."
         />
       );
   }

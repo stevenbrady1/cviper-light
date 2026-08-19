@@ -195,8 +195,36 @@
     animation: cviper-card-settle 200ms ease-out;
   }
 
+  /*
+   * The second — and last — moment: the band scale's tick sliding to the score,
+   * once, when a result appears. 400ms because it is the one place the app
+   * earns a beat of visual weight, and because a tick that snaps into place
+   * reads as a rendering artefact rather than as a measurement.
+   *
+   * It animates the TRANSFORM only. Animating `left` would move the element
+   * itself and force a layout on every frame; this rides on the compositor and
+   * leaves the tick's final position entirely to the inline `left` percentage,
+   * so the resting state is correct even if the animation never runs at all.
+   */
+  @keyframes cviper-tick-in {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(4px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  .cviper-tick-in {
+    animation: cviper-tick-in 400ms ease-out;
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .cviper-card-settle {
+    .cviper-card-settle,
+    .cviper-tick-in {
       animation: none;
     }
   }
