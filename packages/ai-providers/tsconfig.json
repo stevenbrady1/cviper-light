@@ -1,4 +1,17 @@
 {
   "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // `ollama.integration.test.ts` reads env vars to decide whether to run, so
+    // this package genuinely needs Node's types. They are NOT picked up
+    // automatically here — TypeScript's default @types discovery finds nothing
+    // under this package with the workspace's pnpm layout, and `tsc` fails with
+    // "Cannot find name 'process'" while `tsc --types node` passes.
+    //
+    // Naming it explicitly turns automatic discovery off for this package. That
+    // is fine today (`@types/node` is the only one it has) and fails loudly
+    // rather than silently if a second is ever added: the new one simply has to
+    // be listed here too.
+    "types": ["node"]
+  },
   "include": ["src"]
 }
