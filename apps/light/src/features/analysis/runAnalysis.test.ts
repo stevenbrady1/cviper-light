@@ -31,12 +31,14 @@ const ADVERT =
   'on IFRS 9 impairment to the CRO. Python experience essential.';
 
 const BASIC = providerOptions({
+  ollamaRunning: false,
   ollamaModels: [],
   anthropicKey: false,
   openaiKey: false,
 })[0] as ProviderOption;
 
 const OLLAMA = providerOptions({
+  ollamaRunning: true,
   ollamaModels: [{ id: 'llama3.2:3b', label: 'llama3.2:3b' }],
   anthropicKey: false,
   openaiKey: false,

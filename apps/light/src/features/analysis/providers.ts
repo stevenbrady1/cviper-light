@@ -71,6 +71,16 @@ export interface ProviderOption {
 
 /** What this machine actually has. */
 export interface Availability {
+  /**
+   * Did anything answer on Ollama's port?
+   *
+   * Separate from the list below because the two empty cases are different
+   * people. No daemon is the default state of almost every machine and needs no
+   * comment. A daemon with nothing chat-capable in it is somebody who installed
+   * Ollama, pulled an embedder, and is now looking at a picker that appears
+   * broken — see `ollamaHint`.
+   */
+  readonly ollamaRunning: boolean;
   /** Chat-capable models Ollama reported. Empty means "not usable". */
   readonly ollamaModels: readonly ModelInfo[];
   readonly anthropicKey: boolean;
@@ -177,4 +187,41 @@ export function optionByKey(
   key: string,
 ): ProviderOption | null {
   return options.find((option) => option.key === key) ?? null;
+}
+
+/**
+ * The model most people should pull first, named in the hint below.
+ *
+ * `llama3.2` rather than anything larger: it is ~2 GB, it runs on a laptop with
+ * no discrete GPU, and it is good enough at this task. Naming a model the
+ * user's machine cannot run would turn one dead end into a slower one.
+ */
+export const SUGGESTED_OLLAMA_MODEL = 'llama3.2';
+
+/**
+ * What to say about Ollama under the picker, or `null` for nothing.
+ *
+ * ============================================================================
+ * EXACTLY ONE STATE EARNS A SENTENCE.
+ * ============================================================================
+ * `providerOptions` hides options the user cannot use, and the reasoning at the
+ * top of this file holds: a permanent "Ollama (not installed)" row is an advert
+ * for software they have never heard of, shown on every launch.
+ *
+ * But "running, and every model in it is an embedder" is not that state. That
+ * user has already installed Ollama — they took the advice — and the app is
+ * still showing them nothing. Saying "no chat models found" without naming the
+ * command is a dead end, and this app has no support inbox to absorb dead ends.
+ * So the one state where the user is a single command from success is the one
+ * state that gets a sentence, and the sentence contains the command.
+ */
+export function ollamaHint(availability: Availability): string | null {
+  if (!availability.ollamaRunning) return null;
+  if (availability.ollamaModels.length > 0) return null;
+
+  return (
+    'Ollama is running, but none of the models installed can hold a ' +
+    `conversation — an embedding model cannot. Run \`ollama pull ${SUGGESTED_OLLAMA_MODEL}\` ` +
+    'in a terminal, then reopen this screen.'
+  );
 }

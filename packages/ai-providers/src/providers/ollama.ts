@@ -60,19 +60,79 @@ export interface OllamaOptions {
 /** Ollama reports `done_reason: "length"` when it stops at the output cap. */
 const DONE_REASON_LENGTH = 'length';
 
+/**
+ * Model architectures that cannot chat.
+ *
+ * ============================================================================
+ * THIS IS THE FILTER THAT ACTUALLY RUNS. `capabilities` USUALLY IS NOT THERE.
+ * ============================================================================
+ * `/api/tags` — the endpoint this adapter reads, and the one `ollama_probe`
+ * already has in hand — does NOT carry `capabilities`. That field belongs to
+ * `/api/show`, which is one request per installed model. So on a live daemon
+ * the code below is not a legacy fallback: it is the whole filter.
+ *
+ * `details.family` and `details.families` ARE in every `/api/tags` reply, and
+ * they are the honest signal. Every embedding model in Ollama's library is a
+ * BERT derivative, and no chat model is one — a generative model is a llama,
+ * qwen, gemma, phi or mistral. Matching on the architecture therefore catches
+ * `all-minilm` and `bge-m3`, whose names say nothing at all.
+ */
+const EMBEDDING_FAMILIES = new Set([
+  'bert',
+  'nomic-bert',
+  'jina-bert',
+  'distilbert',
+  'roberta',
+  'xlm-roberta',
+]);
+
+/**
+ * Names that mean "embedding" without containing the word.
+ *
+ * The second line of defence, for a daemon too old to report `details` at all.
+ * Deliberately anchored to the START of the name: `bge-m3` is an embedder,
+ * whereas a chat model that merely happens to contain `gte` somewhere in its
+ * tag is not, and a filter that empties a correctly configured picker is worse
+ * than one that lets a bad option through — at least the bad option produces an
+ * error the user can read.
+ */
+const EMBEDDING_NAME_PATTERNS: readonly RegExp[] = [
+  /embed/i,
+  /^all-minilm/i,
+  /^bge-/i,
+  /^gte-/i,
+  /^e5-/i,
+  /^paraphrase-/i,
+  /^mxbai-/i,
+];
+
+/** Every architecture string the daemon offered for one model. */
+function familiesOf(entry: Record<string, unknown>): string[] {
+  const details = readObject(entry, 'details');
+  if (details === null) return [];
+
+  const single = readString(details, 'family');
+  const many = readArray(details, 'families') ?? [];
+
+  return [...(single === null ? [] : [single]), ...many.filter((f) => typeof f === 'string')].map(
+    (family) => family.toLowerCase(),
+  );
+}
+
 function isChatCapable(entry: Record<string, unknown>): boolean {
   const capabilities = readArray(entry, 'capabilities');
 
   if (capabilities !== null) {
-    // Current daemons report this. An embedding model has no "completion".
+    // The daemon's own answer, and it outranks everything below. If a BERT
+    // model ever grows a completion head, this is how we find out — rather than
+    // overruling the daemon with a heuristic written in 2026.
     return capabilities.includes('completion');
   }
 
-  // Older daemons omit `capabilities` entirely. Without a fallback the
-  // embedding model shows up in a chat-model picker, where choosing it produces
-  // a baffling failure. Name matching is crude but it is the only signal left.
+  if (familiesOf(entry).some((family) => EMBEDDING_FAMILIES.has(family))) return false;
+
   const id = readString(entry, 'model') ?? readString(entry, 'name') ?? '';
-  return !/embed/i.test(id);
+  return !EMBEDDING_NAME_PATTERNS.some((pattern) => pattern.test(id));
 }
 
 function toModelInfo(entry: Record<string, unknown>): ModelInfo | null {

@@ -16,12 +16,18 @@ import { describe, expect, it } from 'vitest';
 import {
   KEYWORD_KEY,
   defaultOptionKey,
+  ollamaHint,
   optionByKey,
   providerOptions,
   type Availability,
 } from './providers';
 
-const NOTHING: Availability = { ollamaModels: [], anthropicKey: false, openaiKey: false };
+const NOTHING: Availability = {
+  ollamaRunning: false,
+  ollamaModels: [],
+  anthropicKey: false,
+  openaiKey: false,
+};
 
 const LLAMA = { id: 'llama3.2:3b', label: 'llama3.2:3b (3.2B)' };
 const QWEN = { id: 'qwen2.5:7b', label: 'qwen2.5:7b (7.6B)' };
@@ -29,7 +35,12 @@ const QWEN = { id: 'qwen2.5:7b', label: 'qwen2.5:7b (7.6B)' };
 /** Every combination of the three things that can be set up. */
 const COMBINATIONS: Availability[] = [false, true].flatMap((anthropicKey) =>
   [false, true].flatMap((openaiKey) =>
-    [[], [LLAMA]].map((ollamaModels) => ({ ollamaModels, anthropicKey, openaiKey })),
+    [[], [LLAMA]].map((ollamaModels) => ({
+      ollamaRunning: ollamaModels.length > 0,
+      ollamaModels,
+      anthropicKey,
+      openaiKey,
+    })),
   ),
 );
 
@@ -95,6 +106,7 @@ describe('providerOptions', () => {
 
   it('is ordered basic, then local, then cloud', () => {
     const options = providerOptions({
+      ollamaRunning: true,
       ollamaModels: [LLAMA],
       anthropicKey: true,
       openaiKey: true,
@@ -110,6 +122,7 @@ describe('providerOptions', () => {
 
   it('marks the cloud options as leaving the machine and the others as not', () => {
     const options = providerOptions({
+      ollamaRunning: true,
       ollamaModels: [LLAMA],
       anthropicKey: true,
       openaiKey: true,
@@ -120,6 +133,7 @@ describe('providerOptions', () => {
 
   it('gives every option a distinct key', () => {
     const options = providerOptions({
+      ollamaRunning: true,
       ollamaModels: [LLAMA, QWEN],
       anthropicKey: true,
       openaiKey: true,
@@ -130,6 +144,7 @@ describe('providerOptions', () => {
 
   it('names a concrete model for every option that needs one', () => {
     const options = providerOptions({
+      ollamaRunning: true,
       ollamaModels: [LLAMA],
       anthropicKey: true,
       openaiKey: true,
@@ -175,5 +190,45 @@ describe('optionByKey', () => {
     // Real case: Ollama was running when the view loaded and has since been
     // stopped. The selection must not silently resolve to something else.
     expect(optionByKey(providerOptions(NOTHING), 'ollama:llama3.2:3b')).toBeNull();
+  });
+});
+
+/**
+ * The one thing worth saying about Ollama, and the only state it is worth
+ * saying it in.
+ *
+ * ============================================================================
+ * A DAEMON WITH NO CHAT MODEL IS NOT THE SAME AS NO DAEMON.
+ * ============================================================================
+ * "Ollama is not installed" is an advertisement for software the user has never
+ * heard of, and `providers.ts` is emphatic that it does not belong in a picker.
+ * But somebody who HAS installed Ollama and pulled only `nomic-embed-text` is
+ * in a different position entirely: they did the work, the picker still shows
+ * nothing, and the app looks broken. That person is one command away and has
+ * earned being told which command.
+ */
+describe('ollamaHint', () => {
+  it('names the command when the daemon is running with no chat model', () => {
+    const hint = ollamaHint({ ...NOTHING, ollamaRunning: true });
+
+    expect(hint).not.toBeNull();
+    expect(hint).toContain('ollama pull llama3.2');
+  });
+
+  it('says nothing when a chat model is already installed', () => {
+    expect(ollamaHint({ ...NOTHING, ollamaRunning: true, ollamaModels: [LLAMA] })).toBeNull();
+  });
+
+  it('negative: says nothing at all when Ollama is not running', () => {
+    // The absent case is the DEFAULT for almost every user. Explaining a
+    // product they have not chosen, on every visit, is the advertisement this
+    // app does not run.
+    expect(ollamaHint(NOTHING)).toBeNull();
+  });
+
+  it('boundary: an embedder-only machine is the running-but-empty case', () => {
+    // The exact shape `readAvailability` produces when the only pulled model is
+    // filtered out as an embedder: the probe answered, the list came back empty.
+    expect(ollamaHint({ ...NOTHING, ollamaRunning: true, ollamaModels: [] })).not.toBeNull();
   });
 });

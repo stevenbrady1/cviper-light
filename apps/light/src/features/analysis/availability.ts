@@ -58,15 +58,22 @@ function replayTransport(body: string): ChatTransport {
   };
 }
 
-/** The chat-capable models Ollama reported, or none. */
-async function ollamaModels(): Promise<readonly ModelInfo[]> {
+/** Whether the daemon answered, and the chat-capable models it reported. */
+async function ollamaState(): Promise<{
+  readonly running: boolean;
+  readonly models: readonly ModelInfo[];
+}> {
   const tags = await probeOllama();
   // `null` is the normal answer on most machines. Not an error, and not
   // something to tell the user about here.
-  if (tags === null) return [];
+  if (tags === null) return { running: false, models: [] };
 
+  // Anything at all came back on the port, so the daemon IS running. Whether
+  // its answer parsed is a separate question, and the empty list already says
+  // "nothing usable" — conflating the two would make a proxy's login page look
+  // like an uninstalled Ollama and lose the one hint worth showing.
   const listed = await createOllamaProvider(replayTransport(tags)).listModels();
-  return listed.ok ? listed.value : [];
+  return { running: true, models: listed.ok ? listed.value : [] };
 }
 
 /** Is this key saved? Anything other than a plain `true` counts as no. */
@@ -86,11 +93,16 @@ async function hasKey(key: string): Promise<boolean> {
  * cannot stop the app finding out that Ollama is running. Nothing here rejects.
  */
 export async function readAvailability(): Promise<Availability> {
-  const [models, anthropicKey, openaiKey] = await Promise.all([
-    ollamaModels(),
+  const [ollama, anthropicKey, openaiKey] = await Promise.all([
+    ollamaState(),
     hasKey(ANTHROPIC_KEY),
     hasKey(OPENAI_KEY),
   ]);
 
-  return { ollamaModels: models, anthropicKey, openaiKey };
+  return {
+    ollamaRunning: ollama.running,
+    ollamaModels: ollama.models,
+    anthropicKey,
+    openaiKey,
+  };
 }

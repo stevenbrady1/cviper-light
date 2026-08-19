@@ -25,7 +25,13 @@ import {
   runDisabledReason,
 } from './model';
 import { createDbAnalysisPort, type AnalysisPort } from './port';
-import { KEYWORD_KEY, defaultOptionKey, optionByKey, providerOptions } from './providers';
+import {
+  KEYWORD_KEY,
+  defaultOptionKey,
+  ollamaHint,
+  optionByKey,
+  providerOptions,
+} from './providers';
 import { runAnalysis } from './runAnalysis';
 import { type ChatTransport } from '@cviper/ai-providers';
 
@@ -101,8 +107,20 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
   const [jobText, setJobText] = useState('');
   const [optionKey, setOptionKey] = useState<string>(KEYWORD_KEY);
   const [options, setOptions] = useState(() =>
-    providerOptions({ ollamaModels: [], anthropicKey: false, openaiKey: false }),
+    providerOptions({
+      ollamaRunning: false,
+      ollamaModels: [],
+      anthropicKey: false,
+      openaiKey: false,
+    }),
   );
+  /**
+   * The one sentence worth saying about Ollama, or `null`.
+   *
+   * Held as the computed string rather than as the whole `Availability`, so
+   * there is exactly one place — `ollamaHint` — that decides when it is said.
+   */
+  const [localModelHint, setLocalModelHint] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [result, setResult] = useState<RunResult | null>(null);
@@ -149,6 +167,7 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
       const next = providerOptions(availability);
       setOptions(next);
       setOptionKey(defaultOptionKey(next));
+      setLocalModelHint(ollamaHint(availability));
     });
 
     return () => {
@@ -450,6 +469,21 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
             <p data-testid="analysis-provider-note" className="mt-1 text-xs text-ink-faint">
               {selectedOption?.note ?? 'Choose how to run this.'}
             </p>
+
+            {/*
+              Shown in ONE state only: the daemon answered and nothing in it can
+              chat. Not an error — gold, because it is something the user can
+              act on — and it carries the exact command, because "no chat models
+              found" on its own is a dead end in an app with no support inbox.
+            */}
+            {localModelHint === null ? null : (
+              <p
+                data-testid="analysis-ollama-hint"
+                className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold"
+              >
+                {localModelHint}
+              </p>
+            )}
           </div>
 
           {/* ── 4. Run ────────────────────────────────────────────────── */}

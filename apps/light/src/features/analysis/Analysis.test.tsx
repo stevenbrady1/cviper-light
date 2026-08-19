@@ -410,3 +410,90 @@ describe('when the database will not open', () => {
     );
   });
 });
+
+describe('when Ollama is running but has nothing that can chat', () => {
+  /** A daemon whose only pulled model is an embedder. */
+  function embedderOnly(): void {
+    tauri.invoke.mockImplementation(async (command) => {
+      if (command === 'ollama_probe') {
+        return JSON.stringify({
+          models: [
+            {
+              model: 'nomic-embed-text:latest',
+              name: 'nomic-embed-text:latest',
+              details: { family: 'nomic-bert' },
+            },
+          ],
+        });
+      }
+      if (command === 'secret_status') return false;
+      throw new Error(`unexpected command: ${command}`);
+    });
+  }
+
+  it('names the command that fixes it, rather than showing an empty picker', async () => {
+    embedderOnly();
+    await renderView();
+
+    const hint = await screen.findByTestId('analysis-ollama-hint');
+    expect(hint.textContent).toContain('ollama pull llama3.2');
+
+    // And the embedder is still not offered as somewhere to send a CV.
+    const picker = screen.getByTestId('analysis-provider') as HTMLSelectElement;
+    expect([...picker.options].map((option) => option.value)).toEqual(['keyword']);
+  });
+
+  it('negative: says nothing on the ordinary machine with no Ollama at all', async () => {
+    // The default state of almost every user. An "install Ollama" notice here
+    // would be an advert on every launch for software they did not ask about.
+    await renderView();
+
+    expect(screen.queryByTestId('analysis-ollama-hint')).toBeNull();
+  });
+
+  it('boundary: says nothing once a chat model is installed alongside the embedder', async () => {
+    tauri.invoke.mockImplementation(async (command) => {
+      if (command === 'ollama_probe') {
+        return JSON.stringify({
+          models: [
+            { model: 'nomic-embed-text:latest', name: 'nomic-embed-text:latest' },
+            { model: 'llama3.2:3b', name: 'llama3.2:3b', details: { parameter_size: '3.2B' } },
+          ],
+        });
+      }
+      if (command === 'secret_status') return false;
+      throw new Error(`unexpected command: ${command}`);
+    });
+
+    await renderView();
+
+    await vi.waitFor(() =>
+      expect([
+        ...(screen.getByTestId('analysis-provider') as HTMLSelectElement).options,
+      ]).toHaveLength(2),
+    );
+    expect(screen.queryByTestId('analysis-ollama-hint')).toBeNull();
+  });
+
+  it('says the local option is private but weaker, in those words', async () => {
+    // The honest one-line trade-off for the local model, asserted so a future
+    // copy edit cannot quietly turn it into a boast.
+    tauri.invoke.mockImplementation(async (command) => {
+      if (command === 'ollama_probe') {
+        return JSON.stringify({
+          models: [{ model: 'llama3.2:3b', name: 'llama3.2:3b' }],
+        });
+      }
+      if (command === 'secret_status') return false;
+      throw new Error(`unexpected command: ${command}`);
+    });
+
+    await renderView();
+
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('analysis-provider-note').textContent).toContain(
+        'Private but weaker — nothing leaves your PC.',
+      ),
+    );
+  });
+});

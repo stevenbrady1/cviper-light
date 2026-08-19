@@ -27,7 +27,12 @@ import { KEYWORD_KEY, providerOptions } from './providers';
 
 const NOW = '2026-08-19T09:00:00.000Z';
 
-const [BASIC] = providerOptions({ ollamaModels: [], anthropicKey: false, openaiKey: false });
+const [BASIC] = providerOptions({
+  ollamaRunning: false,
+  ollamaModels: [],
+  anthropicKey: false,
+  openaiKey: false,
+});
 
 const CV: Cv = {
   id: 'cv-1',

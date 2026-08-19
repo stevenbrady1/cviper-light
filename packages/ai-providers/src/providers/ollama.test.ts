@@ -207,6 +207,98 @@ describe('ollama listModels', () => {
     if (result.ok) expect(result.value.map((model) => model.id)).toEqual(['llama3.2:latest']);
   });
 
+  it('hides an embedding model whose name does not contain "embed"', async () => {
+    // THE REAL PRODUCTION PATH. `/api/tags` does NOT carry `capabilities` — that
+    // field only appears on `/api/show` — so on every live daemon the fallback
+    // below is the ONLY filter that runs. A name check alone lets `all-minilm`
+    // and `bge-m3` into a chat picker, where choosing one returns a vector and
+    // the analysis fails with something nobody can act on.
+    //
+    // The architecture is the honest signal, and `/api/tags` does report it:
+    // every embedding model in Ollama's library is a BERT variant, and no chat
+    // model is.
+    const tags = JSON.stringify({
+      models: [
+        { name: 'all-minilm:latest', model: 'all-minilm:latest', details: { family: 'bert' } },
+        { name: 'bge-m3:latest', model: 'bge-m3:latest', details: { families: ['bert'] } },
+        {
+          name: 'nomic-embed-text:latest',
+          model: 'nomic-embed-text:latest',
+          details: { family: 'nomic-bert' },
+        },
+        { name: 'llama3.2:latest', model: 'llama3.2:latest', details: { family: 'llama' } },
+      ],
+    });
+    const transport = fakeTransport({ models: { status: 200, body: tags } });
+    const result = await createOllamaProvider(transport).listModels();
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.map((model) => model.id)).toEqual(['llama3.2:latest']);
+  });
+
+  it('hides a known embedding model even when the daemon reports no details at all', async () => {
+    const tags = JSON.stringify({
+      models: [
+        { name: 'all-minilm:l6-v2', model: 'all-minilm:l6-v2' },
+        { name: 'paraphrase-multilingual:latest', model: 'paraphrase-multilingual:latest' },
+        { name: 'llama3.2:latest', model: 'llama3.2:latest' },
+      ],
+    });
+    const transport = fakeTransport({ models: { status: 200, body: tags } });
+    const result = await createOllamaProvider(transport).listModels();
+
+    if (result.ok) expect(result.value.map((model) => model.id)).toEqual(['llama3.2:latest']);
+  });
+
+  it('does not mistake a chat model for an embedder because of its name', async () => {
+    // The other half of the guard. A filter that is too eager is worse than no
+    // filter: it empties the picker on a machine that is correctly set up, and
+    // there is nothing on screen to explain why.
+    const tags = JSON.stringify({
+      models: [
+        { name: 'gemma3:4b', model: 'gemma3:4b', details: { family: 'gemma3' } },
+        { name: 'qwen2.5-coder:7b', model: 'qwen2.5-coder:7b', details: { family: 'qwen2' } },
+        { name: 'phi4-mini:latest', model: 'phi4-mini:latest', details: { family: 'phi3' } },
+        {
+          name: 'mistral-small:latest',
+          model: 'mistral-small:latest',
+          details: { family: 'llama' },
+        },
+      ],
+    });
+    const transport = fakeTransport({ models: { status: 200, body: tags } });
+    const result = await createOllamaProvider(transport).listModels();
+
+    if (result.ok) {
+      expect(result.value.map((model) => model.id)).toEqual([
+        'gemma3:4b',
+        'qwen2.5-coder:7b',
+        'phi4-mini:latest',
+        'mistral-small:latest',
+      ]);
+    }
+  });
+
+  it('trusts a reported completion capability over the architecture', async () => {
+    // `capabilities` is the daemon's own answer and outranks our guessing. If a
+    // BERT-family model ever gains a completion head, the daemon says so and we
+    // must not overrule it with a heuristic written in 2026.
+    const tags = JSON.stringify({
+      models: [
+        {
+          name: 'oddity:latest',
+          model: 'oddity:latest',
+          details: { family: 'bert' },
+          capabilities: ['completion'],
+        },
+      ],
+    });
+    const transport = fakeTransport({ models: { status: 200, body: tags } });
+    const result = await createOllamaProvider(transport).listModels();
+
+    if (result.ok) expect(result.value.map((model) => model.id)).toEqual(['oddity:latest']);
+  });
+
   it('labels a model with its parameter size when the daemon offers one', async () => {
     const transport = fakeTransport({ models: { status: 200, body: TAGS_OK } });
     const result = await createOllamaProvider(transport).listModels();

@@ -51,6 +51,7 @@ describe('readAvailability', () => {
     nothingConfigured();
 
     await expect(readAvailability()).resolves.toEqual({
+      ollamaRunning: false,
       ollamaModels: [],
       anthropicKey: false,
       openaiKey: false,
@@ -80,6 +81,7 @@ describe('readAvailability', () => {
     });
 
     await expect(readAvailability()).resolves.toEqual({
+      ollamaRunning: false,
       ollamaModels: [],
       anthropicKey: true,
       openaiKey: false,
@@ -95,6 +97,7 @@ describe('readAvailability', () => {
     });
 
     await expect(readAvailability()).resolves.toEqual({
+      ollamaRunning: false,
       ollamaModels: [],
       anthropicKey: false,
       openaiKey: false,
@@ -108,7 +111,11 @@ describe('readAvailability', () => {
       throw new Error(`unexpected command: ${command}`);
     });
 
+    // `ollamaRunning` is TRUE here: something answered on the port. It is not
+    // this file's job to decide that the answer was rubbish — the model list is
+    // empty, which is the fact the picker acts on.
     await expect(readAvailability()).resolves.toEqual({
+      ollamaRunning: true,
       ollamaModels: [],
       anthropicKey: false,
       openaiKey: false,
@@ -123,6 +130,25 @@ describe('readAvailability', () => {
     });
 
     expect((await readAvailability()).ollamaModels).toEqual([]);
+  });
+
+  it('separates "running with nothing usable" from "not running at all"', async () => {
+    // The distinction the picker's hint is built on. Both machines show the
+    // same empty list; only one of them has a user who is one command away.
+    tauri.invoke.mockImplementation(async (command) => {
+      if (command === 'ollama_probe') {
+        return JSON.stringify({
+          models: [{ model: 'nomic-embed-text:latest', name: 'nomic-embed-text:latest' }],
+        });
+      }
+      if (command === 'secret_status') return false;
+      throw new Error(`unexpected command: ${command}`);
+    });
+
+    const availability = await readAvailability();
+
+    expect(availability.ollamaRunning).toBe(true);
+    expect(availability.ollamaModels).toEqual([]);
   });
 
   it('never calls a provider command — the probe is not a request', async () => {
