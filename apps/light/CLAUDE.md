@@ -28,6 +28,13 @@ Three permissions in that file are load-bearing and easy to delete by accident:
 | `dialog:allow-ask`     | Not in `dialog:default`, despite the docs.                             |
 | `dialog:allow-confirm` | Not in `dialog:default`, despite the docs.                             |
 
+`dialog:allow-open` and `dialog:allow-save` are **deliberately absent**. The file
+and save dialogs run in Rust (`src-tauri/src/files.rs`), so JavaScript never
+receives — and can therefore never supply — a path. Re-adding either permission
+puts the OS picker back on the JavaScript side and re-opens that hole; the guard
+`no_command_accepts_a_filesystem_path` only stops the Rust half of the
+regression.
+
 ## Rust dependency traps
 
 - `tauri-plugin-sql` **must** keep `features = ["sqlite"]`. `pnpm tauri add sql`

@@ -52,11 +52,13 @@ pub fn run() {
             providers::provider_list_models,
             providers::ollama_probe,
             // Reading a CV the user picked, and reading or writing a backup.
-            // Narrow by extension and by size — see the module comment in
-            // files.rs for why there is no general-purpose file command.
-            files::read_cv_file,
-            files::read_backup_file,
-            files::write_backup_file,
+            // Each one opens the dialog ITSELF and touches only what came back
+            // out of it: there is no command here that takes a path, so there
+            // is no path for a compromised frontend to name. Same principle as
+            // secrets::secret_get above. See the module comment in files.rs.
+            files::pick_and_read_cv,
+            files::pick_and_read_backup,
+            files::pick_and_write_backup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

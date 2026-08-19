@@ -1,6 +1,6 @@
 /**
- * The file boundary: the OS dialog, and the three narrow Rust commands behind
- * it.
+ * The file boundary: three narrow Rust commands, each of which runs its own
+ * dialog.
  *
  * ============================================================================
  * THIS FILE IS THE ONLY THING IN THE APP THAT KNOWS FILES EXIST.
@@ -10,11 +10,26 @@
  * that is on purpose — it is why both can be tested exhaustively without a
  * filesystem. This module supplies the bytes and takes the string away again.
  *
- * The commands it calls are deliberately incapable of touching an arbitrary
- * file: `read_cv_file` opens a PDF or a Word document and nothing else,
- * `read_backup_file` and `write_backup_file` touch `.json` and nothing else,
- * and all three check the size from the directory entry before reading. See the
- * module comment in `src-tauri/src/files.rs`.
+ * ============================================================================
+ * NOTHING HERE CAN NAME A FILE, AND THERE IS NO DIALOG ON THIS SIDE.
+ * ============================================================================
+ * These commands used to take a path: the dialog ran here, in JavaScript, and
+ * handed its answer to Rust to open. Rust checked the extension, the size and
+ * the file type, so the worst outcome was reading somebody's documents rather
+ * than their credentials — but the path itself was still whatever the caller
+ * said, and this app feeds attacker-written job adverts into a language model
+ * all day.
+ *
+ * The dialog now lives in `src-tauri/src/files.rs`. `pick_and_read_cv` takes no
+ * arguments at all; `pick_and_write_backup` takes the bytes to write and a
+ * suggested file NAME, which Rust replaces outright if it looks like anything
+ * other than a bare name. So there is nothing left in this file for injected
+ * script to point somewhere interesting. Same principle as `secret_get`, which
+ * is deliberately not a command at all.
+ *
+ * Paths come back OUT — the CV row records where it came from and the export
+ * message says where the backup went — because that is a report of what the
+ * user just did in a dialog they were looking at.
  *
  * ============================================================================
  * CANCELLING IS NOT AN ERROR
@@ -23,15 +38,12 @@
  * "the user closed the dialog". That is the single most common outcome of
  * opening a file picker and it is not a failure — showing a red message because
  * somebody changed their mind is the sort of thing that teaches people to
- * distrust every other message the app shows them.
+ * distrust every other message the app shows them. Rust says the same thing the
+ * same way: `Ok(None)`, which arrives here as `null`.
  */
 import { invoke } from '@tauri-apps/api/core';
-import { open, save } from '@tauri-apps/plugin-dialog';
 
 import { err, ok, type Result } from '@cviper/core-types';
-
-/** Extensions the CV dialog offers, matching `CV_EXTENSIONS` in `files.rs`. */
-const CV_EXTENSIONS = ['pdf', 'docx', 'doc'];
 
 /** A CV, read off the disk. */
 export interface PickedCv {
@@ -90,30 +102,7 @@ export function decodeBase64(encoded: string): Uint8Array | null {
 }
 
 /**
- * The one path the dialog chose, or `null`.
- *
- * `open` is typed as `string | string[] | null` because its return shape
- * depends on the options object, and TypeScript cannot narrow that from a
- * runtime flag. Handled here rather than cast, so a future options change
- * cannot turn into `undefined` reaching `invoke` as a path.
- */
-function singlePath(chosen: unknown): string | null {
-  if (typeof chosen === 'string') return chosen;
-  if (Array.isArray(chosen)) {
-    const first: unknown = chosen[0];
-    return typeof first === 'string' ? first : null;
-  }
-  return null;
-}
-
-/** The file's own name, from a Windows or POSIX path. */
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/);
-  return parts[parts.length - 1] ?? path;
-}
-
-/**
- * The text of something `invoke` or the dialog rejected with.
+ * The text of something `invoke` rejected with.
  *
  * ============================================================================
  * ONLY A STRING IS PASSED THROUGH. AN `Error` IS NOT.
@@ -142,37 +131,34 @@ function readString(source: unknown, key: string): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+/**
+ * `true` when Rust said the user cancelled.
+ *
+ * Checked BEFORE the reply is read for fields, so a cancellation can never be
+ * mistaken for a reply we could not parse and reported as a failure.
+ */
+function cancelled(reply: unknown): boolean {
+  return reply === null || reply === undefined;
+}
+
 export function createTauriFilePort(): FilePort {
   return {
     async pickCv() {
-      let chosen: unknown;
-      try {
-        chosen = await open({
-          multiple: false,
-          directory: false,
-          title: 'Choose a CV',
-          filters: [{ name: 'CV', extensions: CV_EXTENSIONS }],
-        });
-      } catch (thrown) {
-        return err({
-          message: rejectionMessage(thrown, 'The file picker would not open. Try again.'),
-        });
-      }
-
-      const path = singlePath(chosen);
-      // Cancelled. Nothing is read, and nothing is said. See the header.
-      if (path === null) return ok(null);
-
       let reply: unknown;
       try {
-        reply = await invoke('read_cv_file', { path });
+        // No arguments. There is nothing to pass, which is the point.
+        reply = await invoke('pick_and_read_cv');
       } catch (thrown) {
         return err({
-          message: rejectionMessage(thrown, 'That file could not be read. Try a different copy.'),
+          message: rejectionMessage(thrown, 'That CV could not be opened. Try again.'),
         });
       }
 
+      // Cancelled. Nothing is read, and nothing is said. See the header.
+      if (cancelled(reply)) return ok(null);
+
       const name = readString(reply, 'name');
+      const path = readString(reply, 'path');
       const encoded = readString(reply, 'bytes_base64');
       const bytes = encoded === null ? null : decodeBase64(encoded);
 
@@ -180,7 +166,7 @@ export function createTauriFilePort(): FilePort {
       // Empty text would be analysed and reported as "no skills found", which
       // looks like an answer — the exact failure `ExtractedDocument.warnings`
       // exists to prevent.
-      if (name === null || bytes === null) {
+      if (name === null || path === null || bytes === null) {
         return err({
           message:
             'CViper read that file but could not make sense of what came back. ' +
@@ -192,61 +178,58 @@ export function createTauriFilePort(): FilePort {
     },
 
     async pickBackup() {
-      let chosen: unknown;
+      let reply: unknown;
       try {
-        chosen = await open({
-          multiple: false,
-          directory: false,
-          title: 'Choose a CViper backup',
-          filters: [{ name: 'CViper backup', extensions: ['json'] }],
-        });
+        reply = await invoke('pick_and_read_backup');
       } catch (thrown) {
         return err({
-          message: rejectionMessage(thrown, 'The file picker would not open. Try again.'),
+          message: rejectionMessage(thrown, 'That backup could not be opened. Try again.'),
         });
       }
 
-      const path = singlePath(chosen);
-      if (path === null) return ok(null);
+      if (cancelled(reply)) return ok(null);
 
-      try {
-        const text = await invoke('read_backup_file', { path });
-        if (typeof text !== 'string') {
-          return err({ message: 'That backup could not be read. Try exporting it again.' });
-        }
-        return ok({ name: basename(path), path, text });
-      } catch (thrown) {
-        return err({
-          message: rejectionMessage(thrown, 'That backup could not be read.'),
-        });
+      const name = readString(reply, 'name');
+      const path = readString(reply, 'path');
+      const text = readString(reply, 'text');
+
+      if (name === null || path === null || text === null) {
+        return err({ message: 'That backup could not be read. Try exporting it again.' });
       }
+
+      return ok({ name, path, text });
     },
 
     async saveBackup(contents, suggestedName) {
-      let chosen: unknown;
+      let reply: unknown;
       try {
-        chosen = await save({
-          title: 'Save your CViper backup',
-          defaultPath: suggestedName,
-          filters: [{ name: 'CViper backup', extensions: ['json'] }],
-        });
+        // `suggestion` only pre-fills the dialog's name box, and Rust throws it
+        // away entirely unless it is a bare `.json` file name. It is not, and
+        // cannot become, a destination.
+        //
+        // The key is one word because Tauri camelCases a Rust command's
+        // snake_case parameters across the boundary: a `suggested_name` there
+        // would have to be `suggestedName` here, with no compile error on
+        // either side if the two ever drifted apart.
+        reply = await invoke('pick_and_write_backup', { contents, suggestion: suggestedName });
       } catch (thrown) {
         return err({
-          message: rejectionMessage(thrown, 'The save dialog would not open. Try again.'),
+          message: rejectionMessage(thrown, 'The backup could not be saved. Try again.'),
         });
       }
 
-      const path = singlePath(chosen);
-      if (path === null) return ok(null);
+      if (cancelled(reply)) return ok(null);
 
-      try {
-        await invoke('write_backup_file', { path, contents });
-        return ok(path);
-      } catch (thrown) {
+      // Written, but Rust did not say where. Reporting that as success would
+      // put "Saved to undefined" on screen; the honest answer is that the save
+      // is in doubt.
+      if (typeof reply !== 'string') {
         return err({
-          message: rejectionMessage(thrown, 'The backup could not be written.'),
+          message: 'CViper saved that backup but could not report where it went.',
         });
       }
+
+      return ok(reply);
     },
   };
 }

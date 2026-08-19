@@ -1,8 +1,11 @@
 /**
- * The file boundary: the dialog, and the three narrow Rust commands behind it.
+ * The file boundary: three Rust commands, each of which opens its own dialog.
  *
- * Everything here is mocked at the two seams the app actually has — the dialog
- * plugin and `invoke` — because there is no Tauri runtime in a Vitest process.
+ * There is only ONE seam left to mock — `invoke` — because the dialog moved
+ * into Rust. That is the whole point of the change: the frontend no longer
+ * knows a path exists until Rust reports one back, so there is no second thing
+ * here to fake and no path for a test (or an injected script) to supply.
+ *
  * What is NOT mocked is the base64 decoder, which is the one piece of real
  * logic in this file and is checked against the RFC's own vectors.
  */
@@ -10,19 +13,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const tauri = vi.hoisted(() => ({
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
-  open: vi.fn<(options?: unknown) => Promise<unknown>>(),
-  save: vi.fn<(options?: unknown) => Promise<unknown>>(),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
-vi.mock('@tauri-apps/plugin-dialog', () => ({ open: tauri.open, save: tauri.save }));
 
 const { createTauriFilePort, decodeBase64 } = await import('./files');
 
 beforeEach(() => {
   tauri.invoke.mockReset();
-  tauri.open.mockReset();
-  tauri.save.mockReset();
 });
 
 /** The bytes of a string, for comparing against a decode. */
@@ -61,9 +59,12 @@ describe('decodeBase64', () => {
 });
 
 describe('pickCv', () => {
-  it('reads the file the user chose', async () => {
-    tauri.open.mockResolvedValue('C:\\Users\\steve\\Documents\\CV.pdf');
-    tauri.invoke.mockResolvedValue({ name: 'CV.pdf', bytes_base64: 'Zm9vYmFy' });
+  it('asks Rust to run the dialog, and never names a file', async () => {
+    tauri.invoke.mockResolvedValue({
+      name: 'CV.pdf',
+      path: 'C:\\Users\\steve\\Documents\\CV.pdf',
+      bytes_base64: 'Zm9vYmFy',
+    });
 
     const picked = await createTauriFilePort().pickCv();
 
@@ -72,33 +73,25 @@ describe('pickCv', () => {
     expect(picked.value?.name).toBe('CV.pdf');
     expect(picked.value?.path).toBe('C:\\Users\\steve\\Documents\\CV.pdf');
     expect(picked.value?.bytes).toEqual(bytesOf('foobar'));
-    expect(tauri.invoke).toHaveBeenCalledWith('read_cv_file', {
-      path: 'C:\\Users\\steve\\Documents\\CV.pdf',
-    });
+
+    // ONE call, and no arguments at all. An argument here would be the hole
+    // this whole boundary exists to close — see the module comment in files.rs.
+    expect(tauri.invoke).toHaveBeenCalledTimes(1);
+    expect(tauri.invoke).toHaveBeenCalledWith('pick_and_read_cv');
   });
 
   it('treats a cancelled dialog as nothing happening, not as a failure', async () => {
-    tauri.open.mockResolvedValue(null);
+    // Rust answers `Ok(None)`, which arrives as null. Showing a red message
+    // because somebody changed their mind teaches people to distrust every
+    // other message the app shows them.
+    tauri.invoke.mockResolvedValue(null);
 
     const picked = await createTauriFilePort().pickCv();
 
     expect(picked).toEqual({ ok: true, value: null });
-    // Nothing was chosen, so nothing is read. A cancel that still hit the disk
-    // would be a bug the user could not see.
-    expect(tauri.invoke).not.toHaveBeenCalled();
-  });
-
-  it('unwraps an array, because the dialog may answer with one', async () => {
-    tauri.open.mockResolvedValue(['C:\\one.pdf']);
-    tauri.invoke.mockResolvedValue({ name: 'one.pdf', bytes_base64: 'Zm9v' });
-
-    const picked = await createTauriFilePort().pickCv();
-
-    expect(picked.ok && picked.value?.path).toBe('C:\\one.pdf');
   });
 
   it("passes the Rust refusal through in Rust's own words", async () => {
-    tauri.open.mockResolvedValue('C:\\secrets.txt');
     tauri.invoke.mockRejectedValue(
       'CViper cannot read that kind of file. Pick a PDF or a Word (.docx) CV.',
     );
@@ -112,47 +105,66 @@ describe('pickCv', () => {
     );
   });
 
-  it('reports a reply it cannot read, rather than handing back empty bytes', async () => {
-    // Empty bytes would be analysed as an empty CV and reported as "no skills
-    // found", which looks like an answer. See `document.ts` in @cviper/cv-parsing.
-    tauri.open.mockResolvedValue('C:\\cv.pdf');
-    tauri.invoke.mockResolvedValue({ name: 'cv.pdf' });
-
-    const picked = await createTauriFilePort().pickCv();
-
-    expect(picked.ok).toBe(false);
-  });
-
-  it('reports a dialog that will not open', async () => {
-    tauri.open.mockRejectedValue(new Error('no display'));
+  it('replaces a developer-facing failure with a sentence for the user', async () => {
+    // An `Error` is a Tauri-level problem — no display, missing permission —
+    // and its message is written for us, not for somebody whose CV would not
+    // open. Same rule as `toProviderError` in `src/ai/transport.ts`.
+    tauri.invoke.mockRejectedValue(new Error('window not found'));
 
     const picked = await createTauriFilePort().pickCv();
 
     expect(picked.ok).toBe(false);
     if (picked.ok) return;
-    expect(picked.error.message).toContain('file picker');
+    expect(picked.error.message).not.toContain('window not found');
+    expect(picked.error.message).toContain('CV');
+  });
+
+  it('reports a reply it cannot read, rather than handing back empty bytes', async () => {
+    // Empty bytes would be analysed as an empty CV and reported as "no skills
+    // found", which looks like an answer. See `document.ts` in @cviper/cv-parsing.
+    tauri.invoke.mockResolvedValue({ name: 'cv.pdf', path: 'C:\\cv.pdf' });
+
+    const picked = await createTauriFilePort().pickCv();
+
+    expect(picked.ok).toBe(false);
+  });
+
+  it('reports a reply whose base64 is not base64', async () => {
+    tauri.invoke.mockResolvedValue({
+      name: 'cv.pdf',
+      path: 'C:\\cv.pdf',
+      bytes_base64: 'not base64!!',
+    });
+
+    const picked = await createTauriFilePort().pickCv();
+
+    expect(picked.ok).toBe(false);
   });
 });
 
 describe('pickBackup', () => {
-  it('reads the backup the user chose', async () => {
-    tauri.open.mockResolvedValue('C:\\backup.json');
-    tauri.invoke.mockResolvedValue('{"schemaVersion":1}');
+  it('asks Rust to run the dialog, and never names a file', async () => {
+    tauri.invoke.mockResolvedValue({
+      name: 'backup.json',
+      path: 'C:\\backup.json',
+      text: '{"schemaVersion":1}',
+    });
 
     const picked = await createTauriFilePort().pickBackup();
 
     expect(picked.ok && picked.value?.text).toBe('{"schemaVersion":1}');
+    // The name is what the import confirmation shows: "Import from backup.json?"
     expect(picked.ok && picked.value?.name).toBe('backup.json');
-    expect(tauri.invoke).toHaveBeenCalledWith('read_backup_file', { path: 'C:\\backup.json' });
+    expect(tauri.invoke).toHaveBeenCalledTimes(1);
+    expect(tauri.invoke).toHaveBeenCalledWith('pick_and_read_backup');
   });
 
   it('treats a cancelled dialog as nothing happening', async () => {
-    tauri.open.mockResolvedValue(null);
+    tauri.invoke.mockResolvedValue(null);
     expect(await createTauriFilePort().pickBackup()).toEqual({ ok: true, value: null });
   });
 
   it('passes a Rust refusal through', async () => {
-    tauri.open.mockResolvedValue('C:\\backup.json');
     tauri.invoke.mockRejectedValue('That file is no longer there.');
 
     const picked = await createTauriFilePort().pickBackup();
@@ -161,43 +173,44 @@ describe('pickBackup', () => {
     if (picked.ok) return;
     expect(picked.error.message).toBe('That file is no longer there.');
   });
+
+  it('reports a reply it cannot read, rather than importing nothing', async () => {
+    // A backup that arrived as an unreadable shape must not become an empty
+    // import that silently replaces the user's data with nothing.
+    tauri.invoke.mockResolvedValue({ name: 'backup.json', path: 'C:\\backup.json' });
+
+    const picked = await createTauriFilePort().pickBackup();
+
+    expect(picked.ok).toBe(false);
+  });
 });
 
 describe('saveBackup', () => {
-  it('writes to the path the user chose and reports it back', async () => {
-    tauri.save.mockResolvedValue('C:\\Users\\steve\\Documents\\cviper-backup.json');
+  it('hands Rust the contents and a suggested NAME, never a path', async () => {
+    tauri.invoke.mockResolvedValue('C:\\Users\\steve\\Documents\\cviper-backup.json');
+
+    const saved = await createTauriFilePort().saveBackup('{}', 'cviper-backup-2026-08-19.json');
+
+    expect(saved).toEqual({ ok: true, value: 'C:\\Users\\steve\\Documents\\cviper-backup.json' });
+    // `suggestion`, one word, because Tauri camelCases a Rust command's
+    // snake_case parameters and a two-word name would silently need two
+    // spellings. `the_frontend_calls_these_commands_by_these_names` in
+    // files.rs pins this key against the Rust signature.
+    expect(tauri.invoke).toHaveBeenCalledWith('pick_and_write_backup', {
+      contents: '{}',
+      suggestion: 'cviper-backup-2026-08-19.json',
+    });
+  });
+
+  it('treats a cancelled save as nothing happening', async () => {
     tauri.invoke.mockResolvedValue(null);
 
     const saved = await createTauriFilePort().saveBackup('{}', 'cviper-backup.json');
 
-    expect(saved).toEqual({ ok: true, value: 'C:\\Users\\steve\\Documents\\cviper-backup.json' });
-    expect(tauri.invoke).toHaveBeenCalledWith('write_backup_file', {
-      path: 'C:\\Users\\steve\\Documents\\cviper-backup.json',
-      contents: '{}',
-    });
-  });
-
-  it('treats a cancelled save as nothing happening, and writes nothing', async () => {
-    tauri.save.mockResolvedValue(null);
-
-    const saved = await createTauriFilePort().saveBackup('{}', 'cviper-backup.json');
-
     expect(saved).toEqual({ ok: true, value: null });
-    expect(tauri.invoke).not.toHaveBeenCalled();
-  });
-
-  it('offers the suggested filename to the dialog', async () => {
-    tauri.save.mockResolvedValue(null);
-
-    await createTauriFilePort().saveBackup('{}', 'cviper-backup-2026-08-19.json');
-
-    expect(tauri.save).toHaveBeenCalledWith(
-      expect.objectContaining({ defaultPath: 'cviper-backup-2026-08-19.json' }),
-    );
   });
 
   it('passes a write refusal through', async () => {
-    tauri.save.mockResolvedValue('C:\\Windows\\backup.json');
     tauri.invoke.mockRejectedValue('Windows would not let CViper write there.');
 
     const saved = await createTauriFilePort().saveBackup('{}', 'b.json');
@@ -205,5 +218,15 @@ describe('saveBackup', () => {
     expect(saved.ok).toBe(false);
     if (saved.ok) return;
     expect(saved.error.message).toBe('Windows would not let CViper write there.');
+  });
+
+  it('reports a reply that is neither a path nor a cancellation', async () => {
+    // Answering "saved" without saying where would put "Saved to undefined" in
+    // front of the user, which is worse than admitting the write is in doubt.
+    tauri.invoke.mockResolvedValue(42);
+
+    const saved = await createTauriFilePort().saveBackup('{}', 'b.json');
+
+    expect(saved.ok).toBe(false);
   });
 });
