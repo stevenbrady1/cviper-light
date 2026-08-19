@@ -1,4 +1,5 @@
 mod db;
+mod secrets;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -30,7 +31,19 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
 
     builder
-        .invoke_handler(tauri::generate_handler![greet])
+        // Custom commands are allow-by-default: only PLUGIN commands are
+        // gated by capabilities/default.json, so the secret commands need no
+        // entry there. They do need to be listed here.
+        //
+        // There is no read command. See the module comment in secrets.rs: the
+        // only way to read a saved key is from Rust, and adding one here
+        // would undo that.
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            secrets::secret_set,
+            secrets::secret_delete,
+            secrets::secret_status,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
