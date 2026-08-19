@@ -1,91 +1,27 @@
 {
   "_comment": "CV-705e Phase 4 — Public sector / policy / non-profit lexicon. Uses 'community engagement' (not the base 'stakeholder management' value).",
   "related_terms": {
-    "policy development": [
-      "policy analysis",
-      "policy advisor",
-      "public policy",
-      "policy making"
-    ],
+    "policy development": ["policy analysis", "policy advisor", "public policy", "policy making"],
     "public administration": [
       "civil service",
       "local government",
       "public sector administration",
       "central government"
     ],
-    "grant management": [
-      "grants",
-      "grant funding",
-      "funding applications",
-      "bid writing"
-    ],
-    "casework": [
-      "caseworker",
-      "case management",
-      "client casework"
-    ],
-    "community engagement": [
-      "community outreach",
-      "public engagement",
-      "community development"
-    ],
-    "non-profit": [
-      "not for profit",
-      "charity",
-      "third sector",
-      "ngo"
-    ],
-    "fundraising": [
-      "fundraiser",
-      "donor management",
-      "income generation"
-    ],
-    "freedom of information": [
-      "foi",
-      "data protection requests"
-    ],
-    "commissioning": [
-      "service commissioning",
-      "public commissioning"
-    ]
+    "grant management": ["grants", "grant funding", "funding applications", "bid writing"],
+    "casework": ["caseworker", "case management", "client casework"],
+    "community engagement": ["community outreach", "public engagement", "community development"],
+    "non-profit": ["not for profit", "charity", "third sector", "ngo"],
+    "fundraising": ["fundraiser", "donor management", "income generation"],
+    "freedom of information": ["foi", "data protection requests"],
+    "commissioning": ["service commissioning", "public commissioning"]
   },
   "skill_title_map": [
-    [
-      [
-        "policy development",
-        "public administration"
-      ],
-      "Policy Advisor"
-    ],
-    [
-      [
-        "grant management",
-        "fundraising"
-      ],
-      "Grants Manager"
-    ],
-    [
-      [
-        "casework",
-        "community engagement"
-      ],
-      "Caseworker"
-    ],
-    [
-      [
-        "non-profit",
-        "fundraising",
-        "community engagement"
-      ],
-      "Charity Manager"
-    ],
-    [
-      [
-        "public administration",
-        "commissioning"
-      ],
-      "Local Government Officer"
-    ]
+    [["policy development", "public administration"], "Policy Advisor"],
+    [["grant management", "fundraising"], "Grants Manager"],
+    [["casework", "community engagement"], "Caseworker"],
+    [["non-profit", "fundraising", "community engagement"], "Charity Manager"],
+    [["public administration", "commissioning"], "Local Government Officer"]
   ],
   "skill_weights": {},
   "common_skills": [

@@ -13,48 +13,14 @@
       "year-end accounts",
       "financial statements"
     ],
-    "audit": [
-      "auditing",
-      "internal audit",
-      "external audit",
-      "statutory audit"
-    ],
-    "tax": [
-      "taxation",
-      "corporate tax",
-      "vat",
-      "tax compliance",
-      "tax advisory"
-    ],
-    "accounts payable": [
-      "ap",
-      "purchase ledger"
-    ],
-    "accounts receivable": [
-      "ar",
-      "sales ledger",
-      "credit control"
-    ],
-    "account reconciliation": [
-      "balance sheet reconciliation",
-      "ledger reconciliation"
-    ],
-    "bookkeeping": [
-      "bookkeeper",
-      "ledger management"
-    ],
-    "financial reporting": [
-      "statutory reporting",
-      "management reporting",
-      "ifrs",
-      "uk gaap"
-    ],
-    "fp&a": [
-      "financial planning and analysis",
-      "budgeting",
-      "forecasting",
-      "variance analysis"
-    ],
+    "audit": ["auditing", "internal audit", "external audit", "statutory audit"],
+    "tax": ["taxation", "corporate tax", "vat", "tax compliance", "tax advisory"],
+    "accounts payable": ["ap", "purchase ledger"],
+    "accounts receivable": ["ar", "sales ledger", "credit control"],
+    "account reconciliation": ["balance sheet reconciliation", "ledger reconciliation"],
+    "bookkeeping": ["bookkeeper", "ledger management"],
+    "financial reporting": ["statutory reporting", "management reporting", "ifrs", "uk gaap"],
+    "fp&a": ["financial planning and analysis", "budgeting", "forecasting", "variance analysis"],
     "acca": [
       "association of chartered certified accountants",
       "chartered accountant",
@@ -63,44 +29,11 @@
     ]
   },
   "skill_title_map": [
-    [
-      [
-        "management accounting",
-        "financial reporting",
-        "fp&a"
-      ],
-      "Management Accountant"
-    ],
-    [
-      [
-        "financial accounting",
-        "financial reporting",
-        "audit"
-      ],
-      "Financial Accountant"
-    ],
-    [
-      [
-        "audit",
-        "internal audit"
-      ],
-      "Auditor"
-    ],
-    [
-      [
-        "tax",
-        "tax compliance"
-      ],
-      "Tax Advisor"
-    ],
-    [
-      [
-        "bookkeeping",
-        "accounts payable",
-        "accounts receivable"
-      ],
-      "Bookkeeper"
-    ]
+    [["management accounting", "financial reporting", "fp&a"], "Management Accountant"],
+    [["financial accounting", "financial reporting", "audit"], "Financial Accountant"],
+    [["audit", "internal audit"], "Auditor"],
+    [["tax", "tax compliance"], "Tax Advisor"],
+    [["bookkeeping", "accounts payable", "accounts receivable"], "Bookkeeper"]
   ],
   "skill_weights": {},
   "common_skills": [

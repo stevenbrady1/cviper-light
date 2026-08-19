@@ -1,108 +1,28 @@
 {
   "_comment": "CV-705d Phase 3 — Manufacturing / supply chain / logistics lexicon. Uses 'quality control' (not the base 'quality assurance'/'qa' keys).",
   "related_terms": {
-    "manufacturing": [
-      "production",
-      "manufacturing operations",
-      "factory operations"
-    ],
-    "supply chain": [
-      "supply chain management",
-      "scm",
-      "supply chain planning",
-      "s&op"
-    ],
-    "logistics": [
-      "distribution",
-      "freight",
-      "transport management",
-      "3pl"
-    ],
-    "procurement": [
-      "purchasing",
-      "sourcing",
-      "strategic sourcing",
-      "vendor management"
-    ],
-    "lean manufacturing": [
-      "lean",
-      "six sigma",
-      "kaizen",
-      "5s",
-      "continuous improvement"
-    ],
-    "inventory management": [
-      "stock control",
-      "inventory control",
-      "warehouse management",
-      "wms"
-    ],
-    "production planning": [
-      "production scheduling",
-      "mrp",
-      "capacity planning"
-    ],
-    "quality control": [
-      "qc",
-      "quality management",
-      "iso 9001",
-      "spc"
-    ],
+    "manufacturing": ["production", "manufacturing operations", "factory operations"],
+    "supply chain": ["supply chain management", "scm", "supply chain planning", "s&op"],
+    "logistics": ["distribution", "freight", "transport management", "3pl"],
+    "procurement": ["purchasing", "sourcing", "strategic sourcing", "vendor management"],
+    "lean manufacturing": ["lean", "six sigma", "kaizen", "5s", "continuous improvement"],
+    "inventory management": ["stock control", "inventory control", "warehouse management", "wms"],
+    "production planning": ["production scheduling", "mrp", "capacity planning"],
+    "quality control": ["qc", "quality management", "iso 9001", "spc"],
     "manufacturing engineering": [
       "process engineering",
       "production engineering",
       "manufacturing engineer"
     ],
-    "warehouse operations": [
-      "warehousing",
-      "fulfilment",
-      "goods in",
-      "dispatch"
-    ],
-    "demand planning": [
-      "demand forecasting",
-      "forecasting"
-    ]
+    "warehouse operations": ["warehousing", "fulfilment", "goods in", "dispatch"],
+    "demand planning": ["demand forecasting", "forecasting"]
   },
   "skill_title_map": [
-    [
-      [
-        "manufacturing",
-        "production planning",
-        "lean manufacturing"
-      ],
-      "Production Manager"
-    ],
-    [
-      [
-        "supply chain",
-        "logistics",
-        "procurement"
-      ],
-      "Supply Chain Manager"
-    ],
-    [
-      [
-        "logistics",
-        "warehouse operations",
-        "inventory management"
-      ],
-      "Logistics Manager"
-    ],
-    [
-      [
-        "procurement",
-        "sourcing"
-      ],
-      "Procurement Manager"
-    ],
-    [
-      [
-        "manufacturing engineering",
-        "quality control"
-      ],
-      "Manufacturing Engineer"
-    ]
+    [["manufacturing", "production planning", "lean manufacturing"], "Production Manager"],
+    [["supply chain", "logistics", "procurement"], "Supply Chain Manager"],
+    [["logistics", "warehouse operations", "inventory management"], "Logistics Manager"],
+    [["procurement", "sourcing"], "Procurement Manager"],
+    [["manufacturing engineering", "quality control"], "Manufacturing Engineer"]
   ],
   "skill_weights": {},
   "common_skills": [

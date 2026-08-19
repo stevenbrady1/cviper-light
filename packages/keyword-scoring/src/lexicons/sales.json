@@ -1,12 +1,7 @@
 {
   "_comment": "CV-705b Phase 1 — Sales / business development lexicon.",
   "related_terms": {
-    "business development": [
-      "bd",
-      "new business",
-      "biz dev",
-      "business development manager"
-    ],
+    "business development": ["bd", "new business", "biz dev", "business development manager"],
     "account management": [
       "account manager",
       "client management",
@@ -14,82 +9,23 @@
       "relationship management",
       "client relationships"
     ],
-    "lead generation": [
-      "lead gen",
-      "prospecting",
-      "pipeline generation",
-      "demand generation"
-    ],
-    "crm": [
-      "salesforce",
-      "hubspot crm",
-      "pipedrive",
-      "dynamics 365"
-    ],
-    "sales": [
-      "selling",
-      "revenue generation",
-      "sales pipeline"
-    ],
-    "negotiation": [
-      "closing",
-      "deal closing",
-      "contract negotiation"
-    ],
-    "b2b sales": [
-      "business to business sales",
-      "enterprise sales",
-      "b2b"
-    ],
-    "inside sales": [
-      "telesales",
-      "sdr",
-      "bdr",
-      "sales development"
-    ],
-    "field sales": [
-      "outside sales",
-      "territory sales"
-    ],
-    "account executive": [
-      "ae",
-      "sales executive"
-    ]
+    "lead generation": ["lead gen", "prospecting", "pipeline generation", "demand generation"],
+    "crm": ["salesforce", "hubspot crm", "pipedrive", "dynamics 365"],
+    "sales": ["selling", "revenue generation", "sales pipeline"],
+    "negotiation": ["closing", "deal closing", "contract negotiation"],
+    "b2b sales": ["business to business sales", "enterprise sales", "b2b"],
+    "inside sales": ["telesales", "sdr", "bdr", "sales development"],
+    "field sales": ["outside sales", "territory sales"],
+    "account executive": ["ae", "sales executive"]
   },
   "skill_title_map": [
     [
-      [
-        "business development",
-        "lead generation",
-        "crm",
-        "b2b sales"
-      ],
+      ["business development", "lead generation", "crm", "b2b sales"],
       "Business Development Manager"
     ],
-    [
-      [
-        "account management",
-        "crm",
-        "negotiation"
-      ],
-      "Account Manager"
-    ],
-    [
-      [
-        "sales",
-        "lead generation",
-        "crm"
-      ],
-      "Sales Manager"
-    ],
-    [
-      [
-        "inside sales",
-        "sdr",
-        "lead generation"
-      ],
-      "Sales Development Representative"
-    ]
+    [["account management", "crm", "negotiation"], "Account Manager"],
+    [["sales", "lead generation", "crm"], "Sales Manager"],
+    [["inside sales", "sdr", "lead generation"], "Sales Development Representative"]
   ],
   "skill_weights": {},
   "common_skills": [

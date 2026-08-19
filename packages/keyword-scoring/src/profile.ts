@@ -64,7 +64,10 @@ export function titleCase(text: string): string {
  * The haystack is folded ONCE and then tested against every term, rather than
  * re-folding a 50,000-character document a few hundred times.
  */
-export function extractSkills(text: string, vocabulary: readonly string[] = SKILL_VOCABULARY): string[] {
+export function extractSkills(
+  text: string,
+  vocabulary: readonly string[] = SKILL_VOCABULARY,
+): string[] {
   const trimmed = (text || '').slice(0, MAX_TEXT_LENGTH);
   if (!trimmed.trim()) return [];
   const folded = foldSpelling(trimmed.toLowerCase());
@@ -136,7 +139,10 @@ import { lexicon } from './lexicon';
  * prefix is cosmetic for scoring anyway: `coreTitleWords` in `match.ts` strips
  * seniority words before comparing.
  */
-export function suggestedTitles(skills: readonly string[], experienceYears: number | null = null): string[] {
+export function suggestedTitles(
+  skills: readonly string[],
+  experienceYears: number | null = null,
+): string[] {
   const skillsLower = new Set(skills.map((s) => s.toLowerCase()));
   const titles: string[] = [];
 
@@ -173,7 +179,10 @@ function contentLines(text: string): string[] {
   return text
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line.length > 3 && !HEADLINE_NOISE.some((noise) => line.toLowerCase().startsWith(noise)));
+    .filter(
+      (line) =>
+        line.length > 3 && !HEADLINE_NOISE.some((noise) => line.toLowerCase().startsWith(noise)),
+    );
 }
 
 /**
@@ -183,7 +192,12 @@ function contentLines(text: string): string[] {
  */
 function extractJobTitle(lines: readonly string[]): string {
   const first = lines[0];
-  if (first !== undefined && first.length < 120 && !first.includes('|') && !first.toLowerCase().includes('hiring')) {
+  if (
+    first !== undefined &&
+    first.length < 120 &&
+    !first.includes('|') &&
+    !first.toLowerCase().includes('hiring')
+  ) {
     return first;
   }
 

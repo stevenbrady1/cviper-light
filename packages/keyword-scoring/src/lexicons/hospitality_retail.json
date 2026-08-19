@@ -1,101 +1,24 @@
 {
   "_comment": "CV-705e Phase 4 — Hospitality / retail / customer service lexicon.",
   "related_terms": {
-    "customer service": [
-      "customer support",
-      "client service",
-      "customer care",
-      "helpdesk"
-    ],
-    "retail management": [
-      "store management",
-      "retail operations",
-      "shop floor management"
-    ],
-    "merchandising": [
-      "visual merchandising",
-      "stock merchandising",
-      "product display"
-    ],
-    "hospitality": [
-      "hospitality management",
-      "food and beverage",
-      "f&b",
-      "front of house"
-    ],
-    "customer experience": [
-      "cx",
-      "customer satisfaction",
-      "customer journey"
-    ],
-    "complaint handling": [
-      "complaints resolution",
-      "escalations",
-      "query resolution"
-    ],
-    "epos": [
-      "point of sale",
-      "pos",
-      "till operations"
-    ],
-    "stock management": [
-      "stock control",
-      "stock replenishment"
-    ],
-    "customer success": [
-      "account retention",
-      "churn reduction",
-      "customer onboarding"
-    ],
-    "restaurant management": [
-      "restaurant manager",
-      "catering management"
-    ]
+    "customer service": ["customer support", "client service", "customer care", "helpdesk"],
+    "retail management": ["store management", "retail operations", "shop floor management"],
+    "merchandising": ["visual merchandising", "stock merchandising", "product display"],
+    "hospitality": ["hospitality management", "food and beverage", "f&b", "front of house"],
+    "customer experience": ["cx", "customer satisfaction", "customer journey"],
+    "complaint handling": ["complaints resolution", "escalations", "query resolution"],
+    "epos": ["point of sale", "pos", "till operations"],
+    "stock management": ["stock control", "stock replenishment"],
+    "customer success": ["account retention", "churn reduction", "customer onboarding"],
+    "restaurant management": ["restaurant manager", "catering management"]
   },
   "skill_title_map": [
-    [
-      [
-        "customer service",
-        "complaint handling",
-        "customer experience"
-      ],
-      "Customer Service Advisor"
-    ],
-    [
-      [
-        "retail management",
-        "merchandising",
-        "epos"
-      ],
-      "Retail Manager"
-    ],
-    [
-      [
-        "hospitality",
-        "food and beverage"
-      ],
-      "Hospitality Manager"
-    ],
-    [
-      [
-        "restaurant management",
-        "hospitality"
-      ],
-      "Restaurant Manager"
-    ],
-    [
-      [
-        "customer success",
-        "customer experience"
-      ],
-      "Customer Success Manager"
-    ]
+    [["customer service", "complaint handling", "customer experience"], "Customer Service Advisor"],
+    [["retail management", "merchandising", "epos"], "Retail Manager"],
+    [["hospitality", "food and beverage"], "Hospitality Manager"],
+    [["restaurant management", "hospitality"], "Restaurant Manager"],
+    [["customer success", "customer experience"], "Customer Success Manager"]
   ],
   "skill_weights": {},
-  "common_skills": [
-    "customer service",
-    "merchandising",
-    "retail management",
-    "hospitality"
-  ]
+  "common_skills": ["customer service", "merchandising", "retail management", "hospitality"]
 }

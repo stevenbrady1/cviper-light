@@ -9,7 +9,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SKILLS, SKILL_VOCABULARY } from './vocabulary';
-import { buildCvProfile, buildJobPosting, extractJobTitles, extractSkills, suggestedTitles } from './profile';
+import {
+  buildCvProfile,
+  buildJobPosting,
+  extractJobTitles,
+  extractSkills,
+  suggestedTitles,
+} from './profile';
 
 describe('SKILL_VOCABULARY', () => {
   it('merges the default skills with every lexicon common_skills entry', () => {
@@ -33,7 +39,9 @@ describe('SKILL_VOCABULARY', () => {
 
 describe('extractSkills', () => {
   it('finds lexicon skills named in the text', () => {
-    const found = extractSkills('Built REST APIs in Python and deployed on AWS with Docker containers');
+    const found = extractSkills(
+      'Built REST APIs in Python and deployed on AWS with Docker containers',
+    );
     expect(found).toContain('python');
     expect(found).toContain('aws');
     expect(found).toContain('docker');
@@ -103,12 +111,9 @@ describe('extractJobTitles', () => {
   });
 
   // NEGATIVE
-  it.each(['', '   ', 'no roles mentioned here whatsoever'])(
-    'returns nothing for %j',
-    (text) => {
-      expect(extractJobTitles(text)).toEqual([]);
-    },
-  );
+  it.each(['', '   ', 'no roles mentioned here whatsoever'])('returns nothing for %j', (text) => {
+    expect(extractJobTitles(text)).toEqual([]);
+  });
 
   it('drops matches shorter than 5 characters', () => {
     // "lead" and "head" are in the title-word list but are too short alone.
@@ -164,7 +169,9 @@ describe('buildJobPosting', () => {
   });
 
   it('handles a "Company hiring Role in Location" headline', () => {
-    const job = buildJobPosting('Barclays hiring Data Engineer in London\n\nPython and SQL needed.');
+    const job = buildJobPosting(
+      'Barclays hiring Data Engineer in London\n\nPython and SQL needed.',
+    );
     expect(job.title).toBe('Data Engineer');
   });
 

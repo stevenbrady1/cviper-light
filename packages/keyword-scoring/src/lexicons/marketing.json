@@ -1,109 +1,32 @@
 {
   "_comment": "CV-705b Phase 1 — Marketing / digital lexicon. Synonyms map CV terms to the long-forms JDs use; skill_title_map lets a matching CV earn a marketing title.",
   "related_terms": {
-    "seo": [
-      "search engine optimisation",
-      "search engine optimization",
-      "organic search",
-      "serp"
-    ],
-    "sem": [
-      "search engine marketing",
-      "paid search",
-      "ppc"
-    ],
-    "ppc": [
-      "pay per click",
-      "paid search",
-      "google ads",
-      "adwords",
-      "paid media"
-    ],
+    "seo": ["search engine optimisation", "search engine optimization", "organic search", "serp"],
+    "sem": ["search engine marketing", "paid search", "ppc"],
+    "ppc": ["pay per click", "paid search", "google ads", "adwords", "paid media"],
     "content marketing": [
       "content strategy",
       "content creation",
       "copywriting",
       "editorial calendar"
     ],
-    "social media": [
-      "social media marketing",
-      "smm",
-      "community management",
-      "paid social"
-    ],
-    "email marketing": [
-      "email campaigns",
-      "crm marketing",
-      "marketing automation",
-      "mailchimp"
-    ],
-    "brand management": [
-      "brand strategy",
-      "brand marketing",
-      "brand positioning"
-    ],
-    "digital marketing": [
-      "online marketing",
-      "performance marketing",
-      "growth marketing"
-    ],
-    "google analytics": [
-      "ga4",
-      "web analytics",
-      "google analytics 4"
-    ],
-    "marketing automation": [
-      "hubspot",
-      "marketo",
-      "pardot"
-    ],
-    "conversion rate optimisation": [
-      "cro",
-      "conversion optimisation",
-      "conversion optimization"
-    ]
+    "social media": ["social media marketing", "smm", "community management", "paid social"],
+    "email marketing": ["email campaigns", "crm marketing", "marketing automation", "mailchimp"],
+    "brand management": ["brand strategy", "brand marketing", "brand positioning"],
+    "digital marketing": ["online marketing", "performance marketing", "growth marketing"],
+    "google analytics": ["ga4", "web analytics", "google analytics 4"],
+    "marketing automation": ["hubspot", "marketo", "pardot"],
+    "conversion rate optimisation": ["cro", "conversion optimisation", "conversion optimization"]
   },
   "skill_title_map": [
     [
-      [
-        "seo",
-        "sem",
-        "ppc",
-        "google analytics",
-        "content marketing",
-        "digital marketing"
-      ],
+      ["seo", "sem", "ppc", "google analytics", "content marketing", "digital marketing"],
       "Digital Marketing Manager"
     ],
-    [
-      [
-        "content marketing",
-        "copywriting",
-        "social media"
-      ],
-      "Content Marketing Manager"
-    ],
-    [
-      [
-        "brand management",
-        "brand strategy"
-      ],
-      "Brand Manager"
-    ],
-    [
-      [
-        "seo",
-        "search engine optimisation"
-      ],
-      "SEO Specialist"
-    ],
-    [
-      [
-        "social media",
-        "community management"
-      ],
-      "Social Media Manager"
-    ]
+    [["content marketing", "copywriting", "social media"], "Content Marketing Manager"],
+    [["brand management", "brand strategy"], "Brand Manager"],
+    [["seo", "search engine optimisation"], "SEO Specialist"],
+    [["social media", "community management"], "Social Media Manager"]
   ],
   "skill_weights": {},
   "common_skills": [

@@ -287,7 +287,11 @@ describe('ultra-short token gating', () => {
 describe('determinism', () => {
   it('gives the same answer twice for the same input', () => {
     const p = profile({ skills: ['python', 'sql'], jobTitles: ['Data Engineer'] });
-    const j = job({ title: 'Data Engineer', description: 'python sql', keySkills: ['python', 'sql'] });
+    const j = job({
+      title: 'Data Engineer',
+      description: 'python sql',
+      keySkills: ['python', 'sql'],
+    });
     expect(matchProfileToJob(p, j)).toEqual(matchProfileToJob(p, j));
   });
 

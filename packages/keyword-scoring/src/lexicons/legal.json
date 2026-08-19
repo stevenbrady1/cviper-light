@@ -1,91 +1,27 @@
 {
   "_comment": "CV-705c Phase 2 — Legal / paralegal lexicon. Avoids the base 'compliance' key (kept for finance/KYC); uses 'legal compliance' instead.",
   "related_terms": {
-    "legal research": [
-      "case law research",
-      "legal analysis",
-      "westlaw",
-      "lexisnexis"
-    ],
-    "contract drafting": [
-      "drafting contracts",
-      "contract review",
-      "contract negotiation"
-    ],
+    "legal research": ["case law research", "legal analysis", "westlaw", "lexisnexis"],
+    "contract drafting": ["drafting contracts", "contract review", "contract negotiation"],
     "litigation": [
       "dispute resolution",
       "civil litigation",
       "commercial litigation",
       "litigation support"
     ],
-    "conveyancing": [
-      "property law",
-      "residential conveyancing",
-      "commercial conveyancing"
-    ],
-    "due diligence": [
-      "legal due diligence",
-      "dd"
-    ],
-    "corporate law": [
-      "company law",
-      "mergers and acquisitions",
-      "m&a"
-    ],
-    "legal advice": [
-      "legal counsel",
-      "legal advisory",
-      "legal opinion"
-    ],
-    "legal compliance": [
-      "regulatory affairs",
-      "legal risk",
-      "contracts compliance"
-    ],
-    "gdpr": [
-      "data protection",
-      "data privacy",
-      "dpa"
-    ],
-    "paralegal": [
-      "legal assistant",
-      "legal executive",
-      "cilex"
-    ]
+    "conveyancing": ["property law", "residential conveyancing", "commercial conveyancing"],
+    "due diligence": ["legal due diligence", "dd"],
+    "corporate law": ["company law", "mergers and acquisitions", "m&a"],
+    "legal advice": ["legal counsel", "legal advisory", "legal opinion"],
+    "legal compliance": ["regulatory affairs", "legal risk", "contracts compliance"],
+    "gdpr": ["data protection", "data privacy", "dpa"],
+    "paralegal": ["legal assistant", "legal executive", "cilex"]
   },
   "skill_title_map": [
-    [
-      [
-        "legal research",
-        "contract drafting",
-        "litigation",
-        "corporate law"
-      ],
-      "Solicitor"
-    ],
-    [
-      [
-        "paralegal",
-        "legal research",
-        "contract drafting"
-      ],
-      "Paralegal"
-    ],
-    [
-      [
-        "conveyancing",
-        "property law"
-      ],
-      "Conveyancer"
-    ],
-    [
-      [
-        "legal advice",
-        "corporate law",
-        "due diligence"
-      ],
-      "Legal Counsel"
-    ]
+    [["legal research", "contract drafting", "litigation", "corporate law"], "Solicitor"],
+    [["paralegal", "legal research", "contract drafting"], "Paralegal"],
+    [["conveyancing", "property law"], "Conveyancer"],
+    [["legal advice", "corporate law", "due diligence"], "Legal Counsel"]
   ],
   "skill_weights": {},
   "common_skills": [

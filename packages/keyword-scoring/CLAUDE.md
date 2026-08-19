@@ -39,19 +39,19 @@ The scoring maths came from the CViper web application, where it has been tuned
 across CV-700 through CV-1040 against real adverts. Sources, in the
 **read-only** repository at `c:\Dev\job-match-pro`:
 
-| Here | There |
-| --- | --- |
-| `spelling.ts` | `backend/ai/keywords.py` lines 30, 53 (`_US_TO_UK`, `_fold_spelling`) |
-| `plurals.ts` | `backend/ai/keywords.py` line 85 (`_plural_variants`) |
-| `term.ts` | `backend/ai/keywords.py` line 302 (`term_in_text`) + lines 21-22 |
-| `similar.ts` | `backend/ai/keywords.py` line 334 (`get_similar_terms`) |
-| `weights.ts` | `backend/ai/keywords.py` line 284 (`skill_weight`) |
-| `lexicon.ts` | `backend/ai/keywords.py` line 113 (`load_lexicons`) + `skill_canonical.py` |
-| `lexicons/*.json` | `backend/ai/data/lexicons/*.json` — **byte-for-byte copies** |
-| `vocabulary.ts` | `backend/ai/keywords.py` lines 156-187, 232 |
-| `match.ts` | `backend/ai/fallbacks.py` line 398 (`matching`) + constants at 75-94 |
-| `ats.ts` | `backend/ai/fallbacks.py` lines 940, 949, 965 |
-| `profile.ts` | `backend/ai/fallbacks.py` lines 203, 238, 763-869 |
+| Here              | There                                                                      |
+| ----------------- | -------------------------------------------------------------------------- |
+| `spelling.ts`     | `backend/ai/keywords.py` lines 30, 53 (`_US_TO_UK`, `_fold_spelling`)      |
+| `plurals.ts`      | `backend/ai/keywords.py` line 85 (`_plural_variants`)                      |
+| `term.ts`         | `backend/ai/keywords.py` line 302 (`term_in_text`) + lines 21-22           |
+| `similar.ts`      | `backend/ai/keywords.py` line 334 (`get_similar_terms`)                    |
+| `weights.ts`      | `backend/ai/keywords.py` line 284 (`skill_weight`)                         |
+| `lexicon.ts`      | `backend/ai/keywords.py` line 113 (`load_lexicons`) + `skill_canonical.py` |
+| `lexicons/*.json` | `backend/ai/data/lexicons/*.json` — **byte-for-byte copies**               |
+| `vocabulary.ts`   | `backend/ai/keywords.py` lines 156-187, 232                                |
+| `match.ts`        | `backend/ai/fallbacks.py` line 398 (`matching`) + constants at 75-94       |
+| `ats.ts`          | `backend/ai/fallbacks.py` lines 940, 949, 965                              |
+| `profile.ts`      | `backend/ai/fallbacks.py` lines 203, 238, 763-869                          |
 
 If a number here looks wrong, measure the Python before changing it. Two
 implementations of the same scorer that disagree are worse than one with a
@@ -94,7 +94,7 @@ known quirk, because neither number can be trusted.
   for. Folding the labels too would advise a candidate into a miss.
 
 - **A trailing full stop hides a skill.** `termInText('python', 'I know
-  Python.')` is `false`, in the Python original as well as here — `.` is inside
+Python.')` is `false`, in the Python original as well as here — `.` is inside
   the token character class so that `node` cannot match inside `node.js`.
   Reproduced on purpose and pinned in `parity.test.ts`; reported upstream
   rather than fixed on one side only.

@@ -160,7 +160,7 @@ function buildSuggestions(match: MatchResult, ats: AtsResult): CvAnalysisSuggest
           ? 'None of the job titles on your CV look like the one in the advert.'
           : 'The job titles on your CV only partly line up with the one in the advert.',
       recommendation:
-        'Where it is honest to do so, use the advert\'s own job title in your personal ' +
+        "Where it is honest to do so, use the advert's own job title in your personal " +
         'statement or as a bracketed alternative next to your current title.',
       priority: match.titleMatchStrength === 'none' ? 'high' : 'medium',
     });
@@ -170,11 +170,10 @@ function buildSuggestions(match: MatchResult, ats: AtsResult): CvAnalysisSuggest
   if (wordingGaps.length > 0) {
     suggestions.push({
       section: 'Wording',
-      issue:
-        `The advert uses ${wordingGaps.map(displaySkill).join(', ')} and your CV does not.`,
+      issue: `The advert uses ${wordingGaps.map(displaySkill).join(', ')} and your CV does not.`,
       recommendation:
         'These are words a screening system looks for. Where you have done the ' +
-        'work, use the advert\'s word for it rather than your own.',
+        "work, use the advert's word for it rather than your own.",
       priority: ats.score < 60 ? 'high' : ats.score < 80 ? 'medium' : 'low',
     });
   }
@@ -200,7 +199,7 @@ function buildSuggestions(match: MatchResult, ats: AtsResult): CvAnalysisSuggest
 function buildAtsNotes(ats: AtsResult): string[] {
   return [
     `Applicant tracking system keyword score: ${ats.score} out of 100. That is the ` +
-      'share of the advert\'s wording, weighted by how distinctive each term is, ' +
+      "share of the advert's wording, weighted by how distinctive each term is, " +
       'that appears somewhere on your CV.',
     ...ats.suggestions,
   ];

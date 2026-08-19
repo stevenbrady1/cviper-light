@@ -210,7 +210,8 @@ export function matchProfileToJob(cvProfile: CvProfile, job: JobPosting): MatchR
   // ── Reverse match: which of the advert's posted skills does the CV have? ──
   const cvSkillsLower = cvProfile.skills.map((skill) => skill.toLowerCase());
   const cvSkillsExpanded = new Set<string>(cvSkillsLower);
-  for (const relatedSkill of cvProfile.relatedSkills) cvSkillsExpanded.add(relatedSkill.toLowerCase());
+  for (const relatedSkill of cvProfile.relatedSkills)
+    cvSkillsExpanded.add(relatedSkill.toLowerCase());
   for (const skill of cvSkillsLower) {
     for (const related of getSimilarTerms(skill)) cvSkillsExpanded.add(related.toLowerCase());
   }
