@@ -78,6 +78,14 @@ export interface SettingsProps {
    * mount the whole app and prove nothing checks for an update on its own.
    */
   readonly updatePort?: UpdatePort | undefined;
+  /**
+   * Reopen the first-run introduction.
+   *
+   * Owned by the shell, because the introduction replaces the whole window and
+   * this screen cannot navigate. Absent in a test that renders Settings alone,
+   * where the button is disabled rather than missing.
+   */
+  readonly onShowWelcome?: (() => void) | undefined;
   /** Injected by tests so the suggested filename is deterministic. */
   readonly now?: Date | undefined;
 }
@@ -109,6 +117,7 @@ export function Settings({
   keyPort,
   browser,
   updatePort,
+  onShowWelcome,
   now,
 }: SettingsProps = {}) {
   const backupPort = useMemo(() => port ?? createDbBackupPort(), [port]);
@@ -339,6 +348,24 @@ export function Settings({
           <KeySetup port={keyPort} browser={browser} />
 
           <UpdateCheck port={updatePort} />
+
+          <section>
+            <h2 className="font-medium text-ink">Getting started</h2>
+            <p className="mt-1 text-ink-muted">
+              The three-card introduction that appears the first time you open CViper Light. It
+              lists what each part of the app needs before it works.
+            </p>
+
+            <button
+              type="button"
+              data-testid="settings-show-welcome"
+              disabled={onShowWelcome === undefined}
+              onClick={onShowWelcome}
+              className={`mt-3 ${SECONDARY_BUTTON}`}
+            >
+              Show the introduction again
+            </button>
+          </section>
 
           {/*
             ============================================================

@@ -18,6 +18,7 @@ const tauri = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 
 const { default: App } = await import('./App');
+const { markWelcomeSeen } = await import('../features/onboarding/store');
 const { createFakeTrackerPort } = await import('../features/tracker/test/fakePort');
 
 /**
@@ -34,6 +35,10 @@ const NOW = new Date(2026, 7, 19, 9, 0, 0);
 
 beforeEach(() => {
   localStorage.clear();
+  // Past the first-run introduction, which is what every assertion in this file
+  // is about — see `onboarding/firstRun.test.tsx` for the introduction itself.
+  // Without this the app opens on the welcome screen and the shell is not drawn.
+  markWelcomeSeen();
   tauri.invoke.mockReset();
   tauri.invoke.mockImplementation(async (command) => {
     if (command === 'ollama_probe') return null;

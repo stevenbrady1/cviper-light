@@ -41,6 +41,7 @@ const tauri = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 
 const { default: App } = await import('../../app/App');
+const { markWelcomeSeen } = await import('../onboarding/store');
 const { createFakeTrackerPort } = await import('./test/fakePort');
 
 /** Commands that mean a provider was contacted. See `src/ai/transport.ts`. */
@@ -56,6 +57,10 @@ function invokedProviderCommands(): string[] {
 
 beforeEach(() => {
   localStorage.clear();
+  // Past the first-run introduction, which is what every assertion in this file
+  // is about — see `onboarding/firstRun.test.tsx` for the introduction itself.
+  // Without this the app opens on the welcome screen and the shell is not drawn.
+  markWelcomeSeen();
   tauri.invoke.mockReset();
   tauri.invoke.mockImplementation(async (command) => {
     // A machine with nothing set up: no daemon, and not one saved credential.

@@ -497,3 +497,35 @@ describe('when Ollama is running but has nothing that can chat', () => {
     );
   });
 });
+
+describe('while the CV list is still being read', () => {
+  /** A port whose read never finishes, so the loading state can be observed. */
+  function neverResolvingPort() {
+    return {
+      loadCvs: () => new Promise<never>(() => undefined),
+      loadJobs: () => new Promise<never>(() => undefined),
+      saveCv: () => new Promise<never>(() => undefined),
+      loadHistory: () => new Promise<never>(() => undefined),
+      saveAnalysis: () => new Promise<never>(() => undefined),
+    };
+  }
+
+  it('does not claim there are no CVs before it knows', async () => {
+    // An empty state shown during a load is not an empty state, it is a wrong
+    // answer — and this one comes with a disabled control, so the user is told
+    // they have nothing AND stopped from doing anything about it.
+    render(<Analysis port={neverResolvingPort()} filePort={createFakeFilePort()} now={NOW} />);
+
+    const picker = (await screen.findByTestId('analysis-cv')) as HTMLSelectElement;
+
+    expect(picker.textContent).toContain('Reading');
+    expect(picker.textContent).not.toContain('No CV uploaded yet');
+  });
+
+  it('says there are none once the read comes back empty', async () => {
+    await renderView();
+
+    const picker = screen.getByTestId('analysis-cv') as HTMLSelectElement;
+    expect(picker.textContent).toContain('No CV uploaded yet');
+  });
+});

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Analysis, type AnalysisProps } from '../features/analysis/Analysis';
+import { Welcome } from '../features/onboarding/Welcome';
+import { forgetWelcome, hasSeenWelcome, markWelcomeSeen } from '../features/onboarding/store';
 import { Search, type SearchProps } from '../features/search/Search';
 import { Settings, type SettingsProps } from '../features/settings/Settings';
 import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
@@ -35,6 +37,18 @@ import { DEFAULT_VIEW, viewForShortcut, type ViewId } from './views';
  * Only digits that are actually bound are intercepted: `Ctrl+4` is left alone
  * rather than being swallowed or falling through to a default view, because
  * moving a user somewhere they did not ask to go is worse than doing nothing.
+ *
+ * ============================================================================
+ * THE INTRODUCTION TAKES THE WINDOW, AND IS SHOWN ONCE
+ * ============================================================================
+ * On a machine that has never run this before, the shell is not drawn at all —
+ * see the note in `onboarding/Welcome.tsx` for why it replaces the app rather
+ * than floating over it. Dismissing it writes the flag, so the second launch
+ * goes straight to the board, and Settings can bring it back.
+ *
+ * The flag is read ONCE, in a lazy initialiser. Reading it on every render
+ * would make the screen a function of `localStorage` rather than of state, and
+ * the overlay would reappear the moment anything else cleared that key.
  */
 
 export interface AppProps {
@@ -83,6 +97,7 @@ export default function App({
 }: AppProps = {}) {
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
   const [status, setStatus] = useState<EnvironmentStatus | null>(null);
+  const [welcomeOpen, setWelcomeOpen] = useState(() => !hasSeenWelcome());
 
   /**
    * Re-read the rail's status on mount and on every view change.
@@ -127,6 +142,34 @@ export default function App({
 
   const onSelect = useCallback((id: ViewId) => setActiveView(id), []);
 
+  /**
+   * Close the introduction.
+   *
+   * `view` is the card the user pressed, or `null` when they skipped. Skipping
+   * deliberately does NOT move them: they are wherever they were, which on a
+   * first run is the board and after a reopen from Settings is Settings.
+   */
+  const onDismissWelcome = useCallback((view: ViewId | null) => {
+    markWelcomeSeen();
+    if (view !== null) setActiveView(view);
+    setWelcomeOpen(false);
+  }, []);
+
+  const onShowWelcome = useCallback(() => {
+    // Forgotten as well as reopened, so "show me that again" survives a
+    // relaunch if the user closes the app while reading it.
+    forgetWelcome();
+    setWelcomeOpen(true);
+  }, []);
+
+  if (welcomeOpen) {
+    return (
+      <div className="flex h-full min-h-0 bg-canvas text-ink">
+        <Welcome onDismiss={onDismissWelcome} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 bg-canvas text-ink">
       <Sidebar activeView={activeView} onSelect={onSelect} status={status} />
@@ -146,7 +189,15 @@ export default function App({
           },
           tracker: { port: trackerPort, now },
           analysis: { port: analysisPort, filePort, createTransport, now },
-          settings: { port: backupPort, filePort, keyPort, browser, updatePort, now },
+          settings: {
+            port: backupPort,
+            filePort,
+            keyPort,
+            browser,
+            updatePort,
+            onShowWelcome,
+            now,
+          },
         })}
       </main>
     </div>

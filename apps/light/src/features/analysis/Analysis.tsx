@@ -102,6 +102,14 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
 
   const [cvs, setCvs] = useState<readonly Cv[]>([]);
+  /**
+   * False until the first read of the CV list comes back.
+   *
+   * Without it the picker says "No CV uploaded yet" — and disables itself —
+   * during the read, which is not an empty state but a wrong answer with a
+   * dead control attached.
+   */
+  const [cvsLoaded, setCvsLoaded] = useState(false);
   const [jobs, setJobs] = useState<readonly Job[]>([]);
   const [selectedCvId, setSelectedCvId] = useState<string | null>(null);
   const [jobText, setJobText] = useState('');
@@ -137,6 +145,10 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
 
     void analysisPort.loadCvs().then((loaded) => {
       if (cancelled) return;
+      // Set on both branches: a failed read is still a finished read, and the
+      // error banner below is the honest thing to show, not a permanent
+      // "Reading…".
+      setCvsLoaded(true);
       if (!loaded.ok) {
         // Never swallowed. A screen that shows no CVs when the database will
         // not open is indistinguishable from a screen with no CVs on it.
@@ -351,7 +363,7 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
                 id="analysis-cv"
                 data-testid="analysis-cv"
                 value={selectedCvId ?? ''}
-                disabled={cvs.length === 0}
+                disabled={cvs.length === 0 || !cvsLoaded}
                 onChange={(event) => {
                   const id = event.currentTarget.value;
                   setSelectedCvId(id === '' ? null : id);
@@ -361,7 +373,9 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
                 }}
                 className="min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
               >
-                {cvs.length === 0 ? <option value="">No CV uploaded yet</option> : null}
+                {cvs.length > 0 ? null : (
+                  <option value="">{cvsLoaded ? 'No CV uploaded yet' : 'Reading your CVs…'}</option>
+                )}
                 {cvs.map((cv) => (
                   <option key={cv.id} value={cv.id}>
                     {cv.name}

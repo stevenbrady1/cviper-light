@@ -28,8 +28,14 @@ const { default: App } = await import('../../../app/App');
 const { createFakeUpdatePort } = await import('./test/fakeUpdatePort');
 const { createFakeTrackerPort } = await import('../../tracker/test/fakePort');
 const { createFakeBackupPort } = await import('../test/fakePort');
+const { markWelcomeSeen } = await import('../../onboarding/store');
 
 beforeEach(() => {
+  localStorage.clear();
+  // Past the first-run introduction. It replaces the whole window, so without
+  // this the app never draws Settings and the assertions below would pass for
+  // the wrong reason — the strongest way to make a negative guard vacuous.
+  markWelcomeSeen();
   tauri.invoke.mockReset();
   tauri.invoke.mockImplementation(async (command) => {
     if (command === 'ollama_probe') return null;
