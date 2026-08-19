@@ -12,7 +12,8 @@
     "lint": "turbo run lint",
     "test": "vitest run",
     "cargo:check": "cargo check --manifest-path apps/light/src-tauri/Cargo.toml",
-    "verify": "pnpm tsc && pnpm lint && pnpm test && pnpm cargo:check",
+    "cargo:test": "cargo test --manifest-path apps/light/src-tauri/Cargo.toml --lib",
+    "verify": "pnpm tsc && pnpm lint && pnpm test && pnpm cargo:check && pnpm cargo:test",
     "dev": "pnpm --filter @cviper/light tauri dev",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

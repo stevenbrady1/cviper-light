@@ -18,16 +18,22 @@ job-search tool. See [docs/PLAN.md](docs/PLAN.md) and
 
 ## Verification loop
 
-All four must pass before anything is called done. Run from the repo root:
+All five must pass before anything is called done. Run from the repo root:
 
 ```
 pnpm tsc          # turbo run typecheck  — tsc --noEmit in every package
 pnpm lint         # turbo run lint       — eslint, --max-warnings 0
 pnpm test         # vitest run
 pnpm cargo:check  # cargo check on apps/light/src-tauri
+pnpm cargo:test   # cargo test --lib on apps/light/src-tauri
 ```
 
-`pnpm verify` runs all four in sequence.
+`pnpm verify` runs all five in sequence.
+
+`cargo:check` does NOT compile `#[cfg(test)]` code, so it cannot run — or even
+typecheck — a single Rust test. Without `cargo:test` in the loop, every Rust
+test in the repo is a guard that looks green because nothing ever asked it a
+question.
 
 Never commit red. Never skip a check. Never weaken a config to make a check
 pass — if a guard fails, fix the thing it is protecting.

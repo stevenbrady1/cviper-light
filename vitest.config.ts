@@ -5,10 +5,11 @@ import { defineConfig } from 'vitest/config';
 // this is the correct and only supported form here.
 export default defineConfig({
   test: {
-    // Phase 0 is a scaffold: the packages export stubs only and have no tests
-    // yet. This keeps `pnpm test` honest (it really runs) rather than fake
-    // (no invented placeholder tests). Phase 1 adds real coverage.
+    // The stub packages (ai-providers, job-apis, cv-parsing, ui) still export
+    // nothing but a name, so they legitimately have no tests. core-types and
+    // apps/light do, and a project that has real logic must have real tests
+    // with it.
     passWithNoTests: true,
-    projects: ['packages/*'],
+    projects: ['packages/*', 'apps/light'],
   },
 });

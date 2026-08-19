@@ -1,3 +1,5 @@
+mod db;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -10,7 +12,15 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_sql::Builder::new().build())
+        // The migrations are registered against `db::DB_URL`, and the frontend
+        // opens the database with the same string from `src/db/constants.ts`.
+        // A mismatch does not error — it silently skips every migration. See
+        // the note on `db::DB_URL`.
+        .plugin(
+            tauri_plugin_sql::Builder::default()
+                .add_migrations(db::DB_URL, db::migrations())
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init());
 
     // `tauri add updater` declares tauri-plugin-updater as a desktop-only Cargo
