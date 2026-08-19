@@ -124,37 +124,61 @@ export interface JsonSchemaNode {
  * every object closed with `additionalProperties: false` — Anthropic's
  * structured outputs reject a schema without it. No `$defs`, no `$ref`: small
  * models cannot follow an indirection.
+ *
+ * ============================================================================
+ * THE PROPERTY ORDER IS LOAD-BEARING. EVIDENCE FIRST, CONCLUSION LAST.
+ * ============================================================================
+ * Every provider we send this to enforces the schema with CONSTRAINED
+ * DECODING — Ollama compiles `format` into a llama.cpp grammar, OpenAI's
+ * `strict: true` and Anthropic's `output_config.format` do the equivalent — and
+ * a grammar walks the properties in the order they are declared here. Declaring
+ * `match_score` first forces the model to emit its final score as the very
+ * first token of its answer, BEFORE it has written a word of the skill audit,
+ * the keyword screen or the ATS notes that are supposed to produce that score.
+ *
+ * It cannot reason before it has answered, so it does not reason. Measured
+ * against a local model on one realistic CV and advert, the same candidate came
+ * back at 92 with the score declared first and 85 with it declared last — and
+ * the prompt's own calibration example puts that candidate at 84. The output
+ * was schema-valid every time. That is the "valid but inert" failure: nothing
+ * errored, nothing retried, and the number was wrong.
+ *
+ * So the reading order below is the REASONING order:
+ *
+ *   1-2  the skill audit
+ *   3-4  the keyword screen
+ *   5    the rest of the ATS screen
+ *   6    the concrete edits, which depend on everything above
+ *   7    the prose summary — the model's reasoning, written out
+ *   8    match_score — the conclusion, now that there is something to conclude
+ *   9    verdict — a function of the score, so it cannot precede it
+ *
+ * `required` is listed in the same order for the same reason: it is the list a
+ * grammar walks to decide what must come next.
+ *
+ * THIS IS NOT A SCHEMA CHANGE AND DOES NOT BUMP `BACKUP_SCHEMA_VERSION`. Same
+ * nine fields, same types, same required set. JSON object key order is
+ * meaningless to `JSON.parse`, to Zod and to every consumer of a `CvAnalysis`,
+ * and this schema is not the export format — nothing that reads a user's backup
+ * file can tell the difference. `analysis.test.ts` pins the order; the drift
+ * guard in `@cviper/ai-providers/schema-order.ts` pins it a second time, from
+ * the far side of the package boundary.
  */
 export const CV_ANALYSIS_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: [
-    'match_score',
-    'verdict',
-    'summary',
     'matched_skills',
     'missing_skills',
-    'keyword_gaps',
     'matched_keywords',
-    'suggestions',
+    'keyword_gaps',
     'ats_notes',
+    'suggestions',
+    'summary',
+    'match_score',
+    'verdict',
   ],
   properties: {
-    match_score: {
-      type: 'integer',
-      minimum: 0,
-      maximum: 100,
-      description: 'How well the CV fits the job, 0 to 100.',
-    },
-    verdict: {
-      type: 'string',
-      enum: ['strong', 'possible', 'weak'],
-      description: 'Overall call on the fit.',
-    },
-    summary: {
-      type: 'string',
-      description: 'Two sentences on the fit, addressed to the candidate.',
-    },
     matched_skills: {
       type: 'array',
       items: { type: 'string' },
@@ -165,15 +189,20 @@ export const CV_ANALYSIS_JSON_SCHEMA = {
       items: { type: 'string' },
       description: 'Skills the job asks for that the CV does not show.',
     },
+    matched_keywords: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Words in the advert that the CV already uses.',
+    },
     keyword_gaps: {
       type: 'array',
       items: { type: 'string' },
       description: 'Words in the advert that an ATS would look for and not find.',
     },
-    matched_keywords: {
+    ats_notes: {
       type: 'array',
       items: { type: 'string' },
-      description: 'Words in the advert that the CV already uses.',
+      description: 'Formatting problems that could break CV parsing software.',
     },
     suggestions: {
       type: 'array',
@@ -194,10 +223,20 @@ export const CV_ANALYSIS_JSON_SCHEMA = {
         },
       },
     },
-    ats_notes: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'Formatting problems that could break CV parsing software.',
+    summary: {
+      type: 'string',
+      description: 'Two sentences on the fit, addressed to the candidate.',
+    },
+    match_score: {
+      type: 'integer',
+      minimum: 0,
+      maximum: 100,
+      description: 'How well the CV fits the job, 0 to 100.',
+    },
+    verdict: {
+      type: 'string',
+      enum: ['strong', 'possible', 'weak'],
+      description: 'Overall call on the fit.',
     },
   },
 } as const satisfies JsonSchemaNode;

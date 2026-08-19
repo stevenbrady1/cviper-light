@@ -2,10 +2,28 @@
  * schema-order.ts — emit the evidence before the conclusion.
  *
  * ============================================================================
- * THIS IS THE SINGLE HIGHEST-IMPACT LINE OF CODE IN THE PACKAGE.
- * MEASURED, NOT GUESSED.
+ * NOW A REGRESSION GUARD, NOT A REPAIR. READ THIS BEFORE DELETING IT.
  * ============================================================================
- * `CV_ANALYSIS_JSON_SCHEMA` lists `match_score` FIRST. Every provider we use
+ * `CV_ANALYSIS_JSON_SCHEMA` in @cviper/core-types NOW DECLARES ITS PROPERTIES
+ * IN THIS ORDER ITSELF, so `reasoningFirstSchema()` is a no-op on the schema it
+ * is applied to today. That looks like dead code and is not: it is the only
+ * thing that makes a reorder in core-types LOUD instead of silent.
+ *
+ * Deleting this module would not break a single provider call. It would remove
+ * the guard, and the next person who tidies the property order in core-types
+ * back into "score first, then the details" — which reads perfectly naturally —
+ * would ship an inflated score with a green test suite. That is exactly how the
+ * bug arrived the first time.
+ *
+ * The tests hold both halves: this must stay a no-op on the canonical schema,
+ * AND it must still repair a schema that puts the score first. A guard that
+ * cannot fail is not a guard.
+ *
+ * ============================================================================
+ * WHY THE ORDER MATTERS AT ALL. MEASURED, NOT GUESSED.
+ * ============================================================================
+ * The original `CV_ANALYSIS_JSON_SCHEMA` listed `match_score` FIRST. Every
+ * provider we use
  * enforces its schema with constrained decoding — Ollama compiles `format` into
  * a llama.cpp grammar, OpenAI's `strict: true` and Anthropic's
  * `output_config.format` do the equivalent — and a grammar walks the schema's
@@ -42,14 +60,14 @@
  * ONLY difference is the sequence, which is invisible to Zod (key order means
  * nothing to an object) and invisible to the `CvAnalysis` type.
  *
- * It is applied on the wire, in this package, exactly as the Anthropic adapter
- * strips `minimum`/`maximum` on the way out. `CV_ANALYSIS_JSON_SCHEMA` in
- * @cviper/core-types is untouched and still the single source of truth.
+ * It is still applied on the wire, in this package, exactly as the Anthropic
+ * adapter strips `minimum`/`maximum` on the way out — so a hand-built schema, or
+ * a core-types regression, is corrected before it reaches a model either way.
  *
- * The cleaner long-term home for this is the property order of
- * `CV_ANALYSIS_JSON_SCHEMA` itself, so every future consumer inherits it. That
- * is a change to another phase's locked artefact and is a decision for a human,
- * not something to slip in from here.
+ * `ANALYSIS_FIELD_ORDER` below and the property order in core-types are the
+ * SAME ORDER STATED TWICE, in two packages that cannot import each other in
+ * that direction. `schema-order.test.ts` asserts they agree field for field, so
+ * changing one alone fails the suite.
  */
 
 /**

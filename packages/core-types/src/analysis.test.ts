@@ -26,6 +26,36 @@ const EXPECTED_ANALYSIS_FIELDS = [
 /** The four flat fields of a suggestion. */
 const EXPECTED_SUGGESTION_FIELDS = ['issue', 'priority', 'recommendation', 'section'] as const;
 
+/**
+ * The CANONICAL property order — evidence first, conclusion last.
+ *
+ * Not an alphabetical or aesthetic choice. Every provider we send this schema
+ * to enforces it with constrained decoding, and a grammar walks the properties
+ * in the order they are declared. Listing `match_score` first forces the model
+ * to emit its conclusion as the very first token of its answer, before it has
+ * written a word of the skill audit that is supposed to produce that score. It
+ * cannot reason before it has answered, so it does not reason: measured against
+ * llama3.2 (3.2B, Q4_K_M) the same candidate scored 92 with the score first and
+ * 85 with it last, against a prompt whose own calibration example puts that
+ * candidate at 84.
+ *
+ * This is a KEY ORDER, not a schema change. Same nine fields, same types, same
+ * `required` set. JSON object key order is meaningless to `JSON.parse` and to
+ * Zod, and this schema is not the export format, so it does NOT bump
+ * `BACKUP_SCHEMA_VERSION` — nothing that reads a file cares.
+ */
+const CANONICAL_FIELD_ORDER = [
+  'matched_skills',
+  'missing_skills',
+  'matched_keywords',
+  'keyword_gaps',
+  'ats_notes',
+  'suggestions',
+  'summary',
+  'match_score',
+  'verdict',
+] as const;
+
 function makeCvAnalysis(): CvAnalysis {
   return {
     match_score: 82,
@@ -106,6 +136,42 @@ describe('CV analysis schema — the two representations must not drift', () => 
     const serialised = JSON.stringify(CV_ANALYSIS_JSON_SCHEMA);
     expect(serialised).not.toContain('$defs');
     expect(serialised).not.toContain('$ref');
+  });
+});
+
+describe('CV analysis schema — the evidence is declared before the conclusion', () => {
+  it('declares its properties in the canonical order', () => {
+    expect(Object.keys(CV_ANALYSIS_JSON_SCHEMA.properties)).toEqual([...CANONICAL_FIELD_ORDER]);
+  });
+
+  it('orders `required` identically — that is the list a grammar walks', () => {
+    expect([...CV_ANALYSIS_JSON_SCHEMA.required]).toEqual([...CANONICAL_FIELD_ORDER]);
+  });
+
+  it('regression: match_score is never first', () => {
+    // Being first is what produced the inflated score. If it goes back, every
+    // candidate is graded before the model has looked at their CV.
+    expect(Object.keys(CV_ANALYSIS_JSON_SCHEMA.properties)[0]).not.toBe('match_score');
+    expect(CV_ANALYSIS_JSON_SCHEMA.required[0]).not.toBe('match_score');
+  });
+
+  it('puts every piece of evidence before match_score', () => {
+    const keys: string[] = Object.keys(CV_ANALYSIS_JSON_SCHEMA.properties);
+    const score = keys.indexOf('match_score');
+
+    for (const evidence of CANONICAL_FIELD_ORDER.slice(0, -2)) {
+      expect(keys.indexOf(evidence)).toBeLessThan(score);
+    }
+  });
+
+  it('puts verdict last, since it is a function of the score', () => {
+    const keys: string[] = Object.keys(CV_ANALYSIS_JSON_SCHEMA.properties);
+    expect(keys.indexOf('verdict')).toBeGreaterThan(keys.indexOf('match_score'));
+  });
+
+  it('changes nothing but the order — same fields, same required set', () => {
+    expect([...CANONICAL_FIELD_ORDER].sort()).toEqual(sorted(EXPECTED_ANALYSIS_FIELDS));
+    expect(sorted(CV_ANALYSIS_JSON_SCHEMA.required)).toEqual(sorted(EXPECTED_ANALYSIS_FIELDS));
   });
 });
 

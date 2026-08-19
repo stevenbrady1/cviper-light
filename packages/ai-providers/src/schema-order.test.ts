@@ -70,8 +70,64 @@ describe('reasoningFirstSchema — nothing but the order changes', () => {
     expect(reordered.additionalProperties).toBe(false);
   });
 
-  it('leaves the shared schema object unmutated', () => {
-    expect(Object.keys(CV_ANALYSIS_JSON_SCHEMA.properties)[0]).toBe('match_score');
+  it('leaves its input object unmutated', () => {
+    // Deliberately fed a schema in the WRONG order, so a mutating
+    // implementation would visibly rewrite it. Asserting against
+    // CV_ANALYSIS_JSON_SCHEMA instead would prove nothing now that the shared
+    // schema already carries the reasoning order — a mutation would leave it
+    // looking exactly the same.
+    const input = {
+      type: 'object',
+      required: ['match_score', 'summary'],
+      properties: { match_score: { type: 'integer' }, summary: { type: 'string' } },
+    };
+
+    reasoningFirstSchema(input);
+
+    expect(Object.keys(input.properties)).toEqual(['match_score', 'summary']);
+    expect(input.required).toEqual(['match_score', 'summary']);
+  });
+});
+
+describe('reasoningFirstSchema — the canonical schema already carries the order', () => {
+  // Since core-types moved the property order to evidence-first, this module is
+  // a REGRESSION GUARD rather than a transformation: it must be a no-op on the
+  // shared schema, and it must stop being one the moment somebody reorders it
+  // back. Both halves are asserted, because a guard that cannot fail is not a
+  // guard.
+  it('is a no-op on CV_ANALYSIS_JSON_SCHEMA — the source is already correct', () => {
+    expect(Object.keys(reordered.properties)).toEqual(
+      Object.keys(CV_ANALYSIS_JSON_SCHEMA.properties),
+    );
+    expect(reordered.required).toEqual([...CV_ANALYSIS_JSON_SCHEMA.required]);
+  });
+
+  it('still repairs a schema that put the score first', () => {
+    const regressed = {
+      type: 'object',
+      additionalProperties: false,
+      required: ['match_score', 'summary', 'matched_skills'],
+      properties: {
+        match_score: { type: 'integer' },
+        summary: { type: 'string' },
+        matched_skills: { type: 'array' },
+      },
+    };
+
+    const out = reasoningFirstSchema(regressed) as {
+      required: string[];
+      properties: Record<string, unknown>;
+    };
+
+    expect(Object.keys(out.properties)).toEqual(['matched_skills', 'summary', 'match_score']);
+    expect(out.required).toEqual(['matched_skills', 'summary', 'match_score']);
+  });
+
+  it('the canonical order and this order list agree, field for field', () => {
+    // The two live in different packages on purpose: core-types cannot import
+    // this one, so the order is stated twice and cross-checked here. Reordering
+    // one without the other fails right here.
+    expect(Object.keys(CV_ANALYSIS_JSON_SCHEMA.properties)).toEqual([...ANALYSIS_FIELD_ORDER]);
   });
 });
 
