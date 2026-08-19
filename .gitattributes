@@ -1,1 +1,5 @@
 * text=auto eol=lf
+
+# Self-hosted webfonts. Binary, and git's heuristic already gets this right —
+# stated explicitly so a future `text=auto` change cannot corrupt them.
+*.woff2 binary

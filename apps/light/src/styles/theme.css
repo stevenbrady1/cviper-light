@@ -1,10 +1,203 @@
 @import 'tailwindcss';
+@import './fonts.css';
 
 /*
- * CViper Light design tokens.
+ * ============================================================================
+ * CViper Light — design tokens. THE SINGLE SOURCE OF TRUTH.
+ * ============================================================================
+ * Tailwind 4 has no `tailwind.config.js` and no PostCSS step. `@theme` is not a
+ * config shim: it emits real CSS custom properties AND generates the utility
+ * classes from them, so `--color-navy` here is both `var(--color-navy)` and
+ * `bg-navy` / `text-navy` / `border-navy`. One declaration, both worlds.
  *
- * Tailwind 4 has no tailwind.config.js — theme customisation happens here, in
- * CSS, via @theme. Left empty in Phase 0 and populated in a later phase.
+ * Every token below is SEMANTIC. Nothing in the app names a colour by what it
+ * looks like ("slate-700"), because the day the palette moves, a hundred call
+ * sites would have to move with it. `tokens.contract.test.ts` enforces that: it
+ * reads every .tsx file in the app and fails on a hex literal, on an arbitrary
+ * `rounded-[...]`/`shadow-[...]`, on a radius or elevation outside the ones
+ * declared here, and on Tailwind's numeric colour scales.
+ *
+ * ----------------------------------------------------------------------------
+ * THE COLOUR GRAMMAR — never swapped, never improvised
+ * ----------------------------------------------------------------------------
+ *   navy   structure. The rail, chrome, anything that frames content.
+ *   blue   action. Exactly ONE primary button per view, links, the focus ring.
+ *   teal   present / matched / fresh. Something is here and it is moving.
+ *   gold   gap / attention / going quiet. Something needs the user.
+ *   red    destructive, and the `rejected` status. Nothing else, ever.
+ *
+ * A second meaning attached to any of these is what turns a palette into
+ * decoration. If a new state needs a colour, it takes one of these meanings or
+ * it does not get a colour.
+ * ----------------------------------------------------------------------------
  */
 @theme {
+  /* --- Type ------------------------------------------------------------- */
+  /*
+   * Inter for all prose and UI labels: 400 body, 500 label, 600 heading and
+   * button, 700 display.
+   *
+   * IBM Plex Mono for EVERY number the user compares — counts, dates,
+   * day-counts, salaries, scores — always with `tabular-nums`, so figures line
+   * up in a column instead of jittering. That single rule does most of the work
+   * in making this read as an instrument rather than a web page. Prose never
+   * gets the mono face.
+   *
+   * The fallbacks are real, not decorative: if the fonts ever fail to ship, the
+   * app must still be legible rather than fall back to Times.
+   */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace;
+
+  /* --- Brand: the five meanings ----------------------------------------- */
+  --color-navy: #0f2044;
+  --color-blue: #1a56db;
+  --color-teal: #0e9f6e;
+  --color-gold: #c27803;
+
+  /* --- Surfaces --------------------------------------------------------- */
+  /* canvas is the page, sunken is a well cut into it, card sits on top. */
+  --color-canvas: #f8fafc;
+  --color-sunken: #f1f5f9;
+  --color-card: #ffffff;
+  --color-line: #cbd5e1;
+
+  /* --- Ink -------------------------------------------------------------- */
+  --color-ink: #0f172a;
+  --color-ink-muted: #475569;
+  --color-ink-faint: #64748b;
+
+  /*
+   * Ink ON navy. These are the SAME two values as `canvas` and `line` — no new
+   * colour is introduced — but the names say what they are for, so nobody has
+   * to work out that `text-line` means "readable label on the rail".
+   *
+   * Against navy these measure roughly 12.9:1 and 8.3:1, so even the muted one
+   * is comfortably past WCAG AA for small text. The palette's own `ink-faint`
+   * would be about 2.2:1 on navy — unreadable — which is exactly why these two
+   * exist rather than reusing the light-surface ink scale.
+   */
+  --color-ink-inverse: #f8fafc;
+  --color-ink-inverse-muted: #cbd5e1;
+
+  /* --- State ------------------------------------------------------------ */
+  --color-success: #059669;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+
+  /* --- Radii: EXACTLY THREE --------------------------------------------- */
+  /*
+   * control  8px   buttons, inputs, selects, chips — anything you click or type
+   *                into
+   * card    12px   cards, panels, the things controls sit inside
+   * pill           status pills and count badges only
+   *
+   * A fourth radius is not a design decision, it is a decision nobody made. The
+   * contract test refuses one, including Tailwind's own `rounded`, `rounded-md`
+   * and `rounded-lg`.
+   */
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-pill: 9999px;
+
+  /* --- Elevation: EXACTLY TWO ------------------------------------------- */
+  /*
+   * Both tinted with navy rather than black. A neutral-black shadow over a cool
+   * canvas reads as grey dirt; tinting it with the structure colour makes the
+   * elevation look like it belongs to the same room as everything else.
+   *
+   * raised   a card lifted off the canvas. The board's default.
+   * overlay  something floating above the page: the detail pane's edge, a
+   *          dragged card, a confirmation.
+   *
+   * There is no third. "A slightly bigger shadow" is how a design system starts
+   * to blur.
+   */
+  --shadow-raised: 0 1px 2px 0 rgb(15 32 68 / 0.06), 0 1px 3px 0 rgb(15 32 68 / 0.1);
+  --shadow-overlay: 0 4px 6px -2px rgb(15 32 68 / 0.08), 0 12px 24px -4px rgb(15 32 68 / 0.14);
+}
+
+@layer base {
+  /*
+   * The app is a fixed-size desktop window, never a scrolling document. The
+   * shell owns its own layout and the page itself must not scroll — a stray
+   * horizontal scrollbar on a 1000px-wide window is a bug, not a responsive
+   * behaviour.
+   */
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * WebView2 does not inherit the page font onto form controls — the same bug
+   * the web app documents. Without this, the buttons and inputs in a Tailwind
+   * app silently render in the platform UI font while everything around them is
+   * Inter, and it reads as a rendering fault rather than a style choice.
+   */
+  button,
+  input,
+  select,
+  textarea,
+  optgroup {
+    font: inherit;
+  }
+
+  /*
+   * The focus ring, once, globally. Blue, because focus is action.
+   *
+   * `outline: none` plus a box-shadow ring rather than a plain outline: the ring
+   * then follows the element's border-radius on every control, which a 3px
+   * outline does not do consistently across engines.
+   *
+   * The cost, stated rather than discovered later: for the few focusable
+   * elements that also carry `shadow-raised`, the ring replaces the elevation
+   * while they are focused. On a card that is invisible; if it ever matters,
+   * the fix is a per-element ring, not a weaker global rule.
+   */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(26 86 219 / 0.25);
+  }
+
+  /*
+   * The motion budget: ONE moment, and it is a card arriving in its new column.
+   * Everything else in this app is still. `prefers-reduced-motion` removes even
+   * that one.
+   */
+  @keyframes cviper-card-settle {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.985);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .cviper-card-settle {
+    animation: cviper-card-settle 200ms ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cviper-card-settle {
+      animation: none;
+    }
+  }
 }

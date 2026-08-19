@@ -1,0 +1,105 @@
+/*
+ * Self-hosted webfonts.
+ *
+ * ============================================================================
+ * NO CDN. NOT EVEN FOR FONTS.
+ * ============================================================================
+ * CViper Light promises the user that nothing leaves their machine unless they
+ * ask for it. A `<link>` to fonts.googleapis.com would break that promise on
+ * the very first paint of the very first launch, and it would do it invisibly:
+ * the app would look identical, and a network capture would show the user's IP
+ * arriving at Google on every start. It would also mean the app renders in a
+ * fallback face on a machine that is genuinely offline, which is the machine
+ * this app is FOR.
+ *
+ * So the woff2 files sit in `public/fonts/` and are shipped inside the bundle.
+ * Both families are SIL Open Font License 1.1; the licence texts are next to
+ * them, which is what the OFL requires of a redistributor.
+ *
+ * `font-display: block` — not `swap`. This is a desktop application reading
+ * files off local disk, so the fonts are there in single-digit milliseconds and
+ * there is no slow-network case to protect against. `swap` would buy nothing
+ * and cost a visible reflow of the whole board on every cold start.
+ *
+ * Only the `latin` and `latin-ext` subsets are shipped. Between them they cover
+ * every Western and Central European name, the currency symbols a salary line
+ * needs, and the punctuation the UI uses. Adding Cyrillic and Greek would
+ * roughly double the font payload for content this app does not produce.
+ *
+ * Inter is the VARIABLE font, one file per subset for the whole 300-700 range,
+ * which is smaller than four static weights and lets the UI use 500 and 600
+ * without another download. IBM Plex Mono has no variable release, so 400 and
+ * 500 are two static faces.
+ */
+
+/* Inter — variable, 300-700 */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: block;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: block;
+  src: url('/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* IBM Plex Mono — 400 */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('/fonts/ibm-plex-mono-400-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('/fonts/ibm-plex-mono-400-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* IBM Plex Mono — 500, for eyebrow labels and emphasised figures */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url('/fonts/ibm-plex-mono-500-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url('/fonts/ibm-plex-mono-500-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
