@@ -84,6 +84,13 @@ Vitest runs in the `node` environment by default. Component tests opt into jsdom
 with `// @vitest-environment jsdom` as the first line of the file, so pure tests
 are not made to pay for a browser they do not use.
 
+`src/lib/events.contract.test.ts` knows a deferring function by its NAME —
+`setTimeout`, `.then`, `queueMicrotask`, anything matching
+`/debounce|throttle|defer|schedule|nextTick/i`, and single-argument
+`set[A-Z]` updaters. Write a new debounce/defer/schedule-style helper under
+another name and the guard cannot see through it, so add that name to those
+lists in the same commit.
+
 ## Status
 
 Built: the data model and export format, the SQLite data-access layer, CV text
