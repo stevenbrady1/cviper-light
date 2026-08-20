@@ -103,7 +103,7 @@ export function Welcome({ onDismiss, detect }: WelcomeProps) {
         </p>
         <h1 className="mt-1 text-2xl font-bold text-ink">Three things this does.</h1>
         <p className="mt-1 max-w-2xl text-ink-muted">
-          Everything stays on this computer. There is no account and nothing to sign up for. Two of
+          Your data stays on this computer. There is no account and nothing to sign up for. Two of
           these work better with a free key, and the page says which — you can start without one.
         </p>
       </header>
