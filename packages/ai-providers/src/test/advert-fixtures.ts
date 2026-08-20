@@ -248,9 +248,11 @@ export const HYBRID: AdvertFixture = {
 /** Fully remote, the other half of the work-mode gap. */
 export const REMOTE: AdvertFixture = {
   name: 'a fully remote role',
-  text: ['Data Engineer', 'Fully remote (UK), occasional travel to London.', 'Salary £85,000.'].join(
-    '\n',
-  ),
+  text: [
+    'Data Engineer',
+    'Fully remote (UK), occasional travel to London.',
+    'Salary £85,000.',
+  ].join('\n'),
   modelReply: {
     ...BASE_REPLY,
     title: 'Data Engineer',

@@ -209,15 +209,15 @@ describe('JobExtractionSchema — validation', () => {
   });
 
   it('rejects a string where a number belongs', () => {
-    expect(JobExtractionSchema.safeParse({ ...makeExtraction(), salary_min: '45000' }).success).toBe(
-      false,
-    );
+    expect(
+      JobExtractionSchema.safeParse({ ...makeExtraction(), salary_min: '45000' }).success,
+    ).toBe(false);
   });
 
   it('rejects a non-integer salary', () => {
-    expect(JobExtractionSchema.safeParse({ ...makeExtraction(), salary_max: 55000.5 }).success).toBe(
-      false,
-    );
+    expect(
+      JobExtractionSchema.safeParse({ ...makeExtraction(), salary_max: 55000.5 }).success,
+    ).toBe(false);
   });
 
   it('boundary: a zero salary is a number and is accepted', () => {

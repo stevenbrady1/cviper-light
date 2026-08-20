@@ -26,10 +26,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  ok,
-  type Result,
-} from '@cviper/core-types';
+import { ok, type Result } from '@cviper/core-types';
 import {
   type ChatTransport,
   type ProviderError,

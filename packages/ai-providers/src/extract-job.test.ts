@@ -233,12 +233,18 @@ describe('extractJob — per provider', () => {
   });
 
   it.each([
-    ['ollama', () => createOllamaProvider(fakeTransport({ chat: ollamaReply(PRO_RATA.modelReply) }))],
+    [
+      'ollama',
+      () => createOllamaProvider(fakeTransport({ chat: ollamaReply(PRO_RATA.modelReply) })),
+    ],
     [
       'anthropic',
       () => createAnthropicProvider(fakeTransport({ chat: anthropicReply(PRO_RATA.modelReply) })),
     ],
-    ['openai', () => createOpenAiProvider(fakeTransport({ chat: openAiReply(PRO_RATA.modelReply) }))],
+    [
+      'openai',
+      () => createOpenAiProvider(fakeTransport({ chat: openAiReply(PRO_RATA.modelReply) })),
+    ],
   ])('%s: the pro-rata clamp applies whichever provider answered', async (_name, make) => {
     const outcome = await extractJob({ provider: make(), model: MODEL, text: PRO_RATA.text });
     expect(outcome.extraction.salary_min).toBeNull();

@@ -106,7 +106,11 @@ function readSalaryNumber(raw: unknown): number | null {
   if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
   if (typeof raw !== 'string') return null;
 
-  const trimmed = raw.trim().replace(/^[£$€¥]\s*/, '').replace(/,/g, '').trim();
+  const trimmed = raw
+    .trim()
+    .replace(/^[£$€¥]\s*/, '')
+    .replace(/,/g, '')
+    .trim();
   if (!/^-?\d+(\.\d+)?$/.test(trimmed)) return null;
 
   const parsed = Number(trimmed);
@@ -240,9 +244,7 @@ export function clampExtraction(raw: unknown, sourceText: string): ExtractionCla
   if (nonAnnual !== null || blankValueWins) {
     const reason = nonAnnual ?? 'blank-value';
     const hadFigure =
-      out['salary_min'] !== null ||
-      out['salary_max'] !== null ||
-      out['salary_currency'] !== null;
+      out['salary_min'] !== null || out['salary_max'] !== null || out['salary_currency'] !== null;
 
     out['salary_min'] = null;
     out['salary_max'] = null;
@@ -263,11 +265,7 @@ export function clampExtraction(raw: unknown, sourceText: string): ExtractionCla
   // ── A currency with nothing to label is noise ─────────────────────────────
   // Ported from the source's `estimated_salary` rule: an object carrying only
   // `{"currency": "GBP"}` and no number was dropped for exactly this reason.
-  if (
-    out['salary_currency'] !== null &&
-    out['salary_min'] === null &&
-    out['salary_max'] === null
-  ) {
+  if (out['salary_currency'] !== null && out['salary_min'] === null && out['salary_max'] === null) {
     out['salary_currency'] = null;
     applied.push('salary_currency:no-figure-to-null');
   }

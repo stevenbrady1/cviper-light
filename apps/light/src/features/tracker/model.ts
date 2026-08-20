@@ -226,7 +226,11 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  * wrong costs the user a decision.
  */
 export function readSalaryField(raw: string): number | null {
-  const trimmed = raw.trim().replace(/^[£$€¥]\s*/, '').replace(/,/g, '').trim();
+  const trimmed = raw
+    .trim()
+    .replace(/^[£$€¥]\s*/, '')
+    .replace(/,/g, '')
+    .trim();
   if (trimmed === '' || !/^-?\d+$/.test(trimmed)) return null;
 
   const parsed = Number(trimmed);
@@ -283,7 +287,8 @@ export function validateDraft(draft: ApplicationDraft): DraftErrors {
     // the right shape and not a day that exists.
     const parsed = ISO_DATE.test(value) ? new Date(`${value}T00:00:00Z`) : null;
     if (parsed === null || Number.isNaN(parsed.getTime())) {
-      errors.postedDate = 'Write the date the advert went up as YYYY-MM-DD, for example 2026-08-18.';
+      errors.postedDate =
+        'Write the date the advert went up as YYYY-MM-DD, for example 2026-08-18.';
     }
   }
 
@@ -293,13 +298,15 @@ export function validateDraft(draft: ApplicationDraft): DraftErrors {
   if (!blank(draft.salaryMin) && salaryMin === null) {
     errors.salaryMin = 'Write the salary as a plain yearly number, for example 45000.';
   } else if (salaryMin !== null && salaryMin < 0) {
-    errors.salaryMin = 'A salary cannot be less than zero. Leave it blank if the advert did not say.';
+    errors.salaryMin =
+      'A salary cannot be less than zero. Leave it blank if the advert did not say.';
   }
 
   if (!blank(draft.salaryMax) && salaryMax === null) {
     errors.salaryMax = 'Write the salary as a plain yearly number, for example 55000.';
   } else if (salaryMax !== null && salaryMax < 0) {
-    errors.salaryMax = 'A salary cannot be less than zero. Leave it blank if the advert did not say.';
+    errors.salaryMax =
+      'A salary cannot be less than zero. Leave it blank if the advert did not say.';
   } else if (
     salaryMin !== null &&
     salaryMax !== null &&

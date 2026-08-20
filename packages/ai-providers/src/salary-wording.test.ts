@@ -76,7 +76,9 @@ describe('nonAnnualSalaryWording — pay that is not a yearly figure', () => {
 
   it('reports the FIRST kind it finds, so a mixed advert still clamps', () => {
     // Whichever fires, the outcome is the same: the salary fields go null.
-    expect(nonAnnualSalaryWording('£500 per day, or £45,000 pro rata if permanent.')).not.toBeNull();
+    expect(
+      nonAnnualSalaryWording('£500 per day, or £45,000 pro rata if permanent.'),
+    ).not.toBeNull();
   });
 });
 
@@ -145,7 +147,9 @@ describe('hasMoneyFigure — is there a number that could be pay at all', () => 
 
 describe('salaryWordingSnippet — the raw wording, kept for the user to read', () => {
   it('returns the sentence a day rate lives in', () => {
-    const snippet = salaryWordingSnippet('Great role. The rate is £750 per day, outside IR35. Apply now.');
+    const snippet = salaryWordingSnippet(
+      'Great role. The rate is £750 per day, outside IR35. Apply now.',
+    );
     expect(snippet).toContain('£750 per day');
     expect(snippet).not.toContain('Apply now');
   });

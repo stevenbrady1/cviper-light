@@ -20,7 +20,10 @@ function goodReply(): Record<string, unknown> {
 }
 
 /** Clamp, then read the value as a record. */
-function clamped(raw: unknown, source: string): { value: Record<string, unknown>; applied: readonly string[] } {
+function clamped(
+  raw: unknown,
+  source: string,
+): { value: Record<string, unknown>; applied: readonly string[] } {
   const result = clampExtraction(raw, source);
   return { value: result.value as Record<string, unknown>, applied: result.applied };
 }
@@ -98,7 +101,10 @@ describe('clampExtraction — salary near-misses', () => {
   });
 
   it('drops a currency it cannot recognise rather than storing rubbish', () => {
-    const { value, applied } = clamped({ ...goodReply(), salary_currency: 'pounds sterling' }, 'Salary £45,000');
+    const { value, applied } = clamped(
+      { ...goodReply(), salary_currency: 'pounds sterling' },
+      'Salary £45,000',
+    );
     expect(value['salary_currency']).toBeNull();
     expect(applied).toContain('salary_currency:unrecognised-to-null');
   });
@@ -113,7 +119,10 @@ describe('clampExtraction — salary near-misses', () => {
   });
 
   it('leaves an unreadable salary alone so validation fails and buys the retry', () => {
-    const { value } = clamped({ ...goodReply(), salary_min: 'about forty grand' }, 'Salary £45,000');
+    const { value } = clamped(
+      { ...goodReply(), salary_min: 'about forty grand' },
+      'Salary £45,000',
+    );
     expect(value['salary_min']).toBe('about forty grand');
     expect(JobExtractionSchema.safeParse(value).success).toBe(false);
   });
@@ -171,7 +180,10 @@ describe('GAP 2 — day rates: salary fields null, raw wording preserved', () =>
   it('nulls the salary rather than multiplying a day rate into a year', () => {
     // The source multiplies by 230 working days. `SalaryPeriod` in
     // `entities.ts` exists because this project already shipped that bug once.
-    const { value, applied } = clamped({ ...goodReply(), salary_min: 750, salary_max: 750 }, ADVERT);
+    const { value, applied } = clamped(
+      { ...goodReply(), salary_min: 750, salary_max: 750 },
+      ADVERT,
+    );
     expect(value['salary_min']).toBeNull();
     expect(value['salary_max']).toBeNull();
     expect(value['salary_currency']).toBeNull();
@@ -205,7 +217,10 @@ describe('the blank-value clamp — overruling a model that invented a number', 
     // The prompt tells the model to answer null. This is what happens when it
     // does not: a deterministic correction, not a hope.
     const advert = 'Credit Risk Analyst, City of London. Competitive salary and bonus.';
-    const { value, applied } = clamped({ ...goodReply(), salary_min: 65000, salary_max: 75000 }, advert);
+    const { value, applied } = clamped(
+      { ...goodReply(), salary_min: 65000, salary_max: 75000 },
+      advert,
+    );
     expect(value['salary_min']).toBeNull();
     expect(value['salary_max']).toBeNull();
     expect(value['salary_currency']).toBeNull();
@@ -255,7 +270,10 @@ describe('GAP 3 — hybrid and remote wording stays in `location`, verbatim', ()
   });
 
   it('keeps "Fully remote (UK)" exactly as written', () => {
-    const { value } = clamped({ ...goodReply(), location: 'Fully remote (UK)' }, 'Fully remote (UK)');
+    const { value } = clamped(
+      { ...goodReply(), location: 'Fully remote (UK)' },
+      'Fully remote (UK)',
+    );
     expect(value['location']).toBe('Fully remote (UK)');
   });
 

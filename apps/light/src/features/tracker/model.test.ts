@@ -476,7 +476,9 @@ describe('createEntry — the advert fields', () => {
     // pay, so any figure that reaches this point IS annual — and the form's own
     // label says "a year". Guessing is what `salary_period` exists to prevent.
     expect(createEntry(draft({ salaryMin: '45000' }), ids, NOW).job.salary_period).toBe('year');
-    expect(createEntry(draft({ salaryMin: '', salaryMax: '' }), ids, NOW).job.salary_period).toBeNull();
+    expect(
+      createEntry(draft({ salaryMin: '', salaryMax: '' }), ids, NOW).job.salary_period,
+    ).toBeNull();
   });
 
   it('boundary: a zero salary is a figure, not an absence', () => {
