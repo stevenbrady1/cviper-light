@@ -38,7 +38,8 @@ import { type SearchForm } from './model';
  * No `utm_source`, no affiliate tag, no identifier of any kind. The URL is
  * built by `@cviper/job-apis` from a template and two form fields, and opened
  * in the user's own browser, where they are already signed in. See the module
- * comment in `links.ts` for why there is no LinkedIn scraper here either.
+ * comment in `links.ts` for why there is no scraper behind these buttons
+ * either.
  */
 
 interface KeylessBarProps {
