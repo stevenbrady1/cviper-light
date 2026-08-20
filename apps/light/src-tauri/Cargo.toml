@@ -55,6 +55,12 @@ reqwest = { version = "0.13", default-features = false, features = [
   "query",
 ] }
 
+# URL parsing for the one-page fetch (src/fetch_page.rs). Already in the tree as
+# reqwest's own dependency — reqwest re-exports `Url` but not `Host`, and
+# `Host` is what lets the SSRF guard match on "IPv4 literal / IPv6 literal /
+# name" exactly, instead of unpicking square brackets out of a string.
+url = "2.5"
+
 # The crypto provider for the TLS stack above, and a DIRECT dependency on
 # purpose.
 #

@@ -1,4 +1,5 @@
 mod db;
+mod fetch_page;
 mod files;
 mod jobs;
 mod providers;
@@ -70,6 +71,17 @@ pub fn run() {
             files::pick_and_read_cv,
             files::pick_and_read_backup,
             files::pick_and_write_backup,
+            // Fetching the ONE page whose address the user pasted, so the same
+            // extraction that reads a paste can read an advert from a link.
+            //
+            // This is the only command in the app that takes a URL from
+            // JavaScript, and `fetch_page.rs` opens with the full account of
+            // why that is not the SSRF hole the other two transports refuse to
+            // become: the scheme, the host and every resolved address are
+            // vetted before each connection, the connection is pinned to the
+            // address that was vetted, redirects are walked by hand and cannot
+            // leave the site, and nothing that identifies the user goes with it.
+            fetch_page::fetch_job_page,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

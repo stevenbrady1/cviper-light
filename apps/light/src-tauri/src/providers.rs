@@ -264,7 +264,7 @@ pub(crate) fn classify(error: &reqwest::Error) -> RequestFailure {
 ///
 /// `install_default` returns `Err` if one is already installed, which is a
 /// success for our purposes: something else got there first.
-fn install_crypto_provider() {
+pub(crate) fn install_crypto_provider() {
     if rustls::crypto::CryptoProvider::get_default().is_none() {
         let _ = rustls::crypto::ring::default_provider().install_default();
     }
