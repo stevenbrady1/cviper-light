@@ -10,9 +10,9 @@ keyword-only scorer, the app shell, the application tracker, the CV analysis
 view, the job-board clients (Adzuna and Reed request building, response
 normalisation, cross-post detection, the eight configurable keyless browser
 links and the daily request budget), the job search view, the API-key setup
-wizard, pasted-advert extraction and the review form it fills, the manual update
-check, the first-run introduction and the app icon. There are no placeholder
-views left.
+wizard, pasted-advert extraction and the review form it fills, fetching one
+advert from a link and the guards around it, the manual update check, the
+first-run introduction and the app icon. There are no placeholder views left.
 
 **Not built, and marked as such below**: accounts, sync and telemetry — all
 three deliberate — and the CV parsing column, where extraction is done and
@@ -34,6 +34,7 @@ be verified by an installed copy. See
 | API key setup                | Yes — tested before saved, never read back | Not applicable                     | Built            |
 | Application tracker          | Yes — local SQLite                         | Yes — synced                       | Built            |
 | Paste a job advert           | Yes — AI reads it, you check every box     | Yes — server-side                  | Built            |
+| Fetch an advert from a link  | Yes — one page, on request, no credentials | Yes — server-side, no user IP      | Built            |
 | CV parsing                   | Yes — fully local                          | Yes — server-side                  | Extraction built |
 | CV analysis (BYO key)        | Yes — user's own provider key              | Not applicable                     | Built            |
 | CV analysis (local Ollama)   | Yes — offline, no key, no network          | No                                 | Built            |
@@ -49,6 +50,11 @@ be verified by an installed copy. See
 
 - **Light is local-first.** Data lives in SQLite on the user's machine. Secrets
   go to the OS credential store via the `keyring` crate, never to a file.
+  "Local-first" is not "never uses the network": a job search, a cloud CV
+  analysis, an update check and a link fetch are all outbound requests. Every
+  one of them is started by the user, none of them reaches a server of ours
+  because there is not one, and the app says which is which at the point of
+  use rather than in a policy page.
 - **Keyless first.** Every capability that can work without an API key has a
   keyless path, so the app is useful before the user configures anything.
 - **"No" in the Light column is a product decision, not a gap** — accounts,
@@ -123,6 +129,84 @@ be verified by an installed copy. See
   worth naming: there is no `agency` field, so an advert from a recruiter
   records the agency as the company — survivable only because the user is
   looking at that box before it is saved.
+- **An advert can be fetched from its link, and that is the one place this app
+  goes out to the open web on its own.** Paste the address, press Fetch, and the
+  page's readable text lands in the same box a paste would have filled — then
+  the SAME extraction runs, and the same review form is checked before anything
+  is saved. Two presses, not one: the one-press version spends thirty seconds of
+  model time before the user can see that the page came back as "Sign in to
+  continue", and puts an advert they have never read in front of them as a
+  filled-in form.
+
+  It is disclosed at the control, not in a policy page: _"Fetching opens that
+  page from your computer, the same as visiting it in your browser — the site
+  sees your IP address. Nothing is sent to us, and no other page is loaded."_
+  That sentence is why the README's privacy section now says "**Your data** stays
+  on your machine" rather than "Everything stays on your machine". The old
+  wording was not false — no data of the user's is sent anywhere, and there is
+  still no server of ours — but it read as a claim about network traffic, and a
+  page fetch is network traffic. The precise promise is the one worth keeping.
+
+- **The fetch command is the only one in the app that takes a URL from
+  JavaScript, and `src-tauri/src/fetch_page.rs` opens with fifty lines about
+  why.** `providers.rs` and `jobs.rs` each carry a test forbidding a
+  caller-supplied URL, because a command that forwards an arbitrary address is
+  server-side request forgery with a friendly name — and this app feeds
+  attacker-influenced adverts into a model all day. So the address is treated as
+  a request rather than an instruction, and every one of these is checked before
+  a socket opens and AGAIN on every redirect hop:
+
+  scheme is `http` or `https`; no username or password in the URL; the host is
+  not `localhost`, `.localhost` or `.local`; every resolved address is public
+  (loopback, `10/8`, `172.16/12`, `192.168/16`, `169.254/16` incl. the cloud
+  metadata endpoint, `0/8`, carrier-NAT, benchmarking, multicast and reserved
+  space are all refused, in IPv4 and IPv6, with IPv4-in-IPv6 unwrapped first);
+  the connection is PINNED to the addresses just vetted so DNS cannot rebind
+  under it; a redirect may not leave the registrable domain it started on and at
+  most three are followed, each compared with the address the USER pasted rather
+  than the previous hop; the reply must be HTML or plain text; the body is
+  capped at 5 MB WHILE STREAMING; and the whole walk shares one 15-second
+  budget.
+
+  It builds its own HTTP client rather than reusing `providers::client()`, which
+  follows redirects itself — reusing it would leave hops two onwards unchecked
+  while the happy path looked identical, and a source-scanning test now forbids
+  it. It sends no cookies, no `Authorization` header and no API key, and it
+  cannot reach the credential store at all: `this_command_cannot_reach_the_credential_store`
+  fails the build if the module so much as names `secret_get`. Every refusal
+  message is a fixed sentence containing no digits, so no address, status code
+  or response byte can travel in an error string.
+
+- **A fetched page is untrusted text, and is handled as such.** The HTML is
+  turned into text in TypeScript (`htmlToText.ts`) — script, style, noscript,
+  svg, iframe and canvas go with their content, and so does nav/header/footer/
+  aside chrome, the `aside` being the one that does real damage because a
+  "similar jobs" rail is a different job at a different company. The result goes
+  through the same `sanitizeForPrompt` the paste path uses: an advert carrying
+  "ignore all previous instructions" in white-on-white text costs an attacker
+  nothing.
+
+  Text under 400 characters is treated as a FAILURE rather than a short advert.
+  The two commonest replies to a fetch of a big job board are a login wall and a
+  single-page app that is one empty div, and both arrive with a 200 status.
+
+- **Every way a fetch can fail produces the same guided sentence.** Blocklisted
+  domain, timeout, unreachable host, blocked redirect, wrong content type,
+  oversize page, 404, login wall, broken IPC — one message, telling the user to
+  open the page and paste the text, with their link left where they typed it and
+  the paste box still working. Eight things to a developer; one thing, with one
+  route forward, to somebody trying to record a job. No status code, error kind
+  or raw message ever reaches the screen, and a test asserts it.
+
+- **`fetch-blocklist.json` is a courtesy list, not a security control, and says
+  so.** LinkedIn and Indeed ship in it because they answer anything that is not
+  a signed-in browser with a wall; a blocked domain skips the network ENTIRELY
+  and gets the guided message immediately rather than fifteen seconds later.
+  Matching is on the registrable domain, so `uk.indeed.com` is covered and
+  `notlinkedin.com` is not. Nothing that keeps this app out of a private network
+  reads this file — that is all in Rust — so a malformed file degrades to an
+  empty list without opening a hole, exactly as `job-boards.json` does.
+
 - **There is deliberately no regex fallback for extraction.** With no AI
   provider configured the feature says so, names both routes to one (free with
   Ollama, or the user's own key), and hands over the blank manual form with the

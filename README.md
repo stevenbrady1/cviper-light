@@ -8,13 +8,13 @@ Windows and macOS. Tauri v2, React, SQLite.
 
 ## Your privacy, in plain words
 
-**Everything stays on your machine. No accounts. We collect nothing.**
+**Your data stays on your machine. No accounts. We collect nothing.**
 
 There is no sign-up, no login and no server belonging to us. Your CVs, your
 applications and your notes are in one database file on your own disk. Nobody
 else can read it, including us — there is nowhere for it to go.
 
-Four more things worth saying out loud:
+Five more things worth saying out loud:
 
 - **No telemetry.** Not "anonymous statistics", not "crash reports", none. The
   Settings screen has a switch showing this, permanently off, and there is a
@@ -26,9 +26,40 @@ Four more things worth saying out loud:
   out — if you forget a key you paste a new one.
 - **Links open in your own browser, untouched.** No tracking parameters are
   added to a job advert's URL when you click it.
+- **"Fetch" opens one page, and only when you press it.** See below.
 
 The only requests this app ever makes are ones you start: a job search, a CV
-check against a provider you chose, and an update check you press.
+check against a provider you chose, an update check you press, and a job advert
+you ask it to fetch.
+
+### When you press "Fetch" on a job advert
+
+This is the one place the app goes and gets something from the open web, and it
+only happens when you press the button.
+
+- **It opens that one page, the same as your browser would.** The site sees your
+  IP address, exactly as it would if you had clicked the link yourself. The app
+  says so on screen, next to the button, before you press it.
+- **Nothing is sent to us.** There is still no server belonging to us. The page
+  comes straight from the site to your computer.
+- **Exactly one page.** It does not follow links, it does not crawl, and it does
+  not load images, adverts or trackers. It asks for the page and reads the text.
+- **It carries nothing that identifies you.** No cookies, no sign-in, no API key.
+  It cannot even reach your saved keys — that is enforced in the app's Rust code
+  and there is a test that fails the build if anyone changes it.
+- **It cannot be pointed at your own network.** Addresses on your computer or
+  your home network — `localhost`, `127.0.0.1`, `192.168.x.x` and the rest — are
+  refused before anything is sent, and refused again if the site tries to
+  redirect there. Only `http` and `https` addresses are opened at all.
+- **You still check every field.** The fetched text lands in the box you can
+  read and edit. Nothing is saved until you have been through the form.
+- **Some sites are skipped without asking them.** LinkedIn and Indeed only show
+  their adverts to a signed-in browser, so the app does not bother them — it
+  tells you to copy the text across instead. The list is a plain file at
+  `apps/light/src/config/fetch-blocklist.json`.
+
+If a fetch does not work, for any reason, you get the same short message asking
+you to open the page and paste the text, and your link stays where you typed it.
 
 ## What it does
 
