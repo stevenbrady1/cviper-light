@@ -10,6 +10,8 @@ import {
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
+import { BoardSettings } from '../boards/BoardSettings';
+import { type BoardPreferencesPort } from '../boards/port';
 import { type BrowserPort } from '../../platform/browser';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
 
@@ -71,6 +73,8 @@ export interface SettingsProps {
   readonly keyPort?: KeyPort | undefined;
   /** Injected by tests: the real one opens the user's browser. */
   readonly browser?: BrowserPort | undefined;
+  /** Injected by tests: the real one reads and writes the board-choices file. */
+  readonly boardsPort?: BoardPreferencesPort | undefined;
   /**
    * Injected by tests: the real one talks to the updater plugin.
    *
@@ -116,6 +120,7 @@ export function Settings({
   filePort,
   keyPort,
   browser,
+  boardsPort,
   updatePort,
   onShowWelcome,
   now,
@@ -346,6 +351,8 @@ export function Settings({
           ) : null}
 
           <KeySetup port={keyPort} browser={browser} />
+
+          <BoardSettings port={boardsPort} />
 
           <UpdateCheck port={updatePort} />
 

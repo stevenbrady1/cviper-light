@@ -69,6 +69,14 @@ export interface AppProps {
   readonly keyPort?: SettingsProps['keyPort'];
   /** Injected by tests: the real one opens the user's browser. */
   readonly browser?: SettingsProps['browser'];
+  /**
+   * Injected by tests: the real one reads and writes the board-choices file.
+   *
+   * The SAME port reaches both views on purpose. Settings writes it, the search
+   * screen reads it back when it is next mounted, and a test can watch one
+   * change travel between them.
+   */
+  readonly boardsPort?: SettingsProps['boardsPort'];
   /** Injected by tests: the real one talks to the updater plugin. */
   readonly updatePort?: SettingsProps['updatePort'];
   /** Injected by tests, for the same reason as `trackerPort`. */
@@ -89,6 +97,7 @@ export default function App({
   backupPort,
   keyPort,
   browser,
+  boardsPort,
   updatePort,
   searchPort,
   readKeyStates,
@@ -179,6 +188,7 @@ export default function App({
           search: {
             port: searchPort,
             browser,
+            boardsPort,
             readKeyStates,
             newId,
             now,
@@ -194,6 +204,7 @@ export default function App({
             filePort,
             keyPort,
             browser,
+            boardsPort,
             updatePort,
             onShowWelcome,
             now,
