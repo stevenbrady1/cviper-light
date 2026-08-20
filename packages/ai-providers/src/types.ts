@@ -69,8 +69,20 @@ export interface ChatJsonRequest {
   readonly model: string;
   readonly system: string;
   readonly user: string;
-  /** JSON Schema. In practice always `CV_ANALYSIS_JSON_SCHEMA`. */
+  /** JSON Schema — `CV_ANALYSIS_JSON_SCHEMA` or `JOB_EXTRACTION_JSON_SCHEMA`. */
   readonly schema: object;
+  /**
+   * A label for the schema, for the one provider that demands one.
+   *
+   * OpenAI's `response_format.json_schema` requires a `name`; Ollama and
+   * Anthropic have no equivalent field and ignore this entirely. It is optional
+   * because the OpenAI adapter has a sensible default, and it exists at all
+   * because two different schemas now travel through the same adapter — leaving
+   * a job extraction labelled `cv_analysis` on the wire would be a small lie
+   * that shows up in exactly one place: a support conversation about a request
+   * body nobody can explain.
+   */
+  readonly schemaName?: string;
   /**
    * ==========================================================================
    * A LITERAL `0`, NOT `number`. THIS IS LOAD-BEARING.

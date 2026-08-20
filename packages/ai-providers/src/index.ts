@@ -36,6 +36,19 @@ export {
 
 export { clampAnalysis, type ClampResult } from './clamp';
 
+export { clampExtraction, type ExtractionClampResult } from './extraction-clamp';
+
+export {
+  BLANK_VALUE_PATTERNS,
+  NON_ANNUAL_PATTERNS,
+  blankValueSalaryWording,
+  hasMoneyFigure,
+  nonAnnualSalaryWording,
+  salaryWordingSnippet,
+  type NonAnnualSalaryWording,
+  type SalaryPattern,
+} from './salary-wording';
+
 export { ANALYSIS_FIELD_ORDER, reasoningFirstSchema } from './schema-order';
 
 export {
@@ -72,3 +85,19 @@ export {
   type AnalysisSuccess,
   type AnalyzeCvOptions,
 } from './analyze';
+
+export {
+  MAX_ADVERT_CHARS,
+  buildExtractionPrompt,
+  extractionSourceText,
+  type ExtractionPrompt,
+  type ExtractionPromptInput,
+} from './prompt/build-extraction-prompt';
+
+export {
+  DEFAULT_MAX_EXTRACTION_TOKENS,
+  extractJob,
+  type ExtractJobOptions,
+  type JobExtractionMeta,
+  type JobExtractionOutcome,
+} from './extract-job';

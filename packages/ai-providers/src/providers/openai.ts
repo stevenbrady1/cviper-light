@@ -31,8 +31,15 @@ import {
 
 const PROVIDER = 'openai' as const;
 
-/** Names the schema in the response format. Free-form, but must be present. */
-const SCHEMA_NAME = 'cv_analysis';
+/**
+ * Names the schema in the response format. Free-form, but must be present.
+ *
+ * The DEFAULT only. `ChatJsonRequest.schemaName` overrides it, because this
+ * adapter now carries two different schemas — the CV analysis and the pasted-
+ * advert extraction — and labelling one with the other's name on the wire is a
+ * lie that only ever surfaces when somebody is already debugging.
+ */
+const DEFAULT_SCHEMA_NAME = 'cv_analysis';
 
 /** `finish_reason` when the model stopped at the output cap. */
 const FINISH_REASON_LENGTH = 'length';
@@ -87,7 +94,11 @@ export function createOpenAiProvider(transport: ChatTransport): AiProvider {
         ],
         response_format: {
           type: 'json_schema',
-          json_schema: { name: SCHEMA_NAME, schema: request.schema, strict: true },
+          json_schema: {
+            name: request.schemaName ?? DEFAULT_SCHEMA_NAME,
+            schema: request.schema,
+            strict: true,
+          },
         },
       });
 
