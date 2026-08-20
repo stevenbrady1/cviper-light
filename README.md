@@ -45,7 +45,24 @@ one, or your own API key.
 
 **Search jobs.** _Needs free Adzuna/Reed keys — or use the browser links, which
 need no key._ Search two UK job boards from inside the app and save what is
-worth chasing straight onto the board.
+worth chasing straight onto the board. The browser links cover eight UK boards
+and open in your own browser; Settings lets you turn any of them off, put them
+in the order you use them, and add your own.
+
+**Paste a job.** _Needs an AI provider._ Copy the text of a job advert, paste it
+in, and a model fills in the form for you — title, company, location, salary,
+link and dates. **Nothing is saved until you have checked every field.** Every
+box is yours to edit first, anything the advert did not actually say is left
+empty rather than guessed at, and the job is only written down when you press
+save. Pay quoted by the hour or by the day leaves the salary boxes empty on
+purpose, with the wording kept in the description, because turning a day rate
+into a yearly figure is how a good contract ends up looking like a bad
+permanent job.
+
+This one needs an AI provider: free with [Ollama](https://ollama.com) on your
+own machine, or your own Anthropic or OpenAI key. Without one you add jobs by
+typing them in, and everything else carries on as normal — the tracker and the
+browser job-search links never needed a key and still do not.
 
 ## What needs a key, and what does not
 
@@ -58,6 +75,7 @@ worth chasing straight onto the board.
 | CV analysis with Anthropic / OpenAI | Yes — your own key, billed to you.                                     |
 | Job search inside the app           | Yes — free Adzuna and/or Reed keys.                                    |
 | Job search in your browser          | **No.** One click, no key at all.                                      |
+| Paste a job advert into the tracker | Yes — a local Ollama model, or your own key.                           |
 | Export and import your data         | **No.**                                                                |
 
 Getting the free keys takes a few minutes; Settings links to both signup pages

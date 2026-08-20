@@ -8,10 +8,11 @@ the shared data model and export/import format, the local SQLite data-access
 layer, CV text extraction, the provider adapters and their Rust transport, the
 keyword-only scorer, the app shell, the application tracker, the CV analysis
 view, the job-board clients (Adzuna and Reed request building, response
-normalisation, cross-post detection, keyless browser links and the daily request
-budget), the job search view, the API-key setup wizard, the manual update check,
-the first-run introduction and the app icon. There are no placeholder views
-left.
+normalisation, cross-post detection, the eight configurable keyless browser
+links and the daily request budget), the job search view, the API-key setup
+wizard, pasted-advert extraction and the review form it fills, the manual update
+check, the first-run introduction and the app icon. There are no placeholder
+views left.
 
 **Not built, and marked as such below**: accounts, sync and telemetry — all
 three deliberate — and the CV parsing column, where extraction is done and
@@ -28,9 +29,11 @@ be verified by an installed copy. See
 | ---------------------------- | ------------------------------------------ | ---------------------------------- | ---------------- |
 | Job search (Adzuna/Reed)     | Yes — user's own API keys, direct calls    | Yes — server-side, shared keys     | Built            |
 | Cross-post detection         | Yes — flags duplicates, never merges       | Yes — merges, with a server undo   | Built            |
-| Keyless browser search links | Yes — no key needed, opens in browser      | Not applicable                     | Built            |
+| Keyless browser search links | Yes — eight UK boards, opens in browser    | Not applicable                     | Built            |
+| Job-board list, user-edited  | Yes — enable, reorder, add your own        | Not applicable                     | Built            |
 | API key setup                | Yes — tested before saved, never read back | Not applicable                     | Built            |
 | Application tracker          | Yes — local SQLite                         | Yes — synced                       | Built            |
+| Paste a job advert           | Yes — AI reads it, you check every box     | Yes — server-side                  | Built            |
 | CV parsing                   | Yes — fully local                          | Yes — server-side                  | Extraction built |
 | CV analysis (BYO key)        | Yes — user's own provider key              | Not applicable                     | Built            |
 | CV analysis (local Ollama)   | Yes — offline, no key, no network          | No                                 | Built            |
@@ -93,6 +96,64 @@ be verified by an installed copy. See
   guest endpoint. Light ports only the URL construction. A scraper inside an
   installed binary points LinkedIn's rate limiting at the user's own home IP and
   breaks on LinkedIn's schedule, with no way to patch it that afternoon.
+- **The board list is data, not code.** Eight UK boards ship in
+  `apps/light/src/config/job-boards.json` — LinkedIn, Indeed, Totaljobs,
+  CV-Library, Reed, Adzuna, Google Jobs and Guardian Jobs — and Settings can
+  switch any of them off, reorder them, or add one by pasting a search URL with
+  `{keyword}` and `{location}` in it. A board is a URL shape and one rule about
+  spaces, so it is stored as exactly that and a single builder serves all of
+  them; the version with a hand-written builder per board made the ninth board a
+  new binary. None of it needs an API key. Choices go to `tauri-plugin-store`, a
+  real file in the app's data directory, rather than `localStorage` — a board
+  somebody worked out and typed in is their work, and the WebView clearing its
+  origin data should not take it. A failed read falls back to the shipped eight
+  for the buttons but still reports the failure to the Settings screen, because
+  quietly switching every disabled board back on with no explanation is the one
+  outcome worth avoiding.
+- **A pasted advert is read by a model, then checked by a human before anything
+  is saved.** Paste the text of an advert and the configured provider
+  (Anthropic, OpenAI, or a local Ollama model) returns nine flat nullable fields
+  — `title`, `company`, `location`, `url`, `description`, `posted_date`,
+  `salary_currency`, `salary_min`, `salary_max`. Each one lands in an editable
+  box, a `null` renders as an EMPTY box rather than a plausible guess, and
+  nothing reaches the database until the user has been through them. The source
+  schema has seventeen fields and a nested salary object; this one is flat and
+  nine because it has to be producible by a 3-billion-parameter quantised model,
+  which fails on breadth the same way it fails on nesting. One casualty is
+  worth naming: there is no `agency` field, so an advert from a recruiter
+  records the agency as the company — survivable only because the user is
+  looking at that box before it is saved.
+- **There is deliberately no regex fallback for extraction.** With no AI
+  provider configured the feature says so, names both routes to one (free with
+  Ollama, or the user's own key), and hands over the blank manual form with the
+  pasted text preserved. A pattern-matched "title" taken off the first line of
+  an email is wrong often enough to be worse than an empty box, and it is wrong
+  INVISIBLY — the review form has no way to mark which fields were guessed. The
+  keyword scorer is filtered out of the provider list for the same reason: it
+  scores a CV against an advert and cannot read a company name out of prose.
+- **Pay quoted hourly, per day, or pro rata produces EMPTY salary boxes, with
+  the wording kept in the description.** `salary_min` and `salary_max` are
+  annual or they are `null`; `JobExtraction` has no `salary_period`, so a day
+  rate has nowhere truthful to live. The web application multiplies a day rate
+  by 230 working days and stores an annual figure — the same class of bug
+  `salary_period` exists to prevent for Reed (see below), and it is not being
+  reintroduced. `£45,000 pro rata` is caught too: it is a full-time-equivalent
+  figure for a part-time job, and the source repo has no coverage for it
+  anywhere — that rule was written here, not inherited. Adverts that describe
+  pay only in words ("Competitive", "DOE") also blank the boxes, because a model
+  asked for an integer will invent one. Nothing is lost: the raw wording stays
+  in `description`, where the user can read it. An empty box the user fills in
+  is correct; a plausible invented day rate is a bad decision waiting to happen.
+  `TODO(salary_period)` in `packages/ai-providers/src/salary-wording.ts` records
+  the schema-plus-form change that would capture these properly instead of
+  discarding the number.
+- **Extraction gets exactly one retry, and never a partial answer.** A bad shape
+  is sent back once with the error and the rejected output quoted; a second
+  failure returns "unavailable" plus a readable sentence, and the empty
+  extraction. Provider-level failures — a stopped daemon, a rejected key, a
+  truncated reply — are not retried at all, because an identical second request
+  cannot fix any of them. Every path returns an outcome object rather than
+  throwing, so no caller can write the version that blanks the screen.
 - **A key is proved before it is stored.** The setup wizard runs a real
   one-result search with the credentials the user just typed
   (`job_test_credentials` in `src-tauri/src/jobs.rs`) and writes nothing to the
