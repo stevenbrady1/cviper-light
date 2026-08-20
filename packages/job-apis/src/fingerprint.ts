@@ -1,7 +1,13 @@
 /**
  * Description fingerprinting for cross-post detection.
  *
- * PORTED FROM `c:\Dev\job-match-pro\backend\helpers\dedupe_fingerprint.py`.
+ * PORTED FROM: backend/helpers/dedupe_fingerprint.py  (CViper repo, @ d15c7b4b)
+ *
+ * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
+ * guard fails there when this source changes. This is a FIDELITY port — the bit
+ * layout must stay identical or the two products disagree about what counts as
+ * a duplicate. Anything in that file's `FINGERPRINT_VERSION` bump list changes
+ * the computed value, not just the decision.
  *
  * ============================================================================
  * WHY

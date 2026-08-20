@@ -1,12 +1,16 @@
 /**
  * Prompt constants — calibration knowledge, not code.
  *
- * PORTED FROM: c:\Dev\job-match-pro\backend\ai\prompts\constants.py
- *   JSON_ONLY ............ line 9
- *   FAIRNESS_GUARDRAIL ... line 13
- *   FIT_SCORE_ANCHORS .... line 28
- *   FIT_SCORE_WEIGHTS .... line 54
- *   ATS_SCORE_ANCHORS .... line 140
+ * PORTED FROM: backend/ai/prompts/constants.py  (CViper repo, @ 2f83a377)
+ *   JSON_ONLY
+ *   FAIRNESS_GUARDRAIL
+ *   FIT_SCORE_ANCHORS
+ *   FIT_SCORE_WEIGHTS
+ *   ATS_SCORE_ANCHORS
+ *
+ * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
+ * guard fails there when this source changes. Symbols are named rather than
+ * line numbers, which decay on the next edit upstream.
  *
  * ============================================================================
  * THE ANCHORS ARE THE MOST VALUABLE THING IN THIS FILE.

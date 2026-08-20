@@ -1,12 +1,17 @@
 /**
  * The awkward adverts, as fixtures.
  *
- * PORTED FROM: c:\Dev\job-match-pro\backend\tests\companies\test_salary_utils.py
+ * PORTED FROM: backend/tests/companies/test_salary_utils.py  (CViper repo, @ e87d07df)
  *   `test_competitive_returns_none`, `test_doe_returns_none`,
  *   `test_annual_range_with_k_suffix`, `test_hourly_rate`,
  *   `test_daily_rate` / `test_daily_rate_range`
- * and c:\Dev\job-match-pro\backend\tests\api\test_email_extraction.py
- *   `_REALISTIC_EMAIL` (line 62) — the Hays agency email about a Tier 1 bank.
+ * and backend/tests/api/test_email_extraction.py  (CViper repo, @ e8a5e8b0)
+ *   `_REALISTIC_EMAIL` — the Hays agency email about a Tier 1 bank.
+ *
+ * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
+ * guard fails there when either source changes. This corpus is shared on
+ * purpose: a case added there and not here means one product is tested against
+ * a real-world advert shape the other is not.
  *
  * ============================================================================
  * WHY THESE LIVE IN ONE FILE

@@ -13,6 +13,11 @@
  *
  * If a case here starts failing, the port has drifted. Re-measure against the
  * Python before changing a single expectation.
+ *
+ * MEASURED AGAINST: backend/ai/keywords.py (CViper repo, @ a42339b6).
+ * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
+ * guard fails there when that file changes, which is the signal to come back
+ * here and re-measure. This file is the pattern the other ports should follow.
  */
 import { describe, expect, it } from 'vitest';
 import { termInText } from './term';

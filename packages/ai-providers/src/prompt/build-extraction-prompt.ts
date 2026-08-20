@@ -1,11 +1,15 @@
 /**
  * The pasted-advert extraction prompt — ONE call, ONE flat object, nine fields.
  *
- * PORTED FROM: c:\Dev\job-match-pro\backend\ai\prompts\search_helpers.py
- *   `build_email_job_extraction_prompt`  — line 72
- *   `build_email_job_extraction_system`  — line 122
- *   and the comment block at line 60, which is the reason the source prompt is
+ * PORTED FROM: backend/ai/prompts/search_helpers.py  (CViper repo, @ e8a5e8b0)
+ *   `build_email_job_extraction_prompt`
+ *   `build_email_job_extraction_system`
+ *   and the comment block above them, which is the reason the source prompt is
  *   worth porting at all rather than writing fresh.
+ *
+ * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
+ * guard fails there when this source changes. Symbols are named rather than
+ * line numbers, which decay on the next edit upstream.
  *
  * That comment says a recruiter email is NOT a job-board posting: it is
  * conversational, the client employer is often deliberately obscured ("a Tier 1

@@ -1,8 +1,12 @@
 /**
  * The pasted-advert extraction result — the FLAT, NINE-FIELD schema.
  *
- * PORTED FROM: c:\Dev\job-match-pro\backend\ai\schemas.py
- *   `EmailJobExtractionResult` — line 452, seventeen fields.
+ * PORTED FROM: backend/ai/schemas.py  (CViper repo, @ e8a5e8b0)
+ *   `EmailJobExtractionResult` — seventeen fields.
+ *
+ * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
+ * guard fails there when this source changes. Symbols are named rather than
+ * line numbers, which decay on the next edit upstream.
  *
  * ============================================================================
  * THIS IS DELIBERATELY *NOT* THE SOURCE'S SCHEMA. NINE FIELDS, NOT SEVENTEEN.

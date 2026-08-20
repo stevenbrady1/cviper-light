@@ -1,9 +1,13 @@
 /**
  * What unit Reed's bare salary numbers are in.
  *
- * PORTED FROM `c:\Dev\job-match-pro\backend\job_sites_api.py`:
- *   `_DAY_RATE_CEILING`       line 309 (comment at 304-308)
- *   `ReedAPI._format_salary`  lines 311-333 — NOT ported, deliberately replaced
+ * PORTED FROM: backend/job_sites_api.py  (CViper repo, @ 32f9f701)
+ *   `_DAY_RATE_CEILING`       (and the comment above it)
+ *   `ReedAPI._format_salary`  — NOT ported, deliberately replaced
+ *
+ * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
+ * guard fails there when this source changes. Symbols are named rather than
+ * line numbers, which decay on the next edit upstream.
  *
  * ============================================================================
  * THE SHAPE IS DELIBERATELY DIFFERENT FROM THE SOURCE, AND THAT IS THE FIX.

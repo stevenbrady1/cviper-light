@@ -1,8 +1,12 @@
 /**
  * sanitize.ts — CViper Light (Tauri, local Ollama)
  *
- * PORTED FROM: c:\Dev\job-match-pro\backend\ai\gateway.py
- *   `sanitize_for_prompt` — lines 422-444 (static method).
+ * PORTED FROM: backend/ai/gateway.py  (CViper repo, @ 52af65a2)
+ *   `sanitize_for_prompt` (static method).
+ *
+ * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
+ * guard fails there when this source changes. Symbols are named rather than
+ * line numbers, which decay on the next edit upstream.
  *
  * Purpose (source docstring, verbatim): "Strip known prompt injection patterns
  * from external text. Removes instruction-override attempts while preserving

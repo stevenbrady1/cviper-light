@@ -1,10 +1,14 @@
 /**
  * extractJob — one pasted advert, one validated `JobExtraction`, never a throw.
  *
- * PORTED FROM: c:\Dev\job-match-pro\backend\ai\services\search_helpers.py
- *   `extract_job_from_email`            — line 130
- *   `_email_extraction_unavailable`     — line 115 (the fail-open contract)
- *   `_normalise_email_fields`           — line 222 (lives in `extraction-clamp.ts`)
+ * PORTED FROM: backend/ai/services/search_helpers.py  (CViper repo, @ e8a5e8b0)
+ *   `extract_job_from_email`            — the pipeline
+ *   `_email_extraction_unavailable`     — the fail-open contract
+ *   `_normalise_email_fields`           — lives in `extraction-clamp.ts`
+ *
+ * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
+ * guard fails there when this source changes. Symbols are named rather than
+ * line numbers, which decay on the next edit upstream.
  *
  * The pipeline is `analyzeCv`'s, unchanged in shape:
  *

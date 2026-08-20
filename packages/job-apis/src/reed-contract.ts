@@ -1,9 +1,13 @@
 /**
  * Best-effort employment-type classification for a Reed advert.
  *
- * PORTED FROM `c:\Dev\job-match-pro\backend\job_sites_api.py`:
- *   `_REED_CONTRACT_SIGNALS`       lines 155-165
- *   `_classify_reed_contract_type` lines 168-199
+ * PORTED FROM: backend/job_sites_api.py  (CViper repo, @ 32f9f701)
+ *   `_REED_CONTRACT_SIGNALS`
+ *   `_classify_reed_contract_type`
+ *
+ * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
+ * guard fails there when this source changes. Symbols are named rather than
+ * line numbers, which decay on the next edit upstream.
  *
  * Ported faithfully in behaviour, including the three-tier fallback and the
  * deliberate omission in the signal list. Both explanatory comments are copied

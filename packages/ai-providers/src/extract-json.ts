@@ -1,10 +1,14 @@
 /**
  * extract-json.ts — the JSON repair ladder.
  *
- * PORTED FROM: c:\Dev\job-match-pro\backend\ai\gateway.py
- *   `strip_code_fences`  — lines 1632-1656
- *   `safe_parse_json`    — lines 1658-1746
- *   `extract_json`       — lines 1748-1778
+ * PORTED FROM: backend/ai/gateway.py  (CViper repo, @ 52af65a2)
+ *   `strip_code_fences`
+ *   `safe_parse_json`
+ *   `extract_json`
+ *
+ * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
+ * guard fails there when this source changes. Symbols are named rather than
+ * line numbers, which decay on the next edit upstream.
  *
  * WHY THIS MATTERS MORE HERE THAN IT DID THERE: the source docstring says the
  * repair ladder exists for "malformed responses from local models" — trailing

@@ -1,12 +1,18 @@
 /**
  * salary-wording.ts — reading what an advert SAYS about money, in TypeScript.
  *
- * PORTED FROM: c:\Dev\job-match-pro\backend\salary_utils.py
- *   `normalize_salary` skip patterns — line 140 (competitive / negotiable /
- *   DOE / depending / not specified / n/a / TBD / market rate / excellent /
+ * PORTED FROM: backend/salary_utils.py  (CViper repo, @ 51db2081)
+ *   `normalize_salary` :: skip patterns (competitive / negotiable / DOE /
+ *   depending / not specified / n/a / TBD / market rate / excellent /
  *   attractive)
- *   period detection — lines 154-158 (`/day|per day|p.d.|daily`,
+ *   `normalize_salary` :: period detection (`/day|per day|p.d.|daily`,
  *   `/hour|per hour|/hr|p.h.|hourly`)
+ *
+ * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
+ * guard fails there when this source changes. Symbols are named rather than
+ * line numbers, which decay on the next edit upstream. NOTE: New Zealand market
+ * work (CViper CV-277) is actively touching that file — a change to the skip
+ * patterns or the period regexes needs this module reviewed.
  *
  * ============================================================================
  * WHAT THIS IS FOR, AND WHY IT IS NOT A SALARY PARSER
