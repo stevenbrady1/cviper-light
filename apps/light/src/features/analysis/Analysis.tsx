@@ -558,6 +558,9 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
               className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
             >
               <p className="font-medium text-ink">Nothing checked yet.</p>
+              {/* cviper-allow-absolute-privacy-claim: the sentence names its own
+                  subject — "The basic match" — which is the keyword scorer in
+                  packages/keyword-scoring and reaches no network at all. */}
               <p className="mt-1 text-ink-muted">
                 Pick a CV, paste an advert, and press the button. The basic match needs no account
                 and no API key, and nothing leaves this machine.
