@@ -465,6 +465,80 @@ describe('when the fetch does not work', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+describe('the wait', () => {
+  /**
+   * ==========================================================================
+   * FIFTEEN SECONDS OF A STILL SCREEN IS INDISTINGUISHABLE FROM A CRASH
+   * ==========================================================================
+   * The same rule the extraction wait already follows. A fetch on a slow
+   * connection has a fifteen-second budget, and the user has no way to tell a
+   * working fetch from a hung one unless the screen says so.
+   */
+  it('says what is happening while it happens, and every control is held', async () => {
+    const user = userEvent.setup();
+    // A transport that does not answer until this test lets it.
+    let release: (value: Result<FetchedPage, PageFetchError>) => void = () => {};
+    const pending = new Promise<Result<FetchedPage, PageFetchError>>((resolve) => {
+      release = resolve;
+    });
+    renderBoard({
+      createPageTransport: () => ({
+        fetchPage: () => pending,
+      }),
+    });
+
+    await openPaste(user);
+    await user.click(screen.getByTestId('paste-job-url'));
+    await user.paste(ADVERT_URL);
+    await user.click(screen.getByTestId('paste-job-fetch'));
+
+    const progress = await screen.findByTestId('paste-job-fetch-progress');
+    expect(progress.textContent).toMatch(/opening that page/i);
+    expect(progress.getAttribute('role')).toBe('status');
+    // A counter, so a long wait visibly IS a wait rather than a freeze.
+    expect(progress.textContent).toMatch(/[0-9]+s/);
+
+    // Nothing else can be touched mid-fetch, so a second press cannot race the
+    // first and the advert box cannot change under the reply.
+    expect((screen.getByTestId('paste-job-fetch') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId('paste-job-url') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByTestId('paste-job-text') as HTMLTextAreaElement).disabled).toBe(true);
+    expect((screen.getByTestId('paste-job-extract') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId('paste-job-manual') as HTMLButtonElement).disabled).toBe(true);
+
+    release(ok({ status: 200, body: ADVERT_PAGE }));
+
+    // …and it all comes back afterwards.
+    await waitFor(() =>
+      expect((screen.getByTestId('paste-job-text') as HTMLTextAreaElement).value).toContain(
+        'Credit Risk Analyst',
+      ),
+    );
+    expect(screen.queryByTestId('paste-job-fetch-progress')).toBeNull();
+    expect((screen.getByTestId('paste-job-url') as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByTestId('paste-job-extract') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('the progress note is gone once a fetch has failed, replaced by the message', async () => {
+    const user = userEvent.setup();
+    renderBoard({
+      createPageTransport: () =>
+        pageTransport(err({ kind: 'network', message: 'That page could not be reached.' })),
+    });
+
+    await openPaste(user);
+    await user.click(screen.getByTestId('paste-job-url'));
+    await user.paste(ADVERT_URL);
+    await user.click(screen.getByTestId('paste-job-fetch'));
+
+    await screen.findByTestId('paste-job-fetch-note');
+    expect(screen.queryByTestId('paste-job-fetch-progress')).toBeNull();
+    expect((screen.getByTestId('paste-job-fetch') as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 describe('the link box itself', () => {
   it('says what fetching does BEFORE the button can be pressed', async () => {
     const user = userEvent.setup();
