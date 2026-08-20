@@ -36,6 +36,16 @@ export {
 } from './analysis';
 
 export {
+  BOARD_ENCODINGS,
+  BoardTemplateSchema,
+  KEYWORD_PLACEHOLDER,
+  LOCATION_PLACEHOLDER,
+  parseBoardTemplates,
+  type BoardEncoding,
+  type BoardTemplate,
+} from './boards';
+
+export {
   BACKUP_SCHEMA_VERSION,
   exportBackup,
   importBackup,

@@ -1,12 +1,13 @@
-import { buildIndeedSearchUrl, buildLinkedInSearchUrl } from '@cviper/job-apis';
+import { buildBoardUrl } from '@cviper/job-apis';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { type Board } from '../boards/model';
 import { type BrowserPort } from '../../platform/browser';
 
 import { type SearchForm } from './model';
 
 /**
- * The two buttons that always work.
+ * The buttons that always work.
  *
  * ============================================================================
  * THIS IS A FEATURE, NOT A FALLBACK, AND THE COPY MUST NOT APOLOGISE
@@ -23,21 +24,33 @@ import { type SearchForm } from './model';
  * always searches for whatever is in the boxes.
  *
  * ============================================================================
+ * NOT ONE BOARD IS NAMED IN THIS FILE
+ * ============================================================================
+ * Every button comes from `boards`, which comes from `job-boards.json` with the
+ * user's own list layered on top. A hard-coded board here would be a board
+ * nobody could switch off, could not reorder, and could not sit next to one
+ * they added themselves — and it would be the one that got forgotten when the
+ * shipped list changed. The label, the order and the URL shape are all data.
+ *
+ * ============================================================================
  * NOTHING IS ADDED TO THE LINK
  * ============================================================================
  * No `utm_source`, no affiliate tag, no identifier of any kind. The URL is
- * built by `@cviper/job-apis` from two form fields and opened in the user's own
- * browser, where they are already signed in. See the module comment in
- * `links.ts` for why there is no LinkedIn scraper here either.
+ * built by `@cviper/job-apis` from a template and two form fields, and opened
+ * in the user's own browser, where they are already signed in. See the module
+ * comment in `links.ts` for why there is no LinkedIn scraper here either.
  */
 
 interface KeylessBarProps {
   readonly form: SearchForm;
   readonly browser: BrowserPort;
+  /** Shipped defaults with the user's choices applied. Disabled boards included. */
+  readonly boards: readonly Board[];
 }
 
-export function KeylessBar({ form, browser }: KeylessBarProps) {
+export function KeylessBar({ form, browser, boards }: KeylessBarProps) {
   const input = { keywords: form.keywords, location: form.location };
+  const shown = boards.filter((board) => board.enabled);
 
   return (
     <section
@@ -48,31 +61,35 @@ export function KeylessBar({ form, browser }: KeylessBarProps) {
         No key needed
       </p>
       <p className="mt-1 text-ink">
-        Open this same search on LinkedIn or Indeed, in your own browser, where you are already
-        signed in. Nothing to set up and nothing to spend.
+        Send this same search to a job board in your own browser, where you are already signed in.
+        Nothing to set up and nothing to spend.
       </p>
 
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          data-testid="keyless-linkedin"
-          onClick={() => void browser.open(buildLinkedInSearchUrl(input))}
-          className={SECONDARY_BUTTON}
-        >
-          Search LinkedIn
-        </button>
-        <button
-          type="button"
-          data-testid="keyless-indeed"
-          onClick={() => void browser.open(buildIndeedSearchUrl(input))}
-          className={SECONDARY_BUTTON}
-        >
-          Search Indeed
-        </button>
-        <span className="text-xs text-ink-faint">
-          Opens in your browser. CViper adds nothing to the link.
-        </span>
-      </div>
+      {shown.length === 0 ? (
+        <p data-testid="keyless-none" className="mt-2 text-ink-muted">
+          Every board is switched off. Turn one back on under Job boards in Settings.
+        </p>
+      ) : (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {shown.map((board) => (
+            <button
+              key={board.id}
+              type="button"
+              data-testid={`keyless-${board.id}`}
+              aria-label={`Search ${board.label} in your browser`}
+              onClick={() => void browser.open(buildBoardUrl(board, input))}
+              className={SECONDARY_BUTTON}
+            >
+              {board.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <p className="mt-2 text-xs text-ink-faint">
+        Opens in your browser. CViper adds nothing to the link. Choose which boards appear, and add
+        your own, under Job boards in Settings.
+      </p>
     </section>
   );
 }

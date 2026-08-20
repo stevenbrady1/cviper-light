@@ -1,0 +1,50 @@
+[
+  {
+    "id": "linkedin",
+    "label": "LinkedIn",
+    "urlTemplate": "https://www.linkedin.com/jobs/search/?keywords={keyword}&location={location}",
+    "encoding": "plus"
+  },
+  {
+    "id": "indeed",
+    "label": "Indeed",
+    "urlTemplate": "https://uk.indeed.com/jobs?q={keyword}&l={location}",
+    "encoding": "plus"
+  },
+  {
+    "id": "totaljobs",
+    "label": "Totaljobs",
+    "urlTemplate": "https://www.totaljobs.com/jobs/{keyword}/in-{location}",
+    "encoding": "hyphen"
+  },
+  {
+    "id": "cv-library",
+    "label": "CV-Library",
+    "urlTemplate": "https://www.cv-library.co.uk/{keyword}-jobs-in-{location}",
+    "encoding": "hyphen"
+  },
+  {
+    "id": "reed",
+    "label": "Reed",
+    "urlTemplate": "https://www.reed.co.uk/jobs/{keyword}-jobs-in-{location}",
+    "encoding": "hyphen"
+  },
+  {
+    "id": "adzuna",
+    "label": "Adzuna",
+    "urlTemplate": "https://www.adzuna.co.uk/search?q={keyword}&w={location}",
+    "encoding": "plus"
+  },
+  {
+    "id": "google-jobs",
+    "label": "Google Jobs",
+    "urlTemplate": "https://www.google.com/search?q={keyword}+jobs+{location}&udm=8&hl=en&gl=uk",
+    "encoding": "plus"
+  },
+  {
+    "id": "guardian",
+    "label": "Guardian Jobs",
+    "urlTemplate": "https://jobs.theguardian.com/jobs/{keyword}/",
+    "encoding": "hyphen"
+  }
+]

@@ -136,7 +136,9 @@ describe('the search view on a machine with no keys', () => {
     await user.type(screen.getByTestId('search-keywords'), 'quant developer');
     await user.click(screen.getByTestId('keyless-indeed'));
 
-    expect(browser.opened()).toEqual(['https://uk.indeed.com/jobs?q=quant+developer&l=']);
+    // No `&l=`. An empty box means "no location filter", and the builder drops
+    // the parameter rather than sending an explicitly empty one.
+    expect(browser.opened()).toEqual(['https://uk.indeed.com/jobs?q=quant+developer']);
     expect(invokedProviderCommands()).toEqual([]);
   });
 

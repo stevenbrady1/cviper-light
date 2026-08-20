@@ -103,7 +103,7 @@ export {
 
 // ── Keyless browser links: no key, no scraper, no account ────────────────────
 
-export { buildIndeedSearchUrl, buildLinkedInSearchUrl, type BrowserSearchInput } from './links';
+export { boardTemplateProblem, buildBoardUrl, type BrowserSearchInput } from './links';
 
 // ── The daily request budget ─────────────────────────────────────────────────
 

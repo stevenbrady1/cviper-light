@@ -14,6 +14,9 @@ import {
 import { PRIMARY_BUTTON, QUIET_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
+import { SHIPPED_BOARDS } from '../boards/defaults';
+import { NO_PREFERENCES, mergeBoards, type Board } from '../boards/model';
+import { createTauriBoardPreferencesPort, type BoardPreferencesPort } from '../boards/port';
 import { readQuota, writeQuota } from '../../jobs/quotaStore';
 import { todayIsoDate } from '../../lib/dates';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
@@ -84,6 +87,8 @@ export interface SearchProps {
   readonly port?: SearchPort | undefined;
   /** Injected by tests: the real one opens the user's browser. */
   readonly browser?: BrowserPort | undefined;
+  /** Injected by tests: the real one reads the user's board choices off disk. */
+  readonly boardsPort?: BoardPreferencesPort | undefined;
   /** Injected by tests so no credential store is read. */
   readonly readKeyStates?: (() => Promise<Record<JobProviderId, KeyState>>) | undefined;
   /** Injected by tests so timestamps and "posted N days ago" are deterministic. */
@@ -97,6 +102,7 @@ export interface SearchProps {
 export function Search({
   port,
   browser,
+  boardsPort,
   readKeyStates,
   now,
   newId,
@@ -106,6 +112,7 @@ export function Search({
   // keystroke in the search box.
   const searchPort = useMemo(() => port ?? createDbSearchPort(), [port]);
   const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
+  const boards = useMemo(() => boardsPort ?? createTauriBoardPreferencesPort(), [boardsPort]);
   const readStates = readKeyStates ?? readJobKeyStates;
 
   const [form, setForm] = useState<SearchForm>(EMPTY_FORM);
@@ -127,6 +134,15 @@ export function Search({
   const [problems, setProblems] = useState<CardNotes>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [quota, setQuota] = useState<QuotaState>(() => readQuota(now ?? new Date()));
+  /*
+    Seeded with the SHIPPED list rather than an empty one, so the buttons are
+    there on the first paint instead of appearing a moment later. The user's own
+    list replaces it as soon as the store answers; if the store cannot be read
+    the shipped list is what stays, which is the whole point of a default layer.
+  */
+  const [jobBoards, setJobBoards] = useState<readonly Board[]>(() =>
+    mergeBoards(SHIPPED_BOARDS, NO_PREFERENCES),
+  );
 
   // ── Loading ──────────────────────────────────────────────────────────────
 
@@ -177,6 +193,23 @@ export function Search({
       cancelled = true;
     };
   }, [searchPort]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void boards.read().then((loaded) => {
+      if (cancelled) return;
+      // A failed read is NOT surfaced here. The shipped boards are already on
+      // screen and every one of them works; a red banner over a row of working
+      // buttons would be the larger error. Settings, where the user would
+      // otherwise see their choices silently reverted, does report it.
+      setJobBoards(mergeBoards(SHIPPED_BOARDS, loaded.ok ? loaded.value : NO_PREFERENCES));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [boards]);
 
   // The ONLY debounce on this screen, and it touches no network: what is in the
   // boxes is written a moment after typing stops, so closing the app mid-thought
@@ -439,7 +472,7 @@ export function Search({
           )}
 
           {/* ALWAYS here. Not a fallback, not an error state. */}
-          <KeylessBar form={form} browser={browserPort} />
+          <KeylessBar form={form} browser={browserPort} boards={jobBoards} />
 
           <div data-testid="search-quota" className="text-xs text-ink-faint">
             Requests today — {PROVIDER_LABEL.reed}{' '}
