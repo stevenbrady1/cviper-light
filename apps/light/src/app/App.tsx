@@ -197,7 +197,14 @@ export default function App({
             // to be acted on.
             onOpenSettings: () => setActiveView('settings'),
           },
-          tracker: { port: trackerPort, now },
+          tracker: {
+            port: trackerPort,
+            now,
+            createTransport,
+            // Same arrangement as the search screen: the shell owns which view
+            // is showing, so "no AI provider — open Settings" comes back here.
+            onOpenSettings: () => setActiveView('settings'),
+          },
           analysis: { port: analysisPort, filePort, createTransport, now },
           settings: {
             port: backupPort,

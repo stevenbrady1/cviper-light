@@ -6,7 +6,9 @@ import {
   draftIsValid,
   groupByStatus,
   joinEntries,
+  MAX_DESCRIPTION_LENGTH,
   MAX_FIELD_LENGTH,
+  MAX_URL_LENGTH,
   STATUS_LABELS,
   STATUS_PILL_TONES,
   TRACKER_COLUMNS,
@@ -58,6 +60,15 @@ function draft(overrides: Partial<ApplicationDraft> = {}): ApplicationDraft {
     company: 'Jane Street',
     location: 'London',
     status: 'saved',
+    // The advert fields, added when the paste-and-review flow arrived. Blank by
+    // default so every assertion above this line still describes the same
+    // hand-typed card it always did.
+    description: '',
+    url: '',
+    postedDate: '',
+    salaryMin: '',
+    salaryMax: '',
+    salaryCurrency: '',
     ...overrides,
   };
 }
@@ -325,5 +336,157 @@ describe('withEdit', () => {
     const original = application('a', { next_action_date: '2026-09-01' });
 
     expect(withEdit(original, { next_action_date: null }, later).next_action_date).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The advert fields — added so an extraction can be REVIEWED rather than
+// silently discarded. Everything below is optional to the user: an advert that
+// says nothing about pay produces empty boxes, not zeroes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('validateDraft — the advert fields', () => {
+  it('accepts a draft that leaves every advert field blank', () => {
+    expect(
+      validateDraft(
+        draft({
+          description: '',
+          url: '',
+          postedDate: '',
+          salaryMin: '',
+          salaryMax: '',
+          salaryCurrency: '',
+        }),
+      ),
+    ).toEqual({});
+  });
+
+  it('accepts a plain whole-number salary', () => {
+    expect(validateDraft(draft({ salaryMin: '45000', salaryMax: '55000' }))).toEqual({});
+  });
+
+  it('accepts a salary the user typed with a comma or a pound sign', () => {
+    // They are copying it off an advert. Refusing "£45,000" teaches nothing.
+    expect(validateDraft(draft({ salaryMin: '£45,000' }))).toEqual({});
+  });
+
+  it('negative: refuses a salary that is not a number', () => {
+    expect(validateDraft(draft({ salaryMin: 'about forty grand' })).salaryMin).toBeDefined();
+  });
+
+  it('negative: refuses a negative salary', () => {
+    expect(validateDraft(draft({ salaryMin: '-45000' })).salaryMin).toBeDefined();
+  });
+
+  it('negative: refuses a bottom of range above the top', () => {
+    const errors = validateDraft(draft({ salaryMin: '55000', salaryMax: '45000' }));
+    expect(errors.salaryMax).toBeDefined();
+  });
+
+  it('boundary: a salary of exactly zero is allowed — unpaid roles exist', () => {
+    expect(validateDraft(draft({ salaryMin: '0', salaryMax: '0' }))).toEqual({});
+  });
+
+  it('boundary: only one half of the range is fine on its own', () => {
+    expect(validateDraft(draft({ salaryMin: '45000', salaryMax: '' }))).toEqual({});
+    expect(validateDraft(draft({ salaryMin: '', salaryMax: '55000' }))).toEqual({});
+  });
+
+  it('negative: refuses a currency that is not a three-letter code', () => {
+    expect(validateDraft(draft({ salaryCurrency: 'pounds' })).salaryCurrency).toBeDefined();
+    expect(validateDraft(draft({ salaryCurrency: '£' })).salaryCurrency).toBeDefined();
+  });
+
+  it('boundary: exactly three letters is a code, in either case', () => {
+    expect(validateDraft(draft({ salaryCurrency: 'GBP' }))).toEqual({});
+    expect(validateDraft(draft({ salaryCurrency: 'gbp' }))).toEqual({});
+  });
+
+  it('negative: refuses a posted date that is not a calendar date', () => {
+    expect(validateDraft(draft({ postedDate: '18/08/2026' })).postedDate).toBeDefined();
+    expect(validateDraft(draft({ postedDate: '2026-13-45' })).postedDate).toBeDefined();
+  });
+
+  it('boundary: a well-formed date passes', () => {
+    expect(validateDraft(draft({ postedDate: '2026-08-18' }))).toEqual({});
+  });
+
+  it('boundary: a link at the cap passes and one past it does not', () => {
+    const at = `https://example.invalid/${'a'.repeat(MAX_URL_LENGTH - 24)}`;
+    expect(at.length).toBe(MAX_URL_LENGTH);
+    expect(validateDraft(draft({ url: at })).url).toBeUndefined();
+    expect(validateDraft(draft({ url: `${at}a` })).url).toBeDefined();
+  });
+
+  it('boundary: a description at the cap passes and one past it does not', () => {
+    const at = 'x'.repeat(MAX_DESCRIPTION_LENGTH);
+    expect(validateDraft(draft({ description: at })).description).toBeUndefined();
+    expect(validateDraft(draft({ description: `${at}x` })).description).toBeDefined();
+  });
+});
+
+describe('createEntry — the advert fields', () => {
+  const ids = { jobId: 'job-1', applicationId: 'app-1' };
+
+  it('carries every reviewed field onto the job row', () => {
+    const entry = createEntry(
+      draft({
+        description: 'Second-line credit risk.',
+        url: 'https://example.invalid/1',
+        postedDate: '2026-08-18',
+        salaryMin: '45000',
+        salaryMax: '55000',
+        salaryCurrency: 'gbp',
+      }),
+      ids,
+      NOW,
+    );
+
+    expect(entry.job).toMatchObject({
+      description: 'Second-line credit risk.',
+      url: 'https://example.invalid/1',
+      posted_date: '2026-08-18',
+      salary_min: 45000,
+      salary_max: 55000,
+      salary_currency: 'GBP',
+    });
+  });
+
+  it('reads a salary the user typed with a comma or a pound sign', () => {
+    const entry = createEntry(draft({ salaryMin: '£45,000' }), ids, NOW);
+    expect(entry.job.salary_min).toBe(45000);
+  });
+
+  it('an empty advert field becomes null, never an empty string', () => {
+    const entry = createEntry(
+      draft({ description: '  ', url: '', postedDate: '', salaryMin: '', salaryCurrency: '' }),
+      ids,
+      NOW,
+    );
+
+    expect(entry.job.description).toBeNull();
+    expect(entry.job.url).toBeNull();
+    expect(entry.job.posted_date).toBeNull();
+    expect(entry.job.salary_min).toBeNull();
+    expect(entry.job.salary_currency).toBeNull();
+  });
+
+  it('marks a salary as YEARLY when there is one, and says nothing when there is not', () => {
+    // The extraction pipeline nulls a day rate, an hourly rate and pro-rata
+    // pay, so any figure that reaches this point IS annual — and the form's own
+    // label says "a year". Guessing is what `salary_period` exists to prevent.
+    expect(createEntry(draft({ salaryMin: '45000' }), ids, NOW).job.salary_period).toBe('year');
+    expect(createEntry(draft({ salaryMin: '', salaryMax: '' }), ids, NOW).job.salary_period).toBeNull();
+  });
+
+  it('boundary: a zero salary is a figure, not an absence', () => {
+    const entry = createEntry(draft({ salaryMin: '0', salaryMax: '0' }), ids, NOW);
+    expect(entry.job.salary_min).toBe(0);
+    expect(entry.job.salary_period).toBe('year');
+  });
+
+  it('leaves an unreadable salary as null rather than storing NaN', () => {
+    const entry = createEntry(draft({ salaryMin: 'lots' }), ids, NOW);
+    expect(entry.job.salary_min).toBeNull();
   });
 });

@@ -2,14 +2,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { type ApplicationStatus } from '@cviper/core-types';
 
-import { PRIMARY_BUTTON } from '../../app/buttons';
+import { type ChatTransport } from '@cviper/ai-providers';
+
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { DetailPane } from '../../app/DetailPane';
 import { ViewHeader } from '../../app/ViewHeader';
 import { todayIsoDate } from '../../lib/dates';
 import { viewById } from '../../app/views';
 
+import { type Availability } from '../analysis/providers';
+
 import { ApplicationDetail } from './ApplicationDetail';
 import { NewApplicationForm } from './NewApplicationForm';
+import { PasteJobForm } from './PasteJobForm';
 import { TrackerColumn } from './TrackerColumn';
 import {
   TRACKER_COLUMNS,
@@ -68,11 +73,43 @@ export interface TrackerProps {
    * forwards these straight through from its own optional props.
    */
   readonly now?: Date | undefined;
+  /**
+   * The shell owns which view is showing, so "no AI provider — open Settings"
+   * has to come back here to be acted on. Same arrangement as `Search`.
+   */
+  readonly onOpenSettings?: (() => void) | undefined;
+  /**
+   * Injected by tests so a fake provider can answer the paste flow without a
+   * socket. Left undefined in the app, where `runExtraction` builds the real
+   * Tauri transport — and never builds one at all until Extract is pressed.
+   */
+  readonly createTransport?: (() => ChatTransport) | undefined;
+  /** Injected by tests so the machine's real credentials are never consulted. */
+  readonly readAvailability?: (() => Promise<Availability>) | undefined;
 }
 
-type Pane = { kind: 'closed' } | { kind: 'new' } | { kind: 'entry'; applicationId: string };
+/**
+ * What the side pane is showing.
+ *
+ * `new` carries an optional starting draft and an optional notice, which is how
+ * the paste flow hands its result over: on success the draft is the extraction,
+ * on failure it is a blank form still holding everything the user pasted, and
+ * the notice explains which happened. ONE destination for both outcomes, so
+ * there is no failure path that leads somewhere nobody thought about.
+ */
+type Pane =
+  | { kind: 'closed' }
+  | { kind: 'new'; initial?: ApplicationDraft; notice?: string; fromPaste?: true }
+  | { kind: 'paste' }
+  | { kind: 'entry'; applicationId: string };
 
-export function Tracker({ port, now }: TrackerProps) {
+export function Tracker({
+  port,
+  now,
+  onOpenSettings,
+  createTransport,
+  readAvailability,
+}: TrackerProps) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke.
   const trackerPort = useMemo(() => port ?? createDbTrackerPort(), [port]);
@@ -214,6 +251,14 @@ export function Tracker({ port, now }: TrackerProps) {
 
   const view = viewById('tracker');
   const boardIsEmpty = !loading && entries.length === 0;
+  /**
+   * Is a "start a new card" pane already open?
+   *
+   * Both entry points go disabled together. Two ways to start the same card,
+   * one of them already on screen, is how a user ends up with a half-typed form
+   * replaced under them by an empty one.
+   */
+  const paneIsOpenForNewWork = pane.kind === 'new' || pane.kind === 'paste';
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-tracker">
@@ -230,11 +275,18 @@ export function Tracker({ port, now }: TrackerProps) {
          */
         action={
           boardIsEmpty ? null : (
-            <AddApplicationButton
-              testId="tracker-add"
-              disabled={pane.kind === 'new'}
-              onClick={() => setPane({ kind: 'new' })}
-            />
+            <div className="flex items-center gap-2">
+              <PasteJobButton
+                testId="tracker-paste"
+                disabled={paneIsOpenForNewWork}
+                onClick={() => setPane({ kind: 'paste' })}
+              />
+              <AddApplicationButton
+                testId="tracker-add"
+                disabled={paneIsOpenForNewWork}
+                onClick={() => setPane({ kind: 'new' })}
+              />
+            </div>
           )
         }
       />
@@ -254,7 +306,11 @@ export function Tracker({ port, now }: TrackerProps) {
           {loading ? (
             <p className="text-ink-muted">Reading your applications…</p>
           ) : boardIsEmpty ? (
-            <EmptyBoard onAdd={() => setPane({ kind: 'new' })} disabled={pane.kind === 'new'} />
+            <EmptyBoard
+              onAdd={() => setPane({ kind: 'new' })}
+              onPaste={() => setPane({ kind: 'paste' })}
+              disabled={paneIsOpenForNewWork}
+            />
           ) : (
             <div className="flex h-full min-h-0 gap-2">
               {TRACKER_COLUMNS.map((status) => (
@@ -274,13 +330,56 @@ export function Tracker({ port, now }: TrackerProps) {
           )}
         </div>
 
-        {pane.kind === 'new' ? (
+        {pane.kind === 'paste' ? (
           <DetailPane
-            title="New application"
-            subtitle="Anything you have applied to, typed in by hand."
+            title="Paste a job"
+            subtitle="An AI reads the advert. You check every field before it is saved."
             onClose={() => setPane({ kind: 'closed' })}
           >
+            <PasteJobForm
+              onExtracted={(initial, notice) =>
+                setPane({
+                  kind: 'new',
+                  initial,
+                  fromPaste: true,
+                  // `exactOptionalPropertyTypes` is on: an absent notice and a
+                  // notice that is `undefined` are different types.
+                  ...(notice === null ? {} : { notice }),
+                })
+              }
+              onCancel={() => setPane({ kind: 'closed' })}
+              onOpenSettings={onOpenSettings}
+              createTransport={createTransport}
+              readAvailability={readAvailability}
+            />
+          </DetailPane>
+        ) : pane.kind === 'new' ? (
+          <DetailPane
+            title={pane.fromPaste === true ? 'Check the details' : 'New application'}
+            subtitle={
+              pane.fromPaste === true
+                ? 'Nothing has been saved yet. Correct anything that is wrong, then save.'
+                : 'Anything you have applied to, typed in by hand.'
+            }
+            onClose={() => setPane({ kind: 'closed' })}
+          >
+            {pane.notice === undefined ? null : (
+              <p
+                role="status"
+                data-testid="tracker-extract-notice"
+                className="mb-3 rounded-control bg-sunken px-3 py-2 text-ink-muted"
+              >
+                {pane.notice} Your paste is in the description below.
+              </p>
+            )}
+            {/*
+              Keyed so a second paste replaces the boxes instead of leaving the
+              first extraction's values sitting in a form the user thinks is new.
+              `initial` is read once, as initial state, by design.
+            */}
             <NewApplicationForm
+              key={pane.initial === undefined ? 'blank' : pane.initial.description}
+              initial={pane.initial}
               onCreate={(draft) => void onCreate(draft)}
               onCancel={() => setPane({ kind: 'closed' })}
             />
@@ -348,13 +447,53 @@ function AddApplicationButton({
 }
 
 /**
+ * The second way in — and NOT a blue button.
+ *
+ * "Add application" stays the view's one primary. Pasting an advert is a
+ * shortcut to the same form, not a different destination, and a second blue
+ * button beside the first would leave neither of them meaning anything.
+ */
+function PasteJobButton({
+  testId,
+  disabled,
+  onClick,
+  className = '',
+}: {
+  testId: string;
+  disabled: boolean;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      disabled={disabled}
+      onClick={onClick}
+      className={`${SECONDARY_BUTTON} ${className}`}
+    >
+      Paste a job
+      {disabled ? <span className="sr-only"> — a form is already open</span> : null}
+    </button>
+  );
+}
+
+/**
  * The empty board.
  *
  * An invitation, not an apology. It does not say "no applications found" — it
- * says what this screen is for and offers the one action that makes it useful,
- * with the reassurance that matters most here: this works with nothing set up.
+ * says what this screen is for and offers the actions that make it useful, with
+ * the reassurance that matters most here: this works with nothing set up.
  */
-function EmptyBoard({ onAdd, disabled }: { onAdd: () => void; disabled: boolean }) {
+function EmptyBoard({
+  onAdd,
+  onPaste,
+  disabled,
+}: {
+  onAdd: () => void;
+  onPaste: () => void;
+  disabled: boolean;
+}) {
   return (
     <div
       data-testid="tracker-empty"
@@ -366,12 +505,10 @@ function EmptyBoard({ onAdd, disabled }: { onAdd: () => void; disabled: boolean 
           The board keeps every application in one place and shows you which ones have gone quiet.
           It needs no account and no API key.
         </p>
-        <AddApplicationButton
-          testId="tracker-empty-add"
-          className="mt-4"
-          disabled={disabled}
-          onClick={onAdd}
-        />
+        <div className="mt-4 flex items-center justify-center gap-2">
+          <AddApplicationButton testId="tracker-empty-add" disabled={disabled} onClick={onAdd} />
+          <PasteJobButton testId="tracker-empty-paste" disabled={disabled} onClick={onPaste} />
+        </div>
       </div>
     </div>
   );

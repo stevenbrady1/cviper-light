@@ -122,17 +122,67 @@ export function groupByStatus(
 
 // --- New entries ------------------------------------------------------------
 
-/** What the user types to add an application by hand. */
+/**
+ * What the user types to add an application by hand — or reviews after a paste.
+ *
+ * ============================================================================
+ * EVERY FIELD IS A STRING, INCLUDING THE SALARY. THAT IS ON PURPOSE.
+ * ============================================================================
+ * This is what is in the boxes, not what will be stored. A half-typed "450" on
+ * the way to "45000" is a legitimate intermediate state, and a draft typed as
+ * `number | null` would have to invent an answer for it. `createEntry` is the
+ * one place strings become the row's real types, and `validateDraft` is the one
+ * place the user is told a box will not read.
+ *
+ * The six advert fields below arrived with the paste-and-review flow. They are
+ * here rather than in a second structure because an extraction that cannot be
+ * REVIEWED must not be saved, and a field with nowhere to be reviewed would
+ * have to be either silently persisted or silently dropped. Both are wrong.
+ * Every one of them is optional to the user: an advert that says nothing about
+ * pay produces empty boxes, never a zero.
+ */
 export interface ApplicationDraft {
   readonly title: string;
   readonly company: string;
   readonly location: string;
   readonly status: ApplicationStatus;
+  readonly description: string;
+  readonly url: string;
+  /** `YYYY-MM-DD`, or empty. */
+  readonly postedDate: string;
+  /** A yearly figure as typed — `45000`, `£45,000`. Empty means not stated. */
+  readonly salaryMin: string;
+  readonly salaryMax: string;
+  /** A three-letter ISO-4217 code as typed, or empty. */
+  readonly salaryCurrency: string;
 }
 
-export type DraftField = 'title' | 'company' | 'location';
+export type DraftField =
+  | 'title'
+  | 'company'
+  | 'location'
+  | 'description'
+  | 'url'
+  | 'postedDate'
+  | 'salaryMin'
+  | 'salaryMax'
+  | 'salaryCurrency';
 
 export type DraftErrors = Partial<Record<DraftField, string>>;
+
+/** A blank draft. The form's starting point, and the paste fall-through's base. */
+export const EMPTY_DRAFT: ApplicationDraft = {
+  title: '',
+  company: '',
+  location: '',
+  status: 'saved',
+  description: '',
+  url: '',
+  postedDate: '',
+  salaryMin: '',
+  salaryMax: '',
+  salaryCurrency: '',
+};
 
 /**
  * The longest a single line of an advert may be.
@@ -142,6 +192,51 @@ export type DraftErrors = Partial<Record<DraftField, string>>;
  * whole advert into the title box, and a card is unreadable long before that.
  */
 export const MAX_FIELD_LENGTH = 200;
+
+/**
+ * The longest link that will be accepted.
+ *
+ * 2,000 characters is the practical ceiling every browser and server agrees on
+ * for a URL. A job-board link with a tracking payload genuinely reaches four
+ * figures, so `MAX_FIELD_LENGTH` would reject real adverts.
+ */
+export const MAX_URL_LENGTH = 2000;
+
+/**
+ * The longest description that will be accepted.
+ *
+ * Generous on purpose: when an extraction fails, the user's ENTIRE paste is put
+ * in this box so nothing they copied is lost, and a whole advert with a quoted
+ * email thread attached runs to tens of thousands of characters. The cap exists
+ * only to stop a runaway paste — a clipboard holding a PDF's worth of text —
+ * being written to the row without anyone being told.
+ */
+export const MAX_DESCRIPTION_LENGTH = 50_000;
+
+/** `YYYY-MM-DD` and nothing else. */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Read a salary the way somebody copying one off an advert would type it.
+ *
+ * `£45,000` and `45000` are the same number, and a form that accepts one and
+ * refuses the other is a form that makes the user feel stupid for pasting. What
+ * it will NOT do is guess: `about forty grand` and `45k` return null, because
+ * "45k" could as easily be 45 as 45,000 and this is the one field where being
+ * wrong costs the user a decision.
+ */
+export function readSalaryField(raw: string): number | null {
+  const trimmed = raw.trim().replace(/^[£$€¥]\s*/, '').replace(/,/g, '').trim();
+  if (trimmed === '' || !/^-?\d+$/.test(trimmed)) return null;
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Is this box empty once the whitespace is gone? */
+function blank(value: string): boolean {
+  return value.trim() === '';
+}
 
 /**
  * What is wrong with a draft, per field. An empty object means it is fine.
@@ -168,6 +263,54 @@ export function validateDraft(draft: ApplicationDraft): DraftErrors {
   // checked.
   if (draft.location.trim().length > MAX_FIELD_LENGTH) {
     errors.location = `Location is too long. Keep it to ${MAX_FIELD_LENGTH} characters or fewer.`;
+  }
+
+  // ── The advert fields. All optional; only what is filled in is checked. ───
+
+  if (draft.description.trim().length > MAX_DESCRIPTION_LENGTH) {
+    errors.description =
+      `That description is longer than ${MAX_DESCRIPTION_LENGTH.toLocaleString()} characters. ` +
+      'Trim it to the part of the advert you want to keep.';
+  }
+
+  if (draft.url.trim().length > MAX_URL_LENGTH) {
+    errors.url = `That link is too long. Keep it to ${MAX_URL_LENGTH} characters or fewer.`;
+  }
+
+  if (!blank(draft.postedDate)) {
+    const value = draft.postedDate.trim();
+    // Both halves matter: `18/08/2026` is the wrong shape, and `2026-13-45` is
+    // the right shape and not a day that exists.
+    const parsed = ISO_DATE.test(value) ? new Date(`${value}T00:00:00Z`) : null;
+    if (parsed === null || Number.isNaN(parsed.getTime())) {
+      errors.postedDate = 'Write the date the advert went up as YYYY-MM-DD, for example 2026-08-18.';
+    }
+  }
+
+  const salaryMin = blank(draft.salaryMin) ? null : readSalaryField(draft.salaryMin);
+  const salaryMax = blank(draft.salaryMax) ? null : readSalaryField(draft.salaryMax);
+
+  if (!blank(draft.salaryMin) && salaryMin === null) {
+    errors.salaryMin = 'Write the salary as a plain yearly number, for example 45000.';
+  } else if (salaryMin !== null && salaryMin < 0) {
+    errors.salaryMin = 'A salary cannot be less than zero. Leave it blank if the advert did not say.';
+  }
+
+  if (!blank(draft.salaryMax) && salaryMax === null) {
+    errors.salaryMax = 'Write the salary as a plain yearly number, for example 55000.';
+  } else if (salaryMax !== null && salaryMax < 0) {
+    errors.salaryMax = 'A salary cannot be less than zero. Leave it blank if the advert did not say.';
+  } else if (
+    salaryMin !== null &&
+    salaryMax !== null &&
+    errors.salaryMin === undefined &&
+    salaryMin > salaryMax
+  ) {
+    errors.salaryMax = 'The top of the range is below the bottom. Swap the two figures over.';
+  }
+
+  if (!blank(draft.salaryCurrency) && !/^[A-Za-z]{3}$/.test(draft.salaryCurrency.trim())) {
+    errors.salaryCurrency = 'Use the three-letter code for the currency, for example GBP.';
   }
 
   return errors;
@@ -198,6 +341,10 @@ export function createEntry(
     return text === '' ? null : text;
   };
 
+  const salaryMin = readSalaryField(draft.salaryMin);
+  const salaryMax = readSalaryField(draft.salaryMax);
+  const hasSalary = salaryMin !== null || salaryMax !== null;
+
   const job: Job = {
     id: ids.jobId,
     source: 'manual',
@@ -208,13 +355,27 @@ export function createEntry(
     title: draft.title.trim(),
     company: draft.company.trim(),
     location: trimmed(draft.location),
-    salary_min: null,
-    salary_max: null,
-    salary_currency: null,
-    salary_period: null,
-    description: null,
-    url: null,
-    posted_date: null,
+    salary_min: salaryMin,
+    salary_max: salaryMax,
+    // Stored upper-case: `Job.salary_currency` is documented as ISO-4217, and
+    // "gbp" and "GBP" sorting as two currencies is a bug waiting for a report.
+    salary_currency: trimmed(draft.salaryCurrency)?.toUpperCase() ?? null,
+    /*
+     * `'year'` whenever there is a figure at all, and `null` when there is not.
+     *
+     * NOT A GUESS, on either path into this function. The extraction pipeline
+     * forces a day rate, an hourly rate and pro-rata pay to null precisely so
+     * that anything reaching here is annual (see `extraction-clamp.ts`), and
+     * the form's own label says "a year" to the user typing one by hand. The
+     * field exists because Reed's period-less figures once made a good contract
+     * look like an insulting permanent salary — so leaving it null when a
+     * figure IS present would reintroduce exactly the ambiguity it was added
+     * to remove.
+     */
+    salary_period: hasSalary ? 'year' : null,
+    description: trimmed(draft.description),
+    url: trimmed(draft.url),
+    posted_date: trimmed(draft.postedDate),
     created_at: now,
   };
 

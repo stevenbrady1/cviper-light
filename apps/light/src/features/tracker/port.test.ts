@@ -18,11 +18,14 @@ const db = vi.hoisted(() => ({
 vi.mock('../../db', () => db);
 
 const { createDbTrackerPort } = await import('./port');
-const { createEntry } = await import('./model');
+const { createEntry, EMPTY_DRAFT } = await import('./model');
 
 const NOW = '2026-08-19T09:00:00.000Z';
 const entry = createEntry(
-  { title: 'Quant Developer', company: 'Jane Street', location: 'London', status: 'saved' },
+  // Spread over the blank draft so the advert fields added with the
+  // paste-and-review flow stay blank here — this file is about which data-layer
+  // calls the port makes, not about what is in the boxes.
+  { ...EMPTY_DRAFT, title: 'Quant Developer', company: 'Jane Street', location: 'London' },
   { jobId: 'job-1', applicationId: 'app-1' },
   NOW,
 );
