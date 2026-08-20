@@ -99,12 +99,31 @@ export type _CvAnalysisTypeMatchesSchema = AssertAssignable<
 
 // --- Hand-written JSON Schema representation --------------------------------
 
+/** Every `type` keyword this package is willing to emit. */
+export type JsonSchemaType =
+  | 'object'
+  | 'array'
+  | 'string'
+  | 'integer'
+  | 'number'
+  | 'boolean'
+  /**
+   * ONLY ever as half of a union, e.g. `['string', 'null']`.
+   *
+   * There is no `nullable` keyword in JSON Schema 2020-12, and OpenAI's
+   * `strict: true` requires a nullable field to declare a type UNION — so a
+   * schema whose fields may legitimately be absent (`JOB_EXTRACTION_JSON_SCHEMA`,
+   * where "the advert did not say" is the commonest answer) has no other way to
+   * say so. `CV_ANALYSIS_JSON_SCHEMA` has no nullable field and does not use it.
+   */
+  | 'null';
+
 /**
  * The subset of JSON Schema this package emits. Narrow on purpose: if a field
  * is not on this type, we do not send it to a provider.
  */
 export interface JsonSchemaNode {
-  readonly type?: 'object' | 'array' | 'string' | 'integer' | 'number' | 'boolean';
+  readonly type?: JsonSchemaType | readonly JsonSchemaType[];
   readonly description?: string;
   readonly properties?: Readonly<Record<string, JsonSchemaNode>>;
   readonly required?: readonly string[];

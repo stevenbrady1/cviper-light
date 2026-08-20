@@ -31,9 +31,17 @@ export {
   type CvAnalysis,
   type CvAnalysisSuggestion,
   type JsonSchemaNode,
+  type JsonSchemaType,
   type SuggestionPriority,
   type Verdict,
 } from './analysis';
+
+export {
+  EMPTY_JOB_EXTRACTION,
+  JOB_EXTRACTION_JSON_SCHEMA,
+  JobExtractionSchema,
+  type JobExtraction,
+} from './job-extraction';
 
 export {
   BOARD_ENCODINGS,
