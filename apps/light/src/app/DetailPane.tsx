@@ -35,12 +35,40 @@ import { useEffect, type ReactNode } from 'react';
  *
  * Asking whether a modal is open is order-independent, and it states the actual
  * rule: while a modal is up, it owns Escape.
+ *
+ * ============================================================================
+ * THE TITLE IS CLIPPED. THE SUBTITLE WRAPS. THAT ASYMMETRY IS THE POINT.
+ * ============================================================================
+ * The pane is 380px, which leaves the header's text block 287px. The title is
+ * a VALUE — usually a job title — and clipping a long one to one line is right:
+ * the header stays one height whatever is selected, and the full text is in the
+ * form below.
+ *
+ * The subtitle is PROSE. Every caller passes a sentence, and the longest of
+ * them — "Nothing has been saved yet. Correct anything that is wrong, then
+ * save." — measures 402px in this font. `truncate` was on it, so what the user
+ * actually read was "Nothing has been saved yet. Correct anything th…", losing
+ * the entire confirm-before-save promise of the paste flow. Every unit test
+ * passed the whole time: the string is in the DOM, and jsdom does no layout.
+ *
+ * So it wraps, and the header grows to fit — 62px to 78px for a two-line
+ * subtitle, with `items-start` keeping Close pinned to the top of it.
+ *
+ * `break-words` is not decoration. Without it the ONE subtitle that is a value
+ * rather than a sentence — the CV filename on Past checks — spills straight out
+ * of the pane the moment it has no spaces in it (`Steven_Brady_Senior_…docx`
+ * measured 530px in a 287px box and put a horizontal scrollbar on the window).
+ * Removing a clip without it trades a hidden sentence for a broken layout.
+ *
+ * `styles/prose-clipping.contract.test.ts` holds the clip off this slot. It
+ * checks the CLASS, not the width — no test in a jsdom process can measure a
+ * rendered pixel.
  */
 
 interface DetailPaneProps {
   /** The heading. Names the thing being edited, not the action. */
   readonly title: string;
-  /** One line under the heading, or `null`. */
+  /** A sentence under the heading, or `null`. Wraps; see the note above. */
   readonly subtitle?: string | null;
   readonly onClose: () => void;
   readonly children: ReactNode;
@@ -73,7 +101,11 @@ export function DetailPane({ title, subtitle = null, onClose, children }: Detail
       <header className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0">
           <h2 className="truncate font-semibold text-ink">{title}</h2>
-          {subtitle === null ? null : <p className="truncate text-xs text-ink-muted">{subtitle}</p>}
+          {subtitle === null ? null : (
+            <p data-testid="detail-pane-subtitle" className="break-words text-xs text-ink-muted">
+              {subtitle}
+            </p>
+          )}
         </div>
 
         {/*
