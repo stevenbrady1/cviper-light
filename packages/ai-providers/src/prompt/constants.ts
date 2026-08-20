@@ -29,12 +29,12 @@
 export type PromptFragment = string;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// JSON_ONLY — constants.py line 9. Ported verbatim.
+// JSON_ONLY — `constants.py :: JSON_ONLY`. Ported verbatim.
 // ─────────────────────────────────────────────────────────────────────────────
 export const JSON_ONLY: PromptFragment = 'Return ONLY valid JSON.';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FAIRNESS_GUARDRAIL — constants.py lines 13-19. Ported verbatim (the Python
+// FAIRNESS_GUARDRAIL — `constants.py :: FAIRNESS_GUARDRAIL`. Ported verbatim (the Python
 // value is a parenthesised implicit string concat; joined here into one literal
 // with the same spacing).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,7 +46,7 @@ export const FAIRNESS_GUARDRAIL: PromptFragment =
   'regardless of name, university prestige, or employment gaps.';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FIT_SCORE_ANCHORS — constants.py lines 28-51.
+// FIT_SCORE_ANCHORS — `constants.py :: FIT_SCORE_ANCHORS`.
 //
 // Changed — ONE deliberate edit, applied three times:
 //   Each worked example in the source ends with a literal sub-score list, e.g.
@@ -92,7 +92,7 @@ EXAMPLE 3 (score: 71 — moderate match):
   Why 71: Strong banking industry fit, has leadership potential (mentored juniors), AWS experience matches cloud requirement. However: Python is secondary skill (intermediate, not expert), 6yr vs 7yr is slightly short, Java-primary is a risk for a Python-focused role. Industry alignment was overwhelmingly the strongest signal; leadership competency and seniority were solid; the hard-skill match was the weakest dimension, with years of experience slightly short of the bar.`;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FIT_SCORE_WEIGHTS — constants.py lines 54-62.
+// FIT_SCORE_WEIGHTS — `constants.py :: FIT_SCORE_WEIGHTS`.
 //
 // Changed — ONE deliberate deletion:
 //   The source ends with "The match_score MUST equal the weighted sum of
@@ -121,7 +121,7 @@ Evidence weighting (guidance only — you return a single match_score, not these
 - Competency match: 10% — soft skills and leadership competencies (weight higher for senior/lead roles)`;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ATS_SCORE_ANCHORS — constants.py lines 140-143. Ported verbatim.
+// ATS_SCORE_ANCHORS — `constants.py :: ATS_SCORE_ANCHORS`. Ported verbatim.
 //
 // In the source app this anchored a SEPARATE `ats_score` integer returned by a
 // second AI call. The flat schema has no `ats_score`, so these bands are reused
@@ -135,7 +135,7 @@ export const ATS_SCORE_ANCHORS: PromptFragment =
 // ─────────────────────────────────────────────────────────────────────────────
 // DELIBERATELY NOT PORTED (each with its one-line reason)
 // ─────────────────────────────────────────────────────────────────────────────
-// _SENIORITY_WEIGHTS (constants.py 69-75) — dynamic per-seniority weight table;
+// _SENIORITY_WEIGHTS (`constants.py :: _SENIORITY_WEIGHTS`) — dynamic per-seniority weight table;
 //   the flat schema takes no seniority input, so only the static "mid" row applies.
 // _resolve_fit_key / resolve_fit_weights / get_fit_score_weights (78-118) —
 //   helpers for the above table plus server-side drift telemetry; both moot here.
