@@ -29,3 +29,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# Reference material copied verbatim from the PRIVATE production CViper repo
+# (backend Python, tests, internal spec). Input for porting only — never ours to
+# publish. This repo is mirrored publicly, so committing it would put proprietary
+# source into a public history where deletion does not remove it.
+docs/ported-from-main/
