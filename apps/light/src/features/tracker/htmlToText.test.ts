@@ -179,9 +179,7 @@ describe('reading the advert out of a page', () => {
   });
 
   it('an unclosed tag at the end does not swallow the advert', () => {
-    expect(htmlToText('<p>Credit Risk Analyst</p><div class="broken')).toBe(
-      'Credit Risk Analyst',
-    );
+    expect(htmlToText('<p>Credit Risk Analyst</p><div class="broken')).toBe('Credit Risk Analyst');
   });
 });
 

@@ -102,9 +102,7 @@ export function isBlockedHost(
   const normalised = host.trim().toLowerCase().replace(/\.$/, '');
   if (normalised === '') return false;
 
-  return list.some(
-    (site) => normalised === site.domain || normalised.endsWith(`.${site.domain}`),
-  );
+  return list.some((site) => normalised === site.domain || normalised.endsWith(`.${site.domain}`));
 }
 
 /**

@@ -15,11 +15,7 @@ import {
   extractionProgressNote,
 } from './extraction';
 import { type PageFetchTransport } from './pageFetch';
-import {
-  FETCH_DISCLOSURE,
-  FETCH_SUCCESS_NOTE,
-  runFetch,
-} from './runFetch';
+import { FETCH_DISCLOSURE, FETCH_SUCCESS_NOTE, runFetch } from './runFetch';
 import { runExtraction } from './runExtraction';
 import { type ApplicationDraft } from './model';
 

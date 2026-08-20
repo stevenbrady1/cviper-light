@@ -23,7 +23,11 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { err, ok, type Result } from '@cviper/core-types';
-import { type ChatTransport, type ProviderError, type ProviderHttpResponse } from '@cviper/ai-providers';
+import {
+  type ChatTransport,
+  type ProviderError,
+  type ProviderHttpResponse,
+} from '@cviper/ai-providers';
 
 import { type Availability } from '../analysis/providers';
 
@@ -246,7 +250,9 @@ describe('the whole link → fetch → review → save loop', () => {
 
   it('says what it fetched, so the user knows to check the box before extracting', async () => {
     const user = userEvent.setup();
-    renderBoard({ createPageTransport: () => pageTransport(ok({ status: 200, body: ADVERT_PAGE })) });
+    renderBoard({
+      createPageTransport: () => pageTransport(ok({ status: 200, body: ADVERT_PAGE })),
+    });
 
     await openPaste(user);
     await user.click(screen.getByTestId('paste-job-url'));
@@ -367,12 +373,21 @@ describe('when the fetch does not work', () => {
       'a redirect that left the site',
       err({ kind: 'blocked', message: 'That address is not one this app will open.' }),
     ],
-    ['a PDF', err({ kind: 'unsupported', message: 'That link is not a web page the app can read.' })],
-    ['a page too big to read', err({ kind: 'too-large', message: 'That page is too big to read.' })],
+    [
+      'a PDF',
+      err({ kind: 'unsupported', message: 'That link is not a web page the app can read.' }),
+    ],
+    [
+      'a page too big to read',
+      err({ kind: 'too-large', message: 'That page is too big to read.' }),
+    ],
     ['a 404', ok({ status: 404, body: '<html><body><h1>Not found</h1></body></html>' })],
     [
       'a login wall',
-      ok({ status: 200, body: '<html><body><main><h1>Sign in to see this job</h1></main></body></html>' }),
+      ok({
+        status: 200,
+        body: '<html><body><main><h1>Sign in to see this job</h1></main></body></html>',
+      }),
     ],
   ];
 
@@ -396,7 +411,9 @@ describe('when the fetch does not work', () => {
     const user = userEvent.setup();
     renderBoard({
       createPageTransport: () =>
-        pageTransport(err({ kind: 'blocked', message: 'That address is not one this app will open.' })),
+        pageTransport(
+          err({ kind: 'blocked', message: 'That address is not one this app will open.' }),
+        ),
     });
 
     await openPaste(user);
@@ -514,7 +531,9 @@ describe('the link box itself', () => {
 
   it('Fetch is NOT the blue button — the screen is still about reading the advert', async () => {
     const user = userEvent.setup();
-    renderBoard({ createPageTransport: () => pageTransport(ok({ status: 200, body: ADVERT_PAGE })) });
+    renderBoard({
+      createPageTransport: () => pageTransport(ok({ status: 200, body: ADVERT_PAGE })),
+    });
 
     await openPaste(user);
     expect(screen.getByTestId('paste-job-fetch').getAttribute('data-primary')).toBeNull();

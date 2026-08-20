@@ -112,9 +112,9 @@ describe('a domain on the blocklist', () => {
     // factory, the same call, an address that is NOT on the list: it throws,
     // which is how we know the blocked cases above were silent because nothing
     // asked rather than because nothing counts.
-    await expect(
-      runFetch('https://jobs.example.com/advert/1', forbiddenTransport),
-    ).rejects.toThrow(/must never reach it/);
+    await expect(runFetch('https://jobs.example.com/advert/1', forbiddenTransport)).rejects.toThrow(
+      /must never reach it/,
+    );
   });
 });
 
@@ -122,10 +122,16 @@ describe('every other way it can go wrong', () => {
   const refusals: ReadonlyArray<readonly [string, PageFetchError]> = [
     ['a timeout', { kind: 'network', message: 'That page took too long to answer.' }],
     ['an unreachable host', { kind: 'network', message: 'That page could not be reached.' }],
-    ['a blocked redirect', { kind: 'blocked', message: 'That address is not one this app will open.' }],
+    [
+      'a blocked redirect',
+      { kind: 'blocked', message: 'That address is not one this app will open.' },
+    ],
     ['a page that is too big', { kind: 'too-large', message: 'That page is too big to read.' }],
     ['a PDF', { kind: 'unsupported', message: 'That link is not a web page the app can read.' }],
-    ['an address Rust would not parse', { kind: 'bad-url', message: 'That does not look like a web address the app can open.' }],
+    [
+      'an address Rust would not parse',
+      { kind: 'bad-url', message: 'That does not look like a web address the app can open.' },
+    ],
     ['a broken IPC', { kind: 'bad-response', message: 'That page could not be fetched.' }],
   ];
 
@@ -194,7 +200,15 @@ describe('what the user is told', () => {
     // No status code, no error kind, no jargon. A number in this sentence would
     // be an HTTP status leaking into a screen the user cannot act on.
     expect(FETCH_FALLBACK_NOTE).not.toMatch(/[0-9]/);
-    for (const leak of ['blocked', 'network', 'unsupported', 'bad-url', 'timeout', 'error', 'HTTP']) {
+    for (const leak of [
+      'blocked',
+      'network',
+      'unsupported',
+      'bad-url',
+      'timeout',
+      'error',
+      'HTTP',
+    ]) {
       expect(FETCH_FALLBACK_NOTE.toLowerCase()).not.toContain(leak.toLowerCase());
     }
   });
@@ -203,7 +217,9 @@ describe('what the user is told', () => {
     // The Rust message is safe by construction, and it is STILL not shown —
     // one message means one message.
     const outcome = await runFetch('https://jobs.example.com/1', () =>
-      transportFor(err({ kind: 'blocked', message: 'That address is not one this app will open.' })),
+      transportFor(
+        err({ kind: 'blocked', message: 'That address is not one this app will open.' }),
+      ),
     );
 
     expect(outcome.reason).toBe(FETCH_FALLBACK_NOTE);

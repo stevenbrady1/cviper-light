@@ -178,7 +178,8 @@ function fromCodePoint(code: number): string | null {
   // Surrogate halves are not characters on their own and corrupt any
   // re-encoding they survive into.
   if (code >= 0xd800 && code <= 0xdfff) return null;
-  const isControl = (code < 0x20 && code !== 0x09 && code !== 0x0a) || (code >= 0x7f && code <= 0x9f);
+  const isControl =
+    (code < 0x20 && code !== 0x09 && code !== 0x0a) || (code >= 0x7f && code <= 0x9f);
   if (isControl) return '';
   return String.fromCodePoint(code);
 }

@@ -114,7 +114,15 @@ describe('when Rust refuses', () => {
   });
 
   it('negative: a reply that is not the {status, body} envelope is refused', async () => {
-    for (const reply of [null, 'a string', 42, {}, { status: 200 }, { body: PAGE }, { status: '200', body: PAGE }]) {
+    for (const reply of [
+      null,
+      'a string',
+      42,
+      {},
+      { status: 200 },
+      { body: PAGE },
+      { status: '200', body: PAGE },
+    ]) {
       tauri.invoke.mockResolvedValue(reply);
 
       const result = await createTauriPageTransport().fetchPage('https://jobs.example.com/1');

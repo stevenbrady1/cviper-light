@@ -6,10 +6,7 @@
  * never loses the paste, an unconfigured machine gets a sentence rather than a
  * dead button — can be tested without rendering anything or mocking a model.
  */
-import {
-  ANTHROPIC_DEFAULT_MODEL,
-  type JobExtractionOutcome,
-} from '@cviper/ai-providers';
+import { ANTHROPIC_DEFAULT_MODEL, type JobExtractionOutcome } from '@cviper/ai-providers';
 import { EMPTY_JOB_EXTRACTION, type JobExtraction } from '@cviper/core-types';
 
 import { providerOptions, type Availability, type ProviderOption } from '../analysis/providers';

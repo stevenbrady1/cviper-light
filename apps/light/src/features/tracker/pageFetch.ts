@@ -42,12 +42,7 @@ export const PAGE_FETCH_COMMAND = 'fetch_job_page';
  * The kind is here so the code can tell them apart, never so a user has to.
  */
 export type PageFetchErrorKind =
-  | 'bad-url'
-  | 'blocked'
-  | 'network'
-  | 'too-large'
-  | 'unsupported'
-  | 'bad-response';
+  'bad-url' | 'blocked' | 'network' | 'too-large' | 'unsupported' | 'bad-response';
 
 export interface PageFetchError {
   readonly kind: PageFetchErrorKind;
