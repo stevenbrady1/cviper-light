@@ -1,0 +1,10 @@
+[
+  {
+    "domain": "linkedin.com",
+    "why": "Answers anything that is not a signed-in browser with a login wall, so a fetch costs the user fifteen seconds and returns nothing readable."
+  },
+  {
+    "domain": "indeed.com",
+    "why": "Serves a bot-check interstitial to fetchers rather than the advert, and its terms do not permit automated retrieval."
+  }
+]
