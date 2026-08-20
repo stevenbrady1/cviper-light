@@ -14,6 +14,12 @@ import {
   extractionOptions,
   extractionProgressNote,
 } from './extraction';
+import { type PageFetchTransport } from './pageFetch';
+import {
+  FETCH_DISCLOSURE,
+  FETCH_SUCCESS_NOTE,
+  runFetch,
+} from './runFetch';
 import { runExtraction } from './runExtraction';
 import { type ApplicationDraft } from './model';
 
@@ -44,7 +50,30 @@ import { type ApplicationDraft } from './model';
  * A local model that is not already resident spends 5-30 seconds loading
  * several gigabytes into memory before it emits a single token. Thirty seconds
  * of a still screen is indistinguishable from a crash, so the wait says what is
- * happening, says why it is slow, and counts.
+ * happening, says why it is slow, and counts. Fetching a page is slower still
+ * on a bad connection, and says the same kind of thing for the same reason.
+ *
+ * ============================================================================
+ * THE LINK BOX FILLS THE ADVERT BOX. IT DOES NOT SKIP IT.
+ * ============================================================================
+ * Fetching and extracting are TWO presses, deliberately. The one-press version
+ * would spend thirty seconds of model time before the user had any chance to
+ * see that the page came back as "Sign in to continue" — and would put an
+ * advert they had never read into a review form. Landing the text in the box
+ * they can read and edit costs one click and makes the whole thing inspectable,
+ * which is the same argument as the review form itself.
+ *
+ * It also means the existing paste path is not touched at all: by the time
+ * anything is extracted, this component is in exactly the state a paste would
+ * have put it in.
+ *
+ * ============================================================================
+ * FETCHING IS DISCLOSED BEFORE IT CAN BE PRESSED
+ * ============================================================================
+ * This app tells people everything stays on their machine. Fetching a page is a
+ * genuine outbound request to somebody else's server, so `FETCH_DISCLOSURE`
+ * sits next to the button, on screen, in ordinary body text — not in a tooltip,
+ * not behind a link, not in a settings page. See its comment in `runFetch.ts`.
  */
 
 /** How often the elapsed counter ticks while a model is reading. */
@@ -64,6 +93,14 @@ export interface PasteJobFormProps {
   readonly onOpenSettings?: (() => void) | undefined;
   /** Injected by tests so a fake provider can answer without a socket. */
   readonly createTransport?: (() => ChatTransport) | undefined;
+  /**
+   * Injected by tests so a fake page can answer without a socket.
+   *
+   * Left undefined in the app, where `runFetch` builds the real Tauri
+   * transport — and never builds one at all for an empty box, an address in a
+   * scheme we do not open, or a domain on the blocklist.
+   */
+  readonly createPageTransport?: (() => PageFetchTransport) | undefined;
   /** Injected by tests so the machine's real credentials are never consulted. */
   readonly readAvailability?: (() => Promise<Availability>) | undefined;
 }
@@ -73,16 +110,21 @@ export function PasteJobForm({
   onCancel,
   onOpenSettings,
   createTransport,
+  createPageTransport,
   readAvailability,
 }: PasteJobFormProps) {
   const probe = useMemo(() => readAvailability ?? readRealAvailability, [readAvailability]);
 
   const [text, setText] = useState('');
+  const [url, setUrl] = useState('');
   const [options, setOptions] = useState<readonly ProviderOption[]>([]);
   /** False until the probe answers. Without it the note flashes on every open. */
   const [probed, setProbed] = useState(false);
   const [optionKey, setOptionKey] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  /** What the last fetch had to say, or `null`. One slot for both outcomes. */
+  const [fetchNote, setFetchNote] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -105,12 +147,21 @@ export function PasteJobForm({
 
   const selected = optionKey === null ? null : optionByKey(options, optionKey);
 
+  /**
+   * One counter, shared by both waits.
+   *
+   * Fetching and extracting cannot happen at once — every control is disabled
+   * for the duration of either — so a single elapsed count is unambiguous, and
+   * two counters would be two places to forget to reset.
+   */
+  const busy = running || fetching;
+
   useEffect(() => {
-    if (!running) return;
+    if (!busy) return;
     setElapsed(0);
     const timer = window.setInterval(() => setElapsed((seconds) => seconds + 1), TICK_MS);
     return () => window.clearInterval(timer);
-  }, [running]);
+  }, [busy]);
 
   const onExtract = useCallback(async () => {
     if (selected === null || text.trim() === '') return;
@@ -120,15 +171,46 @@ export function PasteJobForm({
     setRunning(false);
 
     // Straight to the review form on BOTH paths. A failure is not a dead end:
-    // it is the blank form with everything the user pasted still in it.
-    onExtracted(draftFromOutcome(outcome, text), outcome.available ? null : outcome.reason);
-  }, [createTransport, onExtracted, selected, text]);
+    // it is the blank form with everything the user pasted still in it — and,
+    // now, with whatever address is in the link box, which is a fact the user
+    // supplied rather than anything guessed. See `draftFromExtraction`.
+    onExtracted(draftFromOutcome(outcome, text, url), outcome.available ? null : outcome.reason);
+  }, [createTransport, onExtracted, selected, text, url]);
+
+  /**
+   * Go and get the page, and put its text in the box.
+   *
+   * Everything that could go wrong comes back as one sentence from `runFetch`,
+   * so there is no branching on failure here and nothing to forget: a blocked
+   * domain, a timeout, a 404 and a login wall all land in the same `else`.
+   *
+   * The advert box is only written on SUCCESS. Somebody who pasted an advert
+   * and then also tried the link must not lose the paste when the link fails.
+   */
+  const onFetch = useCallback(async () => {
+    // Read into a local first: `url` is state, but the guard and the request
+    // must be looking at the same string.
+    const address = url.trim();
+    if (address === '') return;
+
+    setFetching(true);
+    setFetchNote(null);
+    const outcome = await runFetch(address, createPageTransport);
+    setFetching(false);
+
+    if (outcome.available) {
+      setText(outcome.text);
+      setFetchNote(FETCH_SUCCESS_NOTE);
+      return;
+    }
+    setFetchNote(outcome.reason);
+  }, [createPageTransport, url]);
 
   const nothingConfigured = probed && options.length === 0;
   const emptyPaste = text.trim() === '';
 
   /** Why the button will not go, or `null`. Always on screen when it applies. */
-  const disabledReason = running
+  const disabledReason = busy
     ? null
     : nothingConfigured
       ? NO_PROVIDER_NOTE
@@ -138,6 +220,80 @@ export function PasteJobForm({
 
   return (
     <div className="space-y-3" data-testid="paste-job-form">
+      {/*
+        The link box goes FIRST because it is the shorter road: somebody looking
+        at an advert in their browser has the address before they have the text.
+        It fills the box below rather than replacing it — see the header.
+      */}
+      <div>
+        <label htmlFor="paste-job-url" className="block text-xs font-medium text-ink-muted">
+          Link to the advert
+        </label>
+        <div className="mt-1 flex items-center gap-2">
+          <input
+            id="paste-job-url"
+            data-testid="paste-job-url"
+            type="url"
+            inputMode="url"
+            value={url}
+            disabled={busy}
+            placeholder="https://…"
+            onChange={(event) => {
+              // Read the value NOW — React nulls `currentTarget` the moment
+              // this handler returns.
+              const next = event.currentTarget.value;
+              setUrl(next);
+            }}
+            className="min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+          />
+          {/*
+            SECONDARY, not primary. The blue button on this screen is the one
+            that reads the advert; fetching is how the advert gets here, not
+            what the screen is for.
+          */}
+          <button
+            type="button"
+            data-testid="paste-job-fetch"
+            disabled={busy || url.trim() === ''}
+            onClick={() => void onFetch()}
+            className={SECONDARY_BUTTON}
+          >
+            {fetching ? 'Fetching…' : 'Fetch'}
+          </button>
+        </div>
+        {/*
+          On screen, next to the control, before it can be pressed. Not a
+          tooltip: a promise about where your data goes is not a hover state.
+        */}
+        <p data-testid="paste-job-fetch-disclosure" className="mt-1 text-xs text-ink-faint">
+          {FETCH_DISCLOSURE}
+        </p>
+      </div>
+
+      {/*
+        One slot for both halves of the wait: what is happening while it
+        happens, and what happened afterwards. A fetch on a bad connection is
+        fifteen seconds of nothing otherwise, which reads as a crash.
+      */}
+      {fetching ? (
+        <p
+          data-testid="paste-job-fetch-progress"
+          role="status"
+          className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
+        >
+          Opening that page and reading the advert text out of it.{' '}
+          <span className="font-mono tabular-nums">{elapsed}s</span>
+        </p>
+      ) : fetchNote === null ? null : (
+        <p
+          data-testid="paste-job-fetch-note"
+          role="status"
+          className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
+        >
+          {fetchNote}
+        </p>
+      )}
+
       <div>
         <label htmlFor="paste-job-text" className="block text-xs font-medium text-ink-muted">
           The advert
@@ -147,7 +303,7 @@ export function PasteJobForm({
           data-testid="paste-job-text"
           rows={12}
           value={text}
-          disabled={running}
+          disabled={busy}
           placeholder="Paste the whole advert or recruiter email here."
           onChange={(event) => setText(event.currentTarget.value)}
           className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
@@ -171,7 +327,7 @@ export function PasteJobForm({
             id="paste-job-provider"
             data-testid="paste-job-provider"
             value={optionKey ?? ''}
-            disabled={running}
+            disabled={busy}
             onChange={(event) => {
               // Read the value NOW — React nulls `currentTarget` the moment
               // this handler returns.
@@ -204,7 +360,7 @@ export function PasteJobForm({
           type="button"
           data-testid="paste-job-extract"
           data-primary="true"
-          disabled={running || nothingConfigured || emptyPaste}
+          disabled={busy || nothingConfigured || emptyPaste}
           onClick={() => void onExtract()}
           className={PRIMARY_BUTTON}
         >
@@ -219,8 +375,8 @@ export function PasteJobForm({
         <button
           type="button"
           data-testid="paste-job-manual"
-          disabled={running}
-          onClick={() => onExtracted(draftWithPastedText(text), null)}
+          disabled={busy}
+          onClick={() => onExtracted(draftWithPastedText(text, url), null)}
           className={SECONDARY_BUTTON}
         >
           Fill it in myself
@@ -229,7 +385,7 @@ export function PasteJobForm({
         <button
           type="button"
           onClick={onCancel}
-          disabled={running}
+          disabled={busy}
           className="rounded-control px-3 py-1.5 text-ink-muted hover:bg-sunken hover:text-ink"
         >
           Cancel

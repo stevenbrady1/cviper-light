@@ -14,6 +14,7 @@ import { type Availability } from '../analysis/providers';
 
 import { ApplicationDetail } from './ApplicationDetail';
 import { NewApplicationForm } from './NewApplicationForm';
+import { type PageFetchTransport } from './pageFetch';
 import { PasteJobForm } from './PasteJobForm';
 import { TrackerColumn } from './TrackerColumn';
 import {
@@ -84,6 +85,13 @@ export interface TrackerProps {
    * Tauri transport — and never builds one at all until Extract is pressed.
    */
   readonly createTransport?: (() => ChatTransport) | undefined;
+  /**
+   * Injected by tests so a fake page can answer the fetch-from-a-link flow
+   * without a socket. Left undefined in the app, where `runFetch` builds the
+   * real Tauri transport — and never builds one at all for an address it has
+   * already decided not to fetch.
+   */
+  readonly createPageTransport?: (() => PageFetchTransport) | undefined;
   /** Injected by tests so the machine's real credentials are never consulted. */
   readonly readAvailability?: (() => Promise<Availability>) | undefined;
 }
@@ -108,6 +116,7 @@ export function Tracker({
   now,
   onOpenSettings,
   createTransport,
+  createPageTransport,
   readAvailability,
 }: TrackerProps) {
   // Created once. A new port object every render would restart the load effect
@@ -350,6 +359,7 @@ export function Tracker({
               onCancel={() => setPane({ kind: 'closed' })}
               onOpenSettings={onOpenSettings}
               createTransport={createTransport}
+              createPageTransport={createPageTransport}
               readAvailability={readAvailability}
             />
           </DetailPane>

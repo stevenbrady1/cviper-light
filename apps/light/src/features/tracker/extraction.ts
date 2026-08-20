@@ -98,6 +98,7 @@ function textField(value: string | null): string {
 export function draftFromExtraction(
   extraction: JobExtraction,
   pastedText: string,
+  sourceUrl = '',
 ): ApplicationDraft {
   return {
     ...EMPTY_DRAFT,
@@ -108,7 +109,14 @@ export function draftFromExtraction(
     // between a job somebody can take and one they cannot.
     location: textField(extraction.location),
     description: extraction.description ?? pastedText,
-    url: textField(extraction.url),
+    // THE SECOND EXCEPTION, and the same kind as `description` above: not a
+    // guess, but something the user themselves supplied. If they typed or
+    // pasted the advert's address into the link box, that address is a fact,
+    // and the page's own text almost never contains it — so without this the
+    // one field we know for certain would be the one left blank. An address
+    // the model actually found IN the advert still wins: an advert naming its
+    // own application link is naming the one the user should end up with.
+    url: textField(extraction.url) || sourceUrl.trim(),
     postedDate: textField(extraction.posted_date),
     salaryMin: numberField(extraction.salary_min),
     salaryMax: numberField(extraction.salary_max),
@@ -125,8 +133,8 @@ export function draftFromExtraction(
  * arbitrary prose is correct rather than wrong — a whole advert in the title
  * box would be a second failure on top of the first.
  */
-export function draftWithPastedText(text: string): ApplicationDraft {
-  return { ...EMPTY_DRAFT, description: text };
+export function draftWithPastedText(text: string, sourceUrl = ''): ApplicationDraft {
+  return { ...EMPTY_DRAFT, description: text, url: sourceUrl.trim() };
 }
 
 /**
@@ -141,10 +149,11 @@ export function draftWithPastedText(text: string): ApplicationDraft {
 export function draftFromOutcome(
   outcome: JobExtractionOutcome,
   pastedText: string,
+  sourceUrl = '',
 ): ApplicationDraft {
   return outcome.available
-    ? draftFromExtraction(outcome.extraction, pastedText)
-    : draftFromExtraction(EMPTY_JOB_EXTRACTION, pastedText);
+    ? draftFromExtraction(outcome.extraction, pastedText, sourceUrl)
+    : draftFromExtraction(EMPTY_JOB_EXTRACTION, pastedText, sourceUrl);
 }
 
 /** Re-exported so the paste form can name the cloud model in its own copy. */

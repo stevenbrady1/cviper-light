@@ -51,6 +51,41 @@ export const FETCH_FALLBACK_NOTE =
   'That page could not be read from here. Open it in your browser, copy the advert text, ' +
   'and paste it in the box below — the link stays in the box above and is saved with the job.';
 
+/**
+ * What the user is told BEFORE they can press Fetch.
+ *
+ * ============================================================================
+ * THE APP SAYS "EVERYTHING STAYS ON YOUR MACHINE". THIS IS A REAL REQUEST.
+ * ============================================================================
+ * Fetching a page is outbound traffic to somebody else's server, started by the
+ * user, and the server on the other end learns their IP address the same way it
+ * would if they had opened the page in a browser. That is not a betrayal of the
+ * promise, but it IS the promise needing one more sentence, and the sentence
+ * has to be on screen next to the control rather than in a tooltip, a settings
+ * page or a README nobody opens.
+ *
+ * Three things it says, in the order they matter:
+ *   * what actually happens, in terms the reader already understands — it is
+ *     the same thing their browser does;
+ *   * what the other end learns — their IP address, named plainly, because
+ *     "some information may be shared" is how a disclosure becomes noise;
+ *   * what does NOT happen — nothing reaches us, and exactly one page is
+ *     loaded, so "fetch" cannot be read as "crawl".
+ */
+export const FETCH_DISCLOSURE =
+  'Fetching opens that page from your computer, the same as visiting it in your browser — ' +
+  'the site sees your IP address. Nothing is sent to us, and no other page is loaded.';
+
+/**
+ * What a fetch that worked says.
+ *
+ * It points at the box rather than celebrating, because the next thing the user
+ * should do is LOOK at what arrived. A fetched advert is one they have not read
+ * yet, and the model is about to read it for them.
+ */
+export const FETCH_SUCCESS_NOTE =
+  'The text from that page is in the advert box below. Check it looks right, then read the advert.';
+
 /** The schemes a fetch is ever attempted for. Rust enforces this too. */
 const FETCHABLE_SCHEMES = new Set(['http:', 'https:']);
 

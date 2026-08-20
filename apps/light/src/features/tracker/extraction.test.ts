@@ -247,3 +247,69 @@ describe('draftFromOutcome — one answer to "what does the user see now"', () =
     expect(draft.title).toBe('');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('the address the user typed is never lost', () => {
+  /**
+   * ==========================================================================
+   * THE DEFAULT IS THE EXISTING BEHAVIOUR, EXACTLY
+   * ==========================================================================
+   * `sourceUrl` is an optional third argument with an empty default, so every
+   * call that does not pass one — which is every call the plain paste path
+   * makes — behaves precisely as it did before the link box existed. The tests
+   * above are the ones that prove that, and they are unchanged.
+   */
+  it('leaves the link box empty when there was no address', () => {
+    expect(draftFromExtraction(EMPTY_JOB_EXTRACTION, 'pasted').url).toBe('');
+    expect(draftWithPastedText('pasted').url).toBe('');
+    expect(draftFromOutcome(outcome(), 'pasted').url).toBe('');
+  });
+
+  it('carries the address into the link box when the model found none', () => {
+    // The everyday case for a fetched advert: the page's text almost never
+    // contains the page's own address, so without this the one field we know
+    // for certain would be the one left blank.
+    const draft = draftFromExtraction(
+      EMPTY_JOB_EXTRACTION,
+      'pasted',
+      'https://jobs.example.com/advert/1',
+    );
+
+    expect(draft.url).toBe('https://jobs.example.com/advert/1');
+  });
+
+  it('prefers the address the model found IN the advert', () => {
+    // An advert that names its own application link is naming the one the user
+    // should end up with; the address bar is the fallback, not the winner.
+    const draft = draftFromExtraction(
+      extraction({ url: 'https://jobs.example.com/apply/1' }),
+      'pasted',
+      'https://jobs.example.com/advert/1',
+    );
+
+    expect(draft.url).toBe('https://jobs.example.com/apply/1');
+  });
+
+  it('survives a failed extraction, which is when it matters most', () => {
+    const draft = draftFromOutcome(
+      outcome({ available: false, reason: 'nope' }),
+      'the whole advert text',
+      'https://jobs.example.com/advert/1',
+    );
+
+    expect(draft.url).toBe('https://jobs.example.com/advert/1');
+    expect(draft.description).toBe('the whole advert text');
+  });
+
+  it('survives "fill it in myself" too', () => {
+    expect(draftWithPastedText('pasted', 'https://jobs.example.com/advert/1').url).toBe(
+      'https://jobs.example.com/advert/1',
+    );
+  });
+
+  it('boundary: a whitespace-only address is an empty box, not a space', () => {
+    expect(draftFromExtraction(EMPTY_JOB_EXTRACTION, 'pasted', '   ').url).toBe('');
+    expect(draftWithPastedText('pasted', '  \n ').url).toBe('');
+  });
+});
