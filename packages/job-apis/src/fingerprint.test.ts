@@ -2,7 +2,7 @@
  * The cross-post fingerprint, pinned against the Python original.
  *
  * The expected values below were produced by running
- * `backend/helpers/dedupe_fingerprint.py` from the CViper web application over
+ * `backend/core/dedupe_fingerprint.py` from the CViper web application over
  * the SAME fixture text. They are not "whatever this implementation happens to
  * produce" - they are the answer the algorithm is supposed to give, which is
  * what makes `FINGERPRINT_VERSION = 1` an honest claim rather than a label.

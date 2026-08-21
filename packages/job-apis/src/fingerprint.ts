@@ -1,7 +1,7 @@
 /**
  * Description fingerprinting for cross-post detection.
  *
- * PORTED FROM: backend/helpers/dedupe_fingerprint.py  (CViper repo, @ d15c7b4b)
+ * PORTED FROM: backend/core/dedupe_fingerprint.py  (CViper repo, @ d15c7b4b)
  *
  * Upstream drift is pinned in CViper's `docs/port-parity-manifest.yaml`; its
  * guard fails there when this source changes. This is a FIDELITY port — the bit
