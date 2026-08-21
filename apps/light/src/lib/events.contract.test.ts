@@ -35,10 +35,24 @@
  * misses the bug or fires on the fix, and both get it deleted.
  *
  * So this one parses. `typescript` is already the compiler every package
- * typechecks with (a root devDependency, resolved from the root
- * `node_modules` exactly as `tsc` is), and `ts.createSourceFile` is a
- * syntax-only parse: no program, no type checker, no `tsconfig`, milliseconds
- * per file.
+ * typechecks with, and `ts.createSourceFile` is a syntax-only parse: no
+ * program, no type checker, no `tsconfig`, milliseconds per file.
+ *
+ * It is a devDependency of `apps/light` ITSELF, not merely of the workspace
+ * root (`9444bcd`). Before that it resolved by walking up to the root
+ * `node_modules`, which worked only because of where this directory happens to
+ * sit. Lift `apps/light` out on its own — the split `monorepo-split.yml`
+ * already performs for three of the `packages/*` — and there is no root to walk
+ * up to: the import fails, or finds some other copy, and the guard goes inert
+ * in exactly the way it was written to warn about.
+ *
+ * The version is not written here or in `apps/light/package.json`. Both that
+ * file and the root say `catalog:`, pointing at the single entry in
+ * `pnpm-workspace.yaml`. Two literal strings for one compiler drift, and pnpm
+ * settles a disagreement by installing BOTH — which would leave this guard
+ * parsing with a different compiler from the one `tsc --noEmit` typechecks
+ * with, the same inertness by another route. One string cannot disagree with
+ * itself.
  *
  * ============================================================================
  * WHAT IS AN OFFENCE
