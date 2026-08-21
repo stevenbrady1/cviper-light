@@ -27,12 +27,39 @@ jobs:
           - platform: windows-latest
             target: ''
             args: ''
-          - platform: macos-latest
-            # Apple Silicon only. A universal binary doubles the download for
-            # every user to serve Intel Macs Apple stopped selling, and the
-            # x86_64 slice cannot be tested on any machine this project has.
-            target: aarch64-apple-darwin
-            args: '--target aarch64-apple-darwin'
+          # ------------------------------------------------------------------
+          # macOS IS COMMENTED OUT UNTIL THERE IS AN APPLE DEVELOPER ACCOUNT.
+          # ------------------------------------------------------------------
+          # It is not that the build is broken. It reached codesigning and died
+          # there, on light-v0.1.0:
+          #
+          #   failed codesign application: failed to run command security
+          #   import: failed to import keychain certificate
+          #
+          # The APPLE_* secrets below are referenced but not set, so GitHub
+          # expands each to an EMPTY STRING rather than leaving it undefined.
+          # Tauri sees APPLE_CERTIFICATE as present-and-blank, tries to import
+          # a certificate that is not there, and fails. An absent variable
+          # would have been skipped; an empty one is worse than none.
+          #
+          # Enabling it is not worth doing before enrolment either way: an
+          # unsigned .app is refused by Gatekeeper on every Mac but the one
+          # that built it, so the artefact would be unshippable even if the
+          # build went green.
+          #
+          # TO TURN IT BACK ON: enrol in the Apple Developer Program, add
+          # APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_ID,
+          # APPLE_PASSWORD and APPLE_TEAM_ID as repository secrets, then
+          # uncomment the three lines below.
+          #
+          # Apple Silicon only, deliberately. A universal binary doubles the
+          # download for every user to serve Intel Macs Apple stopped selling,
+          # and the x86_64 slice cannot be tested on any machine this project
+          # has.
+          #
+          # - platform: macos-latest
+          #   target: aarch64-apple-darwin
+          #   args: '--target aarch64-apple-darwin'
 
     runs-on: ${{ matrix.platform }}
 
