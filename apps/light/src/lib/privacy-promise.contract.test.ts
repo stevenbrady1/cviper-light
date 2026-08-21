@@ -1068,13 +1068,18 @@ const third = 'Everything stays on your machine.';`;
     // Not a style rule. Every entry is a sentence somebody has to re-read
     // before they can believe the promise, and the value of the promise is that
     // it is cheap to check. A new one arriving silently is the drift.
+    //
+    // The list is allowed to SHRINK, and shrinking is the point. `providers.ts`
+    // was here until its Ollama note was rewritten from "nothing leaves your
+    // PC" to "your CV stays on your PC" — same fact, subject narrowed to the
+    // one thing the option actually governs, so no rule fires and no hatch is
+    // needed. Prefer that to a suppression every time: a reworded sentence is
+    // checked by the machine forever, a suppressed one only by whoever next
+    // reads the comment.
     const used = FILES.filter((file) =>
       readFileSync(file, 'utf8').includes('cviper-allow-absolute-privacy-claim'),
     ).map(NAME_OF);
 
-    expect(used).toEqual([
-      'apps/light/src/features/analysis/Analysis.tsx',
-      'apps/light/src/features/analysis/providers.ts',
-    ]);
+    expect(used).toEqual(['apps/light/src/features/analysis/Analysis.tsx']);
   });
 });

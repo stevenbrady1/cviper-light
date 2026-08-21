@@ -117,12 +117,12 @@ export function providerOptions(availability: Availability): ProviderOption[] {
       key: `ollama:${model.id}`,
       kind: 'ollama',
       label: `Ollama · ${model.label}`,
-      // cviper-allow-absolute-privacy-claim: a per-option note, read against
-      // "sent to Anthropic" two entries below, so its subject is this choice
-      // and not the app. Ollama's base URL is a &'static str pinned to
-      // http://127.0.0.1:11434 in src-tauri/src/providers.rs, never built from
-      // anything JavaScript sends, with a Rust test holding it there.
-      note: 'Private but weaker — nothing leaves your PC.',
+      // Scoped to its own subject, so it needs no privacy-promise suppression:
+      // "your CV" is what this option keeps local, read against "sent to
+      // Anthropic" two entries below. Ollama's base URL is a &'static str
+      // pinned to http://127.0.0.1:11434 in src-tauri/src/providers.rs, never
+      // built from anything JavaScript sends, with a Rust test holding it there.
+      note: 'Private but weaker — your CV stays on your PC.',
       model: model.id,
       local: true,
       needsKey: false,

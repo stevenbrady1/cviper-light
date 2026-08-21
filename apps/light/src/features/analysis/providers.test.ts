@@ -83,7 +83,7 @@ describe('providerOptions', () => {
     const [, ollama] = providerOptions({ ...NOTHING, ollamaModels: [LLAMA] });
 
     expect(ollama?.note).toContain('Private but weaker');
-    expect(ollama?.note).toContain('nothing leaves your PC');
+    expect(ollama?.note).toContain('your CV stays on your PC');
     expect(ollama?.local).toBe(true);
   });
 

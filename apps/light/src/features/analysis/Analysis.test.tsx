@@ -492,7 +492,7 @@ describe('when Ollama is running but has nothing that can chat', () => {
 
     await vi.waitFor(() =>
       expect(screen.getByTestId('analysis-provider-note').textContent).toContain(
-        'Private but weaker — nothing leaves your PC.',
+        'Private but weaker — your CV stays on your PC.',
       ),
     );
   });
