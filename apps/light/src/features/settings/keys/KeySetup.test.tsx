@@ -19,7 +19,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { err, ok } from '@cviper/core-types';
-import { jobApiError } from '@cviper/job-apis';
+import { httpStatusError, jobApiError } from '@cviper/job-apis';
 
 import {
   createFakeBrowserPort,
@@ -317,6 +317,107 @@ describe('a test that fails saves nothing', () => {
     expect(problem.textContent ?? '').toContain('worked');
     expect(problem.textContent ?? '').toContain('credential store');
     expect(port.saved()).toEqual({});
+  });
+});
+
+describe('one message, and not the wrong one', () => {
+  /**
+   * ==========================================================================
+   * THE FAILURE THIS GUARD EXISTS TO PREVENT
+   * ==========================================================================
+   * The card used to render the wizard's headline AND the transport's message
+   * glued together, so a refused key produced this on screen:
+   *
+   *   "That key was refused. Check it was pasted whole - a brand new key can
+   *    also take a few minutes to become active. Reed rejected the saved key.
+   *    Check it in Settings - a new key can take a few minutes to become
+   *    active."
+   *
+   * Three things wrong with it, and none of them visible from the constants:
+   * nothing was SAVED (test-before-save is the whole point of this control),
+   * the user IS in Settings looking at the box, and the same advice arrives
+   * twice in two wordings.
+   *
+   * `@cviper/job-apis` is right about all of that in its own context - a
+   * SEARCH failing on an already-saved key. It is the wrong voice here, so the
+   * assertions below read the rendered DOM rather than the constant: the
+   * constant was already correct and the defect was in what reached the screen.
+   */
+  it('regression: a refused key says it once, and never mentions a saved key', async () => {
+    const port = createFakeKeyPort();
+    // The REAL 401 error the real port builds, not a hand-written stand-in, so
+    // this is the exact string the user saw.
+    port.nextTest(err(httpStatusError('reed', 401)));
+    const { user } = renderKeys(port);
+    await screen.findByTestId('key-card-reed');
+
+    await user.type(screen.getByTestId('key-input-reed_api_key'), 'mistyped');
+    await user.click(screen.getByTestId('key-test-reed'));
+
+    const shown = (await screen.findByTestId('key-problem-reed')).textContent ?? '';
+
+    // Nothing was saved, so nothing may say it was.
+    expect(shown).not.toContain('saved key');
+    // They are already here.
+    expect(shown).not.toContain('Check it in Settings');
+    // The wizard's own wording, which is the one that fits this screen.
+    expect(shown).toContain('That key was refused');
+    expect(shown).toContain('Check it was pasted whole');
+    // The advice is good. Once.
+    expect(shown.match(/few minutes to become active/g) ?? []).toHaveLength(1);
+  });
+
+  it('regression: a rate limit does not also tell them to search again', async () => {
+    const port = createFakeKeyPort();
+    port.nextTest(err(httpStatusError('adzuna', 429)));
+    const { user } = renderKeys(port);
+    await screen.findByTestId('key-card-adzuna');
+
+    await fillAdzuna(user, 'the-id', 'the-key');
+    await user.click(screen.getByTestId('key-test-adzuna'));
+
+    const shown = (await screen.findByTestId('key-problem-adzuna')).textContent ?? '';
+
+    expect(shown).toContain('too many requests');
+    // The transport's arm ends "Wait a minute and search again" - but no search
+    // was run and none is what they are trying to do.
+    expect(shown).not.toContain('search again');
+    expect(shown.match(/Wait a minute/g) ?? []).toHaveLength(1);
+  });
+
+  it('regression: a board-side fault does not offer advice about a search', async () => {
+    const port = createFakeKeyPort();
+    port.nextTest(err(httpStatusError('reed', 503)));
+    const { user } = renderKeys(port);
+    await screen.findByTestId('key-card-reed');
+
+    await user.type(screen.getByTestId('key-input-reed_api_key'), 'probably-fine');
+    await user.click(screen.getByTestId('key-test-reed'));
+
+    const shown = (await screen.findByTestId('key-problem-reed')).textContent ?? '';
+
+    expect(shown).toContain('trouble at their end');
+    // "Nothing is wrong with your SEARCH" is the transport's reassurance. On
+    // this card the thing being doubted is the key.
+    expect(shown).not.toContain('your search');
+    expect(shown.match(/trouble at their end/g) ?? []).toHaveLength(1);
+  });
+
+  it('regression: a refused REQUEST is not answered with search advice', async () => {
+    const port = createFakeKeyPort();
+    port.nextTest(err(httpStatusError('reed', 400)));
+    const { user } = renderKeys(port);
+    await screen.findByTestId('key-card-reed');
+
+    await user.type(screen.getByTestId('key-input-reed_api_key'), 'odd-but-present');
+    await user.click(screen.getByTestId('key-test-reed'));
+
+    const shown = (await screen.findByTestId('key-problem-reed')).textContent ?? '';
+
+    expect(shown).toContain('would not accept the test request');
+    // There are no keywords on this card to simplify and no location to widen.
+    expect(shown).not.toContain('keywords');
+    expect(shown).not.toContain('broader location');
   });
 });
 

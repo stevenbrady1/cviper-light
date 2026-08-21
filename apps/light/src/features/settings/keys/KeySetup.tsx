@@ -59,7 +59,7 @@ import { createTauriKeyPort, type KeyPort } from './port';
 interface CardOutcome {
   /** A confirmation. Rendered as a `status`, never an alert. */
   readonly passed: string | null;
-  /** A failure, in two parts: what it means, then what the board said. */
+  /** A failure, in the wizard's own words — and only ever those. */
   readonly problem: string | null;
 }
 
@@ -146,10 +146,20 @@ function KeyCard({ provider, port, browser }: KeyCardProps) {
       setBusy(false);
       // NOTHING is written. The message names what kind of failure it was —
       // a refused key, a connection problem and a rate limit have three
-      // different fixes — and then quotes what the board actually said.
+      // different fixes — and that headline is the WHOLE message.
+      //
+      // `tested.error.message` is dropped, not appended. It is worded for a
+      // SEARCH that failed on an already-saved key, so on this card it argues
+      // with the screen it is sitting on: it says "the saved key" when
+      // test-before-save means nothing was saved, and sends the user to
+      // Settings while they are in Settings with the box in front of them.
+      // Every arm also repeats advice the headline has just given, in a second
+      // wording. That copy is right where it lives
+      // (`packages/job-apis/src/errors.ts`) and is not ours to borrow — the
+      // card's own heading already names the board, so nothing is lost.
       setOutcome({
         passed: null,
-        problem: `${TEST_FAILURE_HEADLINE[tested.error.kind]} ${tested.error.message}`,
+        problem: TEST_FAILURE_HEADLINE[tested.error.kind],
       });
       return;
     }
