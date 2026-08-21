@@ -4,7 +4,7 @@
  * ============================================================================
  * FLAG, NEVER MERGE. THIS IS A DELIBERATE DEPARTURE FROM THE WEB APPLICATION.
  * ============================================================================
- * The source (`backend/helpers/dedupe_fingerprint.py`, `is_merge_match`)
+ * The source (`backend/core/dedupe_fingerprint.py`, `is_merge_match`)
  * auto-merges any pair inside the band. Its own comment on the wider "flag"
  * band explains exactly why that is dangerous:
  *

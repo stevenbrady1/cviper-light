@@ -37,7 +37,7 @@ fingerprinting, keyless browser links, the daily request budget, and the
 
 `params.ts`, `normalise.ts`, `reed-salary.ts`, `reed-contract.ts` and
 `fingerprint.ts` are ports from `backend/job_sites_api.py` and
-`backend/helpers/dedupe_fingerprint.py` in the CViper web application. Comments
+`backend/core/dedupe_fingerprint.py` in the CViper web application. Comments
 copied verbatim from the source are marked as such — they explain why a rule is
 shaped the way it is, and they are what stops the next reader "fixing" a
 deliberate decision back into a bug. Three in particular:

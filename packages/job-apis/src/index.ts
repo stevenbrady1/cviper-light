@@ -11,7 +11,7 @@
  *
  * The normalisation, the Reed salary-period fix and the duplicate fingerprint
  * are PORTS, not fresh designs - from `backend/job_sites_api.py` and
- * `backend/helpers/dedupe_fingerprint.py` in the CViper web application. The
+ * `backend/core/dedupe_fingerprint.py` in the CViper web application. The
  * comments that explain WHY a rule is shaped the way it is are copied verbatim
  * from the source, because those are the ones that stop a later reader
  * "fixing" a deliberate decision back into a bug.
