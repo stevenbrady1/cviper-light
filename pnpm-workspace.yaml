@@ -1,6 +1,20 @@
 packages:
   - 'packages/*'
   - 'apps/*'
+
+# One specifier, referenced as `catalog:` from every package.json that needs it.
+#
+# `typescript` is declared TWICE — the root typechecks and lints with it, and
+# `apps/light` imports it directly in `lib/events.contract.test.ts`. Two literal
+# version strings for one tool drift the moment somebody bumps one of them, and
+# pnpm answers a disagreement by installing both versions. The guard would then
+# parse with a different compiler from the one `tsc` typechecks with, which is
+# the failure it was written to prevent.
+#
+# A catalog removes the second string rather than adding a test to police it.
+catalog:
+  typescript: '~6.0.3'
+
 minimumReleaseAgeExclude:
   - '@turbo/darwin-64@2.10.11'
   - '@turbo/darwin-arm64@2.10.11'
