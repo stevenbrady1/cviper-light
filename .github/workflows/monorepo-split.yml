@@ -13,14 +13,22 @@ name: Monorepo split
 #
 # ORG AND REPOSITORY NAMES BELOW ARE PLACEHOLDERS. Nothing is published until a
 # human replaces them and adds the token.
+# MANUAL ONLY, DELIBERATELY. The three target repositories below do not exist
+# yet and no MONOREPO_SPLIT_TOKEN is set, so an automatic run would fail on
+# every push to main — a red tick for a feature nobody is using. A workflow that
+# is always red is a workflow everyone learns to ignore, including the times it
+# is telling the truth.
+#
+# TO TURN IT ON: create the three repositories, add MONOREPO_SPLIT_TOKEN, then
+# restore the automatic triggers by replacing `workflow_dispatch:` with:
+#
+#   push:
+#     branches:
+#       - main
+#   create:          # so a released version exists as a tag in the split repo
+#
 on:
-  push:
-    branches:
-      - main
-  # Tags come through too, so a released package version exists as a tag in the
-  # split repository as well. Without this the split has commits but nothing
-  # a consumer can pin to.
-  create:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -59,7 +67,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.MONOREPO_SPLIT_TOKEN }}
         with:
           package_directory: ${{ matrix.package.local }}
-          repository_organization: PLACEHOLDER-ORG
+          repository_organization: stevenbrady1
           repository_name: ${{ matrix.package.repository }}
           user_name: 'cviper-bot'
           user_email: 'bot@example.invalid'
@@ -75,7 +83,7 @@ jobs:
         with:
           tag: ${{ github.ref_name }}
           package_directory: ${{ matrix.package.local }}
-          repository_organization: PLACEHOLDER-ORG
+          repository_organization: stevenbrady1
           repository_name: ${{ matrix.package.repository }}
           user_name: 'cviper-bot'
           user_email: 'bot@example.invalid'

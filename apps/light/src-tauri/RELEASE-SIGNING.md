@@ -30,8 +30,8 @@ story for an app that checks one hardcoded public key.
 
 ## 2. Set the real owner and repository
 
-`plugins.updater.endpoints` currently points at `PLACEHOLDER-ORG`. Change it to
-the real GitHub owner and repository at the same time as the pubkey. The tag in
+`plugins.updater.endpoints` points at `stevenbrady1/cviper-light`, set at the
+same time as the pubkey. The tag in the URL stays `latest`. The tag in
 the URL stays `latest`: `release.yml` republishes `latest.json` on every
 release, so the endpoint is never edited again.
 
