@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { MAX_FILE_BYTES } from './constants';
 import { extractPdfText } from './pdf';
@@ -15,7 +15,17 @@ import {
   makeScannedPdf,
   makeTruncatedPdf,
 } from './test/fixtures';
-import { usePdfJsLegacyBuild } from './test/pdfjs-node';
+import {
+  PDFJS_WARMUP_TIMEOUT_MS,
+  usePdfJsLegacyBuild,
+  warmPdfJsLegacyBuild,
+} from './test/pdfjs-node';
+
+// The legacy pdf.js build is ~1.2 MB and the loader imports it LAZILY, so
+// without this the first test that touches a PDF is billed for the whole module
+// load — under 200ms locally, over the 15s testTimeout on a cold CI runner.
+// Loading it here attributes that cost to a hook with a timeout sized for it.
+beforeAll(warmPdfJsLegacyBuild, PDFJS_WARMUP_TIMEOUT_MS);
 
 beforeEach(() => {
   resetPdfJs();
