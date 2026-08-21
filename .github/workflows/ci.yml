@@ -37,14 +37,14 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Before setup-node, because `cache: pnpm` needs a pnpm binary to ask
       # where the store lives.
       - name: Enable pnpm through corepack
         run: corepack enable pnpm
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm

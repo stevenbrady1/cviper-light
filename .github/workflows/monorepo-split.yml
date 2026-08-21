@@ -53,7 +53,7 @@ jobs:
       # rewrites history for one subdirectory, and a shallow clone gives it one
       # commit to rewrite — the split repository then arrives with no history at
       # all, which is silent and permanent.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
