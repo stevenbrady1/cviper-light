@@ -57,15 +57,15 @@
 
   /* --- Surfaces --------------------------------------------------------- */
   /* canvas is the page, sunken is a well cut into it, card sits on top. */
-  --color-canvas: #f8fafc;
-  --color-sunken: #f1f5f9;
+  --color-canvas: #f7f8fa;
+  --color-sunken: #edf0f5;
   --color-card: #ffffff;
-  --color-line: #cbd5e1;
+  --color-line: #dce2ec;
 
   /* --- Ink -------------------------------------------------------------- */
-  --color-ink: #0f172a;
-  --color-ink-muted: #475569;
-  --color-ink-faint: #64748b;
+  --color-ink: #0b1729;
+  --color-ink-muted: #46536a;
+  --color-ink-faint: #6e7c93;
 
   /*
    * Ink ON navy. These are the SAME two values as `canvas` and `line` — no new
@@ -77,13 +77,13 @@
    * would be about 2.2:1 on navy — unreadable — which is exactly why these two
    * exist rather than reusing the light-surface ink scale.
    */
-  --color-ink-inverse: #f8fafc;
-  --color-ink-inverse-muted: #cbd5e1;
+  --color-ink-inverse: #f7f8fa;
+  --color-ink-inverse-muted: #dce2ec;
 
   /* --- State ------------------------------------------------------------ */
-  --color-success: #059669;
-  --color-warning: #d97706;
-  --color-danger: #dc2626;
+  --color-success: #0e7c5a;
+  --color-warning: #b45309;
+  --color-danger: #c0362c;
 
   /* --- Radii: EXACTLY THREE --------------------------------------------- */
   /*
@@ -113,8 +113,8 @@
    * There is no third. "A slightly bigger shadow" is how a design system starts
    * to blur.
    */
-  --shadow-raised: 0 1px 2px 0 rgb(15 32 68 / 0.06), 0 1px 3px 0 rgb(15 32 68 / 0.1);
-  --shadow-overlay: 0 4px 6px -2px rgb(15 32 68 / 0.08), 0 12px 24px -4px rgb(15 32 68 / 0.14);
+  --shadow-raised: 0 0 0 1px rgb(11 23 41 / 0.08);
+  --shadow-overlay: 0 4px 12px rgb(11 23 41 / 0.09), 0 12px 32px rgb(11 23 41 / 0.1);
 }
 
 @layer base {
