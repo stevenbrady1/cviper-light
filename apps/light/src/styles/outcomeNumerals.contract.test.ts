@@ -39,10 +39,15 @@ function scoreClasses(): string {
   const source = fs.readFileSync(BAND_SCALE, 'utf8');
   const anchor = source.indexOf('data-testid="band-scale-score"');
   expect(anchor, 'band-scale-score is missing from BandScale.tsx').toBeGreaterThan(-1);
-  const after = source.slice(anchor, anchor + 400);
-  const match = after.match(/className=\{`([^`]+)`\}/);
-  expect(match, 'could not read the score className').not.toBeNull();
-  return match![1];
+  const captured = source.slice(anchor, anchor + 400).match(/className=\{`([^`]+)`\}/)?.[1];
+  // A throw, not an expect: this helper's RETURN TYPE has to be `string` for
+  // every caller, and a non-null assertion would only silence the compiler
+  // while leaving `undefined` free to reach `.toContain()` -- where it fails
+  // with a type error about the matcher rather than naming the real problem.
+  if (!captured) {
+    throw new Error('could not read the score className from BandScale.tsx');
+  }
+  return captured;
 }
 
 describe('outcome numerals (Northlight)', () => {
