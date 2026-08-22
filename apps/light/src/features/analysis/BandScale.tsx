@@ -120,13 +120,21 @@ export function BandScale({ score, verdict }: BandScaleProps) {
     >
       <div className="flex items-baseline gap-2">
         {/*
-          Plex Mono with tabular figures, per the type rules: this is a number
-          the user compares against other runs, and it must not jitter between
-          renders as the digits change.
+          The display serif, per the Northlight rule: numbers that change what
+          a person does next are set apart from numbers they scan past. This is
+          the former -- it is the whole reason the screen exists.
+
+          It moved here from Plex Mono, which was chosen for the same property
+          this keeps: `tabular-nums`, so the figure does not jitter between runs
+          as the digits change. `lining-nums` is new and load-bearing -- this
+          serif defaults to OLD-STYLE figures that sit above and below the
+          baseline, which would make a 71 and a 100 rock against each other.
+
+          `font-normal`, not medium: the face ships one weight.
         */}
         <span
           data-testid="band-scale-score"
-          className={`font-mono text-5xl leading-none font-medium tabular-nums ${VERDICT_INK[verdict]}`}
+          className={`font-display text-5xl leading-none font-normal lining-nums tabular-nums ${VERDICT_INK[verdict]}`}
         >
           {value}
         </span>
