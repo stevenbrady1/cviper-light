@@ -114,7 +114,7 @@
    * to blur.
    */
   --shadow-raised: 0 0 0 1px rgb(11 23 41 / 0.08);
-  --shadow-overlay: 0 4px 12px rgb(11 23 41 / 0.09), 0 12px 32px rgb(11 23 41 / 0.10);
+  --shadow-overlay: 0 4px 12px rgb(11 23 41 / 0.09), 0 12px 32px rgb(11 23 41 / 0.1);
 }
 
 @layer base {
