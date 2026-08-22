@@ -103,3 +103,58 @@
     U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
     U+A720-A7FF;
 }
+
+/* Newsreader — the display face (Northlight).
+ *
+ * Static instances, not the variable release: Newsreader ships an optical-size
+ * axis (6-72) as well as weight, and its variable latin subset alone is 132 KB
+ * — nearly three times Inter, which covers its whole 300-700 range in 48 KB.
+ * Pinning both axes gives identical glyphs at 22 KB.
+ *
+ * One weight, 400. Steep — the reference this serif comes from — sets its
+ * display face at 400 and nothing else; size and spacing carry the hierarchy.
+ *
+ * `font-display: block` for the same reason as the other two families: this is
+ * a desktop app reading files off local disk, so there is no slow-network case
+ * to protect against and `swap` would only buy a visible reflow on cold start.
+ *
+ * Roman gets latin-ext because headings can carry a place or company name.
+ * Italic does not — it sets decorative UI copy, and a Central European glyph
+ * there falls back to the serif stack rather than to tofu.
+ */
+
+/* Newsreader — 400 */
+@font-face {
+  font-family: 'Newsreader';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('/fonts/newsreader-400-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Newsreader';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('/fonts/newsreader-400-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* Newsreader — 400 italic */
+@font-face {
+  font-family: 'Newsreader';
+  font-style: italic;
+  font-weight: 400;
+  font-display: block;
+  src: url('/fonts/newsreader-400-italic-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

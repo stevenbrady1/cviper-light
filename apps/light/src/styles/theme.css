@@ -48,6 +48,12 @@
    */
   --font-sans: 'Inter', ui-sans-serif, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace;
+  /* The display face. Two jobs, both deliberate: display headings, and the
+     OUTCOME NUMERALS -- the numbers that change what a person does next, which
+     in this app are the match score and the salary band. Every other number
+     stays in --font-sans with tabular figures. Applied through <Outcome>,
+     never by hand, or it drifts within a release. */
+  --font-display: 'Newsreader', 'Source Serif 4', Georgia, 'Times New Roman', serif;
 
   /* --- Brand: the five meanings ----------------------------------------- */
   --color-navy: #0f2044;
