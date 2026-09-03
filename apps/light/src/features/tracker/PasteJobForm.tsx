@@ -15,6 +15,7 @@ import {
   extractionProgressNote,
 } from './extraction';
 import { type PageFetchTransport } from './pageFetch';
+import { urlOnlyNote, urlOnlyPaste } from './pastedUrl';
 import { FETCH_DISCLOSURE, FETCH_SUCCESS_NOTE, runFetch } from './runFetch';
 import { runExtraction } from './runExtraction';
 import { type ApplicationDraft } from './model';
@@ -62,6 +63,18 @@ import { type ApplicationDraft } from './model';
  * It also means the existing paste path is not touched at all: by the time
  * anything is extracted, this component is in exactly the state a paste would
  * have put it in.
+ *
+ * ============================================================================
+ * A LINK IN THE ADVERT BOX IS ANSWERED HERE, NOT BY THE MODEL
+ * ============================================================================
+ * Pasting the address instead of the advert is the single most likely way to
+ * use this screen wrongly — the link box is one field up, and the two boxes
+ * look alike. Sent a bare URL a model does not fail; it invents a title from
+ * the words in the address and the review form fills with confident fiction.
+ *
+ * So `urlOnlyPaste` is checked BEFORE the transport factory is touched, the
+ * address is lifted into the link box where it belongs, and no request is made
+ * to anything. See `pastedUrl.ts` for why the rule is deliberately narrow.
  *
  * ============================================================================
  * FETCHING IS DISCLOSED BEFORE IT CAN BE PRESSED
@@ -121,7 +134,25 @@ export function PasteJobForm({
   const [fetching, setFetching] = useState(false);
   /** What the last fetch had to say, or `null`. One slot for both outcomes. */
   const [fetchNote, setFetchNote] = useState<string | null>(null);
+  /** Set when the advert box was holding a link. Cleared by the effect below. */
+  const [urlNote, setUrlNote] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+
+  /**
+   * The link note cannot outlive the paste it was about.
+   *
+   * An effect rather than a `setUrlNote(null)` in each of the three places that
+   * write `text` — the textarea, a successful fetch, and any future fourth one.
+   * Clearing it structurally means a new way to change the box cannot forget,
+   * and a stale "that is a link" over a real advert would be the guard telling
+   * the user something untrue about what is in front of them.
+   *
+   * It does not fire when the guard itself runs: that sets the note without
+   * touching `text`, so this effect's dependency has not changed.
+   */
+  useEffect(() => {
+    setUrlNote(null);
+  }, [text]);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,6 +192,20 @@ export function PasteJobForm({
 
   const onExtract = useCallback(async () => {
     if (selected === null || text.trim() === '') return;
+
+    // The advert box is holding a link, not an advert. Checked BEFORE the
+    // transport factory is touched, so "no request was made" is provable rather
+    // than intended — `urlOnlyPaste.test.tsx` counts transports built and
+    // asserts zero. Same arrangement as the blocklist check in `runFetch`.
+    const link = urlOnlyPaste(text);
+    if (link !== null) {
+      // Lift it into the box it belongs in, so the route forward is one press.
+      // Only when that box is EMPTY: pre-filling a blank is a convenience,
+      // overwriting an address the user typed is taking something away.
+      setUrl((current) => (current.trim() === '' ? link.url : current));
+      setUrlNote(urlOnlyNote(link));
+      return;
+    }
 
     setRunning(true);
     const outcome = await runExtraction({ option: selected, text }, createTransport);
@@ -308,6 +353,22 @@ export function PasteJobForm({
           Nothing is saved until you have checked every field on the next screen.
         </p>
       </div>
+
+      {/*
+        Sits under the box it is about and above the button that was pressed, so
+        the sentence and the thing it refers to are on screen together. A
+        STATUS, not an alert: nothing is broken, nobody did anything wrong, and
+        the address has already been moved somewhere useful.
+      */}
+      {urlNote === null ? null : (
+        <p
+          data-testid="paste-job-url-only-note"
+          role="status"
+          className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
+        >
+          {urlNote}
+        </p>
+      )}
 
       {/*
         The picker only appears when there is a choice to make. One installed
