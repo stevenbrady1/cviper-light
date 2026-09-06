@@ -2425,7 +2425,9 @@ dependencies = [
 name = "light"
 version = "0.1.0"
 dependencies = [
+ "apple-native-keyring-store",
  "keyring",
+ "keyring-core",
  "reqwest",
  "rustls",
  "serde",

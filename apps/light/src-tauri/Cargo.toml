@@ -83,3 +83,13 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
 
+# iOS has no file-based keychain, and `keyring`'s default (`v1`) facade installs
+# NO store there: every `keyring::Entry::new` answers `NoDefaultStore`. The
+# store Apple does provide on a phone is the data-protection keychain, which
+# lives behind this crate's `protected` feature — without that feature the crate
+# refuses to compile for iOS at all (`compile_error!`, L-82). `secrets.rs`
+# installs it as the default store before the first entry is made.
+[target.'cfg(target_os = "ios")'.dependencies]
+apple-native-keyring-store = { version = "1.0.2", features = ["protected"] }
+keyring-core = "1.0.0"
+

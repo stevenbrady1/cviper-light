@@ -1,8 +1,10 @@
 //! API keys, held in the operating system's credential store.
 //!
 //! Windows Credential Manager, macOS Keychain, or the Secret Service on Linux —
-//! whichever the `keyring` crate finds. Nothing here writes to a file, and no
-//! key is ever stored in the SQLite database or in `tauri-plugin-store`.
+//! whichever the `keyring` crate finds — and on iOS the data-protection
+//! keychain, which `keyring` does not set up by itself (see `ios_store`).
+//! Nothing here writes to a file, and no key is ever stored in the SQLite
+//! database or in `tauri-plugin-store`.
 //!
 //! ============================================================================
 //! THE KEY GOES IN AND DOES NOT COME BACK OUT
@@ -26,7 +28,11 @@
 //! comment is longer than the function.
 //! ============================================================================
 
-use keyring::{Entry, Error as KeyErr};
+#[cfg(not(target_os = "ios"))]
+use keyring::Entry;
+use keyring::Error as KeyErr;
+#[cfg(target_os = "ios")]
+use keyring_core::Entry;
 use serde::{Deserialize, Serialize};
 
 /// The service name every credential is filed under.
@@ -143,11 +149,65 @@ pub(crate) fn describe(error: &KeyErr) -> String {
     .to_string()
 }
 
+#[cfg(not(target_os = "ios"))]
 fn entry(key: SecretKey) -> Result<Entry, KeyErr> {
     // `keyring` v4's default features are the v1-compatible API, and the
     // platform store is initialised lazily on the first `Entry::new` — there is
     // no `set_default_store` call to make.
     Entry::new(SERVICE, key.account())
+}
+
+#[cfg(target_os = "ios")]
+fn entry(key: SecretKey) -> Result<Entry, KeyErr> {
+    // The v1 facade's `Entry::new` returns `NoDefaultStore` on iOS whatever
+    // has been installed, so the phone uses `keyring_core::Entry` directly,
+    // after making sure a store exists. Same service, same account names:
+    // a key saved on a phone is filed exactly as it is on a desktop.
+    ios_store::ensure()?;
+    Entry::new(SERVICE, key.account())
+}
+
+/// The credential store on iOS, installed once.
+///
+/// `keyring` 4's default `v1` feature wires up a store for macOS, Windows and
+/// desktop *nix and, on iOS, deliberately none: its one-time initialiser
+/// returns `Invalid("platform", …)` and every `keyring::Entry::new` after it
+/// `NoDefaultStore`. What Apple offers on a phone is the data-protection
+/// keychain — `SecItem*` with `kSecUseDataProtectionKeychain` — which
+/// `apple-native-keyring-store` exposes as `protected::Store`. It is installed
+/// here as `keyring-core`'s default store before the first entry is made.
+///
+/// `Store::new()` is the plain configuration: no iCloud sync, and the app's
+/// own access group (the one the provisioning profile grants; no
+/// `keychain-access-groups` entitlement beyond the default is needed for that).
+/// A synchronised store would copy API keys to every device on the user's
+/// iCloud account, which nobody asked for.
+///
+/// Verified for the `aarch64-apple-ios` target with a probe crate over the same
+/// three crates and the same calls (L-82); the device run is the remaining
+/// step, and `secret_status` reports its result without ever revealing a key.
+#[cfg(target_os = "ios")]
+mod ios_store {
+    use std::sync::OnceLock;
+
+    use super::KeyErr;
+
+    /// `Ok` once the store is installed; the failure text if it could not be.
+    /// Kept as text because `keyring::Error` is not `Clone`, and the same
+    /// answer has to be handed to every later caller.
+    static INSTALLED: OnceLock<Result<(), String>> = OnceLock::new();
+
+    pub(super) fn ensure() -> Result<(), KeyErr> {
+        INSTALLED
+            .get_or_init(|| {
+                let store = apple_native_keyring_store::protected::Store::new()
+                    .map_err(|error| error.to_string())?;
+                keyring_core::set_default_store(store);
+                Ok(())
+            })
+            .clone()
+            .map_err(|detail| KeyErr::NoStorageAccess(detail.into()))
+    }
 }
 
 /// Everything `secret_set` checks before it goes anywhere near the credential
@@ -401,6 +461,16 @@ mod tests {
         let stripped = without_comments("// mentions secret_get\nlet x = 1; // secret_get\n");
         assert!(!stripped.contains("secret_get"));
         assert!(stripped.contains("let x = 1;"));
+    }
+
+    #[cfg(target_os = "ios")]
+    #[test]
+    fn the_ios_store_is_installed_once_and_answers_the_same_every_time() {
+        // Two calls, one installation: the second must not try to install
+        // again, and must report whatever the first one found.
+        let first = ios_store::ensure().map_err(|error| describe(&error));
+        let second = ios_store::ensure().map_err(|error| describe(&error));
+        assert_eq!(first, second);
     }
 
     #[test]
