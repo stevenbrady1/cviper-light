@@ -8,7 +8,7 @@ the shared data model and export/import format, the local SQLite data-access
 layer, CV text extraction, the provider adapters and their Rust transport, the
 keyword-only scorer, the app shell, the application tracker, the CV analysis
 view, the job-board clients (Adzuna and Reed request building, response
-normalisation, cross-post detection, the eight configurable keyless browser
+normalisation, cross-post detection, the nine configurable keyless browser
 links and the daily request budget), the job search view, the API-key setup
 wizard, pasted-advert extraction and the review form it fills, fetching one
 advert from a link and the guards around it, the manual update check, the
@@ -29,7 +29,7 @@ be verified by an installed copy. See
 | ------------------------------- | ------------------------------------------ | ---------------------------------- | ---------------- |
 | Job search (Adzuna/Reed)        | Yes — user's own API keys, direct calls    | Yes — server-side, shared keys     | Built            |
 | Cross-post detection            | Yes — flags duplicates, never merges       | Yes — merges, with a server undo   | Built            |
-| Keyless browser search links    | Yes — eight UK boards, opens in browser    | Not applicable                     | Built            |
+| Keyless browser search links    | Yes — nine UK boards, opens in browser     | Not applicable                     | Built            |
 | Job-board list, user-edited     | Yes — enable, reorder, add your own        | Not applicable                     | Built            |
 | API key setup                   | Yes — tested before saved, never read back | Not applicable                     | Built            |
 | Application tracker             | Yes — local SQLite                         | Yes — synced                       | Built            |
@@ -103,7 +103,7 @@ be verified by an installed copy. See
   guest endpoint. Light ports only the URL construction. A scraper inside an
   installed binary points LinkedIn's rate limiting at the user's own home IP and
   breaks on LinkedIn's schedule, with no way to patch it that afternoon.
-- **The board list is data, not code.** Eight UK boards ship in
+- **The board list is data, not code.** Nine UK boards ship in
   `apps/light/src/config/job-boards.json` — LinkedIn, Indeed, Totaljobs,
   CV-Library, Reed, Adzuna, Google Jobs and Guardian Jobs — and Settings can
   switch any of them off, reorder them, or add one by pasting a search URL with
@@ -113,7 +113,7 @@ be verified by an installed copy. See
   new binary. None of it needs an API key. Choices go to `tauri-plugin-store`, a
   real file in the app's data directory, rather than `localStorage` — a board
   somebody worked out and typed in is their work, and the WebView clearing its
-  origin data should not take it. A failed read falls back to the shipped eight
+  origin data should not take it. A failed read falls back to the shipped nine
   for the buttons but still reports the failure to the Settings screen, because
   quietly switching every disabled board back on with no explanation is the one
   outcome worth avoiding.

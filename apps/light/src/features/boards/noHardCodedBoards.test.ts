@@ -118,7 +118,7 @@ describe('no component names a job board', () => {
     // below would be vacuously true.
     expect(FILES.length).toBeGreaterThan(0);
     expect(FILES.some((file) => file.endsWith('KeylessBar.tsx'))).toBe(true);
-    expect(FORBIDDEN_HOSTS.length).toBe(8);
+    expect(FORBIDDEN_HOSTS.length).toBe(9);
     expect(FORBIDDEN_NAMES.length).toBeGreaterThanOrEqual(6);
   });
 
