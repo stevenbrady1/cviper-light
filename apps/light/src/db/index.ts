@@ -44,3 +44,4 @@ export {
   deleteAnalysis,
 } from './analyses';
 export { readAll, writeAll, type DbSnapshot } from './backup';
+export { wipeAll, WIPE_ORDER } from './wipe';

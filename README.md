@@ -24,6 +24,12 @@ Five more things worth saying out loud:
 - **Your API keys go to the operating system's credential store**, never to a
   file in this app and never into the page. There is no way to read one back
   out — if you forget a key you paste a new one.
+- **One button deletes everything.** Settings → Delete everything empties the
+  database, removes every key from the credential store and forgets every
+  preference. A test fails the build if a new table or store is left out.
+- **The privacy notice is generated, not written.** Settings lists every
+  address the app can contact, straight from the same list the build is held
+  to; a test fails if the code names one the notice does not show.
 - **Links open in your own browser, untouched.** No tracking parameters are
   added to a job advert's URL when you click it.
 - **"Fetch" opens one page, and only when you press it.** See below.

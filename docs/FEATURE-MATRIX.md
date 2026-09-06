@@ -41,6 +41,8 @@ be verified by an installed copy. See
 | CV analysis (local Ollama)      | Yes — offline, no key, no network          | No                                 | Built            |
 | Keyword-only analysis           | Yes — no AI, no key, always available      | Yes                                | Built            |
 | Data export/import              | Yes — user-initiated file in/out           | Yes — plus migration to/from Light | Built            |
+| Delete everything               | Yes — database, keys and preferences       | Yes — account deletion             | Built            |
+| Privacy notice                  | Yes — generated from the host registry     | Policy page                        | Built            |
 | App updates                     | Yes — manual check only, never on launch   | Not applicable                     | Built, unsigned  |
 | First-run introduction          | Yes — three cards, reopenable in Settings  | Not applicable                     | Built            |
 | Accounts                        | No — no login, no identity                 | Yes                                | Not built        |

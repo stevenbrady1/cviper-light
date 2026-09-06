@@ -92,3 +92,52 @@ jobs:
 
       - name: Check formatting
         run: pnpm format:check
+
+  # ------------------------------------------------------------------
+  # No key of ours is ever compiled into this app (hosted ADR 012, R-COST).
+  # Three surfaces: every reachable commit, the working tree, and the BUILT
+  # web bundle — the last is what ships inside the installer's webview and is
+  # where a key pasted "just for a minute" during development would end up.
+  # The source-level half of the same promise is
+  # apps/light/src/lib/no-baked-in-key.contract.test.ts.
+  # ------------------------------------------------------------------
+  secret-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The whole history, so a key committed and then "removed" is still found.
+          fetch-depth: 0
+
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The Vite build only — never `tauri build` (see the verify job).
+      - name: Build the web bundle that ships inside the installer
+        run: pnpm --filter @cviper/light build
+
+      # Pinned by version AND checksum. A scanner fetched as "latest" is a
+      # supply-chain step nobody reviewed.
+      - name: Install gitleaks 8.24.3
+        run: |
+          curl -sSL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz
+          echo "9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks
+
+      - name: Scan every commit reachable from this ref
+        run: ./gitleaks git --no-banner --redact --config .gitleaks.toml .
+
+      - name: Scan the working tree
+        run: ./gitleaks dir --no-banner --redact --config .gitleaks.toml --exit-code 1 apps packages
+
+      - name: Scan the built bundle
+        run: ./gitleaks dir --no-banner --redact --config .gitleaks.toml --exit-code 1 apps/light/dist

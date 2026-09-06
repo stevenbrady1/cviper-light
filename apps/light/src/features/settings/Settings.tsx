@@ -15,7 +15,10 @@ import { type BoardPreferencesPort } from '../boards/port';
 import { type BrowserPort } from '../../platform/browser';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
 
+import { EraseEverything } from './erase/EraseEverything';
+import { type ErasePort } from './erase/port';
 import { KeySetup } from './keys/KeySetup';
+import { PrivacyNotice } from './privacy/PrivacyNotice';
 import { TELEMETRY_ENABLED, TELEMETRY_NOTE } from './telemetry';
 import { type KeyPort } from './keys/port';
 import { UpdateCheck } from './updates/UpdateCheck';
@@ -92,6 +95,13 @@ export interface SettingsProps {
   readonly onShowWelcome?: (() => void) | undefined;
   /** Injected by tests so the suggested filename is deterministic. */
   readonly now?: Date | undefined;
+  /** Injected by tests. Defaults to the real database, credential store and preferences file. */
+  readonly erasePort?: ErasePort | undefined;
+  /**
+   * Everything was deleted. Owned by the shell, which returns the app to its
+   * first-run state; absent in a test that renders Settings alone.
+   */
+  readonly onErased?: (() => void) | undefined;
 }
 
 /**
@@ -124,6 +134,8 @@ export function Settings({
   updatePort,
   onShowWelcome,
   now,
+  erasePort,
+  onErased,
 }: SettingsProps = {}) {
   const backupPort = useMemo(() => port ?? createDbBackupPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
@@ -405,7 +417,11 @@ export function Settings({
               The only requests it ever makes are the ones you start: a job search, a CV check
               against a provider you chose, and an update check you press.
             </p>
+
+            <PrivacyNotice />
           </section>
+
+          <EraseEverything port={erasePort} backupPort={backupPort} onErased={onErased} />
         </div>
       </div>
     </section>
