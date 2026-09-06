@@ -171,6 +171,18 @@ export default function App({
     setWelcomeOpen(true);
   }, []);
 
+  /**
+   * Everything was deleted. Back to the first run: the introduction, the
+   * default view, and a rail that re-reads a store which is now empty. The
+   * welcome flag itself went with the preferences, so it is not forgotten
+   * here a second time.
+   */
+  const onErased = useCallback(() => {
+    setActiveView(DEFAULT_VIEW);
+    setStatus(null);
+    setWelcomeOpen(true);
+  }, []);
+
   if (welcomeOpen) {
     return (
       <div className="flex h-full min-h-0 bg-canvas text-ink">
@@ -214,6 +226,7 @@ export default function App({
             boardsPort,
             updatePort,
             onShowWelcome,
+            onErased,
             now,
           },
         })}

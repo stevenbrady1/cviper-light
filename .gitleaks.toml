@@ -1,0 +1,49 @@
+# gitleaks configuration for CViper Light.
+#
+# Run in CI over three surfaces (see .github/workflows/ci.yml, job `secrets`):
+#   1. every commit reachable from the ref being checked,
+#   2. the working tree,
+#   3. the BUILT web bundle in apps/light/dist — what actually ships inside the
+#      installer's webview, which is where a key pasted "just for a minute"
+#      during development would end up.
+#
+# The promise this enforces (hosted CViper ADR 012, invariant R-COST): no key
+# of ours is ever compiled into this app. Keys come from the user's own
+# credential store via secrets.rs, or from nowhere.
+#
+# The source-level half of the same promise is
+# apps/light/src/lib/no-baked-in-key.contract.test.ts. Two guards, two
+# surfaces: that one reads source, this one reads history and artefacts.
+
+title = "CViper Light"
+
+[extend]
+useDefault = true
+
+# The five credentials this app knows by name, assigned a value anywhere.
+# `secret_status`/`secret_set` take the NAME (a SecretKey enum variant) and
+# never a value, so a name followed by a long literal is never legitimate.
+[[rules]]
+id = "cviper-light-named-credential-assignment"
+description = "A CViper Light credential name assigned a literal value"
+regex = '''(?i)\b(adzuna_app_id|adzuna_app_key|reed_api_key|openai_api_key|anthropic_api_key)\b\s*[:=]\s*["']?[A-Za-z0-9_\-]{12,}'''
+keywords = ["adzuna_app_id", "adzuna_app_key", "reed_api_key", "openai_api_key", "anthropic_api_key"]
+
+# Tests plant obviously fake values ('sk-do-not-store-me', 'already-saved') to
+# prove they are never stored. Only THIS rule steps aside for test files; the
+# default rules still read them, so a real provider key pasted into a test is
+# still caught by its own shape.
+[rules.allowlist]
+paths = [
+  '''\.test\.tsx?$''',
+  '''(^|/)(test|tests|fixtures)/''',
+]
+
+[allowlist]
+description = "Things that look like secrets and are not"
+regexTarget = "line"
+regexes = [
+  # The updater's minisign PUBLIC key in tauri.conf.json. Public by definition;
+  # the private half never enters version control (RELEASE-SIGNING.md).
+  '''"pubkey"\s*:''',
+]
