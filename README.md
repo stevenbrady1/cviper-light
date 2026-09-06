@@ -76,7 +76,7 @@ one, or your own API key.
 
 **Search jobs.** _Needs free Adzuna/Reed keys — or use the browser links, which
 need no key._ Search two UK job boards from inside the app and save what is
-worth chasing straight onto the board. The browser links cover eight UK boards
+worth chasing straight onto the board. The browser links cover nine UK boards
 and open in your own browser; Settings lets you turn any of them off, put them
 in the order you use them, and add your own.
 
@@ -222,3 +222,10 @@ Read [CLAUDE.md](CLAUDE.md) first. It holds the non-negotiable rules and the
 handful of toolchain traps that will otherwise cost you an afternoon.
 [docs/PLAN.md](docs/PLAN.md) is the build plan, unedited, including the
 human-only tasks that remain.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). Free to use, copy, change and redistribute, for
+anyone, with no account and no payment, now or later. The hosted CViper
+service is a separate product with its own repository and terms; nothing here
+depends on it.
