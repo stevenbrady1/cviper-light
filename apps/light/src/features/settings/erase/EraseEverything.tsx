@@ -137,7 +137,7 @@ export function EraseEverything({ port, backupPort, onErased }: EraseEverythingP
             this, and nothing needs to be — there is no copy of your data anywhere else to delete.
           </p>
 
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               data-testid="settings-erase-confirm"

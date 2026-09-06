@@ -304,7 +304,7 @@ function KeyCard({ provider, port, browser }: KeyCardProps) {
         ))}
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
           data-testid={`key-test-${provider.id}`}

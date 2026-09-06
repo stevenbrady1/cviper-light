@@ -175,9 +175,10 @@ export function AnalysisResult({
       {/*
         Side by side, because the comparison IS the information: what you have
         against what they asked for. Stacked, the user has to hold the first
-        list in their head while reading the second.
+        list in their head while reading the second. A phone has no room for
+        two columns, so there — and only there — they stack (L-81).
       */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <Eyebrow>What you have</Eyebrow>
           <TermChips

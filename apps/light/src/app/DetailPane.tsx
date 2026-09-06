@@ -1,7 +1,8 @@
 import { useEffect, type ReactNode } from 'react';
 
 /**
- * The right-hand detail pane. 380px, persistent, NOT a modal.
+ * The right-hand detail pane. 380px, persistent, NOT a modal — and on a phone,
+ * the whole screen, because 380px IS the whole screen (L-81).
  *
  * ============================================================================
  * WHY A PANE AND NOT A DIALOG
@@ -96,7 +97,14 @@ export function DetailPane({ title, subtitle = null, onClose, children }: Detail
     <aside
       aria-label={title}
       data-testid="detail-pane"
-      className="flex w-[380px] shrink-0 flex-col border-l border-line bg-card"
+      className={[
+        'flex shrink-0 flex-col border-line bg-card',
+        // Phone: over everything, edge to edge, above the bottom bar. Close is
+        // in the header, always rendered, so there is always a way back.
+        'fixed inset-0 z-40 w-full pt-safe pb-safe',
+        // Desktop: the pane it always was, beside the view.
+        'md:static md:inset-auto md:z-auto md:w-[380px] md:border-l md:pt-0 md:pb-0',
+      ].join(' ')}
     >
       <header className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0">
