@@ -74,8 +74,8 @@ is months later and looks like the updater is broken rather than absent.
 `.github/workflows/ios.yml` runs on a Mac and proves two things on every pull
 request: the Rust side compiles for `aarch64-apple-ios` and
 `aarch64-apple-ios-sim`, and `tauri ios init` plus an **unsigned** simulator
-build (`CODE_SIGNING_ALLOWED=NO`) produce an `.app` that is uploaded as an
-artefact. No certificate, profile or team is involved, and none is stored in
+build (`tauri ios build --target aarch64-sim --no-sign`) produce an `.app` that
+is uploaded as an artefact. No certificate, profile or team is involved, and none is stored in
 this repository.
 
 Everything past that is human, in this order:

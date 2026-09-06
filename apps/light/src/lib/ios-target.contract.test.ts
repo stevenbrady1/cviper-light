@@ -103,7 +103,7 @@ describe('the Mac workflow checks the phone targets', () => {
     expect(IOS_WORKFLOW).toMatch(/cargo check .*--target aarch64-apple-ios\b/);
     expect(IOS_WORKFLOW).toMatch(/cargo check .*--target aarch64-apple-ios-sim\b/);
     expect(IOS_WORKFLOW).toMatch(/runs-on: macos-/);
-    expect(IOS_WORKFLOW).toMatch(/CODE_SIGNING_ALLOWED=NO/);
+    expect(IOS_WORKFLOW).toMatch(/tauri ios build .*--target aarch64-sim .*--no-sign/);
   });
 
   it('never carries a certificate, profile or team into the build', () => {

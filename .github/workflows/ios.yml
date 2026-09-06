@@ -10,10 +10,17 @@ name: iOS
 #   2. `tauri ios init` + an UNSIGNED simulator build — the generated Xcode
 #      project builds, the Rust static library links into it, and the app
 #      bundle comes out as a downloadable artefact. No certificate, no
-#      provisioning profile, no team: `CODE_SIGNING_ALLOWED=NO` builds for the
-#      simulator only, which is exactly as far as a repository with no secrets
-#      can go. Signing and the App Store upload are human steps (L-84,
-#      RELEASE-SIGNING.md).
+#      provisioning profile, no team: `tauri ios build --no-sign` for the
+#      simulator target only, which is exactly as far as a repository with no
+#      secrets can go. Signing and the App Store upload are human steps
+#      (L-84, RELEASE-SIGNING.md).
+#
+#      Why the Tauri CLI and not `xcodebuild` directly: the Xcode project's
+#      "Build Rust Code" phase calls `tauri ios xcode-script`, which reads its
+#      options from a small server the CLI starts for the duration of
+#      `tauri ios build` (or `dev`). Run `xcodebuild` on its own and that
+#      phase panics on a missing `<identifier>-server-addr` file — the first
+#      run of this workflow did exactly that.
 #
 # Same trigger shape as ci.yml, deliberately with no path filter: the Rust
 # side is what breaks on iOS and it is touched by changes that do not look
@@ -114,33 +121,22 @@ jobs:
       - name: Generate the Xcode project
         run: pnpm --filter @cviper/light tauri ios init --ci
 
-      # Simulator, debug, unsigned. The Xcode build phase calls back into
-      # `tauri ios xcode-script`, which compiles the Rust static library for
-      # the simulator target and links it in — so a green build here means the
-      # whole app, not just the web layer, runs on an iPhone simulator.
-      - name: Build for the iOS simulator
-        working-directory: apps/light/src-tauri/gen/apple
-        run: |
-          set -euo pipefail
-          project=$(ls -d *.xcodeproj | head -1)
-          scheme=$(xcodebuild -list -json -project "$project" | python3 -c 'import json,sys; s=[x for x in json.load(sys.stdin)["project"]["schemes"] if x.endswith("_iOS")]; print(s[0])')
-          echo "project=$project scheme=$scheme"
-          xcodebuild \
-            -project "$project" \
-            -scheme "$scheme" \
-            -configuration debug \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            build
+      # Simulator, debug, unsigned. `--target aarch64-sim` picks the simulator
+      # SDK; `--no-sign` archives with code signing off and, for a simulator
+      # target, moves the `.app` out of the archive instead of exporting an
+      # IPA (tauri-cli `mobile/ios/build.rs`). The archive's "Build Rust Code"
+      # phase compiles the Rust static library for the simulator and links it
+      # in — so a green run here means the whole app, not just the web layer,
+      # builds for an iPhone simulator. `--ci` answers every prompt.
+      - name: Build for the iOS simulator (unsigned)
+        run: pnpm --filter @cviper/light tauri ios build --debug --target aarch64-sim --no-sign --ci
 
       # The artefact IS the assertion (hosted rule #69): a job that "did not
       # fail" proves nothing; an `.app` that exists does.
       - name: Collect the simulator app
         run: |
           set -euo pipefail
-          app=$(find apps/light/src-tauri/gen/apple/build/DerivedData -type d -name '*.app' -path '*iphonesimulator*' | head -1)
+          app=$(find apps/light/src-tauri/gen/apple/build -type d -name '*.app' | head -1)
           test -n "$app"
           mkdir -p ios-artefact
           ditto "$app" "ios-artefact/$(basename "$app")"
