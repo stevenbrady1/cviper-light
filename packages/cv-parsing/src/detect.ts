@@ -7,8 +7,11 @@
  * a renamed zip" is not.
  */
 
-/** The formats this package knows about. `doc` is recognised only to refuse it. */
-export type FileKind = 'pdf' | 'docx' | 'doc';
+/**
+ * The formats this package knows about. `doc` is recognised only to refuse it;
+ * `json` is a JSON Resume file (see `@cviper/resume-schema`).
+ */
+export type FileKind = 'pdf' | 'docx' | 'doc' | 'json';
 
 /** `%PDF`. */
 const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46] as const;
@@ -30,6 +33,15 @@ const OLE2_MAGIC = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1] as const;
  */
 const PDF_HEADER_SEARCH_BYTES = 1024;
 
+/** The UTF-8 byte-order mark. Windows tools put one in front of JSON. */
+const UTF8_BOM = [0xef, 0xbb, 0xbf] as const;
+
+/** `{` and `[` — the only two bytes a JSON document can begin with. */
+const JSON_OPENERS = [0x7b, 0x5b] as const;
+
+/** JSON whitespace: space, tab, newline, carriage return. */
+const JSON_WHITESPACE = [0x20, 0x09, 0x0a, 0x0d] as const;
+
 function startsWith(bytes: Uint8Array, magic: readonly number[]): boolean {
   if (bytes.length < magic.length) return false;
   return magic.every((byte, index) => bytes[index] === byte);
@@ -48,6 +60,23 @@ function findsWithin(bytes: Uint8Array, magic: readonly number[], limit: number)
 }
 
 /**
+ * Does the text begin, after an optional byte-order mark and whitespace, the
+ * way a JSON document must — with `{` or `[`?
+ *
+ * JSON has no magic number, so this is the most evidence there is. It is
+ * enough for the job: a PDF, a zip and an OLE2 file all begin with something
+ * else, and what it lets through — a JSON array, say — is answered by the
+ * résumé parser with "not a JSON Resume", which is the right message.
+ */
+function looksLikeJson(bytes: Uint8Array): boolean {
+  let offset = startsWith(bytes, UTF8_BOM) ? UTF8_BOM.length : 0;
+  while (offset < bytes.length && JSON_WHITESPACE.some((byte) => bytes[offset] === byte)) {
+    offset += 1;
+  }
+  return offset < bytes.length && JSON_OPENERS.some((byte) => bytes[offset] === byte);
+}
+
+/**
  * Work out what a file is from its leading bytes.
  *
  * Returns `null` when the bytes match nothing we handle — which covers plain
@@ -55,9 +84,12 @@ function findsWithin(bytes: Uint8Array, magic: readonly number[], limit: number)
  */
 export function sniffFileKind(bytes: Uint8Array): FileKind | null {
   // Order matters: OLE2 and zip headers are checked at offset 0 and are
-  // unambiguous, so they are settled before the lenient PDF search runs.
+  // unambiguous, so they are settled first. JSON is settled before the lenient
+  // PDF search, which looks a kilobyte deep and would otherwise claim a
+  // résumé whose summary mentions "%PDF".
   if (startsWith(bytes, OLE2_MAGIC)) return 'doc';
   if (startsWith(bytes, ZIP_MAGIC)) return 'docx';
+  if (looksLikeJson(bytes)) return 'json';
   if (findsWithin(bytes, PDF_MAGIC, PDF_HEADER_SEARCH_BYTES)) return 'pdf';
   return null;
 }
@@ -92,6 +124,8 @@ export function kindFromExtension(extension: string | null): FileKind | null {
       return 'docx';
     case 'doc':
       return 'doc';
+    case 'json':
+      return 'json';
     default:
       return null;
   }

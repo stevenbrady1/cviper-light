@@ -37,6 +37,8 @@ export type ParseErrorCode =
   | 'NO_TEXT_LAYER'
   /** Parsed perfectly and contained no text. An empty document, not a scan. */
   | 'EMPTY_DOCUMENT'
+  /** A `.json` file that is JSON but not a JSON Resume, or one with fields of the wrong shape. */
+  | 'INVALID_JSON_RESUME'
   /** Something we did not anticipate. Carries the underlying message in `detail`. */
   | 'EXTRACTION_FAILED';
 
@@ -72,6 +74,10 @@ export type ParseError =
   | ParseErrorBase<'PASSWORD_PROTECTED'>
   | (ParseErrorBase<'NO_TEXT_LAYER'> & { readonly pageCount: number })
   | ParseErrorBase<'EMPTY_DOCUMENT'>
+  | (ParseErrorBase<'INVALID_JSON_RESUME'> & {
+      /** One line per problem, by path. Empty when the file is simply not a résumé. */
+      readonly issues: readonly string[];
+    })
   | ParseErrorBase<'EXTRACTION_FAILED'>;
 
 // ── Wording helpers ──────────────────────────────────────────────────────────
@@ -90,6 +96,8 @@ function describeKind(kind: FileKind | null): string {
       return 'a Word document (.docx)';
     case 'doc':
       return 'an old Word document (.doc)';
+    case 'json':
+      return 'a JSON Resume file (.json)';
     case null:
       return 'not a format CViper can read';
   }
@@ -138,7 +146,7 @@ export function unsupportedFormatError(extension: string | null): ParseError {
   return {
     code: 'UNSUPPORTED_FORMAT',
     message:
-      `CViper reads PDF and Word (.docx) CVs. ${what} ` +
+      `CViper reads PDF and Word (.docx) CVs, and JSON Resume (.json) files. ${what} ` +
       'Open it and save a copy as a PDF or a .docx, then try again.',
     detail: null,
     extension,
@@ -231,6 +239,35 @@ export function emptyDocumentError(): ParseError {
       'That document opened correctly but has no text in it at all. Check you ' +
       'picked the right file, and that the CV was saved before you closed it.',
     detail: null,
+  };
+}
+
+/**
+ * A `.json` file that is not JSON: a syntax error, or bytes that are not
+ * UTF-8. Reported as corrupt, like a damaged PDF, because that is what it is.
+ */
+export function invalidJsonError(detail: string | null): ParseError {
+  return {
+    code: 'CORRUPT_FILE',
+    message:
+      'That .json file is not valid JSON, so it cannot be a JSON Resume. It may ' +
+      'have been cut short while saving, or it may not be a JSON file at all. ' +
+      'Export it again from the tool that made it, then try again.',
+    detail,
+  };
+}
+
+/**
+ * A `.json` file that is JSON but not a résumé, or a résumé with fields of
+ * the wrong shape. `message` is `@cviper/resume-schema`'s own — it names the
+ * fields, and that is the useful part.
+ */
+export function invalidJsonResumeError(message: string, issues: readonly string[]): ParseError {
+  return {
+    code: 'INVALID_JSON_RESUME',
+    message,
+    detail: null,
+    issues,
   };
 }
 

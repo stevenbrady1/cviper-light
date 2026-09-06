@@ -22,6 +22,7 @@ export type { ParseError, ParseErrorCode } from './errors';
 
 export { extractPdfText } from './pdf';
 export { extractDocxText } from './docx';
+export { extractJsonResumeText } from './json-resume';
 export { extractText } from './extract';
 
 export { normalizeWhitespace, truncateForPrompt, TRUNCATION_MARKER } from './text';
