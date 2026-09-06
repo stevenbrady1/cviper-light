@@ -9,6 +9,9 @@ there are not negotiable from inside this app.
 ## Never
 
 - **Never run `tauri build` or `cargo build --release`.** `cargo check` only.
+- **Never run `tauri ios build`, `tauri ios init` or `tauri android *` in an agent
+  session.** They need Xcode or the Android SDK and write into `src-tauri/gen/`.
+  The iOS target is checked by `.github/workflows/ios.yml` on a Mac runner.
 - **Never run `pnpm tauri dev` in an agent session** — it opens a GUI window and
   blocks. Ask the operator to verify interactively.
 - **Never edit `src-tauri/gen/` or `src-tauri/target/`.** Both are generated and
@@ -27,6 +30,12 @@ Three permissions in that file are load-bearing and easy to delete by accident:
 | `sql:allow-execute`    | `sql:default` omits it. Without it every INSERT/UPDATE fails silently. |
 | `dialog:allow-ask`     | Not in `dialog:default`, despite the docs.                             |
 | `dialog:allow-confirm` | Not in `dialog:default`, despite the docs.                             |
+
+`updater:default` lives in `capabilities/desktop.json`, scoped with
+`"platforms": ["macOS", "windows", "linux"]`, and must never move into
+`default.json`: the updater plugin is not compiled into iOS or Android builds
+(Cargo.toml target section, `lib.rs` `cfg(desktop)`), and a capability that
+names its permission on a platform where the plugin is absent fails the build.
 
 `dialog:allow-open` and `dialog:allow-save` are **deliberately absent**. The file
 and save dialogs run in Rust (`src-tauri/src/files.rs`), so JavaScript never

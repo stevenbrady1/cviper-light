@@ -30,7 +30,10 @@ pub fn run() {
 
     // `tauri add updater` declares tauri-plugin-updater as a desktop-only Cargo
     // dependency but emits an unconditional `.plugin(...)` call. Guard it so the
-    // Rust matches the manifest.
+    // Rust matches the manifest. The matching capability lives in
+    // `capabilities/desktop.json`, scoped to desktop platforms for the same
+    // reason: on iOS the plugin is not compiled in, and a capability naming
+    // `updater:default` there fails the build (L-80).
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
 

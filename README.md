@@ -4,7 +4,7 @@ A desktop app for running a job hunt: search adverts, track what you have
 applied for, and check a CV against a job description. It runs on your own
 computer and keeps everything there.
 
-Windows and macOS. Tauri v2, React, SQLite.
+Windows and macOS, with an iPhone build target checked in CI. Tauri v2, React, SQLite.
 
 ## Your privacy, in plain words
 

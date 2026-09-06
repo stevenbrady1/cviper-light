@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "Desktop-only permissions: the updater. On iOS and Android the App Store and Play deliver updates, the updater plugin is not compiled in (Cargo.toml target section, lib.rs cfg(desktop)), and a capability naming its permission would fail the build.",
+  "platforms": ["macOS", "windows", "linux"],
+  "windows": ["main"],
+  "permissions": ["updater:default"]
+}

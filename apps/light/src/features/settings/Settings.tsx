@@ -14,6 +14,7 @@ import { BoardSettings } from '../boards/BoardSettings';
 import { type BoardPreferencesPort } from '../boards/port';
 import { type BrowserPort } from '../../platform/browser';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
+import { detectMobileOs, type MobileOs } from '../../platform/os';
 
 import { EraseEverything } from './erase/EraseEverything';
 import { type ErasePort } from './erase/port';
@@ -21,6 +22,7 @@ import { KeySetup } from './keys/KeySetup';
 import { PrivacyNotice } from './privacy/PrivacyNotice';
 import { TELEMETRY_ENABLED, TELEMETRY_NOTE } from './telemetry';
 import { type KeyPort } from './keys/port';
+import { StoreUpdates } from './updates/StoreUpdates';
 import { UpdateCheck } from './updates/UpdateCheck';
 import { type UpdatePort } from './updates/port';
 
@@ -86,6 +88,13 @@ export interface SettingsProps {
    */
   readonly updatePort?: UpdatePort | undefined;
   /**
+   * Which phone this build is running on, or `null` on a desktop. Injected by
+   * tests; the real value comes from the WebView's user agent (`platform/os`).
+   * On a phone the Updates section names the store instead of offering a
+   * check that has nothing to call (L-80).
+   */
+  readonly mobileOs?: MobileOs | null | undefined;
+  /**
    * Reopen the first-run introduction.
    *
    * Owned by the shell, because the introduction replaces the whole window and
@@ -132,6 +141,7 @@ export function Settings({
   browser,
   boardsPort,
   updatePort,
+  mobileOs = detectMobileOs(),
   onShowWelcome,
   now,
   erasePort,
@@ -366,7 +376,7 @@ export function Settings({
 
           <BoardSettings port={boardsPort} />
 
-          <UpdateCheck port={updatePort} />
+          {mobileOs === null ? <UpdateCheck port={updatePort} /> : <StoreUpdates os={mobileOs} />}
 
           <section>
             <h2 className="font-medium text-ink">Getting started</h2>
