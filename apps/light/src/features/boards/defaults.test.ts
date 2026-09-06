@@ -31,6 +31,7 @@ const EXPECTED_IDS = [
   'adzuna',
   'google-jobs',
   'guardian',
+  'jobserve',
 ];
 
 /** `id -> the whole URL`, for `business analyst` in `Milton Keynes`. */
@@ -45,6 +46,7 @@ const WORKED_URLS: Readonly<Record<string, string>> = {
   'google-jobs':
     'https://www.google.com/search?q=business+analyst+jobs+Milton+Keynes&udm=8&hl=en&gl=uk',
   guardian: 'https://jobs.theguardian.com/jobs/business-analyst/',
+  jobserve: 'https://www.jobserve.com/gb/en/JobSearch.aspx?q=business+analyst&l=Milton+Keynes',
 };
 
 /** The same search with the location box left empty. */
@@ -57,6 +59,7 @@ const NO_LOCATION_URLS: Readonly<Record<string, string>> = {
   adzuna: 'https://www.adzuna.co.uk/search?q=business+analyst',
   'google-jobs': 'https://www.google.com/search?q=business+analyst+jobs&udm=8&hl=en&gl=uk',
   guardian: 'https://jobs.theguardian.com/jobs/business-analyst/',
+  jobserve: 'https://www.jobserve.com/gb/en/JobSearch.aspx?q=business+analyst',
 };
 
 function boardById(id: string) {
@@ -76,7 +79,7 @@ describe('the shipped job-board config', () => {
     }
   });
 
-  it('holds exactly these eight ids, in this order', () => {
+  it('holds exactly these nine ids, in this order', () => {
     expect(SHIPPED_BOARDS.map((board) => board.id)).toEqual(EXPECTED_IDS);
   });
 

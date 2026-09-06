@@ -17,7 +17,7 @@
  * import time, and the thing that would be broken is a row of buttons. So a bad
  * file leaves `SHIPPED_BOARDS` empty and `KeylessBar` says so, and
  * `defaults.test.ts` is what makes sure a bad file cannot be released: it
- * asserts `SHIPPED_BOARDS_PROBLEM` is `null` and that the eight ids are
+ * asserts `SHIPPED_BOARDS_PROBLEM` is `null` and that the nine ids are
  * present, in order. The guard is in the test, where a human sees it, rather
  * than in a crash the user sees.
  */
