@@ -92,7 +92,14 @@ const MAX_BACKUP_BYTES: u64 = 128 * 1024 * 1024;
 /// a legacy Word file with "open it in Word and use Save As", which is the most
 /// useful thing anyone can tell that user. Refusing to read the bytes here
 /// would replace that advice with "unsupported format".
-const CV_EXTENSIONS: [&str; 3] = ["pdf", "docx", "doc"];
+///
+/// `json` is a JSON Resume file — the interchange format CVAurum, Reactive
+/// Resume and the jsonresume.org tools export. Whether a given `.json` really
+/// is one is `@cviper/resume-schema`'s decision, made on the bytes.
+const CV_EXTENSIONS: [&str; 4] = ["pdf", "docx", "doc", "json"];
+
+/// How the CV picker describes what it accepts, in every refusal.
+const CV_WHAT: &str = "a PDF, a Word (.docx) or a JSON Resume (.json) CV";
 
 /// Extensions the backup commands will touch. Lower-case, no dot.
 const BACKUP_EXTENSIONS: [&str; 1] = ["json"];
@@ -361,7 +368,7 @@ fn bare_file_name(suggested: &str) -> String {
 /// does not, belongs to `@cviper/cv-parsing` — this function's whole job is to
 /// get the bytes across the boundary safely.
 fn read_cv_at(path: &Path) -> Result<CvFile, String> {
-    check_readable(path, &CV_EXTENSIONS, MAX_CV_BYTES, "a PDF or a Word (.docx) CV")?;
+    check_readable(path, &CV_EXTENSIONS, MAX_CV_BYTES, CV_WHAT)?;
 
     let bytes = fs::read(path).map_err(|error| describe_io_error(&error))?;
 
@@ -610,6 +617,28 @@ mod tests {
 
         assert_eq!(size, 8);
         fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn a_json_resume_is_a_cv() {
+        // L-20: a `.json` file passes the picker's guard. Whether it is really
+        // a JSON Resume is decided from its bytes on the TypeScript side.
+        let path = temp_path("resume.json");
+        fs::write(&path, b"{\"basics\":{\"name\":\"Jane\"}}").unwrap();
+
+        let size = check_readable(&path, &CV_EXTENSIONS, MAX_CV_BYTES, CV_WHAT).unwrap();
+
+        assert_eq!(size, 26);
+        fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn the_refusal_names_every_format_the_picker_accepts() {
+        let error = check_readable(Path::new("notes.md"), &CV_EXTENSIONS, MAX_CV_BYTES, CV_WHAT)
+            .unwrap_err();
+        for format in ["PDF", ".docx", "JSON Resume"] {
+            assert!(error.contains(format), "{format} missing from: {error}");
+        }
     }
 
     #[test]

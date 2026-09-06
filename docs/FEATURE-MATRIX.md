@@ -6,7 +6,7 @@ column records the truth.
 **Built**: everything in the Light column below that is not marked otherwise —
 the shared data model and export/import format, the local SQLite data-access
 layer, CV text extraction, the provider adapters and their Rust transport, the
-keyword-only scorer, the app shell, the application tracker, the CV analysis
+keyword-only scorer, JSON Resume import, the app shell, the application tracker, the CV analysis
 view, the job-board clients (Adzuna and Reed request building, response
 normalisation, cross-post detection, the nine configurable keyless browser
 links and the daily request budget), the job search view, the API-key setup
@@ -37,6 +37,7 @@ be verified by an installed copy. See
 | Fetch an advert from a link     | Yes — one page, on request, no credentials | Yes — server-side, no user IP      | Built            |
 | A link pasted in the advert box | Yes — spotted, never sent to a model       | No — not built there               | Built            |
 | CV parsing                      | Yes — fully local                          | Yes — server-side                  | Extraction built |
+| JSON Resume import              | Yes — any JSON Resume 1.0 file, read here  | Yes — server-side                  | Built            |
 | CV analysis (BYO key)           | Yes — user's own provider key              | Not applicable                     | Built            |
 | CV analysis (local Ollama)      | Yes — offline, no key, no network          | No                                 | Built            |
 | Keyword-only analysis           | Yes — no AI, no key, always available      | Yes                                | Built            |

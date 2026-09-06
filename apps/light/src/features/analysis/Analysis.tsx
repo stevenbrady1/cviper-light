@@ -394,7 +394,8 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
             </div>
 
             <p className="mt-1 text-xs text-ink-faint">
-              PDF or Word (.docx). The file is read on this machine and never uploaded anywhere.
+              PDF, Word (.docx) or JSON Resume (.json). The file is read on this machine and never
+              uploaded anywhere.
             </p>
 
             {uploadProblem === null ? null : (

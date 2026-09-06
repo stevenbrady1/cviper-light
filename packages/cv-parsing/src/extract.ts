@@ -14,6 +14,7 @@ import {
   unsupportedFormatError,
   type ParseError,
 } from './errors';
+import { extractJsonResumeText } from './json-resume';
 import { extractPdfText } from './pdf';
 import { MAX_FILE_BYTES } from './constants';
 
@@ -53,5 +54,12 @@ export async function extractText(
   if (actual === 'doc') return err(legacyDocError());
   if (actual !== claimed) return err(formatMismatchError(claimed, actual));
 
-  return claimed === 'pdf' ? extractPdfText(bytes) : extractDocxText(bytes);
+  switch (claimed) {
+    case 'pdf':
+      return extractPdfText(bytes);
+    case 'docx':
+      return extractDocxText(bytes);
+    case 'json':
+      return extractJsonResumeText(bytes);
+  }
 }

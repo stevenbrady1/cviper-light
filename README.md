@@ -111,7 +111,7 @@ browser job-search links never needed a key and still do not.
 | Feature                             | Key needed?                                                            |
 | ----------------------------------- | ---------------------------------------------------------------------- |
 | Application tracker                 | **No.** Works completely offline.                                      |
-| CV upload and text extraction       | **No.** PDF and Word are read on your machine.                         |
+| CV upload and text extraction       | **No.** PDF, Word and JSON Resume are read on your machine.            |
 | Basic keyword CV match              | **No.** Runs locally, instantly.                                       |
 | CV analysis with a local model      | **No key** — needs [Ollama](https://ollama.com) installed and running. |
 | CV analysis with Anthropic / OpenAI | Yes — your own key, billed to you.                                     |
@@ -205,6 +205,7 @@ that existing installs can update to also needs a signing key — see
 | `packages/job-apis`        | Adzuna / Reed clients, keyless search links |
 | `packages/cv-parsing`      | CV ingestion and extraction                 |
 | `packages/keyword-scoring` | The no-AI CV match                          |
+| `packages/resume-schema`   | JSON Resume: read, flatten, write back      |
 | `packages/ui`              | Shared presentational components            |
 | `docs/`                    | Build plan and feature matrix               |
 
