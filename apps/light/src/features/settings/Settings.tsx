@@ -270,7 +270,7 @@ export function Settings({
         }
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
         <div className="max-w-2xl space-y-6">
           <section>
             <h2 className="font-medium text-ink">Your data</h2>
@@ -282,7 +282,7 @@ export function Settings({
               exactly where you put it and nowhere else.
             </p>
 
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 data-testid="settings-import"
@@ -340,7 +340,7 @@ export function Settings({
                 it does.
               </p>
 
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   data-testid="settings-confirm-import"

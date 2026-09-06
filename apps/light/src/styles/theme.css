@@ -123,6 +123,27 @@
   --shadow-overlay: 0 4px 12px rgb(11 23 41 / 0.09), 0 12px 32px rgb(11 23 41 / 0.1);
 }
 
+/*
+ * The phone's insets: the notch, the rounded corners and the home indicator.
+ *
+ * `env(safe-area-inset-*)` is zero on every desktop and on every phone screen
+ * that has none of those, so these cost nothing where they do nothing. They are
+ * only non-zero once `index.html` says `viewport-fit=cover`, which it does —
+ * without that the WebView letterboxes the page instead and the values stay 0.
+ */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@utility pl-safe {
+  padding-left: env(safe-area-inset-left);
+}
+@utility pr-safe {
+  padding-right: env(safe-area-inset-right);
+}
+
 @layer base {
   /*
    * The app is a fixed-size desktop window, never a scrolling document. The

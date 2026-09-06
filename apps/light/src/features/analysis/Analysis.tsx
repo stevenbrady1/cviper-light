@@ -345,20 +345,20 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
         <p
           role="alert"
           data-testid="analysis-error"
-          className="border-b border-danger/30 bg-danger/5 px-6 py-2 text-danger"
+          className="border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
         >
           {error}
         </p>
       )}
 
       <div className="flex min-h-0 flex-1">
-        <div className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+        <div className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
           {/* ── 1. The CV ─────────────────────────────────────────────── */}
           <div>
             <label htmlFor="analysis-cv" className="block text-xs font-medium text-ink-muted">
               Your CV
             </label>
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               <select
                 id="analysis-cv"
                 data-testid="analysis-cv"
@@ -436,7 +436,7 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
             />
 
             {jobs.length === 0 ? null : (
-              <div className="mt-1 flex items-center gap-2">
+              <div className="mt-1 flex flex-wrap items-center gap-2">
                 <label htmlFor="analysis-job-pick" className="text-xs text-ink-faint">
                   Or use one you are already tracking
                 </label>

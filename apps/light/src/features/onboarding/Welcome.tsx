@@ -95,7 +95,7 @@ export function Welcome({ onDismiss, detect }: WelcomeProps) {
     <section
       aria-label="Welcome to CViper Light"
       data-testid="welcome"
-      className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-canvas px-8 py-8"
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-canvas px-4 py-6 md:px-8 md:py-8"
     >
       <header className="mx-auto w-full max-w-5xl">
         <p className="font-mono text-xs font-medium tracking-[0.14em] text-ink-faint uppercase">
@@ -159,7 +159,7 @@ export function Welcome({ onDismiss, detect }: WelcomeProps) {
         ))}
       </div>
 
-      <footer className="mx-auto mt-6 flex w-full max-w-5xl items-center gap-3">
+      <footer className="mx-auto mt-6 flex w-full max-w-5xl flex-wrap items-center gap-3">
         <button
           type="button"
           data-testid="welcome-skip"

@@ -304,14 +304,14 @@ export function Tracker({
         <p
           role="alert"
           data-testid="tracker-error"
-          className="border-b border-danger/30 bg-danger/5 px-6 py-2 text-danger"
+          className="border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
         >
           {error}
         </p>
       )}
 
       <div className="flex min-h-0 flex-1">
-        <div className="min-h-0 min-w-0 flex-1 overflow-hidden p-4">
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden p-2 md:p-4">
           {loading ? (
             <p className="text-ink-muted">Reading your applications…</p>
           ) : boardIsEmpty ? (
@@ -321,7 +321,15 @@ export function Tracker({
               disabled={paneIsOpenForNewWork}
             />
           ) : (
-            <div className="flex h-full min-h-0 gap-2">
+            /*
+             * Phone: the columns are wider than the screen and scroll sideways,
+             * one column snapping into view at a time — the same board, read a
+             * column at a time. Desktop: all of them, side by side, as before.
+             */
+            <div
+              data-testid="tracker-board"
+              className="flex h-full min-h-0 snap-x snap-mandatory gap-2 overflow-x-auto md:snap-none md:overflow-x-visible"
+            >
               {TRACKER_COLUMNS.map((status) => (
                 <TrackerColumn
                   key={status}

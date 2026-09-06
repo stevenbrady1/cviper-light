@@ -18,7 +18,7 @@ interface ViewHeaderProps {
 
 export function ViewHeader({ title, summary, action = null }: ViewHeaderProps) {
   return (
-    <header className="flex items-start justify-between gap-4 border-b border-line bg-card px-6 py-4">
+    <header className="flex flex-col gap-3 border-b border-line bg-card px-4 py-3 md:flex-row md:items-start md:justify-between md:gap-4 md:px-6 md:py-4">
       <div className="min-w-0">
         <h1 className="text-lg font-semibold text-ink">{title}</h1>
         <p className="text-ink-muted">{summary}</p>

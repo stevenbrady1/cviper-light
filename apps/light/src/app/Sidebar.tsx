@@ -4,15 +4,16 @@ import { StatusStrip } from './StatusStrip';
 import { PINNED_VIEWS, SEQUENCE_VIEWS, type ViewDefinition, type ViewId } from './views';
 
 /**
- * The rail: fixed 240px, navy, always open.
+ * The rail: fixed 240px, navy, always open — on a desktop window.
  *
  * ============================================================================
- * NO HAMBURGER, NO BREAKPOINTS, NO COLLAPSE
+ * NO HAMBURGER, NO COLLAPSE
  * ============================================================================
- * A collapsible sidebar exists to solve the problem of a 375px screen. This app
- * has a 1000x700 minimum window (`tauri.conf.json`) and cannot be opened on a
- * phone. Adding a collapse control here would add a control whose only job is
- * to hide the thing it controls — and a second layout to keep correct for ever.
+ * A collapsible sidebar exists to solve the problem of a 375px screen, and that
+ * problem is solved elsewhere: below Tailwind's `md` the shell does not mount
+ * this rail at all and mounts `BottomNav` instead (L-81). Adding a collapse
+ * control here would add a control whose only job is to hide the thing it
+ * controls — and a third layout to keep correct for ever.
  *
  * ============================================================================
  * THE ACTIVE MARKER IS TEAL, NOT BLUE

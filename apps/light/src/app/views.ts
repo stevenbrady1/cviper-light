@@ -25,12 +25,12 @@
  * the question the user came with. Search is one keystroke away.
  *
  * ============================================================================
- * THERE IS NO HAMBURGER AND THERE ARE NO BREAKPOINTS
+ * THERE IS NO HAMBURGER, AND EXACTLY ONE BREAKPOINT
  * ============================================================================
- * The window has a 1000x700 minimum (see `tauri.conf.json`), the rail is a
- * fixed 240px, and it is always open. A collapsible sidebar solves the problem
- * of a phone screen, and this app does not run on one — all it would add here
- * is a control that hides the thing it controls.
+ * On a desktop window (1000x700 minimum, `tauri.conf.json`) the rail is a fixed
+ * 240px and always open. On a phone (below Tailwind's `md`, L-81) the shell
+ * mounts a bottom bar with these same four views instead. Nothing collapses:
+ * a control that hides the thing it controls teaches nobody anything.
  */
 
 export type ViewId = 'search' | 'tracker' | 'analysis' | 'settings';

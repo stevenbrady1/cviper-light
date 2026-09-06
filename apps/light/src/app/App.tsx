@@ -8,17 +8,22 @@ import { Settings, type SettingsProps } from '../features/settings/Settings';
 import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
 import { readEnvironmentStatus, type EnvironmentStatus } from '../status/environment';
 
+import { BottomNav } from './BottomNav';
 import { Sidebar } from './Sidebar';
+import { useViewportClass } from './viewport';
 import { DEFAULT_VIEW, viewForShortcut, type ViewId } from './views';
 
 /**
- * The application shell: a fixed navy rail on the left, one view to the right.
+ * The application shell: a fixed navy rail on the left, one view to the right
+ * — or, on a phone, the view on top and a navigation bar along the bottom.
  *
  * ============================================================================
  * WHAT THE SHELL OWNS, AND WHAT IT DOES NOT
  * ============================================================================
- * It owns exactly two things: WHICH VIEW is showing, and the environment status
- * the rail displays. It does not own selection, editing, or any view's data —
+ * It owns exactly three things: WHICH VIEW is showing, the environment status
+ * the rail displays, and which of the two navigations is mounted (L-81: the
+ * rail above Tailwind's `md`, the bottom bar below it — never both, because
+ * they share `data-testid`s). It does not own selection, editing, or any view's data —
  * a shell that reaches into a feature is a shell that has to change every time
  * the feature does.
  *
@@ -107,6 +112,7 @@ export default function App({
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
   const [status, setStatus] = useState<EnvironmentStatus | null>(null);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !hasSeenWelcome());
+  const viewport = useViewportClass();
 
   /**
    * Re-read the rail's status on mount and on every view change.
@@ -183,17 +189,31 @@ export default function App({
     setWelcomeOpen(true);
   }, []);
 
+  const narrow = viewport === 'narrow';
+  // The phone's insets — notch, corners, home indicator — kept off the content
+  // once, here, so no view has to know it is on a phone. Zero everywhere else.
+  const insets = narrow ? 'pt-safe pb-safe pl-safe pr-safe' : '';
+
   if (welcomeOpen) {
     return (
-      <div className="flex h-full min-h-0 bg-canvas text-ink">
+      <div className={`flex h-full min-h-0 bg-canvas text-ink ${insets}`}>
         <Welcome onDismiss={onDismissWelcome} />
       </div>
     );
   }
 
   return (
-    <div className="flex h-full min-h-0 bg-canvas text-ink">
-      <Sidebar activeView={activeView} onSelect={onSelect} status={status} />
+    <div
+      data-testid="shell"
+      data-viewport={viewport}
+      className={[
+        'flex h-full min-h-0 bg-canvas text-ink',
+        // Phone: a column, the view above the bar. The bottom inset is the
+        // bar's own (`BottomNav`), so it is navy under the home indicator.
+        narrow ? 'flex-col pt-safe pl-safe pr-safe' : '',
+      ].join(' ')}
+    >
+      {narrow ? null : <Sidebar activeView={activeView} onSelect={onSelect} status={status} />}
 
       <main className="flex min-h-0 min-w-0 flex-1">
         {renderView(activeView, {
@@ -231,6 +251,8 @@ export default function App({
           },
         })}
       </main>
+
+      {narrow ? <BottomNav activeView={activeView} onSelect={onSelect} /> : null}
     </div>
   );
 }

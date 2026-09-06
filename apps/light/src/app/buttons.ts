@@ -20,9 +20,12 @@
  * here, and the `rejected` status pill.
  */
 
+// `min-h-11` below `md`: 44px is the smallest thing a thumb reliably hits,
+// and every button in the app is a thumb target on a phone (L-81). Above `md`
+// the buttons keep their natural height.
 const BASE =
   'inline-flex items-center justify-center gap-1.5 rounded-control px-3 py-1.5 font-medium ' +
-  'disabled:cursor-not-allowed';
+  'min-h-11 md:min-h-0 disabled:cursor-not-allowed';
 
 export const PRIMARY_BUTTON = `${BASE} bg-blue text-ink-inverse hover:bg-navy disabled:bg-line disabled:text-ink-faint`;
 
