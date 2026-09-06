@@ -68,3 +68,33 @@ bar and asks nothing.
 Without it a release builds installers that no existing install can ever see.
 The omission is invisible until the first user fails to receive an update, which
 is months later and looks like the updater is broken rather than absent.
+
+## iOS — what CI does, and what only a person can do
+
+`.github/workflows/ios.yml` runs on a Mac and proves two things on every pull
+request: the Rust side compiles for `aarch64-apple-ios` and
+`aarch64-apple-ios-sim`, and `tauri ios init` plus an **unsigned** simulator
+build (`tauri ios build --target aarch64-sim --no-sign`) produce an `.app` that
+is uploaded as an artefact. No certificate, profile or team is involved, and none is stored in
+this repository.
+
+Everything past that is human, in this order:
+
+1. In App Store Connect, create the app record for `com.cviper.light` (the
+   `identifier` in `tauri.conf.json`), named **CViper Light**.
+2. Set `bundle.iOS.developmentTeam` in `tauri.conf.json` — or export
+   `APPLE_DEVELOPMENT_TEAM` when building — to the team id from the developer
+   account. A team id is not a secret; a signing certificate and its private
+   key are, and they stay in the account's keychain and in repository secrets
+   (`APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`,
+   `APPLE_PASSWORD` / an App Store Connect API key) for a future release job.
+3. `pnpm tauri ios build --export-method app-store-connect` on a Mac with the
+   certificate installed, then upload with Transporter or the release job.
+4. The App Privacy questionnaire: every answer "no" — Light collects nothing,
+   and the contract tests under `src/lib/` are the evidence. Apple still
+   requires a privacy policy URL; the hosted `cviper.ai/light/privacy` page
+   (CV-1394) is that URL.
+
+The updater plugin is not part of an iOS build at all (Cargo.toml target
+section, `lib.rs` `cfg(desktop)`, `capabilities/desktop.json`): the App Store
+delivers updates, and Settings says so on a phone instead of offering a check.

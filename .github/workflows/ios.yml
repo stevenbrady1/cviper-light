@@ -1,0 +1,150 @@
+name: iOS
+
+# The iPhone build target (L-80, Road A). Two things, on a Mac because Xcode
+# is Mac-only:
+#
+#   1. `cargo check` for the two iOS targets — the whole Rust side compiles for
+#      a phone. This is the check that cannot run anywhere else (the Apple SDK
+#      is needed even to type-check the objc2 crates), and it is the one that
+#      caught L-82: the keyring crate had no store on iOS at all.
+#   2. `tauri ios init` + an UNSIGNED simulator build — the generated Xcode
+#      project builds, the Rust static library links into it, and the app
+#      bundle comes out as a downloadable artefact. No certificate, no
+#      provisioning profile, no team: `tauri ios build --no-sign` for the
+#      simulator target only, which is exactly as far as a repository with no
+#      secrets can go. Signing and the App Store upload are human steps
+#      (L-84, RELEASE-SIGNING.md).
+#
+#      Why the Tauri CLI and not `xcodebuild` directly: the Xcode project's
+#      "Build Rust Code" phase calls `tauri ios xcode-script`, which reads its
+#      options from a small server the CLI starts for the duration of
+#      `tauri ios build` (or `dev`). Run `xcodebuild` on its own and that
+#      phase panics on a missing `<identifier>-server-addr` file — the first
+#      run of this workflow did exactly that.
+#
+# Same trigger shape as ci.yml, deliberately with no path filter: the Rust
+# side is what breaks on iOS and it is touched by changes that do not look
+# iOS-related. macOS minutes cost ten times Linux minutes; the Rust cache and
+# `cancel-in-progress` keep a run to a few minutes once warm.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+jobs:
+  ios-check:
+    name: cargo check (aarch64-apple-ios, aarch64-apple-ios-sim)
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/light/src-tauri
+          key: ios
+
+      # The frontend must exist before the Rust side is checked: `tauri-build`
+      # reads `frontendDist` at compile time and fails on a missing `dist/`.
+      - name: Build the frontend
+        run: pnpm --filter @cviper/light build
+
+      - name: cargo check for a device
+        run: cargo check --manifest-path apps/light/src-tauri/Cargo.toml --target aarch64-apple-ios
+
+      - name: cargo check for the simulator
+        run: cargo check --manifest-path apps/light/src-tauri/Cargo.toml --target aarch64-apple-ios-sim
+
+  ios-simulator-build:
+    name: unsigned simulator build
+    runs-on: macos-latest
+    needs: ios-check
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/light/src-tauri
+          key: ios
+
+      # The Xcode project generator the Tauri CLI shells out to.
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Build the frontend
+        run: pnpm --filter @cviper/light build
+
+      # Generates `src-tauri/gen/apple` (gitignored — never edited, never
+      # committed; regenerated on every run so it can never drift from
+      # tauri.conf.json). `--ci` answers every prompt with its default.
+      - name: Generate the Xcode project
+        run: pnpm --filter @cviper/light tauri ios init --ci
+
+      # Simulator, debug, unsigned. `--target aarch64-sim` picks the simulator
+      # SDK; `--no-sign` archives with code signing off and, for a simulator
+      # target, moves the `.app` out of the archive instead of exporting an
+      # IPA (tauri-cli `mobile/ios/build.rs`). The archive's "Build Rust Code"
+      # phase compiles the Rust static library for the simulator and links it
+      # in — so a green run here means the whole app, not just the web layer,
+      # builds for an iPhone simulator. `--ci` answers every prompt.
+      - name: Build for the iOS simulator (unsigned)
+        run: pnpm --filter @cviper/light tauri ios build --debug --target aarch64-sim --no-sign --ci
+
+      # The artefact IS the assertion (hosted rule #69): a job that "did not
+      # fail" proves nothing; an `.app` that exists does.
+      - name: Collect the simulator app
+        run: |
+          set -euo pipefail
+          app=$(find apps/light/src-tauri/gen/apple/build -type d -name '*.app' | head -1)
+          test -n "$app"
+          mkdir -p ios-artefact
+          ditto "$app" "ios-artefact/$(basename "$app")"
+          ls -la ios-artefact
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cviper-light-ios-simulator
+          path: ios-artefact
+          if-no-files-found: error
+          retention-days: 14

@@ -25,30 +25,31 @@ be verified by an installed copy. See
 
 `apps/cloud` is an empty stub directory. There is no cloud code of any kind.
 
-| Feature                         | Light                                      | Cloud (future)                     | State            |
-| ------------------------------- | ------------------------------------------ | ---------------------------------- | ---------------- |
-| Job search (Adzuna/Reed)        | Yes — user's own API keys, direct calls    | Yes — server-side, shared keys     | Built            |
-| Cross-post detection            | Yes — flags duplicates, never merges       | Yes — merges, with a server undo   | Built            |
-| Keyless browser search links    | Yes — nine UK boards, opens in browser     | Not applicable                     | Built            |
-| Job-board list, user-edited     | Yes — enable, reorder, add your own        | Not applicable                     | Built            |
-| API key setup                   | Yes — tested before saved, never read back | Not applicable                     | Built            |
-| Application tracker             | Yes — local SQLite                         | Yes — synced                       | Built            |
-| Paste a job advert              | Yes — AI reads it, you check every box     | Yes — server-side                  | Built            |
-| Fetch an advert from a link     | Yes — one page, on request, no credentials | Yes — server-side, no user IP      | Built            |
-| A link pasted in the advert box | Yes — spotted, never sent to a model       | No — not built there               | Built            |
-| CV parsing                      | Yes — fully local                          | Yes — server-side                  | Extraction built |
-| JSON Resume import              | Yes — any JSON Resume 1.0 file, read here  | Yes — server-side                  | Built            |
-| CV analysis (BYO key)           | Yes — user's own provider key              | Not applicable                     | Built            |
-| CV analysis (local Ollama)      | Yes — offline, no key, no network          | No                                 | Built            |
-| Keyword-only analysis           | Yes — no AI, no key, always available      | Yes                                | Built            |
-| Data export/import              | Yes — user-initiated file in/out           | Yes — plus migration to/from Light | Built            |
-| Delete everything               | Yes — database, keys and preferences       | Yes — account deletion             | Built            |
-| Privacy notice                  | Yes — generated from the host registry     | Policy page                        | Built            |
-| App updates                     | Yes — manual check only, never on launch   | Not applicable                     | Built, unsigned  |
-| First-run introduction          | Yes — three cards, reopenable in Settings  | Not applicable                     | Built            |
-| Accounts                        | No — no login, no identity                 | Yes                                | Not built        |
-| Sync                            | No — single device by design               | Yes                                | Not built        |
-| Telemetry                       | No — none, ever                            | Opt-in                             | Absent, guarded  |
+| Feature                         | Light                                           | Cloud (future)                     | State             |
+| ------------------------------- | ----------------------------------------------- | ---------------------------------- | ----------------- |
+| Job search (Adzuna/Reed)        | Yes — user's own API keys, direct calls         | Yes — server-side, shared keys     | Built             |
+| Cross-post detection            | Yes — flags duplicates, never merges            | Yes — merges, with a server undo   | Built             |
+| Keyless browser search links    | Yes — nine UK boards, opens in browser          | Not applicable                     | Built             |
+| Job-board list, user-edited     | Yes — enable, reorder, add your own             | Not applicable                     | Built             |
+| API key setup                   | Yes — tested before saved, never read back      | Not applicable                     | Built             |
+| Application tracker             | Yes — local SQLite                              | Yes — synced                       | Built             |
+| Paste a job advert              | Yes — AI reads it, you check every box          | Yes — server-side                  | Built             |
+| Fetch an advert from a link     | Yes — one page, on request, no credentials      | Yes — server-side, no user IP      | Built             |
+| A link pasted in the advert box | Yes — spotted, never sent to a model            | No — not built there               | Built             |
+| CV parsing                      | Yes — fully local                               | Yes — server-side                  | Extraction built  |
+| JSON Resume import              | Yes — any JSON Resume 1.0 file, read here       | Yes — server-side                  | Built             |
+| CV analysis (BYO key)           | Yes — user's own provider key                   | Not applicable                     | Built             |
+| CV analysis (local Ollama)      | Yes — offline, no key, no network               | No                                 | Built             |
+| Keyword-only analysis           | Yes — no AI, no key, always available           | Yes                                | Built             |
+| Data export/import              | Yes — user-initiated file in/out                | Yes — plus migration to/from Light | Built             |
+| Delete everything               | Yes — database, keys and preferences            | Yes — account deletion             | Built             |
+| Privacy notice                  | Yes — generated from the host registry          | Policy page                        | Built             |
+| App updates                     | Yes — manual check only, never on launch        | Not applicable                     | Built, unsigned   |
+| iPhone build (Road A)           | Yes — same code, unsigned simulator build in CI | Not applicable                     | CI only, unsigned |
+| First-run introduction          | Yes — three cards, reopenable in Settings       | Not applicable                     | Built             |
+| Accounts                        | No — no login, no identity                      | Yes                                | Not built         |
+| Sync                            | No — single device by design                    | Yes                                | Not built         |
+| Telemetry                       | No — none, ever                                 | Opt-in                             | Absent, guarded   |
 
 ## Notes
 
