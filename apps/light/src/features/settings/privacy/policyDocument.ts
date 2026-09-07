@@ -67,8 +67,10 @@ export function renderPrivacyPolicy(inputs: PolicyInputs): string {
       'press a button that says it will, and only the services listed on this page.',
     '',
     'We — the people who make CViper Light — receive nothing from it. Not your CV, not your ' +
-      'searches, not your keys, not whether you use it at all. No address on this page belongs ' +
-      'to us.',
+      'searches, not your keys, not whether you use it at all. The one address on this page ' +
+      'that is ours, cviper.ai, is only ever opened in your own browser when you tap a line ' +
+      'that names it; the app never contacts it, and what that site sees is what your ' +
+      'browser shows it.',
     '',
     '## What the app keeps, and where',
     '',

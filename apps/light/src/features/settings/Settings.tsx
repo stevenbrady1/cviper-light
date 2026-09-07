@@ -12,13 +12,16 @@ import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { BoardSettings } from '../boards/BoardSettings';
 import { type BoardPreferencesPort } from '../boards/port';
-import { type BrowserPort } from '../../platform/browser';
+import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
 import { detectMobileOs, type MobileOs } from '../../platform/os';
 
+import { About } from './about/About';
 import { EraseEverything } from './erase/EraseEverything';
 import { type ErasePort } from './erase/port';
 import { KeySetup } from './keys/KeySetup';
+import { Signpost } from '../signposts/Signpost';
+
 import { PrivacyNotice } from './privacy/PrivacyNotice';
 import { TELEMETRY_ENABLED, TELEMETRY_NOTE } from './telemetry';
 import { type KeyPort } from './keys/port';
@@ -149,6 +152,9 @@ export function Settings({
 }: SettingsProps = {}) {
   const backupPort = useMemo(() => port ?? createDbBackupPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
+  // One port for every link on this screen: the key signup pages, the privacy
+  // signpost and the About entry (L-87).
+  const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
 
   const [stage, setStage] = useState<Stage>({ kind: 'idle' });
   const [message, setMessage] = useState<string | null>(null);
@@ -372,7 +378,7 @@ export function Settings({
             </div>
           ) : null}
 
-          <KeySetup port={keyPort} browser={browser} />
+          <KeySetup port={keyPort} browser={browserPort} />
 
           <BoardSettings port={boardsPort} />
 
@@ -429,7 +435,14 @@ export function Settings({
             </p>
 
             <PrivacyNotice />
+
+            {/* The third signpost: what the full CViper keeps, on its own page (L-87). */}
+            <div className="mt-3">
+              <Signpost id="privacy" browser={browserPort} />
+            </div>
           </section>
+
+          <About browser={browserPort} />
 
           <EraseEverything port={erasePort} backupPort={backupPort} onErased={onErased} />
         </div>

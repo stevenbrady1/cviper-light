@@ -12,6 +12,7 @@ import {
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { DetailPane } from '../../app/DetailPane';
 import { ViewHeader } from '../../app/ViewHeader';
+import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { viewById } from '../../app/views';
 import { createTauriTransport } from '../../ai/transport';
 import {
@@ -20,6 +21,8 @@ import {
   type FilePort,
   type PickedCv,
 } from '../../platform/files';
+
+import { Signpost } from '../signposts/Signpost';
 
 import { AnalysisResult } from './AnalysisResult';
 import { readAvailability } from './availability';
@@ -108,6 +111,8 @@ export interface AnalysisProps {
    */
   readonly incomingCv?: Result<PickedCv, FileError> | null | undefined;
   readonly onIncomingCvHandled?: (() => void) | undefined;
+  /** Injected by tests: the real one opens the user's browser (the L-87 signpost). */
+  readonly browser?: BrowserPort | undefined;
 }
 
 export function Analysis({
@@ -117,11 +122,13 @@ export function Analysis({
   now,
   incomingCv,
   onIncomingCvHandled,
+  browser,
 }: AnalysisProps = {}) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke in the advert box.
   const analysisPort = useMemo(() => port ?? createDbAnalysisPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
+  const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
 
   const [cvs, setCvs] = useState<readonly Cv[]>([]);
   /**
@@ -625,13 +632,17 @@ export function Analysis({
               </p>
             </div>
           ) : (
-            <AnalysisResult
-              analysis={result.analysis}
-              provider={result.provider}
-              model={result.model}
-              retried={result.retried}
-              aiAvailable={aiAvailable}
-            />
+            <>
+              <AnalysisResult
+                analysis={result.analysis}
+                provider={result.provider}
+                model={result.model}
+                retried={result.retried}
+                aiAvailable={aiAvailable}
+              />
+              {/* One line, after the result, the same every time (L-87). */}
+              <Signpost id="analysis" browser={browserPort} />
+            </>
           )}
         </div>
 
