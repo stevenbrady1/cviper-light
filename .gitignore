@@ -35,3 +35,6 @@ pnpm-debug.log*
 # publish. This repo is mirrored publicly, so committing it would put proprietary
 # source into a public history where deletion does not remove it.
 docs/ported-from-main/
+
+# App Store screenshots are uploaded, never committed (docs/app-store/SCREENSHOTS.md)
+docs/app-store/screenshots/

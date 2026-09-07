@@ -28,10 +28,18 @@ opaque rounded-square badge, so the transparent padding is not visible.
 pnpm --filter @cviper/light tauri icon branding/cviper-icon-1024.png
 ```
 
-It rewrites every file in `src-tauri/icons/`. It also creates `icons/android/`
-and `icons/ios/`, which are deleted afterwards: `apps/light` is a desktop target
-and has no mobile project for them to belong to. If a mobile target is ever
-added, rerun the command and keep them.
+It rewrites every file in `src-tauri/icons/`, and creates `icons/android/` and
+`icons/ios/`. `icons/ios/` is KEPT since L-80/L-84: the iOS project generated
+by `tauri ios init` takes its app icon set from it, and
+`AppIcon-512@2x.png` (1024 × 1024, fully opaque) is the App Store marketing
+icon. Generate it with the brand navy behind it, because an iOS icon may carry
+no transparency:
+
+```
+pnpm --filter @cviper/light tauri icon branding/cviper-icon-1024.png --ios-color "#0f2044"
+```
+
+`icons/android/` is still deleted until there is an Android target (L-86).
 
 `tauri.conf.json` names only five of the generated files. The rest are used by
 the Windows Store packaging targets and are generated for completeness.
