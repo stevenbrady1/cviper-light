@@ -105,9 +105,14 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     why: 'A keyless search link for Jobserve, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page, and it never scrapes Jobserve.',
   },
   {
+    host: 'cviper.ai',
+    purpose: 'opened-in-your-browser',
+    why: 'The full CViper, and the page about this app. Three one-line signposts and the About entry in Settings hand the address to your browser when you tap them; the app never loads it, and nothing is added to the link.',
+  },
+  {
     host: 'github.com',
     purpose: 'fetched-on-request',
-    why: 'The update check reads a small signed file from this app’s public GitHub releases. It happens when you press “Check for updates”, and carries no data about you beyond the request itself.',
+    why: 'The update check reads a small signed file from this app’s public GitHub releases. It happens when you press “Check for updates”, and carries no data about you beyond the request itself. The source code is also opened in your browser from Settings → About.',
   },
   {
     host: '127.0.0.1',

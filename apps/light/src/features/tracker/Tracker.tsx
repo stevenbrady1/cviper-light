@@ -7,10 +7,12 @@ import { type ChatTransport } from '@cviper/ai-providers';
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { DetailPane } from '../../app/DetailPane';
 import { ViewHeader } from '../../app/ViewHeader';
+import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { todayIsoDate } from '../../lib/dates';
 import { viewById } from '../../app/views';
 
 import { type Availability } from '../analysis/providers';
+import { Signpost } from '../signposts/Signpost';
 
 import { ApplicationDetail } from './ApplicationDetail';
 import { NewApplicationForm } from './NewApplicationForm';
@@ -94,6 +96,8 @@ export interface TrackerProps {
   readonly createPageTransport?: (() => PageFetchTransport) | undefined;
   /** Injected by tests so the machine's real credentials are never consulted. */
   readonly readAvailability?: (() => Promise<Availability>) | undefined;
+  /** Injected by tests: the real one opens the user's browser (the L-87 signpost). */
+  readonly browser?: BrowserPort | undefined;
 }
 
 /**
@@ -118,10 +122,12 @@ export function Tracker({
   createTransport,
   createPageTransport,
   readAvailability,
+  browser,
 }: TrackerProps) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke.
   const trackerPort = useMemo(() => port ?? createDbTrackerPort(), [port]);
+  const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
   const clock = useMemo(() => now ?? new Date(), [now]);
   const today = todayIsoDate(clock);
 
@@ -426,6 +432,11 @@ export function Tracker({
             />
           </DetailPane>
         )}
+      </div>
+
+      {/* One line under the board, the same every time (L-87). */}
+      <div className="border-t border-line px-4 py-1 md:px-6">
+        <Signpost id="tracker" browser={browserPort} />
       </div>
     </section>
   );

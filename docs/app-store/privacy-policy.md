@@ -6,7 +6,7 @@ _For CViper Light 0.1.0. This page is generated from the app's own list of the a
 
 CViper Light has no account to create, no server of ours behind it and no analytics in it. Your CV text, your saved jobs and your applications are stored on your own device, in a database that belongs to the app. The app contacts another service only when you press a button that says it will, and only the services listed on this page.
 
-We — the people who make CViper Light — receive nothing from it. Not your CV, not your searches, not your keys, not whether you use it at all. No address on this page belongs to us.
+We — the people who make CViper Light — receive nothing from it. Not your CV, not your searches, not your keys, not whether you use it at all. The one address on this page that is ours, cviper.ai, is only ever opened in your own browser when you tap a line that names it; the app never contacts it, and what that site sees is what your browser shows it.
 
 ## What the app keeps, and where
 
@@ -32,7 +32,7 @@ These carry a key you pasted into Settings, under an account that is yours. The 
 
 A plain request with nothing about you in it beyond the request itself.
 
-- `github.com` — The update check reads a small signed file from this app’s public GitHub releases. It happens when you press “Check for updates”, and carries no data about you beyond the request itself.
+- `github.com` — The update check reads a small signed file from this app’s public GitHub releases. It happens when you press “Check for updates”, and carries no data about you beyond the request itself. The source code is also opened in your browser from Settings → About.
 
 ### Opened in your browser, never by the app
 
@@ -47,6 +47,7 @@ The app hands the address to your own browser and is not involved from then on. 
 - `www.google.com` — A keyless search link for Google Jobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `jobs.theguardian.com` — A keyless search link for Guardian Jobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.jobserve.com` — A keyless search link for Jobserve, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page, and it never scrapes Jobserve.
+- `cviper.ai` — The full CViper, and the page about this app. Three one-line signposts and the About entry in Settings hand the address to your browser when you tap them; the app never loads it, and nothing is added to the link.
 
 ### Stays on this computer
 

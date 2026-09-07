@@ -265,6 +265,7 @@ export default function App({
             port: trackerPort,
             now,
             createTransport,
+            browser,
             // Same arrangement as the search screen: the shell owns which view
             // is showing, so "no AI provider — open Settings" comes back here.
             onOpenSettings: () => setActiveView('settings'),
@@ -276,6 +277,7 @@ export default function App({
             now,
             incomingCv,
             onIncomingCvHandled,
+            browser,
           },
           settings: {
             port: backupPort,

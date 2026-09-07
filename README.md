@@ -106,6 +106,13 @@ own machine, or your own Anthropic or OpenAI key. Without one you add jobs by
 typing them in, and everything else carries on as normal — the tracker and the
 browser job-search links never needed a key and still do not.
 
+**Point at the full CViper, three times, in one line each.** After a CV check,
+under the tracker and in Settings → Privacy there is a single sentence saying
+what the full CViper at cviper.ai adds, and Settings → About says who made
+Light. Each opens your own browser only when you tap it. There is no badge, no
+count, no timer and no nag: the same sentence every time, and a test fails the
+build if one of those lines ever reads or writes any state.
+
 ## What needs a key, and what does not
 
 | Feature                             | Key needed?                                                            |
