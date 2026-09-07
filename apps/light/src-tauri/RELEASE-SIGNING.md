@@ -78,6 +78,9 @@ build (`tauri ios build --target aarch64-sim --no-sign`) produce an `.app` that
 is uploaded as an artefact. No certificate, profile or team is involved, and none is stored in
 this repository.
 
+The listing itself — copy, privacy questionnaire, policy page, screenshots —
+is prepared in [`docs/app-store/`](../../../docs/app-store/README.md) (L-84).
+
 Everything past that is human, in this order:
 
 1. In App Store Connect, create the app record for `com.cviper.light` (the

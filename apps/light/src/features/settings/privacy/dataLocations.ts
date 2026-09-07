@@ -34,7 +34,7 @@ export const DATA_LOCATIONS: readonly DataLocation[] = [
   {
     what: 'Your API keys',
     where:
-      'this computer’s credential store (Windows Credential Manager or the macOS Keychain), one entry per key',
+      'this device’s credential store (the Keychain on an iPhone, iPad or Mac; Credential Manager on Windows; the Secret Service on Linux), one entry per key',
     erasedBy: 'keys',
   },
   {
