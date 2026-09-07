@@ -6,6 +6,7 @@ import {
   type Cv,
   type CvAnalysis,
   type Job,
+  type Result,
 } from '@cviper/core-types';
 
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
@@ -13,7 +14,12 @@ import { DetailPane } from '../../app/DetailPane';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { createTauriTransport } from '../../ai/transport';
-import { createTauriFilePort, type FilePort } from '../../platform/files';
+import {
+  createTauriFilePort,
+  type FileError,
+  type FilePort,
+  type PickedCv,
+} from '../../platform/files';
 
 import { AnalysisResult } from './AnalysisResult';
 import { readAvailability } from './availability';
@@ -93,9 +99,25 @@ export interface AnalysisProps {
   readonly createTransport?: (() => ChatTransport) | undefined;
   /** Injected by tests so stored timestamps are deterministic. */
   readonly now?: Date | undefined;
+  /**
+   * A CV the OS asked the app to open (the iPhone share sheet, L-83), or the
+   * refusal Rust gave it. Handled exactly like a pick: read, stored, selected
+   * — or its message shown where an upload problem is shown. The shell hands
+   * it down and `onIncomingCvHandled` tells the shell it has been consumed,
+   * so the same file is not ingested twice on a re-render.
+   */
+  readonly incomingCv?: Result<PickedCv, FileError> | null | undefined;
+  readonly onIncomingCvHandled?: (() => void) | undefined;
 }
 
-export function Analysis({ port, filePort, createTransport, now }: AnalysisProps = {}) {
+export function Analysis({
+  port,
+  filePort,
+  createTransport,
+  now,
+  incomingCv,
+  onIncomingCvHandled,
+}: AnalysisProps = {}) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke in the advert box.
   const analysisPort = useMemo(() => port ?? createDbAnalysisPort(), [port]);
@@ -220,6 +242,49 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
 
   const selectedCv = cvs.find((cv) => cv.id === selectedCvId) ?? null;
 
+  /**
+   * A file's bytes, wherever they came from — the dialog or the share sheet —
+   * become a CV row, or a message.
+   */
+  const ingest = useCallback(
+    async (picked: PickedCv) => {
+      const extracted = await extractText(picked.name, picked.bytes);
+      if (!extracted.ok) {
+        // VERBATIM. Every message in `@cviper/cv-parsing` says what happened,
+        // why, and what to do — "that PDF has 2 pages but no readable text at
+        // all, which means it is almost certainly a scan". Replacing that with
+        // "could not read file" throws away the only useful thing on the
+        // screen.
+        setUploadProblem(extracted.error.message);
+        setWarnings([]);
+        return;
+      }
+
+      const cv = newCvRecord({
+        id: crypto.randomUUID(),
+        name: picked.name,
+        path: picked.path,
+        text: extracted.value.text,
+        now: (now ?? new Date()).toISOString(),
+      });
+
+      const saved = await analysisPort.saveCv(cv);
+      if (!saved.ok) {
+        setError(`That CV could not be saved: ${saved.error.message} Try again.`);
+        return;
+      }
+
+      setCvs((current) => [cv, ...current]);
+      setSelectedCvId(cv.id);
+      setResult(null);
+      // Warnings ride along with a SUCCESSFUL extraction — some pages were
+      // images and their contents are missing from the text. The user has to
+      // be told, because the analysis below is about to be run on a partial CV.
+      setWarnings(extracted.value.warnings);
+    },
+    [analysisPort, now],
+  );
+
   const onUpload = useCallback(async () => {
     setError(null);
     setUploadProblem(null);
@@ -232,39 +297,31 @@ export function Analysis({ port, filePort, createTransport, now }: AnalysisProps
     // Cancelled. Nothing happened, and nothing is said about it.
     if (picked.value === null) return;
 
-    const extracted = await extractText(picked.value.name, picked.value.bytes);
-    if (!extracted.ok) {
-      // VERBATIM. Every message in `@cviper/cv-parsing` says what happened, why,
-      // and what to do — "that PDF has 2 pages but no readable text at all,
-      // which means it is almost certainly a scan". Replacing that with "could
-      // not read file" throws away the only useful thing on the screen.
-      setUploadProblem(extracted.error.message);
-      setWarnings([]);
-      return;
-    }
+    await ingest(picked.value);
+  }, [files, ingest]);
 
-    const cv = newCvRecord({
-      id: crypto.randomUUID(),
-      name: picked.value.name,
-      path: picked.value.path,
-      text: extracted.value.text,
-      now: (now ?? new Date()).toISOString(),
-    });
+  // A file the OS opened for us (L-83). Same path as a pick from here on.
+  useEffect(() => {
+    if (incomingCv === undefined || incomingCv === null) return;
 
-    const saved = await analysisPort.saveCv(cv);
-    if (!saved.ok) {
-      setError(`That CV could not be saved: ${saved.error.message} Try again.`);
-      return;
-    }
+    let cancelled = false;
+    setError(null);
+    setUploadProblem(null);
 
-    setCvs((current) => [cv, ...current]);
-    setSelectedCvId(cv.id);
-    setResult(null);
-    // Warnings ride along with a SUCCESSFUL extraction — some pages were images
-    // and their contents are missing from the text. The user has to be told,
-    // because the analysis below is about to be run on a partial CV.
-    setWarnings(extracted.value.warnings);
-  }, [analysisPort, files, now]);
+    void (async () => {
+      if (!incomingCv.ok) {
+        setUploadProblem(incomingCv.error.message);
+        setWarnings([]);
+      } else {
+        await ingest(incomingCv.value);
+      }
+      if (!cancelled) onIncomingCvHandled?.();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [incomingCv, ingest, onIncomingCvHandled]);
 
   const onRun = useCallback(async () => {
     if (selectedCv === null || selectedOption === null) return;

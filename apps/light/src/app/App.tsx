@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { type Result } from '@cviper/core-types';
+
 import { Analysis, type AnalysisProps } from '../features/analysis/Analysis';
 import { Welcome } from '../features/onboarding/Welcome';
 import { forgetWelcome, hasSeenWelcome, markWelcomeSeen } from '../features/onboarding/store';
 import { Search, type SearchProps } from '../features/search/Search';
 import { Settings, type SettingsProps } from '../features/settings/Settings';
 import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
+import {
+  createTauriOpenedCvPort,
+  type FileError,
+  type OpenedCvPort,
+  type PickedCv,
+} from '../platform/files';
 import { readEnvironmentStatus, type EnvironmentStatus } from '../status/environment';
 
 import { BottomNav } from './BottomNav';
@@ -66,6 +74,14 @@ export interface AppProps {
   readonly analysisPort?: AnalysisProps['port'];
   /** Injected by tests: the real one opens an OS dialog and calls into Rust. */
   readonly filePort?: AnalysisProps['filePort'];
+  /**
+   * Injected by tests: the real one listens for the file the OS asked this
+   * app to open (the iPhone share sheet, L-83). A file arriving switches to
+   * Analysis and is handed to it, whatever was on screen — including the
+   * first-run introduction, which a person who has just tapped "Open in
+   * CViper Light" has answered by doing so.
+   */
+  readonly openedCv?: OpenedCvPort;
   /** Injected by tests so a fake provider can answer without a socket. */
   readonly createTransport?: AnalysisProps['createTransport'];
   /** Injected by tests, for the same reason as `trackerPort`. */
@@ -98,6 +114,7 @@ export default function App({
   trackerPort,
   analysisPort,
   filePort,
+  openedCv,
   createTransport,
   backupPort,
   keyPort,
@@ -112,7 +129,22 @@ export default function App({
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
   const [status, setStatus] = useState<EnvironmentStatus | null>(null);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !hasSeenWelcome());
+  const [incomingCv, setIncomingCv] = useState<Result<PickedCv, FileError> | null>(null);
   const viewport = useViewportClass();
+
+  useEffect(() => {
+    const port = openedCv ?? createTauriOpenedCvPort();
+    return port.watch((opened) => {
+      setIncomingCv(opened);
+      setActiveView('analysis');
+      // Opening a file IS the first thing this person wants to do; the
+      // introduction would only stand between them and it.
+      markWelcomeSeen();
+      setWelcomeOpen(false);
+    });
+  }, [openedCv]);
+
+  const onIncomingCvHandled = useCallback(() => setIncomingCv(null), []);
 
   /**
    * Re-read the rail's status on mount and on every view change.
@@ -237,7 +269,14 @@ export default function App({
             // is showing, so "no AI provider — open Settings" comes back here.
             onOpenSettings: () => setActiveView('settings'),
           },
-          analysis: { port: analysisPort, filePort, createTransport, now },
+          analysis: {
+            port: analysisPort,
+            filePort,
+            createTransport,
+            now,
+            incomingCv,
+            onIncomingCvHandled,
+          },
           settings: {
             port: backupPort,
             filePort,

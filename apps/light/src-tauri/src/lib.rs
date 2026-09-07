@@ -86,6 +86,18 @@ pub fn run() {
             // leave the site, and nothing that identifies the user goes with it.
             fetch_page::fetch_job_page,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // A file the OS asked us to open — the iPhone share sheet's "Open
+            // in CViper Light" (L-83, `Info.ios.plist`). Read in Rust under
+            // the picker's guards and handed to the frontend as an event; the
+            // URL never passes through JavaScript. See `files::on_opened`.
+            #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                files::on_opened(app, urls);
+            }
+            #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "android")))]
+            let _ = (app, event);
+        });
 }
