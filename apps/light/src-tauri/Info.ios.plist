@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merged into the generated iOS Info.plist by `tauri ios init` / `tauri ios
+  build` (tauri-cli `mobile/ios/build.rs`: `src-tauri/Info.plist` and
+  `src-tauri/Info.ios.plist` are read and merged over the template's). This
+  file is the source; `src-tauri/gen/apple/` is generated and never edited.
+
+  The document types are what put "CViper Light" in the share sheet's "Open
+  in" list for a PDF, a Word file or a JSON Resume in Files, Mail or Safari
+  (L-83). iOS copies the file into this app's Documents/Inbox and hands the
+  copy's URL to the app; `files::on_opened` reads it with the same guards as
+  the picker and then deletes the copy. `LSHandlerRank` is Alternate: this app
+  can open these files, it is not claiming to be THE app for them.
+
+  `LSSupportsOpeningDocumentsInPlace` is false on purpose: in-place access
+  would mean holding a security-scoped reference to the user's original file,
+  and this app reads a CV once and keeps only its text.
+-->
+<plist version="1.0">
+<dict>
+  <key>LSSupportsOpeningDocumentsInPlace</key>
+  <false/>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>PDF CV</string>
+      <key>LSHandlerRank</key>
+      <string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>com.adobe.pdf</string>
+      </array>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Word CV</string>
+      <key>LSHandlerRank</key>
+      <string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>org.openxmlformats.wordprocessingml.document</string>
+        <string>com.microsoft.word.doc</string>
+      </array>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>JSON Resume</string>
+      <key>LSHandlerRank</key>
+      <string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>public.json</string>
+      </array>
+    </dict>
+  </array>
+</dict>
+</plist>

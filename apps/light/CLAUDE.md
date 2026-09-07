@@ -15,7 +15,8 @@ there are not negotiable from inside this app.
 - **Never run `pnpm tauri dev` in an agent session** — it opens a GUI window and
   blocks. Ask the operator to verify interactively.
 - **Never edit `src-tauri/gen/` or `src-tauri/target/`.** Both are generated and
-  both are gitignored.
+  both are gitignored. iOS `Info.plist` additions go in `src-tauri/Info.ios.plist`,
+  which the Tauri CLI merges into the generated project on every build.
 
 ## Capabilities, not allowlists
 

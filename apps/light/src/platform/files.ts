@@ -42,6 +42,7 @@
  * same way: `Ok(None)`, which arrives here as `null`.
  */
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 import { err, ok, type Result } from '@cviper/core-types';
 
@@ -74,6 +75,25 @@ export interface FilePort {
   /** Ask where to save, then write. Resolves with the path, or `null`. */
   saveBackup(contents: string, suggestedName: string): Promise<Result<string | null, FileError>>;
 }
+
+/**
+ * A CV the operating system asked this app to open — the iPhone share
+ * sheet's "Open in CViper Light" from Files, Mail or Safari (L-83).
+ *
+ * The other direction from `FilePort`: nothing is asked for, the file simply
+ * arrives. Rust receives the URL from the OS, reads it under the picker's
+ * guards, and emits either the `CvFile` or a sentence; this port turns those
+ * two events into one `Result`, the same shape `pickCv` answers with. The
+ * path still never passes through JavaScript on its way IN.
+ */
+export interface OpenedCvPort {
+  /** Start listening. The returned function stops. */
+  watch(listener: (opened: Result<PickedCv, FileError>) => void): () => void;
+}
+
+/** The two events `files::on_opened` in Rust emits. Same strings, both sides. */
+export const CV_OPENED_EVENT = 'cv-opened';
+export const CV_OPEN_FAILED_EVENT = 'cv-open-failed';
 
 /**
  * Decode standard base64 into bytes. `null` when the input is not base64.
@@ -141,6 +161,31 @@ function cancelled(reply: unknown): boolean {
   return reply === null || reply === undefined;
 }
 
+/**
+ * A `CvFile` from Rust — the picker's reply or the opened-file event — as a
+ * `PickedCv`.
+ *
+ * A reply we cannot read becomes an error, NEVER an empty document. Empty
+ * text would be analysed and reported as "no skills found", which looks like
+ * an answer — the exact failure `ExtractedDocument.warnings` exists to prevent.
+ */
+export function parseCvFile(reply: unknown): Result<PickedCv, FileError> {
+  const name = readString(reply, 'name');
+  const path = readString(reply, 'path');
+  const encoded = readString(reply, 'bytes_base64');
+  const bytes = encoded === null ? null : decodeBase64(encoded);
+
+  if (name === null || path === null || bytes === null) {
+    return err({
+      message:
+        'CViper read that file but could not make sense of what came back. ' +
+        'Try a different copy of the CV.',
+    });
+  }
+
+  return ok({ name, path, bytes });
+}
+
 export function createTauriFilePort(): FilePort {
   return {
     async pickCv() {
@@ -157,24 +202,7 @@ export function createTauriFilePort(): FilePort {
       // Cancelled. Nothing is read, and nothing is said. See the header.
       if (cancelled(reply)) return ok(null);
 
-      const name = readString(reply, 'name');
-      const path = readString(reply, 'path');
-      const encoded = readString(reply, 'bytes_base64');
-      const bytes = encoded === null ? null : decodeBase64(encoded);
-
-      // A reply we cannot read becomes an error, NEVER an empty document.
-      // Empty text would be analysed and reported as "no skills found", which
-      // looks like an answer — the exact failure `ExtractedDocument.warnings`
-      // exists to prevent.
-      if (name === null || path === null || bytes === null) {
-        return err({
-          message:
-            'CViper read that file but could not make sense of what came back. ' +
-            'Try a different copy of the CV.',
-        });
-      }
-
-      return ok({ name, path, bytes });
+      return parseCvFile(reply);
     },
 
     async pickBackup() {
@@ -230,6 +258,55 @@ export function createTauriFilePort(): FilePort {
       }
 
       return ok(reply);
+    },
+  };
+}
+
+/**
+ * The real `OpenedCvPort`: two Tauri event listeners, one `Result` out.
+ *
+ * `listen` resolves asynchronously with its unlisten function. A watcher
+ * that stops before that promise settles must still end up stopped, so
+ * the resolved unlisten is called immediately if `stop` has already run. A
+ * listener that fails to register (no Tauri runtime — a browser tab, a test)
+ * leaves the port silent: there is nothing to open there anyway, and the rest
+ * of the app is unaffected.
+ */
+export function createTauriOpenedCvPort(): OpenedCvPort {
+  return {
+    watch(listener) {
+      let active = true;
+      const stoppers: (() => void)[] = [];
+
+      const keep = (registration: Promise<() => void>): void => {
+        registration
+          .then((unlisten) => {
+            if (active) stoppers.push(unlisten);
+            else unlisten();
+          })
+          .catch(() => undefined);
+      };
+
+      keep(
+        listen<unknown>(CV_OPENED_EVENT, (event) => {
+          if (active) listener(parseCvFile(event.payload));
+        }),
+      );
+      keep(
+        listen<unknown>(CV_OPEN_FAILED_EVENT, (event) => {
+          if (!active) return;
+          listener(
+            err({
+              message: rejectionMessage(event.payload, 'That file could not be opened. Try again.'),
+            }),
+          );
+        }),
+      );
+
+      return () => {
+        active = false;
+        for (const stop of stoppers.splice(0)) stop();
+      };
     },
   };
 }

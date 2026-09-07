@@ -128,7 +128,7 @@ const MAX_SUGGESTED_NAME_CHARS: usize = 128;
 /// it was chosen over Tauri's raw-response channel — its behaviour across the
 /// boundary is completely determined by this file plus `atob`, so both halves
 /// can be tested without a running WebView.
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct CvFile {
     /// The file's own name, e.g. `Steven Brady CV.pdf`. What the CV is labelled
     /// with on screen.
@@ -439,6 +439,99 @@ fn write_backup_at(path: &Path, contents: &str) -> Result<(), String> {
 // one file that came back out of it.
 
 /// Ask for a CV and read it. `Ok(None)` means the user cancelled.
+// ── A file the operating system asked us to open ────────────────────────────
+//
+// On an iPhone, "Open in CViper Light" from Files, Mail or Safari copies the
+// file into this app's Documents/Inbox and hands the copy's URL to the app
+// (`Info.ios.plist` declares the document types). Tauri delivers that as
+// `RunEvent::Opened { urls }` — the same event a URL scheme would use — and
+// `lib.rs` routes it here.
+//
+// This is the ONE way a path reaches this module without a dialog, and it is
+// still not JavaScript naming it: the URL comes from the OS, on the Rust side,
+// and is read with exactly the guards the picker uses (`read_cv_at`:
+// extension, size, is-a-file). What the frontend receives is the same `CvFile`
+// the picker returns, as an event. Nothing is exposed as a command, so
+// `no_command_accepts_a_filesystem_path` still holds.
+
+/// Emitted with a `CvFile` when a file the OS opened has been read.
+///
+/// (The `dead_code` allowances: the only caller is the `RunEvent::Opened` arm
+/// in `lib.rs`, which exists on macOS, iOS and Android. On Windows and Linux
+/// these are compiled, tested, and never called — which is what we want, not
+/// a warning.)
+#[cfg_attr(
+    not(any(target_os = "macos", target_os = "ios", target_os = "android")),
+    allow(dead_code)
+)]
+pub(crate) const CV_OPENED_EVENT: &str = "cv-opened";
+/// Emitted with a sentence when a file the OS opened could not be read.
+#[cfg_attr(
+    not(any(target_os = "macos", target_os = "ios", target_os = "android")),
+    allow(dead_code)
+)]
+pub(crate) const CV_OPEN_FAILED_EVENT: &str = "cv-open-failed";
+
+/// Route every URL the OS asked us to open. Non-file URLs are not ours and
+/// are ignored; a file is read and reported, one event per file.
+#[cfg_attr(
+    not(any(target_os = "macos", target_os = "ios", target_os = "android")),
+    allow(dead_code)
+)]
+pub(crate) fn on_opened<R: tauri::Runtime>(app: &tauri::AppHandle<R>, urls: &[tauri::Url]) {
+    use tauri::Emitter;
+
+    for url in urls {
+        let Some(outcome) = opened_cv(url) else {
+            continue;
+        };
+        match outcome {
+            Ok(file) => {
+                let _ = app.emit(CV_OPENED_EVENT, file);
+            }
+            Err(message) => {
+                let _ = app.emit(CV_OPEN_FAILED_EVENT, message);
+            }
+        }
+    }
+}
+
+/// `None` for a URL that is not a file at all. Otherwise the file, read under
+/// the picker's guards — and the iOS Inbox copy deleted either way, so a
+/// refused file is not left behind any more than an accepted one.
+fn opened_cv(url: &tauri::Url) -> Option<Result<CvFile, String>> {
+    if url.scheme() != "file" {
+        return None;
+    }
+    let Ok(path) = url.to_file_path() else {
+        return Some(Err(
+            "That file could not be opened: its location could not be understood.".to_string(),
+        ));
+    };
+
+    let outcome = read_cv_at(&path);
+    discard_inbox_copy(&path);
+    Some(outcome)
+}
+
+/// Is this the copy iOS made for us? Only such a copy is ever deleted: it is
+/// ours, it is a duplicate, and leaving it would fill the app's sandbox with
+/// every CV ever opened. A file anywhere else is the user's and is not touched.
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+fn is_inbox_copy(path: &Path) -> bool {
+    path.components().any(|part| part.as_os_str() == "Inbox")
+}
+
+fn discard_inbox_copy(path: &Path) {
+    // iOS only. On a desktop a folder called "Inbox" is somebody's mail.
+    #[cfg(target_os = "ios")]
+    if is_inbox_copy(path) {
+        let _ = fs::remove_file(path);
+    }
+    #[cfg(not(target_os = "ios"))]
+    let _ = path;
+}
+
 #[tauri::command]
 pub(crate) async fn pick_and_read_cv(app: AppHandle) -> Result<Option<CvFile>, String> {
     let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
@@ -639,6 +732,87 @@ mod tests {
         for format in ["PDF", ".docx", "JSON Resume"] {
             assert!(error.contains(format), "{format} missing from: {error}");
         }
+    }
+
+    // ── Files the OS asked us to open (L-83) ────────────────────────────────
+
+    #[test]
+    fn a_url_that_is_not_a_file_is_not_ours() {
+        // A custom scheme or a web link is someone else's business; it must
+        // not become a read attempt, a refusal, or an event.
+        for text in ["https://cviper.ai/light", "cviper://open", "mailto:jane@example.com"] {
+            let url = tauri::Url::parse(text).unwrap();
+            assert!(opened_cv(&url).is_none(), "{text}");
+        }
+    }
+
+    #[test]
+    fn an_opened_cv_is_read_under_the_picker_guards() {
+        let path = temp_path("opened.pdf");
+        fs::write(&path, b"%PDF-1.4 opened from the share sheet").unwrap();
+        let url = tauri::Url::from_file_path(&path).unwrap();
+
+        let file = opened_cv(&url).expect("a file URL").expect("readable");
+
+        assert_eq!(
+            file.name,
+            "cviper-files-test-".to_string() + &std::process::id().to_string() + "-opened.pdf"
+        );
+        assert_eq!(file.path, path.display().to_string());
+        assert_eq!(
+            file.bytes_base64,
+            base64(b"%PDF-1.4 opened from the share sheet")
+        );
+        fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn an_opened_file_of_the_wrong_kind_is_refused_like_any_other() {
+        // The share sheet can only offer the declared types, but the guard does
+        // not rely on that: a renamed credential file is refused here exactly as
+        // it would be in the dialog.
+        let path = temp_path("opened.txt");
+        fs::write(&path, b"secret").unwrap();
+        let url = tauri::Url::from_file_path(&path).unwrap();
+
+        let error = opened_cv(&url).expect("a file URL").unwrap_err();
+
+        assert!(error.contains("CViper cannot read"), "{error}");
+        fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn an_opened_file_that_is_missing_is_reported_as_missing() {
+        let url = tauri::Url::from_file_path(temp_path("gone.pdf")).unwrap();
+        let error = opened_cv(&url).expect("a file URL").unwrap_err();
+        assert!(error.contains("no longer there"), "{error}");
+    }
+
+    #[test]
+    fn only_the_ios_inbox_copy_counts_as_ours() {
+        assert!(is_inbox_copy(Path::new(
+            "/var/mobile/Containers/Data/Application/ABC/Documents/Inbox/CV.pdf"
+        )));
+        assert!(!is_inbox_copy(Path::new("/Users/jane/Documents/CV.pdf")));
+        // "Inbox" must be a whole path component: a folder merely containing
+        // the word is not the iOS drop box.
+        assert!(!is_inbox_copy(Path::new(
+            "/Users/jane/Inbox-archive/CV.pdf"
+        )));
+    }
+
+    #[test]
+    fn a_desktop_file_is_never_deleted_after_being_opened() {
+        // The deletion is compiled out everywhere but iOS. On the platform this
+        // test runs on, a file that passed through `opened_cv` must still exist.
+        let path = temp_path("keep.pdf");
+        fs::write(&path, b"%PDF-1.4 keep me").unwrap();
+        let url = tauri::Url::from_file_path(&path).unwrap();
+
+        opened_cv(&url).expect("a file URL").expect("readable");
+
+        assert!(path.exists());
+        fs::remove_file(&path).ok();
     }
 
     #[test]
