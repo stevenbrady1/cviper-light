@@ -43,15 +43,23 @@ pub const DB_URL: &str = "sqlite:cviper.db";
 /// preference; it is the only behaviour the plugin has.
 /// ==========================================================================
 pub fn migrations() -> Vec<Migration> {
-    vec![Migration {
-        version: 1,
-        description: "initial schema: jobs, applications, cvs, analyses",
-        // A real `.sql` file rather than an inline string: reviewable in a diff,
-        // greppable, and readable by the TypeScript test that checks every
-        // column is mapped in `src/db/rows.ts`.
-        sql: include_str!("../migrations/0001_init.sql"),
-        kind: MigrationKind::Up,
-    }]
+    vec![
+        Migration {
+            version: 1,
+            description: "initial schema: jobs, applications, cvs, analyses",
+            // A real `.sql` file rather than an inline string: reviewable in a
+            // diff, greppable, and readable by the TypeScript test that checks
+            // every column is mapped in `src/db/rows.ts`.
+            sql: include_str!("../migrations/0001_init.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "cvs.json_resume: the original JSON Resume document, for export (L-20b)",
+            sql: include_str!("../migrations/0002_cv_json_resume.sql"),
+            kind: MigrationKind::Up,
+        },
+    ]
 }
 
 #[cfg(test)]
@@ -100,6 +108,23 @@ mod tests {
         sorted.sort_unstable();
         sorted.dedup();
         assert_eq!(versions, sorted, "migration versions must be unique and ascending");
+    }
+
+    #[test]
+    fn the_second_migration_only_adds_json_resume_to_cvs() {
+        // L-20b. Additive and forward-only: one column on one table, nothing
+        // created, dropped or rewritten. `rows.test.ts` reads the same file to
+        // check the column is mapped.
+        let migration = &migrations()[1];
+        assert_eq!(migration.version, 2);
+        let sql = executable_sql(migration.sql);
+        assert!(
+            sql.contains("ALTER TABLE cvs ADD COLUMN json_resume TEXT"),
+            "0002 must add cvs.json_resume"
+        );
+        for forbidden in ["CREATE TABLE", "DROP", "RENAME", "UPDATE", "DELETE"] {
+            assert!(!sql.contains(forbidden), "0002 must be additive; found `{forbidden}`");
+        }
     }
 
     #[test]

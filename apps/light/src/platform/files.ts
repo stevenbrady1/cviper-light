@@ -74,6 +74,11 @@ export interface FilePort {
   pickBackup(): Promise<Result<PickedBackup | null, FileError>>;
   /** Ask where to save, then write. Resolves with the path, or `null`. */
   saveBackup(contents: string, suggestedName: string): Promise<Result<string | null, FileError>>;
+  /**
+   * Ask where to save a CV as a JSON Resume, then write it (L-20b). Same
+   * contract as `saveBackup`: the path, or `null` for a cancel.
+   */
+  saveCvJson(contents: string, suggestedName: string): Promise<Result<string | null, FileError>>;
 }
 
 /**
@@ -254,6 +259,29 @@ export function createTauriFilePort(): FilePort {
       if (typeof reply !== 'string') {
         return err({
           message: 'CViper saved that backup but could not report where it went.',
+        });
+      }
+
+      return ok(reply);
+    },
+
+    async saveCvJson(contents, suggestedName) {
+      let reply: unknown;
+      try {
+        // Its own literal call rather than a shared helper: the Rust test that
+        // pins command names to this file matches each call as written.
+        reply = await invoke('pick_and_write_cv_json', { contents, suggestion: suggestedName });
+      } catch (thrown) {
+        return err({
+          message: rejectionMessage(thrown, 'The CV could not be saved. Try again.'),
+        });
+      }
+
+      if (cancelled(reply)) return ok(null);
+
+      if (typeof reply !== 'string') {
+        return err({
+          message: 'CViper saved that CV but could not report where it went.',
         });
       }
 

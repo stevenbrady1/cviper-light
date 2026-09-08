@@ -255,6 +255,7 @@ function emitCv(cv: Cv): Record<string, unknown> {
       file_path: cv.file_path,
       extracted_text: cv.extracted_text,
       created_at: cv.created_at,
+      json_resume: cv.json_resume,
     },
     cv.__extra,
   );

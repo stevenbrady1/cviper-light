@@ -5,13 +5,17 @@
  * afterwards, lives here so it can be tested without rendering anything.
  */
 import { MIN_SCORABLE_CHARS } from '@cviper/keyword-scoring';
+import { parseJsonResume, serializeJsonResume, stampCviperMeta } from '@cviper/resume-schema';
 
 import {
+  err,
+  ok,
   type Analysis,
-  type CvAnalysis,
   type Cv,
+  type CvAnalysis,
   type IsoTimestamp,
   type Job,
+  type Result,
 } from '@cviper/core-types';
 
 import { type ProviderOption } from './providers';
@@ -116,6 +120,11 @@ export function newCvRecord(input: {
   readonly path: string | null;
   readonly text: string;
   readonly now: IsoTimestamp;
+  /**
+   * The JSON Resume file's own text when that is what arrived, so it can be
+   * written back out (L-20b). Omitted or `null` for a PDF, a .docx or a paste.
+   */
+  readonly jsonResume?: string | null;
 }): Cv {
   return {
     id: input.id,
@@ -123,7 +132,90 @@ export function newCvRecord(input: {
     file_path: input.path,
     extracted_text: input.text,
     created_at: input.now,
+    json_resume: input.jsonResume ?? null,
   };
+}
+
+// --- JSON Resume export (L-20b) ---------------------------------------------
+
+/** Is this file name a JSON Resume, by extension? Case-insensitive. */
+export function isJsonResumeFileName(name: string): boolean {
+  return /\.json$/i.test(name.trim());
+}
+
+/**
+ * The text of a JSON Resume file, kept verbatim for export — or `null` for
+ * any other kind of CV.
+ *
+ * Only called once `extractText` has accepted the bytes, so a `.json` here is
+ * a résumé the parser already read. The byte-order mark, if any, is dropped
+ * (the default for `TextDecoder`), and bytes that are not UTF-8 give `null`
+ * rather than a string full of replacement characters — the parser would
+ * have refused those first, so this branch is belt and braces.
+ */
+export function originalJsonResume(name: string, bytes: Uint8Array): string | null {
+  if (!isJsonResumeFileName(name)) return null;
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+/** What the save dialog is pre-filled with when the CV's name yields nothing. */
+export const FALLBACK_JSON_RESUME_NAME = 'cv.json';
+
+/**
+ * `Steve Brady CV.json` for `Steve Brady CV.json`, `Steve Brady CV.json` for
+ * `Steve Brady CV.pdf`, and `cv.json` when there is no name left once the
+ * extension goes. Only a SUGGESTION: Rust re-checks it for separators and
+ * control characters and falls back to `cv.json` itself (`bare_json_name`).
+ */
+export function jsonResumeFileName(cvName: string): string {
+  const stem = cvName
+    .trim()
+    .replace(/\.[A-Za-z0-9]+$/, '')
+    .trim();
+  return stem === '' ? FALLBACK_JSON_RESUME_NAME : `${stem}.json`;
+}
+
+export interface JsonResumeExportError {
+  /** Legible enough to show a user without further translation. */
+  readonly message: string;
+}
+
+/**
+ * The file to write for "Save as JSON Resume": the stored original, parsed,
+ * stamped with `meta.cviper` and serialised. Byte-identical to what came in
+ * except for that one block (`stampCviperMeta`).
+ */
+export function exportJsonResume(input: {
+  readonly cv: Cv;
+  readonly app: string;
+  readonly exportedAt: IsoTimestamp;
+}): Result<string, JsonResumeExportError> {
+  const { cv } = input;
+  if (cv.json_resume === null) {
+    return err({
+      message: `${cv.name} did not arrive as a JSON Resume, so there is nothing to save in that format.`,
+    });
+  }
+
+  const parsed = parseJsonResume(cv.json_resume);
+  if (!parsed.ok) {
+    // The stored text was accepted on the way in, so this means the row has
+    // been altered since. Said plainly, never swallowed.
+    return err({
+      message: `The stored JSON Resume for ${cv.name} could not be read: ${parsed.error.message}`,
+    });
+  }
+
+  const stamped = stampCviperMeta(parsed.value, {
+    app: input.app,
+    exportedAt: input.exportedAt,
+    sourceCvId: cv.id,
+  });
+  return ok(serializeJsonResume(stamped));
 }
 
 /**

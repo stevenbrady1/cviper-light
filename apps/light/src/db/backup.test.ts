@@ -76,6 +76,7 @@ const CV: Cv = {
   name: 'Main CV',
   file_path: null,
   extracted_text: null,
+  json_resume: null,
   created_at: '2026-08-19T09:01:00.000Z',
 };
 

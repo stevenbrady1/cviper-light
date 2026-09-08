@@ -86,7 +86,15 @@ export const APPLICATION_COLUMNS = [
   'updated_at',
 ] as const;
 
-export const CV_COLUMNS = ['id', 'name', 'file_path', 'extracted_text', 'created_at'] as const;
+// `json_resume` is last because 0002_cv_json_resume.sql appended it (L-20b).
+export const CV_COLUMNS = [
+  'id',
+  'name',
+  'file_path',
+  'extracted_text',
+  'created_at',
+  'json_resume',
+] as const;
 
 export const ANALYSIS_COLUMNS = [
   'id',
@@ -297,6 +305,7 @@ export function cvToValues(cv: Cv): SqlValue[] {
     file_path: cv.file_path,
     extracted_text: cv.extracted_text,
     created_at: cv.created_at,
+    json_resume: cv.json_resume,
   };
   return CV_COLUMNS.map((column) => row[column]);
 }

@@ -38,6 +38,7 @@ be verified by an installed copy. See
 | A link pasted in the advert box | Yes — spotted, never sent to a model             | No — not built there               | Built                     |
 | CV parsing                      | Yes — fully local                                | Yes — server-side                  | Extraction built          |
 | JSON Resume import              | Yes — any JSON Resume 1.0 file, read here        | Yes — server-side                  | Built                     |
+| JSON Resume export              | Yes — the file it came in as, `meta.cviper` only | Planned — cviper.ai/import         | Built                     |
 | CV analysis (BYO key)           | Yes — user's own provider key                    | Not applicable                     | Built                     |
 | CV analysis (local Ollama)      | Yes — offline, no key, no network                | No                                 | Built                     |
 | Keyword-only analysis           | Yes — no AI, no key, always available            | Yes                                | Built                     |

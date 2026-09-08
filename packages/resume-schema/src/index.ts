@@ -51,3 +51,5 @@ export { parseJsonResume, parseJsonResumeBytes, describePath } from './parse';
 export { flattenJsonResume } from './flatten';
 
 export { serializeJsonResume } from './serialize';
+
+export { stampCviperMeta } from './stamp';

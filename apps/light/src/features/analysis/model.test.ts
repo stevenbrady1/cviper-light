@@ -39,6 +39,7 @@ const CV: Cv = {
   name: 'Steven Brady CV.pdf',
   file_path: 'C:\\Users\\steve\\Documents\\CV.pdf',
   extracted_text: 'Credit risk analyst with eight years in London banking. SQL, Python, Basel III.',
+  json_resume: null,
   created_at: NOW,
 };
 
@@ -149,6 +150,7 @@ describe('newCvRecord', () => {
       name: 'CV.docx',
       file_path: 'C:\\CV.docx',
       extracted_text: 'Some text',
+      json_resume: null,
       created_at: NOW,
     });
   });

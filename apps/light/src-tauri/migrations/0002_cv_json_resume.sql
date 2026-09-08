@@ -1,0 +1,13 @@
+-- 0002: keep the original JSON Resume document alongside a CV's text (L-20b).
+--
+-- A CV that arrived as a JSON Resume file used to be stored as flattened text
+-- only, which is enough to analyse it and not enough to write it back out.
+-- `json_resume` holds the file's own text, unchanged, so "Save as JSON Resume"
+-- can return exactly what came in. NULL for a CV that came from a PDF, a .docx
+-- or pasted text — there is nothing to export for those, and the button says so.
+--
+-- SQLite has no `ADD COLUMN IF NOT EXISTS`. This statement is applied exactly
+-- once because tauri-plugin-sql records each migration version in its own
+-- ledger table and never replays one; `db.rs` pins that this file is version 2
+-- and touches only `cvs`. Forward-only: nothing here is ever downgraded.
+ALTER TABLE cvs ADD COLUMN json_resume TEXT;
