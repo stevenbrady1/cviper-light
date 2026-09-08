@@ -26,6 +26,7 @@ const CV = {
   name: 'CV.pdf',
   file_path: 'C:\\CV.pdf',
   extracted_text: 'text',
+  json_resume: null,
   created_at: NOW,
 };
 

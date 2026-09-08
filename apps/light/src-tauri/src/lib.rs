@@ -74,6 +74,7 @@ pub fn run() {
             files::pick_and_read_cv,
             files::pick_and_read_backup,
             files::pick_and_write_backup,
+            files::pick_and_write_cv_json,
             // Fetching the ONE page whose address the user pasted, so the same
             // extraction that reads a paste can read an advert from a link.
             //

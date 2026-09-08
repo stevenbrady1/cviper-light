@@ -57,6 +57,7 @@ const CV: Cv = {
   name: 'Steven Brady CV.pdf',
   file_path: 'C:\\Users\\steve\\Documents\\CV.pdf',
   extracted_text: 'Credit risk analyst with eight years in London banking.',
+  json_resume: null,
   created_at: '2026-08-01T09:00:00.000Z',
 };
 

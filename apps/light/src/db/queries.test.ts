@@ -90,6 +90,7 @@ const CV: Cv = {
   name: 'Credit risk CV',
   file_path: null,
   extracted_text: 'SENIOR CREDIT RISK ANALYST',
+  json_resume: null,
   created_at: '2026-08-19T09:15:00.000Z',
 };
 

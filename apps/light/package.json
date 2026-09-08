@@ -15,6 +15,7 @@
     "@cviper/ai-providers": "workspace:*",
     "@cviper/core-types": "workspace:*",
     "@cviper/cv-parsing": "workspace:*",
+    "@cviper/resume-schema": "workspace:*",
     "@cviper/job-apis": "workspace:*",
     "@cviper/keyword-scoring": "workspace:*",
     "@cviper/ui": "workspace:*",

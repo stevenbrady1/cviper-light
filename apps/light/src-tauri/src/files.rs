@@ -108,6 +108,10 @@ const BACKUP_EXTENSIONS: [&str; 1] = ["json"];
 /// not a plain file name. See `bare_file_name`.
 const FALLBACK_BACKUP_NAME: &str = "cviper-backup.json";
 
+/// The save dialog's pre-fill for a CV export whose suggested name is not a
+/// plain file name (L-20b). See `bare_json_name`.
+const FALLBACK_CV_JSON_NAME: &str = "cv.json";
+
 /// The longest suggested file name we will hand to the dialog.
 ///
 /// Windows caps one path component at 255 characters; 128 is comfortably inside
@@ -340,6 +344,13 @@ fn local_path(chosen: FilePath) -> Result<PathBuf, String> {
 /// to look at and confirm, and whatever they confirm still goes through
 /// `write_backup_at`.
 fn bare_file_name(suggested: &str) -> String {
+    bare_json_name(suggested, FALLBACK_BACKUP_NAME)
+}
+
+/// The same rule with the caller's fallback: a backup falls back to
+/// `cviper-backup.json`, a CV export to `cv.json`. A CV's name is the user's
+/// own file name, so `Steve Brady CV.json` is welcome and `..\CV.json` is not.
+fn bare_json_name(suggested: &str, fallback: &str) -> String {
     let is_a_plain_name = !suggested.is_empty()
         && suggested.chars().count() <= MAX_SUGGESTED_NAME_CHARS
         && !suggested.contains(['/', '\\', ':'])
@@ -350,7 +361,7 @@ fn bare_file_name(suggested: &str) -> String {
     if is_a_plain_name {
         suggested.to_string()
     } else {
-        FALLBACK_BACKUP_NAME.to_string()
+        fallback.to_string()
     }
 }
 
@@ -421,6 +432,40 @@ fn write_backup_at(path: &Path, contents: &str) -> Result<(), String> {
         return Err("That backup is too large to write.".to_string());
     }
 
+    write_text_at(
+        path,
+        contents,
+        "The backup could not be written. Try saving it somewhere else.",
+    )
+}
+
+/// Write a CV back out as the JSON Resume file it arrived as (L-20b).
+///
+/// `contents` comes from `exportJsonResume` in `features/analysis/model.ts`,
+/// which parsed, stamped and serialised it. Nothing here inspects it. The
+/// guards are the backup writer's: `.json` only, the same size ceiling.
+fn write_cv_json_at(path: &Path, contents: &str) -> Result<(), String> {
+    let Some(extension) = extension_of(path) else {
+        return Err("Give the file a name ending in .json.".to_string());
+    };
+    if !BACKUP_EXTENSIONS.contains(&extension.as_str()) {
+        return Err("A JSON Resume must be saved as a .json file.".to_string());
+    }
+    if contents.len() as u64 > MAX_BACKUP_BYTES {
+        return Err("That CV is too large to write.".to_string());
+    }
+
+    write_text_at(
+        path,
+        contents,
+        "The CV could not be written. Try saving it somewhere else.",
+    )
+}
+
+/// The one `fs::write`, with the three messages a save can end in. `otherwise`
+/// names what was being written, because "the file" is what the user already
+/// knows and "the backup" or "the CV" is what they clicked.
+fn write_text_at(path: &Path, contents: &str, otherwise: &str) -> Result<(), String> {
     fs::write(path, contents).map_err(|error| match error.kind() {
         ErrorKind::NotFound => {
             "That folder no longer exists. Pick somewhere else to save the file.".to_string()
@@ -429,7 +474,7 @@ fn write_backup_at(path: &Path, contents: &str) -> Result<(), String> {
             "Windows would not let CViper write there. Pick a folder you own, such as Documents."
                 .to_string()
         }
-        _ => "The backup could not be written. Try saving it somewhere else.".to_string(),
+        _ => otherwise.to_string(),
     })
 }
 
@@ -611,6 +656,41 @@ pub(crate) async fn pick_and_write_backup(
 
     let path = local_path(chosen)?;
     write_backup_at(&path, &contents)?;
+
+    Ok(Some(path.display().to_string()))
+}
+
+/// Ask where to save a CV as a JSON Resume, then write it (L-20b). Same shape
+/// as `pick_and_write_backup`: `Ok(None)` is a cancel, `Ok(Some(path))` is
+/// where it went, and the path never passes through JavaScript on the way in.
+#[tauri::command]
+pub(crate) async fn pick_and_write_cv_json(
+    app: AppHandle,
+    contents: String,
+    // One word, for the reason given on `pick_and_write_backup`.
+    suggestion: String,
+) -> Result<Option<String>, String> {
+    if contents.len() as u64 > MAX_BACKUP_BYTES {
+        return Err("That CV is too large to write.".to_string());
+    }
+
+    let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
+
+    app.dialog()
+        .file()
+        .set_title("Save your CV as a JSON Resume")
+        .set_file_name(bare_json_name(&suggestion, FALLBACK_CV_JSON_NAME))
+        .add_filter("JSON Resume", &BACKUP_EXTENSIONS)
+        .save_file(move |chosen| {
+            let _ = answer.try_send(chosen);
+        });
+
+    let Some(chosen) = wait_for_choice(answers).await? else {
+        return Ok(None);
+    };
+
+    let path = local_path(chosen)?;
+    write_cv_json_at(&path, &contents)?;
 
     Ok(Some(path.display().to_string()))
 }
@@ -980,6 +1060,61 @@ mod tests {
         assert_eq!(bare_file_name(&one_over), FALLBACK_BACKUP_NAME);
     }
 
+    // ── The CV export (L-20b) ───────────────────────────────────────────────
+
+    #[test]
+    fn a_cv_export_is_refused_for_anything_but_json() {
+        // Negative: the wrong extension is refused before anything is written,
+        // and the message says what to do.
+        let wrong = temp_path("resume.txt");
+        let refused = write_cv_json_at(&wrong, "{}").unwrap_err();
+        assert!(refused.contains(".json"), "{refused}");
+        assert!(!wrong.exists());
+
+        let none = temp_path("resume");
+        assert!(write_cv_json_at(&none, "{}").unwrap_err().contains(".json"));
+    }
+
+    #[test]
+    fn a_cv_export_writes_the_text_verbatim() {
+        let path = temp_path("resume.json");
+        let text = "{\n  \"basics\": { \"name\": \"Steve\" }\n}\n";
+        write_cv_json_at(&path, text).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), text);
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn a_cv_name_that_is_not_a_plain_name_falls_back_to_cv_json() {
+        // Boundary: the suggested name is the user's own CV name with `.json`
+        // on the end, so separators, `..` and control characters are plausible
+        // and every one of them lands on the fallback, never a repaired path.
+        assert_eq!(
+            bare_json_name("Steve Brady CV.json", FALLBACK_CV_JSON_NAME),
+            "Steve Brady CV.json"
+        );
+        for hostile in [
+            "../CV.json",
+            "..\\CV.json",
+            "C:CV.json",
+            "docs/CV.json",
+            "CV\u{7}.json",
+            "CV.pdf",
+            "",
+        ] {
+            assert_eq!(
+                bare_json_name(hostile, FALLBACK_CV_JSON_NAME),
+                FALLBACK_CV_JSON_NAME,
+                "{hostile:?}"
+            );
+        }
+        // And the fallback passes its own guard, so the safe answer is savable.
+        assert_eq!(
+            bare_json_name(FALLBACK_CV_JSON_NAME, FALLBACK_CV_JSON_NAME),
+            FALLBACK_CV_JSON_NAME
+        );
+    }
+
     #[test]
     fn the_fallback_name_is_itself_a_name_the_guard_accepts() {
         // Otherwise the safe answer would be the one thing that could not be
@@ -1227,6 +1362,7 @@ mod tests {
             "invoke('pick_and_read_cv')",
             "invoke('pick_and_read_backup')",
             "invoke('pick_and_write_backup', ",
+            "invoke('pick_and_write_cv_json', ",
         ] {
             assert!(
                 PLATFORM_FILES_TS.contains(call),

@@ -8,7 +8,7 @@
  * relies on is itself tested — both that it reads real columns, and that it
  * refuses input it cannot classify instead of quietly returning fewer columns.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
@@ -37,16 +37,22 @@ import {
 
 // --- The migration, read from disk ------------------------------------------
 
-const MIGRATION_SQL = readFileSync(
-  new URL('../../src-tauri/migrations/0001_init.sql', import.meta.url),
-  'utf8',
-);
+// Every migration, in version order, so a column added by a later
+// `ALTER TABLE … ADD COLUMN` (0002, L-20b) is held to rows.ts exactly as the
+// original `CREATE TABLE` columns are.
+const MIGRATIONS_DIR = new URL('../../src-tauri/migrations/', import.meta.url);
+const MIGRATION_SQL = readdirSync(MIGRATIONS_DIR)
+  .filter((name) => name.endsWith('.sql'))
+  .sort()
+  .map((name) => readFileSync(new URL(name, MIGRATIONS_DIR), 'utf8'))
+  .join('\n');
 
 /** A table-level constraint line, which declares no column of its own. */
 const TABLE_CONSTRAINT = /^(PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)\b/i;
 
 /**
- * Pull the declared column names out of every `CREATE TABLE` in a migration.
+ * Pull the declared column names out of every `CREATE TABLE` in a migration,
+ * then append any `ALTER TABLE … ADD COLUMN` a later migration made.
  *
  * Deliberately strict: a line it cannot classify THROWS. A lenient parser that
  * skipped what it did not understand would make the coverage guard below pass
@@ -76,6 +82,16 @@ function columnsFromMigration(sql: string): Record<string, string[]> {
 
     if (columns.length === 0) throw new Error(`Table "${name}" declared no columns`);
     tables[name] = columns;
+  }
+
+  const addColumn = /ALTER TABLE (\w+) ADD COLUMN ([a-z_][a-z0-9_]*)\b/g;
+  for (const match of sql.replace(/--.*$/gm, '').matchAll(addColumn)) {
+    const name = match[1];
+    const column = match[2];
+    if (name === undefined || column === undefined) continue;
+    const existing = tables[name];
+    if (existing === undefined) throw new Error(`ALTER TABLE on unknown table "${name}"`);
+    existing.push(column);
   }
 
   return tables;
@@ -135,6 +151,7 @@ const CV: Cv = {
   name: 'Credit risk CV',
   file_path: 'C:\\Users\\steve\\Documents\\cv.pdf',
   extracted_text: 'SENIOR CREDIT RISK ANALYST \u2014 \u00a385,000',
+  json_resume: null,
   created_at: '2026-08-19T09:15:00.000Z',
 };
 
@@ -197,6 +214,21 @@ function analysisRow(overrides: Record<string, unknown> = {}): Record<string, un
 // --- The schema-coverage guard ----------------------------------------------
 
 describe('the migration column parser', () => {
+  it('appends a column a later ALTER TABLE adds, in migration order', () => {
+    const parsed = columnsFromMigration(
+      'CREATE TABLE IF NOT EXISTS widgets (\n  id TEXT PRIMARY KEY NOT NULL\n);\n' +
+        '-- ALTER TABLE widgets ADD COLUMN in_a_comment TEXT;\n' +
+        'ALTER TABLE widgets ADD COLUMN colour TEXT;',
+    );
+    expect(parsed['widgets']).toEqual(['id', 'colour']);
+  });
+
+  it('refuses an ALTER TABLE on a table no migration created', () => {
+    expect(() => columnsFromMigration('ALTER TABLE ghosts ADD COLUMN x TEXT;')).toThrow(
+      /unknown table/,
+    );
+  });
+
   it('reads column names and ignores comments and blank lines', () => {
     const parsed = columnsFromMigration(
       [

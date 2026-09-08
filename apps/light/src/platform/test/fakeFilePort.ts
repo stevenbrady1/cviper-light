@@ -29,8 +29,10 @@ export interface FakeFilePort extends FilePort {
   readonly failSave: (message: string) => void;
   /** Everything `saveBackup` was asked to write, in order. */
   readonly written: () => readonly { path: string; contents: string }[];
+  /** Everything `saveCvJson` was asked to write, in order (L-20b). */
+  readonly writtenCvJson: () => readonly { path: string; contents: string }[];
   /** How many times each method was called. */
-  readonly calls: Record<'pickCv' | 'pickBackup' | 'saveBackup', number>;
+  readonly calls: Record<'pickCv' | 'pickBackup' | 'saveBackup' | 'saveCvJson', number>;
 }
 
 export function createFakeFilePort(): FakeFilePort {
@@ -41,11 +43,13 @@ export function createFakeFilePort(): FakeFilePort {
   let savePath: string | null = 'C:\\Users\\steve\\Documents\\cviper-backup.json';
   let saveFailure: string | null = null;
   const written: { path: string; contents: string }[] = [];
-  const calls = { pickCv: 0, pickBackup: 0, saveBackup: 0 };
+  const writtenCvJson: { path: string; contents: string }[] = [];
+  const calls = { pickCv: 0, pickBackup: 0, saveBackup: 0, saveCvJson: 0 };
 
   return {
     calls,
     written: () => written,
+    writtenCvJson: () => writtenCvJson,
     nextCv: (next) => {
       cv = next;
       cvFailure = null;
@@ -86,6 +90,16 @@ export function createFakeFilePort(): FakeFilePort {
       // Cancelled: nothing is written, exactly as the real port behaves.
       if (savePath === null) return ok(null);
       written.push({ path: savePath, contents });
+      return ok(savePath);
+    },
+
+    // The same save-dialog fakes (`nextSavePath`, `failSave`) drive this one:
+    // a test that wants a cancel or a failure sets them exactly as for a backup.
+    async saveCvJson(contents) {
+      calls.saveCvJson += 1;
+      if (saveFailure !== null) return err({ message: saveFailure });
+      if (savePath === null) return ok(null);
+      writtenCvJson.push({ path: savePath, contents });
       return ok(savePath);
     },
   };

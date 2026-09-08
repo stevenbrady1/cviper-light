@@ -24,12 +24,17 @@ import {
 
 import { Signpost } from '../signposts/Signpost';
 
+import { APP_NAME } from '../settings/backup';
+
 import { AnalysisResult } from './AnalysisResult';
 import { readAvailability } from './availability';
 import {
+  exportJsonResume,
   jobAdvertText,
+  jsonResumeFileName,
   newAnalysisRecord,
   newCvRecord,
+  originalJsonResume,
   providerLabel,
   runDisabledReason,
 } from './model';
@@ -141,6 +146,9 @@ export function Analysis({
   const [cvsLoaded, setCvsLoaded] = useState(false);
   const [jobs, setJobs] = useState<readonly Job[]>([]);
   const [selectedCvId, setSelectedCvId] = useState<string | null>(null);
+  /** "Saved to …" after a JSON Resume export (L-20b). */
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [jobText, setJobText] = useState('');
   const [optionKey, setOptionKey] = useState<string>(KEYWORD_KEY);
   const [options, setOptions] = useState(() =>
@@ -273,6 +281,9 @@ export function Analysis({
         path: picked.path,
         text: extracted.value.text,
         now: (now ?? new Date()).toISOString(),
+        // Kept verbatim when the file WAS a JSON Resume, so "Save as JSON
+        // Resume" can return exactly it (L-20b). `null` for everything else.
+        jsonResume: originalJsonResume(picked.name, picked.bytes),
       });
 
       const saved = await analysisPort.saveCv(cv);
@@ -284,6 +295,7 @@ export function Analysis({
       setCvs((current) => [cv, ...current]);
       setSelectedCvId(cv.id);
       setResult(null);
+      setExportMessage(null);
       // Warnings ride along with a SUCCESSFUL extraction — some pages were
       // images and their contents are missing from the text. The user has to
       // be told, because the analysis below is about to be run on a partial CV.
@@ -291,6 +303,44 @@ export function Analysis({
     },
     [analysisPort, now],
   );
+
+  /**
+   * Save the selected CV back out as the JSON Resume it arrived as (L-20b).
+   *
+   * Only reachable when `selectedCv.json_resume` is a string — the button is
+   * disabled otherwise — but `exportJsonResume` re-checks, because a disabled
+   * button is a UI fact and this is a data one.
+   */
+  const onSaveJsonResume = useCallback(async () => {
+    if (selectedCv === null) return;
+    setError(null);
+    setExportMessage(null);
+
+    const text = exportJsonResume({
+      cv: selectedCv,
+      app: APP_NAME,
+      exportedAt: (now ?? new Date()).toISOString(),
+    });
+    if (!text.ok) {
+      setError(text.error.message);
+      return;
+    }
+
+    setExporting(true);
+    const saved = await files.saveCvJson(text.value, jsonResumeFileName(selectedCv.name));
+    setExporting(false);
+
+    if (!saved.ok) {
+      setError(`That CV could not be saved as a JSON Resume: ${saved.error.message}`);
+      return;
+    }
+    // Cancelled. Nothing was written, and nothing is said about it.
+    if (saved.value === null) return;
+
+    setExportMessage(
+      `Saved to ${saved.value}. The file is the one that came in, with a note of when it left.`,
+    );
+  }, [files, now, selectedCv]);
 
   const onUpload = useCallback(async () => {
     setError(null);
@@ -434,6 +484,7 @@ export function Analysis({
                   setResult(null);
                   setWarnings([]);
                   setUploadProblem(null);
+                  setExportMessage(null);
                 }}
                 className="min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
               >
@@ -455,12 +506,43 @@ export function Analysis({
               >
                 Upload a CV
               </button>
+
+              {/*
+                Disabled, never hidden, for a CV that came from a PDF or a
+                .docx: there is no JSON Resume to give back for those, and a
+                control that comes and goes is one the user cannot learn.
+              */}
+              <button
+                type="button"
+                data-testid="analysis-save-json"
+                disabled={selectedCv === null || selectedCv.json_resume === null || exporting}
+                title={
+                  selectedCv !== null && selectedCv.json_resume === null
+                    ? 'Only a CV that arrived as a JSON Resume can be saved as one.'
+                    : undefined
+                }
+                onClick={() => void onSaveJsonResume()}
+                className={SECONDARY_BUTTON}
+              >
+                {exporting ? 'Saving…' : 'Save as JSON Resume'}
+              </button>
             </div>
 
             <p className="mt-1 text-xs text-ink-faint">
               PDF, Word (.docx) or JSON Resume (.json). The file is read on this machine and never
-              uploaded anywhere.
+              uploaded anywhere. A CV that arrived as a JSON Resume can be saved back out as one,
+              unchanged, to take anywhere that reads the format.
             </p>
+
+            {exportMessage === null ? null : (
+              <p
+                role="status"
+                data-testid="analysis-export-message"
+                className="mt-2 rounded-control bg-teal/10 px-3 py-2 break-all text-teal"
+              >
+                {exportMessage}
+              </p>
+            )}
 
             {uploadProblem === null ? null : (
               <p

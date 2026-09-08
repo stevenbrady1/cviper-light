@@ -119,6 +119,7 @@ build if one of those lines ever reads or writes any state.
 | ----------------------------------- | ---------------------------------------------------------------------- |
 | Application tracker                 | **No.** Works completely offline.                                      |
 | CV upload and text extraction       | **No.** PDF, Word and JSON Resume are read on your machine.            |
+| Save a CV back out as JSON Resume   | **No.** The file it arrived as, written where you choose.              |
 | Basic keyword CV match              | **No.** Runs locally, instantly.                                       |
 | CV analysis with a local model      | **No key** — needs [Ollama](https://ollama.com) installed and running. |
 | CV analysis with Anthropic / OpenAI | Yes — your own key, billed to you.                                     |
@@ -223,7 +224,10 @@ compiles them from source and TypeScript typechecks them in place.
 
 Everything lives in one SQLite file in the app's own data directory. Settings
 exports the whole thing as a single readable `.json` file wherever you choose to
-put it, and imports it back. The format is documented in
+put it, and imports it back. A CV that arrived as a JSON Resume can also go
+back out on its own — Analysis → Save as JSON Resume writes the file it came in
+as, unchanged except for a `meta.cviper` note of when it left — so it can go
+into any tool that reads the format, the full CViper included. The format is documented in
 [docs/FEATURE-MATRIX.md](docs/FEATURE-MATRIX.md) and is additive-only: a file
 exported today still imports in five years.
 

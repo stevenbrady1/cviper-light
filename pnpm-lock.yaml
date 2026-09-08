@@ -58,6 +58,9 @@ importers:
       '@cviper/keyword-scoring':
         specifier: workspace:*
         version: link:../../packages/keyword-scoring
+      '@cviper/resume-schema':
+        specifier: workspace:*
+        version: link:../../packages/resume-schema
       '@cviper/ui':
         specifier: workspace:*
         version: link:../../packages/ui

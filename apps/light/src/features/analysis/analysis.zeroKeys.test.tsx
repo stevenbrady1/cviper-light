@@ -169,6 +169,7 @@ describe('the analysis view on a machine with no keys and no Ollama', () => {
           name: 'CV.docx',
           file_path: null,
           extracted_text: CV_TEXT,
+          json_resume: null,
           created_at: '2026-08-01T09:00:00.000Z',
         },
       ],

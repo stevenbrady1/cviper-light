@@ -116,6 +116,11 @@ export interface Cv {
   /** `null` until parsing has run. */
   extracted_text: string | null;
   created_at: IsoTimestamp;
+  /**
+   * The JSON Resume file this CV arrived as, verbatim, so it can be written
+   * back out (L-20b). `null` for a PDF, a .docx or pasted text.
+   */
+  json_resume: string | null;
   /** @internal forward-compatibility bag — see `ExtraFields`. */
   __extra?: ExtraFields;
 }
@@ -191,6 +196,9 @@ export const CvSchema = z.object({
   file_path: z.string().nullable(),
   extracted_text: z.string().nullable(),
   created_at: isoTimestamp,
+  // Added in L-20b. Absent in every backup written before it, so absence reads
+  // as `null` rather than refusing a file the user made last month.
+  json_resume: z.string().nullable().default(null),
 });
 
 export const AnalysisSchema = z.object({

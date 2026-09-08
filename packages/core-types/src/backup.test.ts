@@ -131,6 +131,7 @@ function makeFixture(): BackupPayload {
         // Backslashes must survive JSON escaping intact on Windows.
         file_path: 'C:\\Users\\steve\\Documents\\Risk CV.pdf',
         extracted_text: CV_TEXT,
+        json_resume: null,
         created_at: '2026-08-10T07:15:00.000Z',
       },
     ],

@@ -51,6 +51,7 @@ const CV: Cv = {
   name: 'CV.docx',
   file_path: null,
   extracted_text: CV_TEXT,
+  json_resume: null,
   created_at: '2026-08-01T09:00:00.000Z',
 };
 
