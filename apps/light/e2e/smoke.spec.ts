@@ -45,9 +45,9 @@
  */
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { connect } from 'node:net';
-import { homedir, tmpdir } from 'node:os';
+import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -194,15 +194,27 @@ describe('the built CViper Light binary', () => {
         args.push('--native-driver', nativeDriver);
       }
 
+      // ------------------------------------------------------------------
+      // NO `WEBVIEW2_USER_DATA_FOLDER` HERE. NAMING ONE BREAKS THE SESSION.
+      // ------------------------------------------------------------------
+      // The first version of this file set it to a fresh temp directory, so
+      // that "first run" was guaranteed rather than inherited. That cost run
+      // #1 of this workflow: msedgedriver launches the app with a
+      // `--user-data-dir` of its own and then watches THAT directory for the
+      // `DevToolsActivePort` file. WebView2 obeyed the environment variable
+      // instead, wrote the file where msedgedriver was not looking, and the
+      // driver sat out its full 60-second startup timeout before reporting
+      // `session not created: DevToolsActivePort file doesn't exist`. A user
+      // data folder holds at most one WebView2 session, and naming two paths
+      // for it is how you end up with none.
+      //
+      // So the driver owns the profile, exactly as the canonical Tauri
+      // example leaves it. The consequence is stated rather than hidden: the
+      // first-run assertion below is guaranteed on a CI runner, which has
+      // never run this app, and on a developer machine it holds only until
+      // somebody dismisses the welcome for real.
       tauriDriver = spawn(resolveTauriDriver(), args, {
         stdio: ['ignore', 'inherit', 'inherit'],
-        env: {
-          ...process.env,
-          // A throwaway WebView2 profile, so "first run" MEANS first run.
-          // Without it this machine's `localStorage` decides whether the
-          // welcome appears, and the second run of the day asserts nothing.
-          WEBVIEW2_USER_DATA_FOLDER: mkdtempSync(join(tmpdir(), 'cviper-smoke-')),
-        },
       });
 
       tauriDriver.on('exit', (code) => {
@@ -213,6 +225,12 @@ describe('the built CViper Light binary', () => {
       });
 
       await waitForDriver(DRIVER_PORT, DRIVER_STARTUP_TIMEOUT);
+
+      // Printed because run #1 spent sixty seconds failing without either of
+      // these paths appearing anywhere in the log. A driver that cannot start
+      // should at least say what it was pointed at.
+      console.log(`smoke: application   = ${application}`);
+      console.log(`smoke: native driver = ${nativeDriver ?? '(from PATH)'}`);
 
       const capabilities = new Capabilities();
       capabilities.set('tauri:options', { application });
