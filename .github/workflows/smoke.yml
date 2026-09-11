@@ -142,22 +142,49 @@ jobs:
       #
       # Nothing this job produces is shippable, and nothing here publishes it.
       # release.yml remains the only path to a signed artefact.
-      - name: Build the app (unsigned, no updater artefacts)
+      #
+      # ------------------------------------------------------------------
+      # `--debug` IS LOAD-BEARING. DO NOT "OPTIMISE" IT TO A RELEASE BUILD.
+      # ------------------------------------------------------------------
+      # Runs #1 and #2 of this workflow built RELEASE and both died sixty
+      # seconds into the smoke step with `session not created:
+      # DevToolsActivePort file doesn't exist` — msedgedriver's startup budget,
+      # spent waiting on an app that had in fact launched.
+      #
+      # msedgedriver drives a WebView2 app over the Chrome DevTools Protocol,
+      # and Tauri's debugging docs say the inspector "is only enabled in
+      # development and debug builds unless you enable it with a Cargo
+      # feature". A release binary has nothing to attach to, so it is simply
+      # undriveable. The canonical Tauri example builds `--debug` for exactly
+      # this reason.
+      #
+      # The alternative — the `devtools` Cargo feature — would ship the
+      # inspector enabled in the binaries release.yml distributes, to make a
+      # test pass. Not worth it. A debug build is still the real app, the real
+      # toolchain, the real WebView2 and the real bundled frontend; only the
+      # Rust optimisation level differs, and per Tauri's CLI docs the bundler
+      # "will do the same as they would in the actual release mode", so the
+      # installers still come out (under target/debug/bundle).
+      - name: Build the app (debug profile, unsigned, no updater artefacts)
         shell: bash
-        run: pnpm --filter @cviper/light tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
+        run: pnpm --filter @cviper/light tauri build --debug --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
       # Uploaded BEFORE the smoke test runs, on purpose: when the smoke test
       # goes red the installer is the first thing anyone will want to open.
       # `if-no-files-found: error` makes the upload itself an assertion — a job
       # that "did not fail" proves nothing, an installer that exists does.
+      # `target/debug/bundle`, because the build above is `--debug`. The
+      # bundler produces the same installers it would for a release; they are
+      # simply compiled unoptimised, and they are unsigned.
       - uses: actions/upload-artifact@v4
         with:
           name: cviper-light-windows-installers
           path: |
-            apps/light/src-tauri/target/release/bundle/msi/*.msi
-            apps/light/src-tauri/target/release/bundle/nsis/*-setup.exe
+            apps/light/src-tauri/target/debug/bundle/msi/*.msi
+            apps/light/src-tauri/target/debug/bundle/nsis/*-setup.exe
           if-no-files-found: error
-          # Short: these are unsigned debug-of-record builds, not releases.
+          # Short: these are unsigned debug-profile builds for inspection after
+          # a red run, not releases. release.yml produces the shippable ones.
           retention-days: 7
 
       - name: Smoke-test the real binary

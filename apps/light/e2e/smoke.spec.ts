@@ -14,8 +14,9 @@
  * bundled `frontendDist`, and the plugin registrations in `lib.rs` — none of
  * which any existing test can fail on.
  *
- * So this runs against `src-tauri/target/release/<app>.exe`, driven through
- * `tauri-driver`, in CI, on Windows, where a full build is allowed.
+ * So this runs against the built `src-tauri/target/<profile>/<app>.exe` — see
+ * the note on the build profile below for why that profile is `debug` —
+ * driven through `tauri-driver`, in CI, on Windows, where a build is allowed.
  *
  * ============================================================================
  * IT DOES NOT BUILD THE APP. THAT IS DELIBERATE.
@@ -74,7 +75,37 @@ const DRIVER_STARTUP_TIMEOUT = 30_000;
 const WELCOME_HEADING = 'Welcome to CViper Light';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
-const RELEASE_DIRECTORY = resolve(HERE, '..', 'src-tauri', 'target', 'release');
+
+/**
+ * A DEBUG BUILD, NOT A RELEASE ONE. THIS IS NOT AN OVERSIGHT.
+ *
+ * ============================================================================
+ * Runs #1 and #2 of this workflow both died sixty seconds into the setup hook
+ * with `session not created: DevToolsActivePort file doesn't exist`, pointed
+ * at a RELEASE binary. Sixty seconds is msedgedriver's startup budget, so the
+ * driver launched the app and then waited for something that never arrived.
+ *
+ * msedgedriver drives a WebView2 application over the Chrome DevTools
+ * Protocol, and Tauri's debugging documentation is explicit that the inspector
+ * "is only enabled in development and debug builds unless you enable it with a
+ * Cargo feature". A release binary therefore offers nothing to attach to: it
+ * starts perfectly well and is simply undriveable. That is also why the
+ * canonical Tauri example builds with `--debug` and drives `target/debug`.
+ *
+ * The other way to fix it — adding the `devtools` Cargo feature — would turn
+ * the inspector on in the binaries `release.yml` actually ships, to make a
+ * test pass. A debug build is the better trade by a distance: it is still the
+ * real application, compiled by the real toolchain, running the real WebView2
+ * against the real bundled frontend, and Tauri's CLI documentation notes that
+ * with `--debug` "the bundler etc. will do the same as they would in the
+ * actual release mode" — so the installers still come out. Only the Rust
+ * optimisation level differs.
+ *
+ * Overridable so that a developer who has built the other profile by hand can
+ * point this at it without editing the file.
+ */
+const BUILD_PROFILE = process.env.SMOKE_PROFILE ?? 'debug';
+const BUILD_DIRECTORY = resolve(HERE, '..', 'src-tauri', 'target', BUILD_PROFILE);
 
 /**
  * What Tauri may have called the executable.
@@ -84,28 +115,33 @@ const RELEASE_DIRECTORY = resolve(HERE, '..', 'src-tauri', 'target', 'release');
  * the two differ here (`light` vs `CViper Light`). Rather than pin a guess that
  * goes stale at the next CLI bump, both are tried and a miss reports what IS in
  * the directory. A wrong guess must never look like a missing build.
+ *
+ * Run #1 settled it for now: the build log said
+ * `Built application at: ...\target\release\light.exe`.
  */
 const BINARY_CANDIDATES = ['CViper Light.exe', 'light.exe'];
 
 function resolveApplication(): string {
   for (const name of BINARY_CANDIDATES) {
-    const candidate = join(RELEASE_DIRECTORY, name);
+    const candidate = join(BUILD_DIRECTORY, name);
     if (existsSync(candidate)) return candidate;
   }
 
-  const listing = existsSync(RELEASE_DIRECTORY)
-    ? readdirSync(RELEASE_DIRECTORY)
+  const listing = existsSync(BUILD_DIRECTORY)
+    ? readdirSync(BUILD_DIRECTORY)
         .filter((entry) => entry.endsWith('.exe'))
         .join(', ')
-    : '(no release directory at all)';
+    : `(no ${BUILD_PROFILE} directory at all)`;
 
   throw new Error(
-    `No built application found in ${RELEASE_DIRECTORY}.\n` +
+    `No built application found in ${BUILD_DIRECTORY}.\n` +
       `Tried: ${BINARY_CANDIDATES.join(', ')}\n` +
       `Executables actually there: ${listing || '(none)'}\n\n` +
       'This spec drives the REAL binary and deliberately does not build it. ' +
       'CI builds it in its own step; locally a human runs ' +
-      '`pnpm --filter @cviper/light tauri build` first (never an agent — see CLAUDE.md).',
+      '`pnpm --filter @cviper/light tauri build --debug` first (never an agent — ' +
+      'see CLAUDE.md). Set SMOKE_PROFILE=release to drive a release build, but ' +
+      'note that one has no inspector for the driver to attach to.',
   );
 }
 
