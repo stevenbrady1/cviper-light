@@ -1,0 +1,164 @@
+name: Smoke
+
+# ============================================================================
+# THE SECOND PLACE `tauri build` IS RUN, AND THE ONLY PLACE THE RESULT IS DRIVEN.
+# ============================================================================
+# CLAUDE.md forbids an agent from running `tauri build`. The cost of that rule
+# was that nothing in this repository had ever been verified in the binary a
+# user actually runs: every test is Vitest against jsdom, or `cargo test --lib`.
+# The WebView2 runtime, the Tauri IPC bridge, the capability file and the
+# bundled `frontendDist` sit between those tests and a working app, and none of
+# them can fail a single existing check.
+#
+# This workflow builds the real installer and then drives the real executable
+# through `tauri-driver` and Microsoft Edge WebDriver, asking it four questions.
+# See apps/light/e2e/smoke.spec.ts.
+#
+# ============================================================================
+# WHY A SEPARATE WORKFLOW AND NOT A JOB IN ci.yml
+# ============================================================================
+# Three reasons, in order of weight:
+#
+#   1. ci.yml's `verify` job IS the five checks, and its own comments say
+#      "NEVER `tauri build`" about that job. Adding a bundling step to it would
+#      make the file argue with itself.
+#   2. ci.yml has `cancel-in-progress` over one concurrency group. A fifteen
+#      minute build in that group delays the three-minute feedback that the
+#      five checks exist to give.
+#   3. The repository already puts heavy platform work in its own file —
+#      ios.yml for the Mac leg, release.yml for bundling. This is the same
+#      shape as those.
+#
+# The trigger is ios.yml's, deliberately: every pull request, plus pushes to
+# main. NO PATH FILTER. A change-detection rule that skipped this on a
+# "frontend-only" commit is exactly how a latent failure ends up sitting on a
+# green main — the thing ci.yml's header warns about.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+jobs:
+  built-app:
+    name: build the app and drive the real binary
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Its own cache key: this job compiles in RELEASE, which shares nothing
+      # with the debug artefacts `cargo check` leaves behind in ci.yml.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/light/src-tauri
+          key: smoke-release
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      # ------------------------------------------------------------------
+      # THE DRIVER MUST MATCH THE WEBVIEW2 RUNTIME, NOT THE EDGE BROWSER.
+      # ------------------------------------------------------------------
+      # `windows-latest` ships a preinstalled Edge WebDriver under
+      # C:\SeleniumWebDrivers\EdgeDriver, and it is the WRONG ONE: it is keyed
+      # to the installed Edge BROWSER, while a Tauri app embeds the WebView2
+      # Evergreen Runtime, which updates on its own schedule. On the machine
+      # this was written on they were a major version apart — WebView2
+      # 152.0.4191.66 against Edge 153.0.4234.32. A mismatch does not fail
+      # loudly; it hangs the session until the job times out.
+      #
+      # So the WebView2 version is read from its own registry key and the
+      # exactly matching driver is downloaded. Tauri's own CI docs reach for
+      # `cargo install --git https://github.com/chippers/msedgedriver-tool`,
+      # which is an unpinned third-party git checkout — this repository pins
+      # gitleaks by version AND checksum, and an unreviewed build script is not
+      # a step to take for something four lines of PowerShell do.
+      #
+      # Every failure path here throws. A `|| echo` on a version lookup is how
+      # an alarm becomes indistinguishable from a healthy system.
+      - name: Install the Edge WebDriver matching the WebView2 runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $keys = @(
+            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
+            'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          )
+
+          $version = $null
+          foreach ($key in $keys) {
+            try { $version = (Get-ItemProperty -Path $key -ErrorAction Stop).pv; break } catch { }
+          }
+          if (-not $version) {
+            throw "The WebView2 Evergreen Runtime version was not found in the registry. Tried: $($keys -join ', ')"
+          }
+          Write-Host "WebView2 Evergreen Runtime: $version"
+
+          $zip = Join-Path $env:RUNNER_TEMP 'edgedriver.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'edgedriver'
+          Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$version/edgedriver_win64.zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+
+          $driver = Join-Path $dir 'msedgedriver.exe'
+          if (-not (Test-Path $driver)) { throw "msedgedriver.exe was not in the archive for $version." }
+          & $driver --version
+
+          "MSEDGEDRIVER=$driver" >> $env:GITHUB_ENV
+
+      # ------------------------------------------------------------------
+      # `createUpdaterArtifacts` IS TURNED OFF FOR THIS BUILD, AND MUST BE.
+      # ------------------------------------------------------------------
+      # tauri.conf.json sets it true, which makes `tauri build` sign the
+      # updater artefacts — and RELEASE-SIGNING.md records what happens with no
+      # signing key in the environment: "`tauri build` with updater artifacts:
+      # Fails outright." That is the correct behaviour for a release, and it is
+      # not what this job is for. There are no secrets here by design, so the
+      # override is what lets an unsigned, un-updatable, perfectly drivable
+      # installer come out.
+      #
+      # Nothing this job produces is shippable, and nothing here publishes it.
+      # release.yml remains the only path to a signed artefact.
+      - name: Build the app (unsigned, no updater artefacts)
+        shell: bash
+        run: pnpm --filter @cviper/light tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      # Uploaded BEFORE the smoke test runs, on purpose: when the smoke test
+      # goes red the installer is the first thing anyone will want to open.
+      # `if-no-files-found: error` makes the upload itself an assertion — a job
+      # that "did not fail" proves nothing, an installer that exists does.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cviper-light-windows-installers
+          path: |
+            apps/light/src-tauri/target/release/bundle/msi/*.msi
+            apps/light/src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          # Short: these are unsigned debug-of-record builds, not releases.
+          retention-days: 7
+
+      - name: Smoke-test the real binary
+        run: pnpm smoke

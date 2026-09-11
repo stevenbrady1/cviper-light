@@ -202,6 +202,27 @@ Run by a human or by CI, never as part of routine development. A signed release
 that existing installs can update to also needs a signing key — see
 [`apps/light/src-tauri/RELEASE-SIGNING.md`](apps/light/src-tauri/RELEASE-SIGNING.md).
 
+### The built-app smoke test
+
+```
+pnpm smoke
+```
+
+Four questions asked of the real built executable — the window opens, the
+first-run welcome is shown, Settings opens, the Privacy section is visible —
+driven through `tauri-driver` and Microsoft Edge WebDriver. Everything else in
+this repository tests jsdom or a pure function; this is the only check that can
+fail because of the WebView2 runtime, the Tauri IPC bridge, the capability file
+or the bundled frontend.
+
+It does **not** build the app, deliberately: run it without a build and it says
+so rather than starting one. CI does the build in its own step
+(`.github/workflows/smoke.yml`, on every pull request), which is also the only
+place the build is allowed to happen — see the hard rules in
+[CLAUDE.md](CLAUDE.md). Locally it needs `cargo install tauri-driver --locked`
+and an `msedgedriver.exe` matching the **WebView2 runtime** on the machine,
+which is not necessarily the one matching the installed Edge browser.
+
 ## Layout
 
 | Path                       | What it is                                  |

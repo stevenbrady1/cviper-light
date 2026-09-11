@@ -119,12 +119,18 @@ importers:
       '@types/react-dom':
         specifier: ^19.1.6
         version: 19.2.4(@types/react@19.2.18)
+      '@types/selenium-webdriver':
+        specifier: ^4.1.30
+        version: 4.35.6
       '@vitejs/plugin-react':
         specifier: ^6.0.5
         version: 6.0.5(vite@8.2.1(@types/node@26.2.0)(jiti@2.7.0))
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1
+      selenium-webdriver:
+        specifier: ^4.37.0
+        version: 4.49.0
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
@@ -217,6 +223,9 @@ packages:
   '@babel/runtime@7.29.7':
     resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
     engines: {node: '>=6.9.0'}
+
+  '@bazel/runfiles@6.5.0':
+    resolution: {integrity: sha512-RzahvqTkfpY2jsDxo8YItPX+/iZ6hbiikw1YhE0bA9EKBR5Og8Pa6FHn9PO9M0zaXRVsr0GFQLKbB/0rzy9SzA==}
 
   '@bramus/specificity@2.4.2':
     resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
@@ -790,6 +799,12 @@ packages:
 
   '@types/react@19.2.18':
     resolution: {integrity: sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w==}
+
+  '@types/selenium-webdriver@4.35.6':
+    resolution: {integrity: sha512-8nfyMRi4VvkY9QrQGyY/zkleAhnjnmE8YtdEeoCrWe3izp1P9vo9f5VTNRYF0up+l+kn+VuZah+je+bLddNV+g==}
+
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
   '@typescript-eslint/eslint-plugin@8.67.0':
     resolution: {integrity: sha512-Un7Heoyj65NREbKAyIrFxeM143NZpExWmy1Nep4DLeQOeLlTeumPjoNKnBrU5D5moWXbPJgRa5Uwcdu0faVNGQ==}
@@ -1495,6 +1510,10 @@ packages:
   scheduler@0.27.0:
     resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
 
+  selenium-webdriver@4.49.0:
+    resolution: {integrity: sha512-16XqeOEMj+4+p+pzLLyvNWmF5jCY05EKIl3e1anZBgv4+zq7PUTtiNjKtQhMpwosZ0wIMKDFAQ2xdyogOHD4DA==}
+    engines: {node: '>= 22.0.0'}
+
   semver@7.8.5:
     resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
     engines: {node: '>=10'}
@@ -1561,6 +1580,10 @@ packages:
   tldts@7.4.10:
     resolution: {integrity: sha512-GgouD1B+sWwvkaEq8vXC15DjQitxbvs12oIXELpconwm+Tg3zfcEv4jgzq3vtKverDXsg3VI8aRgNL2Nra0Iog==}
     hasBin: true
+
+  tmp@0.2.7:
+    resolution: {integrity: sha512-e0votIpp4Uo2AJYSzVHV6xCcawuiez3DzqDAbrTc3YxBkplN6e+dM13ZeIcZnDg/QpSuU2zfZ3rzwY8ukEnaXw==}
+    engines: {node: '>=14.14'}
 
   tough-cookie@6.0.2:
     resolution: {integrity: sha512-exgYmnmL/sJpR3upZfXG5PoatXQii55xAiXGXzY+sROLZ/Y+SLcp9PgJNI9Vz37HpQ74WvDcLT8eqm+kV3FzrA==}
@@ -1730,6 +1753,18 @@ packages:
     resolution: {integrity: sha512-BN22B5eaMMI9UMtjrGd5g5eCYPpCPDUy0FJXbYsaT5zYxjFOckS53SQDE3pWkVoWpHXVb3BrYcEN4Twa55B5cA==}
     engines: {node: '>=0.10.0'}
 
+  ws@8.21.3:
+    resolution: {integrity: sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   xml-name-validator@5.0.0:
     resolution: {integrity: sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg==}
     engines: {node: '>=18'}
@@ -1774,6 +1809,8 @@ snapshots:
   '@babel/helper-validator-identifier@7.29.7': {}
 
   '@babel/runtime@7.29.7': {}
+
+  '@bazel/runfiles@6.5.0': {}
 
   '@bramus/specificity@2.4.2':
     dependencies:
@@ -2180,6 +2217,15 @@ snapshots:
   '@types/react@19.2.18':
     dependencies:
       csstype: 3.2.3
+
+  '@types/selenium-webdriver@4.35.6':
+    dependencies:
+      '@types/node': 26.2.0
+      '@types/ws': 8.18.1
+
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 26.2.0
 
   '@typescript-eslint/eslint-plugin@8.67.0(@typescript-eslint/parser@8.67.0(eslint@10.8.1(jiti@2.7.0))(typescript@6.0.3))(eslint@10.8.1(jiti@2.7.0))(typescript@6.0.3)':
     dependencies:
@@ -2868,6 +2914,16 @@ snapshots:
 
   scheduler@0.27.0: {}
 
+  selenium-webdriver@4.49.0:
+    dependencies:
+      '@bazel/runfiles': 6.5.0
+      jszip: 3.10.1
+      tmp: 0.2.7
+      ws: 8.21.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   semver@7.8.5: {}
 
   setimmediate@1.0.5: {}
@@ -2914,6 +2970,8 @@ snapshots:
   tldts@7.4.10:
     dependencies:
       tldts-core: 7.4.10
+
+  tmp@0.2.7: {}
 
   tough-cookie@6.0.2:
     dependencies:
@@ -3039,6 +3097,8 @@ snapshots:
       stackback: 0.0.2
 
   word-wrap@1.2.5: {}
+
+  ws@8.21.3: {}
 
   xml-name-validator@5.0.0: {}
 
