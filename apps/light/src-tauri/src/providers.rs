@@ -83,6 +83,19 @@ impl ProviderId {
         }
     }
 
+    /// How this provider's name reads in a sentence shown to a person.
+    ///
+    /// The ONLY thing ever interpolated into a key-test message. It is a
+    /// `&'static str` chosen by a closed enum, not anything a caller sent and
+    /// not anything a server answered, so the messages stay fixed sentences.
+    fn label(self) -> &'static str {
+        match self {
+            ProviderId::Anthropic => "Anthropic",
+            ProviderId::Openai => "OpenAI",
+            ProviderId::Ollama => "Ollama",
+        }
+    }
+
     /// What to tell the user when the key they need is not saved.
     fn missing_key_message(self) -> &'static str {
         match self {
@@ -399,6 +412,204 @@ pub(crate) async fn provider_list_models(provider: ProviderId) -> Result<String,
     }
 
     send(provider, request).await
+}
+
+/// What a key test concluded, before any wording is chosen.
+///
+/// A hand-rolled enum rather than a status code carried around, so the message
+/// table below is a pure function that can be tested exhaustively WITHOUT a
+/// network — the same shape as `RequestFailure` above, for the same reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KeyTestOutcome {
+    /// 401/403 — the provider read the key and refused it.
+    Refused,
+    /// 429 — the key is real, and it is being throttled.
+    RateLimited,
+    /// The request never completed: DNS, connection, timeout.
+    Unreachable,
+    /// 5xx — their end, not the key.
+    ProviderFault,
+    /// Any other non-2xx.
+    Rejected,
+}
+
+/// Which outcome a COMPLETED key test reached. `None` means the key works.
+///
+/// Coarse on purpose, and the three the user can act on differently are the
+/// three the card names: a refused key is re-pasted, an unreachable provider is
+/// retried, and a rate limit is waited out.
+fn key_test_outcome(status: u16) -> Option<KeyTestOutcome> {
+    match status {
+        200..=299 => None,
+        401 | 403 => Some(KeyTestOutcome::Refused),
+        429 => Some(KeyTestOutcome::RateLimited),
+        500..=599 => Some(KeyTestOutcome::ProviderFault),
+        _ => Some(KeyTestOutcome::Rejected),
+    }
+}
+
+/// Which `ProviderErrorKind` each outcome maps to.
+fn key_test_kind(outcome: KeyTestOutcome) -> &'static str {
+    match outcome {
+        KeyTestOutcome::Refused => "auth",
+        KeyTestOutcome::RateLimited => "rate-limit",
+        KeyTestOutcome::Unreachable => "network",
+        KeyTestOutcome::ProviderFault => "server",
+        KeyTestOutcome::Rejected => "bad-request",
+    }
+}
+
+/// What to tell the user, for each outcome.
+///
+/// ============================================================================
+/// EVERY ARM IS A FIXED SENTENCE. THE PROVIDER'S NAME IS THE ONLY VARIABLE.
+/// ============================================================================
+/// No status code, no digit, and not one byte of the response — `provider_test_key`
+/// never reads the body at all, so there is nothing here that could have come
+/// from the network. That matters more on this path than anywhere else in the
+/// app: OpenAI's own 401 body quotes the rejected key back, masked, and a
+/// transport that passed provider prose through would put a fragment of the
+/// user's credential straight onto the card they just typed it into.
+///
+/// These five sentences are mirrored in `aiKeyModel.ts` so the card can be
+/// tested without a socket, and `AiKeySetup.test.tsx` reads this file and
+/// asserts the two still agree.
+fn key_test_message(provider: ProviderId, outcome: KeyTestOutcome) -> String {
+    let name = provider.label();
+    match outcome {
+        KeyTestOutcome::Refused => format!(
+            "{name} did not accept that key. Check it was pasted whole — a brand new key can \
+             take a few minutes to become active."
+        ),
+        KeyTestOutcome::Unreachable => {
+            format!("CViper could not reach {name}. Check your internet connection and try again.")
+        }
+        KeyTestOutcome::RateLimited => {
+            format!("{name} is rate-limiting this key. Wait a moment and test it again.")
+        }
+        KeyTestOutcome::ProviderFault => format!(
+            "{name} is having trouble at their end. Nothing is wrong with your key — try again \
+             shortly."
+        ),
+        KeyTestOutcome::Rejected => {
+            format!("{name} would not accept the test request. Nothing was changed.")
+        }
+    }
+}
+
+/// Everything checked before a candidate key goes anywhere near the network.
+///
+/// The size limit is `secrets::MAX_SECRET_BYTES`, ALIASED rather than decided
+/// again: a key that passes the test and is then refused by `secret_set` for
+/// being too long is exactly the failure test-before-save exists to prevent.
+///
+/// Trimmed here as well as in the frontend. A pasted key very often carries a
+/// trailing newline, and a newline cannot go into an HTTP header at all — the
+/// request would fail before leaving the machine and the user would be told
+/// their key was wrong. Trimming on both sides is also what makes the value
+/// that was TESTED byte-identical to the value that gets SAVED.
+///
+/// NOTHING is interpolated into any message here. The value IS the secret.
+fn candidate_key(provider: ProviderId, key: &str) -> Result<String, String> {
+    if provider.secret().is_none() {
+        return Err(transport_error(
+            "bad-request",
+            provider.missing_key_message().to_string(),
+        ));
+    }
+
+    let trimmed = key.trim();
+
+    if trimmed.is_empty() {
+        return Err(transport_error(
+            "no-key",
+            "Paste your API key before testing it.".to_string(),
+        ));
+    }
+
+    if trimmed.len() > secrets::MAX_SECRET_BYTES {
+        return Err(transport_error(
+            "bad-request",
+            "That key is too long to save. Check it was pasted correctly.".to_string(),
+        ));
+    }
+
+    Ok(trimmed.to_string())
+}
+
+/// Auth headers built from a key the user just TYPED, not from the keyring.
+///
+/// The deliberate twin of `auth_headers`, which reads the saved key. Keeping
+/// them separate is what stops a key test silently falling back to whatever is
+/// already in the credential store and reporting a pass for the wrong key.
+fn candidate_auth_headers(provider: ProviderId, key: String) -> Vec<(&'static str, String)> {
+    match provider {
+        ProviderId::Anthropic => vec![
+            ("x-api-key", key),
+            ("anthropic-version", "2023-06-01".to_string()),
+        ],
+        ProviderId::Openai => vec![("authorization", format!("Bearer {key}"))],
+        ProviderId::Ollama => Vec::new(),
+    }
+}
+
+/// Does this key actually work? A real request, with nothing saved.
+///
+/// ============================================================================
+/// THIS COMMAND CANNOT SAVE ANYTHING, AND THAT IS THE WHOLE POINT.
+/// ============================================================================
+/// The same reasoning as `jobs::job_test_credentials`, which this mirrors. A key
+/// is only worth saving once it is known to work, and both of the other shapes
+/// are worse:
+///
+///   * Save first, test afterwards. A mistyped key is then already in the
+///     credential store — and, the part that actually hurts, it has already
+///     overwritten the working key it was meant to replace.
+///   * Save, test, delete on failure. Same window, plus a crash or a power cut
+///     mid-test leaves the bad key in place with nothing to say so.
+///
+/// So the candidate travels in as an argument, is used to build one request, and
+/// is dropped. `testing_a_key_cannot_save_one` asserts that nothing in this file
+/// can reach `secret_set`, so the save can only happen afterwards, from the
+/// frontend, once this has come back green.
+///
+/// The probe is `GET /v1/models` — the cheapest authenticated call OpenAI
+/// offers. It is not billed, it returns no user data, and the RESPONSE BODY IS
+/// NEVER READ: the status alone answers the only question being asked, and not
+/// reading the body is what guarantees no provider prose can reach the user.
+///
+/// The key does NOT come back out, and this is not a weakening of `secret_get`.
+/// A value the user typed thirty seconds ago, into a box they are still looking
+/// at, is already in the frontend's memory. What stays impossible is reading a
+/// SAVED key back.
+#[tauri::command]
+pub(crate) async fn provider_test_key(provider: ProviderId, key: String) -> Result<(), String> {
+    let candidate = candidate_key(provider, &key)?;
+
+    let mut request = client()?
+        .get(format!("{}{}", provider.base_url(), provider.models_path()))
+        .timeout(MODELS_TIMEOUT);
+
+    for (name, value) in candidate_auth_headers(provider, candidate) {
+        request = request.header(name, value);
+    }
+
+    // Every way of failing to arrive is one thing to the user: we could not
+    // reach them. The `reqwest::Error` itself is dropped without being rendered.
+    let response = request.send().await.map_err(|_| {
+        transport_error(
+            key_test_kind(KeyTestOutcome::Unreachable),
+            key_test_message(provider, KeyTestOutcome::Unreachable),
+        )
+    })?;
+
+    match key_test_outcome(response.status().as_u16()) {
+        None => Ok(()),
+        Some(outcome) => Err(transport_error(
+            key_test_kind(outcome),
+            key_test_message(provider, outcome),
+        )),
+    }
 }
 
 /// Is Ollama running?
@@ -820,5 +1031,266 @@ mod tests {
                 "a command appears to take a URL from the caller: {forbidden}"
             );
         }
+    }
+
+    // ── Testing a key that has NOT been saved ────────────────────────────
+
+    const ALL_OUTCOMES: [KeyTestOutcome; 5] = [
+        KeyTestOutcome::Refused,
+        KeyTestOutcome::RateLimited,
+        KeyTestOutcome::Unreachable,
+        KeyTestOutcome::ProviderFault,
+        KeyTestOutcome::Rejected,
+    ];
+
+    #[test]
+    fn a_key_test_maps_each_status_to_the_outcome_the_user_can_act_on() {
+        assert_eq!(key_test_outcome(401), Some(KeyTestOutcome::Refused));
+        assert_eq!(key_test_outcome(403), Some(KeyTestOutcome::Refused));
+        assert_eq!(key_test_outcome(429), Some(KeyTestOutcome::RateLimited));
+        assert_eq!(key_test_outcome(500), Some(KeyTestOutcome::ProviderFault));
+        assert_eq!(key_test_outcome(503), Some(KeyTestOutcome::ProviderFault));
+        assert_eq!(key_test_outcome(400), Some(KeyTestOutcome::Rejected));
+        assert_eq!(key_test_outcome(404), Some(KeyTestOutcome::Rejected));
+    }
+
+    #[test]
+    fn boundary_only_the_two_hundreds_count_as_a_working_key() {
+        // A 3xx is NOT a pass. Following a redirect off the API would be the
+        // one way a "working key" could be reported by something that never
+        // authenticated at all.
+        assert_eq!(key_test_outcome(199), Some(KeyTestOutcome::Rejected));
+        assert_eq!(key_test_outcome(200), None);
+        assert_eq!(key_test_outcome(299), None);
+        assert_eq!(key_test_outcome(300), Some(KeyTestOutcome::Rejected));
+    }
+
+    #[test]
+    fn the_three_outcomes_a_user_acts_on_differently_read_as_three_different_things() {
+        let refused = key_test_message(ProviderId::Openai, KeyTestOutcome::Refused);
+        let unreachable = key_test_message(ProviderId::Openai, KeyTestOutcome::Unreachable);
+        let limited = key_test_message(ProviderId::Openai, KeyTestOutcome::RateLimited);
+
+        // Re-paste it, retry it, wait for it. Three fixes, three sentences.
+        assert!(refused.contains("did not accept that key"));
+        assert!(unreachable.contains("could not reach OpenAI"));
+        assert!(limited.contains("rate-limiting"));
+
+        assert_ne!(refused, unreachable);
+        assert_ne!(refused, limited);
+        assert_ne!(unreachable, limited);
+
+        // A rate limit must never read as the key being wrong: that would send
+        // somebody off to re-paste a key that works perfectly.
+        assert!(!limited.contains("did not accept"));
+        assert!(!unreachable.contains("did not accept"));
+    }
+
+    #[test]
+    fn no_key_test_message_leaks_a_status_a_digit_or_key_material() {
+        for provider in ALL {
+            for outcome in ALL_OUTCOMES {
+                let message = key_test_message(provider, outcome);
+
+                assert!(!message.is_empty());
+                for forbidden in ["http", "api.", "/v1/", "sk-", "Bearer", "x-api-key"] {
+                    assert!(
+                        !message.contains(forbidden),
+                        "key-test message leaked {forbidden:?}: {message}"
+                    );
+                }
+                // A status code would arrive as digits.
+                assert!(
+                    !message.chars().any(|character| character.is_ascii_digit()),
+                    "key-test message contains a number: {message}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn key_test_kinds_are_members_of_the_typescript_union() {
+        // Same contract as `error_kinds_match_the_typescript_union` above, for
+        // the two kinds only this command can produce. `auth` and `rate-limit`
+        // are members of `ProviderErrorKind` in packages/ai-providers/src/types.ts.
+        for outcome in ALL_OUTCOMES {
+            let kind = key_test_kind(outcome);
+            assert!(
+                ["auth", "rate-limit", "network", "server", "bad-request"].contains(&kind),
+                "{kind} is not a ProviderErrorKind"
+            );
+
+            let rendered = transport_error(kind, key_test_message(ProviderId::Openai, outcome));
+            let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+            assert_eq!(parsed["kind"], kind);
+            assert!(!parsed["message"].as_str().unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn a_blank_candidate_key_is_refused_before_anything_is_sent() {
+        for blank in ["", "   ", "\t\n"] {
+            assert!(
+                candidate_key(ProviderId::Openai, blank).is_err(),
+                "{blank:?} should be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn a_candidate_key_is_trimmed_so_the_tested_value_is_the_saved_value() {
+        // The trailing newline case is not hypothetical: copying a key out of a
+        // terminal or a text file produces one every time, and a newline cannot
+        // go into an HTTP header at all.
+        assert_eq!(
+            candidate_key(ProviderId::Openai, "  the-key  \n").unwrap(),
+            "the-key"
+        );
+    }
+
+    #[test]
+    fn boundary_a_candidate_key_at_the_size_limit_is_accepted_and_one_byte_over_is_not() {
+        // The same boundary `secret_set` enforces, aliased rather than repeated.
+        // Testing a key that could never be saved would pass and then fail at
+        // the save, which is the one sequence this whole flow exists to prevent.
+        let at_limit = "k".repeat(secrets::MAX_SECRET_BYTES);
+        assert!(candidate_key(ProviderId::Openai, &at_limit).is_ok());
+
+        let over = "k".repeat(secrets::MAX_SECRET_BYTES + 1);
+        assert!(candidate_key(ProviderId::Openai, &over).is_err());
+    }
+
+    #[test]
+    fn boundary_a_key_far_longer_than_a_real_one_is_still_accepted() {
+        // Five hundred characters is several times any real OpenAI key and
+        // comfortably inside the credential store's limit, so it must pass. A
+        // limit set by guesswork rather than by the store is how a legitimate
+        // key gets refused for being "suspicious".
+        assert!(candidate_key(ProviderId::Openai, &"k".repeat(500)).is_ok());
+    }
+
+    #[test]
+    fn a_keyless_provider_cannot_be_key_tested() {
+        // Ollama needs no key, so "test this key" is a category error rather
+        // than a failure, and it must not put a request on the loopback port.
+        assert!(candidate_key(ProviderId::Ollama, "anything").is_err());
+    }
+
+    #[test]
+    fn a_rejected_candidate_key_never_appears_in_the_message() {
+        let secret = "do-not-log-me";
+        let oversized = format!("{secret}{}", "x".repeat(secrets::MAX_SECRET_BYTES));
+
+        let message = candidate_key(ProviderId::Openai, &oversized).unwrap_err();
+        assert!(!message.contains(secret), "the message echoed the key back");
+        assert!(!message.contains("xxx"), "the message echoed the key back");
+    }
+
+    #[test]
+    fn the_candidate_key_travels_in_the_header_each_provider_documents() {
+        assert_eq!(
+            candidate_auth_headers(ProviderId::Openai, "the-key".to_string()),
+            vec![("authorization", "Bearer the-key".to_string())]
+        );
+
+        // Anthropic's own scheme, if the card is ever extended to it.
+        assert!(
+            candidate_auth_headers(ProviderId::Anthropic, "the-key".to_string())
+                .iter()
+                .any(|(name, value)| *name == "x-api-key" && value == "the-key")
+        );
+
+        // A keyless provider gets no header at all, so nothing can be sent to
+        // the loopback daemon by accident.
+        assert!(candidate_auth_headers(ProviderId::Ollama, "the-key".to_string()).is_empty());
+    }
+
+    #[test]
+    fn a_key_test_reaches_the_models_endpoint_and_nothing_else() {
+        // The cheapest authenticated call OpenAI offers: not billed, and it
+        // returns no user data. The URL is assembled from two `&'static str`s.
+        assert_eq!(
+            format!(
+                "{}{}",
+                ProviderId::Openai.base_url(),
+                ProviderId::Openai.models_path()
+            ),
+            "https://api.openai.com/v1/models"
+        );
+    }
+
+    #[test]
+    fn testing_a_key_cannot_save_one() {
+        // The structural half of "never persist an untested key". The command
+        // that tests a candidate has no route to the credential store at all,
+        // so the save can only happen afterwards, from the frontend, once the
+        // test has come back green. The same guard `jobs.rs` carries.
+        let whole = without_comments(include_str!("providers.rs"));
+        let source = production_slice(&whole);
+
+        for forbidden in ["secret_set", "set_password", "secret_delete"] {
+            assert!(
+                !source.contains(forbidden),
+                "the provider transport can write to the credential store: {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_key_test_command_is_registered_for_javascript() {
+        let handler = without_comments(include_str!("lib.rs"));
+        assert!(
+            handler.contains("providers::provider_test_key,"),
+            "provider_test_key is not registered in generate_handler!"
+        );
+    }
+
+    #[test]
+    fn the_frontend_calls_the_key_test_by_this_name() {
+        const PORT_TS: &str = include_str!("../../src/features/settings/keys/aiKeyPort.ts");
+
+        assert!(
+            PORT_TS.contains("'provider_test_key'"),
+            "the OpenAI key card does not invoke provider_test_key"
+        );
+        // The argument names must be the Rust parameter names exactly. A rename
+        // on either side would otherwise break silently at runtime.
+        assert!(
+            PORT_TS.contains("{ provider: OPENAI_PROVIDER, key }"),
+            "the OpenAI key card no longer passes `provider` and `key`"
+        );
+    }
+
+    #[test]
+    fn the_card_repeats_these_sentences_word_for_word() {
+        // ====================================================================
+        // FIVE SENTENCES, TWO LANGUAGES, ACROSS AN FFI BOUNDARY.
+        // ====================================================================
+        // They are declared here, because only the transport knows what
+        // happened, and repeated in `aiKeyModel.ts` so the card can be tested
+        // without a socket. That repetition is exactly the kind of thing that
+        // drifts: reword an arm above and the TypeScript constants quietly
+        // become a lie, which no test on that side would notice — every one of
+        // them compares a constant against itself.
+        //
+        // The messages name the provider, and the card is the OpenAI one, so
+        // the comparison is made with OpenAI's own wording.
+        const MODEL_TS: &str = include_str!("../../src/features/settings/keys/aiKeyModel.ts");
+
+        for outcome in ALL_OUTCOMES {
+            let sentence = key_test_message(ProviderId::Openai, outcome);
+            assert!(
+                MODEL_TS.contains(&sentence),
+                "aiKeyModel.ts no longer carries this sentence word for word: {sentence}"
+            );
+        }
+
+        // Anti-inert: prove the haystack is the real file and the check can
+        // actually fail, rather than passing on an empty string or a stale one.
+        assert!(MODEL_TS.contains("AI_KEY_REFUSED"));
+        assert!(
+            !MODEL_TS.contains("OpenAI politely declined that key."),
+            "the detector would pass on a sentence that is not there"
+        );
     }
 }

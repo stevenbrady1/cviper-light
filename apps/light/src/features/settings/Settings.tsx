@@ -19,6 +19,8 @@ import { detectMobileOs, type MobileOs } from '../../platform/os';
 import { About } from './about/About';
 import { EraseEverything } from './erase/EraseEverything';
 import { type ErasePort } from './erase/port';
+import { AiKeySetup } from './keys/AiKeySetup';
+import { type AiKeyPort } from './keys/aiKeyPort';
 import { KeySetup } from './keys/KeySetup';
 import { Signpost } from '../signposts/Signpost';
 
@@ -79,6 +81,8 @@ export interface SettingsProps {
   readonly filePort?: FilePort | undefined;
   /** Injected by tests. Defaults to the real keyring-and-transport port. */
   readonly keyPort?: KeyPort | undefined;
+  /** Injected by tests. The OpenAI key card's own port — see `aiKeyPort.ts`. */
+  readonly aiKeyPort?: AiKeyPort | undefined;
   /** Injected by tests: the real one opens the user's browser. */
   readonly browser?: BrowserPort | undefined;
   /** Injected by tests: the real one reads and writes the board-choices file. */
@@ -141,6 +145,7 @@ export function Settings({
   port,
   filePort,
   keyPort,
+  aiKeyPort,
   browser,
   boardsPort,
   updatePort,
@@ -379,6 +384,14 @@ export function Settings({
           ) : null}
 
           <KeySetup port={keyPort} browser={browserPort} />
+
+          {/*
+            The AI key, in its own section rather than as a third entry in the
+            list above. That list is typed to `JobProviderId` all the way down
+            and tests its keys with `job_test_credentials`, a command that
+            REFUSES an AI credential by design — see the note in `aiKeyModel.ts`.
+          */}
+          <AiKeySetup port={aiKeyPort} />
 
           <BoardSettings port={boardsPort} />
 

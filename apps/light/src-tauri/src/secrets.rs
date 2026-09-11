@@ -9,11 +9,20 @@
 //! ============================================================================
 //! THE KEY GOES IN AND DOES NOT COME BACK OUT
 //! ============================================================================
-//! Three commands are exposed to JavaScript:
+//! Four commands are exposed to JavaScript:
 //!
 //!     secret_set     write a key
 //!     secret_delete  remove a key
 //!     secret_status  is there a key? — a bool, NEVER the value
+//!     secret_hint    bullets and AT MOST the last four characters
+//!
+//! `secret_hint` is a deliberate, bounded exception to the rule below, and it is
+//! worth being honest about: it is the only thing in this module that returns
+//! any part of a saved key. It exists because "Key saved" alone cannot answer
+//! the question a person with two OpenAI keys actually has — which one is in
+//! there? Four characters answer it and cannot authenticate anything, the
+//! masking is computed HERE rather than in JavaScript, and a key too short for
+//! four characters to be a small fraction of it is masked completely.
 //!
 //! There is deliberately no `secret_get` command. `secret_get` exists, but it is
 //! a plain Rust function that `generate_handler!` does not know about, so there
@@ -269,6 +278,49 @@ pub(crate) fn secret_status(key: SecretKey) -> Result<bool, String> {
     }
 }
 
+/// How many characters of a saved key a hint may show. NEVER more.
+const HINT_TAIL_CHARS: usize = 4;
+
+/// The mask itself. Four bullets, whatever the length of the key.
+///
+/// Deliberately NOT one bullet per character: the length of an API key is a
+/// small fact about it, and a hint that rendered it would be one more thing a
+/// screenshot gives away for nothing in return.
+const HINT_MASK: &str = "••••";
+
+/// The masked form of a key: bullets, then at most its last four CHARACTERS.
+///
+/// Characters, not bytes — slicing a UTF-8 string by byte offset panics in the
+/// middle of a multi-byte character, and a panic inside a Tauri command takes
+/// the window with it. A key is ASCII in practice, which is exactly why a
+/// byte-based version of this would pass every test and wait.
+///
+/// A short key is masked COMPLETELY. Four characters out of forty is a hint;
+/// four out of six is most of the key.
+fn hint_for(value: &str) -> String {
+    let count = value.chars().count();
+    if count <= HINT_TAIL_CHARS * 2 {
+        return HINT_MASK.to_string();
+    }
+
+    let tail: String = value.chars().skip(count - HINT_TAIL_CHARS).collect();
+    format!("{HINT_MASK}{tail}")
+}
+
+/// Enough of a saved key to tell it apart from another one. `None` = none saved.
+///
+/// See the module comment: this is the one command that returns any part of a
+/// key, the amount is bounded here in Rust, and the value itself never reaches
+/// JavaScript. `a_hint_never_contains_the_whole_key` is the guard.
+#[tauri::command]
+pub(crate) fn secret_hint(key: SecretKey) -> Result<Option<String>, String> {
+    match entry(key).and_then(|entry| entry.get_password()) {
+        Ok(value) => Ok(Some(hint_for(&value))),
+        Err(KeyErr::NoEntry) => Ok(None),
+        Err(error) => Err(describe(&error)),
+    }
+}
+
 /// Read a key. **NOT A `#[tauri::command]`, and it must never become one.**
 ///
 /// See the module comment: this is the only way to read a saved key, it is
@@ -471,6 +523,53 @@ mod tests {
         let first = ios_store::ensure().map_err(|error| describe(&error));
         let second = ios_store::ensure().map_err(|error| describe(&error));
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn a_hint_shows_at_most_the_last_four_characters() {
+        assert_eq!(hint_for("sk-proj-abcdefghijklmnop"), "••••mnop");
+    }
+
+    #[test]
+    fn a_hint_never_contains_the_whole_key() {
+        // The guard that matters. Whatever the masking rule becomes, the value
+        // it was given must not be recoverable from what it returns.
+        for key in [
+            "sk-proj-abcdefghijklmnop",
+            "short",
+            "12345678",
+            "123456789",
+            "",
+        ] {
+            let hint = hint_for(key);
+            assert!(
+                !hint.contains(key) || key.is_empty(),
+                "the hint rendered the whole key: {hint}"
+            );
+            // At most four characters of the key survive, plus the mask.
+            let revealed = hint.chars().filter(|c| *c != '•').count();
+            assert!(revealed <= HINT_TAIL_CHARS, "{hint} revealed too much");
+        }
+    }
+
+    #[test]
+    fn boundary_a_key_too_short_to_hint_is_masked_completely() {
+        // Four characters out of forty is a hint. Four out of six is most of
+        // the key, so nothing is shown at all below twice the tail length.
+        assert_eq!(hint_for(""), HINT_MASK);
+        assert_eq!(hint_for("abcd"), HINT_MASK);
+        assert_eq!(hint_for("abcdefgh"), HINT_MASK);
+        // One past the boundary, the tail appears.
+        assert_eq!(hint_for("abcdefghi"), "••••fghi");
+    }
+
+    #[test]
+    fn a_hint_counts_characters_so_a_multibyte_key_cannot_panic() {
+        // Slicing by BYTE offset panics in the middle of a multi-byte
+        // character, and a panic inside a Tauri command takes the window with
+        // it. Every character here is three bytes.
+        let hint = hint_for("€€€€€€€€€€");
+        assert_eq!(hint, "••••€€€€");
     }
 
     #[test]

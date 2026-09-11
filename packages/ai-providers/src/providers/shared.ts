@@ -30,6 +30,34 @@ export function classifyStatus(status: number): ProviderErrorKind {
   return 'bad-request';
 }
 
+/**
+ * The provider's own prose, or `null` when it must not be repeated.
+ *
+ * ============================================================================
+ * AN AUTH FAILURE IS NEVER QUOTED BACK.
+ * ============================================================================
+ * OpenAI's 401 body quotes the key it rejected, masked:
+ *
+ *     {"error":{"message":"Incorrect API key provided: sk-proj-****abcd", …}}
+ *
+ * `httpError` used to pass that straight through, and the analysis screen
+ * renders a failure verbatim (`runAnalysis.ts` → `Analysis.tsx`). So a fragment
+ * of the user's own credential ended up on screen — and in every screenshot of
+ * it, which is exactly what people attach to a support message.
+ *
+ * Dropping the detail costs nothing here, because `httpError`'s auth fallback
+ * already says the one thing the user can act on: the key was rejected, and
+ * Settings is where it is fixed. Every other status keeps its prose, where the
+ * provider's explanation is genuinely the most useful thing available.
+ *
+ * A rule about a SHAPE of response rather than about one provider's wording:
+ * OpenAI is the one known to echo the key today, and a second provider deciding
+ * to do it tomorrow is the sort of change nobody here would hear about.
+ */
+export function detailUnlessAuth(status: number, detail: string | null): string | null {
+  return classifyStatus(status) === 'auth' ? null : detail;
+}
+
 /** Trim provider prose to something that fits in a toast. */
 export function trimMessage(raw: string): string {
   const flat = raw.replace(/\s+/g, ' ').trim();

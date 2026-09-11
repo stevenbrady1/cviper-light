@@ -50,12 +50,22 @@ pub fn run() {
             secrets::secret_set,
             secrets::secret_delete,
             secrets::secret_status,
+            // Bullets and at most the last four characters of a saved key, so
+            // somebody with two keys can tell which one is in the store. The
+            // masking happens in Rust; see the module comment in secrets.rs for
+            // why this is the one bounded exception to "nothing comes back out".
+            secrets::secret_hint,
             // The provider transport. Rust owns every base URL and injects the
             // API key from the keyring, so a compromised frontend can still
             // only reach the three APIs named in providers.rs.
             providers::provider_chat,
             providers::provider_list_models,
             providers::ollama_probe,
+            // Testing an AI key the user has just typed and has NOT saved: one
+            // cheap metadata request, the candidate key passed straight in, the
+            // response body never read, nothing written anywhere. Same
+            // test-before-save shape as jobs::job_test_credentials.
+            providers::provider_test_key,
             // The job-board transport. Same shape: Rust owns both base URLs,
             // reads Adzuna's two keys and Reed's one from the keyring, and
             // enforces the minimum gap between submits — a disabled button
