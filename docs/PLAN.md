@@ -401,7 +401,12 @@ actionable — the correct first impression for a zero-key product.
 **Workflows:** `ci.yml` on **windows-latest** (catches the path/line-ending/MSVC issues Ubuntu
 hides) running the four verification commands with `Swatinem/rust-cache` — and **never
 `tauri build`**. `release.yml` on `light-v*` tags via `tauri-action`, matrix windows + macOS
-`aarch64-apple-darwin`, `releaseDraft: true` always, secrets by name only. Plus the
+`universal-apple-darwin` (lipo'd from both darwin slices, so an Intel Mac is not handed a
+bundle that cannot run), `releaseDraft: true` always, secrets by name only. The macOS leg is
+gated on a first step that classifies the five `APPLE_*` secrets into three visibly different
+outcomes — all five set signs and notarises, none set skips the leg with a warning and still
+ships Windows, a PARTIAL set fails the run naming the missing ones, because an unset secret
+expands to an empty string and is otherwise indistinguishable from a real one. Plus the
 monorepo-split workflow with placeholder org/repo.
 
 ---
