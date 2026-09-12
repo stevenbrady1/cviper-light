@@ -87,9 +87,9 @@ the executable alone was the correct minimal package.
 Store "may apply all tests from this workflow", so WACK marking "Blocked
 executables" optional is not a guarantee that the Store's own gate ignores it
 too. That residual risk closes with a real submission and nothing else, which is
-also the cheapest next move: enrol as an individual developer (free, via
-storedeveloper.microsoft.com) and submit one build to find out what the gate
-actually does with it.
+also the cheapest next move: enrol — as a COMPANY account, not the free
+individual one this entry originally recommended (see L-99 below) — and submit
+one build to find out what the gate actually does with it.
 
 ### A consent gate now guards every cloud AI call (L-97, 2026-09-12)
 
@@ -117,6 +117,44 @@ branch here for it to fall into — a local run never even asks the question.
 Consent is per provider, never global, and revocation is reachable from the
 analysis screen itself (`ConsentStatus`), not from Settings, because
 `Settings.tsx` was mid-flight in another change at the time this landed.
+
+### Store enrolment is a company account, not an individual one (L-99, 2026-09-12)
+
+**The decision: a company account — roughly $99 one-off, plus business
+verification.** The L-95 entry above recommended the free individual developer
+account. That recommendation is withdrawn, and the reasoning is recorded here
+rather than the wrong clause simply being deleted, because this is one of the
+few choices in this project that cannot be walked back: **individual→company
+conversion is not supported**, and the account's country cannot be changed
+afterwards either. Getting it wrong is unrecoverable, which is why it was
+settled before signup rather than discovered after.
+
+**Two Store policies decide it.** Policy 10.14 sets two tests an individual
+account would have had to pass: a publisher name a reasonable consumer would
+read as a business requires a company account, and individual accounts are only
+for developers whose distribution is "not in relation to their business, trade,
+or profession." CViper Light carries an upsell link to the owner's commercial
+hosted product — permitted, and deliberately so, under ADR 012 in the hosted
+repository — which makes passing that second test genuinely doubtful. Policy
+10.8.3 is the blunter one: it bars a free individual account from requiring API
+secret keys for primary functionality, which would have forced the listing to
+lead with the keyless features alone. Neither restriction binds a company
+account.
+
+**It also lifts the Azure Artifact Signing geographic lockout**, which changes
+what this product may do rather than merely what it files. Individual developers
+there are limited to the USA and Canada; organisations in the UK are eligible,
+at roughly $9.99/month. The company account therefore turns "MSIX or nothing"
+into "MSIX **and** a signed direct-download `.exe`" — the Microsoft Store stops
+being the only possible Windows distribution channel.
+
+**It does not buy a clean install outside the Store, and nothing does on day
+one.** EV certificates stopped granting instant SmartScreen reputation in 2024;
+reputation now accrues over several weeks and hundreds of clean installs, with
+no route to request an expedited review. **The Store remains the only way to a
+warning-free install from the very first download.** A signed direct `.exe` is a
+second channel that improves with age — not a replacement for the Store, and not
+a reason to treat the Store submission as optional.
 
 ---
 
@@ -607,7 +645,10 @@ text editor and starts with `"schemaVersion": 1`.
    inert until those exist, and with none of them set it skips itself with a
    warning while Windows still ships.
 8. Microsoft Store enrolment — **the recommended next step**, on the strength of
-   the WACK result recorded in Status. Free for an individual developer at
-   `storedeveloper.microsoft.com`, and the only way to settle what that result
-   cannot: submit one real build and see what the Store's own gate does with it.
+   the WACK result recorded in Status. Enrol as a **company account** — roughly
+   $99 one-off plus business verification — and never as the free individual
+   one: the conversion between them does not exist, and neither does changing
+   the account's country later (see L-99 in Status for why). It remains the only
+   way to settle what the WACK result cannot: submit one real build and see what
+   the Store's own gate does with it.
 9. First tagged release and macOS notarization.
