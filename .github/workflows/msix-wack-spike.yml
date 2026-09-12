@@ -498,33 +498,51 @@ jobs:
           $report = Join-Path $env:WACK_DIR 'wack-report.xml'
           [xml]$xml = Get-Content $report -Raw
 
-          # Every element carrying a RESULT attribute, whatever the schema
-          # version calls them. Parsing defensively beats hardcoding a shape
-          # that a future kit release quietly changes.
-          $results = @($xml.SelectNodes('//*[@RESULT]'))
-          $failed  = @($results | Where-Object { $_.GetAttribute('RESULT') -notmatch '^(PASS|PASSED)$' })
-
-          $overall = if ($xml.DocumentElement.GetAttribute('OVERALL_RESULT')) {
-            $xml.DocumentElement.GetAttribute('OVERALL_RESULT')
-          } elseif ($failed.Count -eq 0) { 'PASS' } else { 'FAIL' }
+          # The real shape, confirmed against the 49 KB report run #2 produced:
+          #
+          #   <TEST NAME="..." OPTIONAL="TRUE|FALSE">
+          #     <RESULT>PASS|FAIL</RESULT>
+          #     <MESSAGES><MESSAGE TEXT="..."/></MESSAGES>
+          #   </TEST>
+          #
+          # RESULT is a CHILD ELEMENT, not an attribute. The first version of
+          # this step searched for //*[@RESULT], matched nothing at all, and
+          # then printed "Every check passed" — while Blocked executables was
+          # FAILING. A count over an empty set is not evidence of anything, and
+          # a guard that reports success because it asked no question is the
+          # failure class this project keeps re-learning.
+          #
+          # Hence the hard stop below: no <TEST> elements means the schema moved
+          # and the summary must not be believed.
+          $tests = @($xml.SelectNodes('//TEST'))
+          if ($tests.Count -eq 0) {
+            Write-Host '::error::Report parsed but contains no <TEST> elements. The kit schema has changed and this summary cannot be trusted.'
+            exit 1
+          }
+          $failed  = @($tests | Where-Object { $_.SelectSingleNode('RESULT').InnerText.Trim() -ne 'PASS' })
+          $overall = $xml.DocumentElement.GetAttribute('OVERALL_RESULT')
 
           $sb = [System.Text.StringBuilder]::new()
           [void]$sb.AppendLine("## MSIX WACK spike - ${{ matrix.profile }} build")
           [void]$sb.AppendLine('')
           [void]$sb.AppendLine("**WACK ran.** Overall result: **$overall**  ")
-          [void]$sb.AppendLine("appcert exit code: ``$env:APPCERT_EXIT`` - checks with a result: $($results.Count), not passing: $($failed.Count)")
+          [void]$sb.AppendLine("appcert exit code: ``$env:APPCERT_EXIT`` - tests run: $($tests.Count), passed: $($tests.Count - $failed.Count), failed: $($failed.Count)")
           [void]$sb.AppendLine('')
 
           if ($failed.Count -eq 0) {
-            [void]$sb.AppendLine('Every check passed. No Blocked Executables failure, so tauri-apps/tauri#14935 did not reproduce on a release build.')
+            [void]$sb.AppendLine("All $($tests.Count) tests passed. No Blocked executables failure, so tauri-apps/tauri#14935 did not reproduce on this build.")
           } else {
-            [void]$sb.AppendLine('### Checks that did not pass')
+            if ($overall -eq 'PASS') {
+              # The distinction that decides whether the Store route is open.
+              [void]$sb.AppendLine('NOTE: WACK reports overall PASS even though the tests below failed, because they are marked OPTIONAL. Microsoft documents that the Store may apply all tests from this workflow, so an optional failure is a submission risk to resolve rather than a non-event.')
+              [void]$sb.AppendLine('')
+            }
+            [void]$sb.AppendLine('### Tests that did not pass')
             [void]$sb.AppendLine('')
-            [void]$sb.AppendLine('| Check | Result |')
-            [void]$sb.AppendLine('| --- | --- |')
+            [void]$sb.AppendLine('| Test | Result | Optional |')
+            [void]$sb.AppendLine('| --- | --- | --- |')
             foreach ($f in $failed) {
-              $n = $f.GetAttribute('NAME'); if (-not $n) { $n = $f.LocalName }
-              [void]$sb.AppendLine("| $n | $($f.GetAttribute('RESULT')) |")
+              [void]$sb.AppendLine("| $($f.GetAttribute('NAME')) | $($f.SelectSingleNode('RESULT').InnerText.Trim()) | $($f.GetAttribute('OPTIONAL')) |")
             }
             [void]$sb.AppendLine('')
             # The API and binary names behind a Blocked Executables failure —
@@ -534,11 +552,13 @@ jobs:
             [void]$sb.AppendLine('')
             [void]$sb.AppendLine('```')
             foreach ($f in $failed) {
-              $n = $f.GetAttribute('NAME'); if (-not $n) { $n = $f.LocalName }
-              [void]$sb.AppendLine("--- $n ---")
-              $t = ($f.InnerText -replace '\s+', ' ').Trim()
-              if ($t.Length -gt 4000) { $t = $t.Substring(0, 4000) + ' ...[truncated, see the artefact]' }
-              [void]$sb.AppendLine($t)
+              [void]$sb.AppendLine("=== $($f.GetAttribute('NAME')) ===")
+              # The API and binary names live in MESSAGE/@TEXT. This is the
+              # detail #14935 is actually about, so it is reproduced verbatim
+              # rather than summarised.
+              foreach ($m in $f.SelectNodes('.//MESSAGE')) {
+                [void]$sb.AppendLine('  ' + $m.GetAttribute('TEXT'))
+              }
               [void]$sb.AppendLine('')
             }
             [void]$sb.AppendLine('```')
