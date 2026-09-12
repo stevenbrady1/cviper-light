@@ -15,8 +15,10 @@
  * which any existing test can fail on.
  *
  * So this runs against the built `src-tauri/target/<profile>/<app>.exe` — see
- * the note on the build profile below for why that profile is `debug` —
- * driven through `tauri-driver`, in CI, on Windows, where a build is allowed.
+ * the note on the build profile below for why that profile is `debug` — in CI,
+ * on Windows, where a build is allowed. The app serves WebDriver itself when
+ * compiled with the `wdio` feature, so there is no external driver process:
+ * this file launches the binary and talks to it directly.
  *
  * ============================================================================
  * IT DOES NOT BUILD THE APP. THAT IS DELIBERATE.
@@ -116,8 +118,9 @@ const BUILD_DIRECTORY = resolve(HERE, '..', 'src-tauri', 'target', BUILD_PROFILE
  * goes stale at the next CLI bump, both are tried and a miss reports what IS in
  * the directory. A wrong guess must never look like a missing build.
  *
- * Run #1 settled it for now: the build log said
- * `Built application at: ...\target\release\light.exe`.
+ * Settled by the build logs: they report
+ * `Built application at: ...\target\debug\light.exe`, so the Cargo package
+ * name wins over `productName`.
  */
 const BINARY_CANDIDATES = ['CViper Light.exe', 'light.exe'];
 

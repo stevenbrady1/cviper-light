@@ -10,9 +10,14 @@ name: Smoke
 # bundled `frontendDist` sit between those tests and a working app, and none of
 # them can fail a single existing check.
 #
-# This workflow builds the real installer and then drives the real executable
-# through `tauri-driver` and Microsoft Edge WebDriver, asking it four questions.
-# See apps/light/e2e/smoke.spec.ts.
+# This workflow builds twice, on purpose, and the reason is a security one:
+#
+#   1. a CLEAN installer, with no test feature, which is the artefact uploaded;
+#   2. an INSTRUMENTED binary (`--features wdio --no-bundle`), never bundled and
+#      never uploaded, which is the thing the spec drives.
+#
+# The app serves WebDriver itself when built with `wdio`; there is no external
+# driver. See apps/light/e2e/smoke.spec.ts and the note above the build steps.
 #
 # ============================================================================
 # WHY A SEPARATE WORKFLOW AND NOT A JOB IN ci.yml
@@ -69,12 +74,14 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      # Its own cache key: this job compiles in RELEASE, which shares nothing
-      # with the debug artefacts `cargo check` leaves behind in ci.yml.
+      # Its own cache key. This job compiles in DEBUG, and twice — once without
+      # the `wdio` feature and once with it — so its artefacts are not the ones
+      # `cargo check` leaves behind in ci.yml, and changing the feature set
+      # invalidates only the top crate rather than the whole tree.
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/light/src-tauri
-          key: smoke-release
+          key: smoke-debug
 
       # ------------------------------------------------------------------
       # THERE IS NO EXTERNAL DRIVER STEP HERE ANY MORE, AND THAT IS THE FIX.
@@ -114,36 +121,29 @@ jobs:
       # Nothing this job produces is shippable, and nothing here publishes it.
       # release.yml remains the only path to a signed artefact.
       #
-      # ------------------------------------------------------------------
-      # `--features wdio` IS THE WHOLE POINT, AND `--debug` IS NOT OPTIONAL.
-      # ------------------------------------------------------------------
-      # `wdio` compiles in the embedded WebDriver server that this job drives.
-      # It is a TEST-ONLY feature: see the long comment in src-tauri/Cargo.toml.
-      # Nothing else in the repository enables it, and a contract test fails if
-      # release.yml or ci.yml ever do.
+      # ==================================================================
+      # BUILD ONE: THE CLEAN INSTALLER. THIS IS THE ONLY THING UPLOADED.
+      # ==================================================================
+      # No `--features wdio`, so no automation server is compiled in. This is
+      # the artefact a person may download and install.
       #
-      # `--debug` is required in tandem, and is enforced rather than trusted:
-      # src-tauri/src/lib.rs raises a `compile_error!` when `wdio` is enabled
-      # without debug assertions, so `--features wdio` on a release profile
-      # does not build at all. Passing one without the other is a compile
-      # failure, not a silently shipped automation server.
-      #
-      # A debug build is still the real app: the real toolchain, the real
-      # WebView2, the real bundled frontend. Only the Rust optimisation level
-      # differs, and per Tauri's CLI docs the bundler with `--debug` "will do
-      # the same as they would in the actual release mode", so the installers
-      # still come out — under target/debug/bundle.
-      - name: Build the app (debug profile, wdio feature, unsigned)
+      # An earlier version of this workflow built ONCE, with the feature on,
+      # and uploaded THOSE installers. That was a real hole, not an untidiness:
+      # the `wdio` plugin runs an unauthenticated HTTP server on
+      # 127.0.0.1:4445 exposing execute-script, screenshot, cookie and element
+      # handlers, with no Origin or Host check. The artefact carried the normal
+      # product name and version, and on a public repository any signed-in user
+      # can download it. The Cargo feature gate was doing its job — it is
+      # release.yml that it protects — and this job was quietly publishing an
+      # instrumented build through a different door.
+      - name: Build the shippable installer (no test feature)
         shell: bash
-        run: pnpm --filter @cviper/light tauri build --debug --features wdio --config '{"bundle":{"createUpdaterArtifacts":false}}'
+        run: pnpm --filter @cviper/light tauri build --debug --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
-      # Uploaded BEFORE the smoke test runs, on purpose: when the smoke test
-      # goes red the installer is the first thing anyone will want to open.
-      # `if-no-files-found: error` makes the upload itself an assertion — a job
-      # that "did not fail" proves nothing, an installer that exists does.
-      # `target/debug/bundle`, because the build above is `--debug`. The
-      # bundler produces the same installers it would for a release; they are
-      # simply compiled unoptimised, and they are unsigned.
+      # Uploaded here, between the two builds, so what leaves this job is
+      # unambiguously the clean one. `if-no-files-found: error` makes the
+      # upload itself an assertion: a job that "did not fail" proves nothing,
+      # an installer that exists does.
       - uses: actions/upload-artifact@v4
         with:
           name: cviper-light-windows-installers
@@ -151,9 +151,33 @@ jobs:
             apps/light/src-tauri/target/debug/bundle/msi/*.msi
             apps/light/src-tauri/target/debug/bundle/nsis/*-setup.exe
           if-no-files-found: error
-          # Short: these are unsigned debug-profile builds for inspection after
-          # a red run, not releases. release.yml produces the shippable ones.
+          # Unsigned debug-profile builds for inspection after a red run, not
+          # releases. release.yml produces the shippable, signed ones.
           retention-days: 7
+
+      # ==================================================================
+      # BUILD TWO: THE INSTRUMENTED BINARY. `--no-bundle` IS LOAD-BEARING.
+      # ==================================================================
+      # `wdio` compiles in the embedded WebDriver server the spec drives. It is
+      # a TEST-ONLY feature — see the long comment in src-tauri/Cargo.toml.
+      #
+      # `--no-bundle` means no `.msi` and no `-setup.exe` is ever PRODUCED from
+      # this build, so an instrumented installer cannot be uploaded by accident,
+      # by a reordered step, or by a future edit to the paths above. Ordering
+      # the steps would have been a convention; not creating the file is a
+      # property. The contract test asserts that any `tauri build` carrying
+      # `--features wdio` also carries `--no-bundle`.
+      #
+      # `--debug` is required in tandem and is enforced rather than trusted:
+      # src-tauri/src/lib.rs raises a `compile_error!` when `wdio` is enabled
+      # without debug assertions, so the feature on a release profile does not
+      # compile at all.
+      #
+      # This overwrites target/debug/light.exe with the instrumented binary,
+      # which is exactly what the spec then drives. It never leaves the runner.
+      - name: Build the instrumented binary (wdio feature, never bundled)
+        shell: bash
+        run: pnpm --filter @cviper/light tauri build --debug --features wdio --no-bundle
 
       - name: Smoke-test the real binary
         run: pnpm smoke
