@@ -26,11 +26,20 @@ that is accessible to the developer or to the developer's third-party partners
 
 ### The one thing to be clear about with the reviewer
 
-A user may paste their **own** OpenAI or Anthropic key and then press
-"Analyse". The CV text goes to that provider, under the user's own account,
-by the user's explicit action each time. Those providers are not our partners
-— we have no agreement, no account and no key with them; the user does — and
-we receive nothing from the exchange. That is why the answer is still "no".
+A user may paste their **own** OpenAI key and then press "Analyse". The CV text
+goes to OpenAI, under the user's own account, by the user's explicit action each
+time. OpenAI is not our partner — we have no agreement, no account and no key
+with them; the user does — and we receive nothing from the exchange. That is why
+the answer is still "no".
+
+**OpenAI is the only one.** This section used to say "OpenAI or Anthropic", and
+since L-102 no screen in the app can save an Anthropic key: `AI_KEY_PROVIDER_IDS`
+holds `openai` alone, and `analysis/providers.ts` offers only providers that list
+names, so the picker cannot present Anthropic even on a machine whose credential
+store still holds a key from an older build. `api.anthropic.com` is still in the
+generated privacy policy because the adapter and the host registry entry still
+exist; telling a reviewer they can paste a key would have been a claim about a
+screen that does not exist.
 
 If App Review pushes back, the fallback declaration that is still true is:
 
@@ -38,7 +47,7 @@ If App Review pushes back, the fallback declaration that is still true is:
 - **Use:** App Functionality
 - **Linked to the user's identity:** No
 - **Used for tracking:** No
-- with the note that it is sent only to a service the user chose and holds
+- with the note that it is sent only to OpenAI, which the user chose and holds
   their own account with, only when they press the button, and never to us.
 
 Do not declare anything under Contact Info, Identifiers, Usage Data,

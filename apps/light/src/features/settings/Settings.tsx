@@ -14,6 +14,11 @@ import { BoardSettings } from '../boards/BoardSettings';
 import { type BoardPreferencesPort } from '../boards/port';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
+import {
+  MICROSOFT_STORE,
+  distributionChannel,
+  type DistributionChannel,
+} from '../../platform/distribution';
 import { detectMobileOs, type MobileOs } from '../../platform/os';
 
 import { About } from './about/About';
@@ -103,6 +108,17 @@ export interface SettingsProps {
    */
   readonly mobileOs?: MobileOs | null | undefined;
   /**
+   * How this copy was delivered. Injected by tests; the real value comes from
+   * the build (`platform/distribution`).
+   *
+   * On a desktop it decides the Updates section, because a Microsoft Store
+   * install and a direct download are the same code on the same operating
+   * system and only one of them can update itself: an installed MSIX is
+   * read-only, so the Store flavour is compiled without the updater plugin at
+   * all and the section names the Store instead (L-93).
+   */
+  readonly distribution?: DistributionChannel | undefined;
+  /**
    * Reopen the first-run introduction.
    *
    * Owned by the shell, because the introduction replaces the whole window and
@@ -151,6 +167,7 @@ export function Settings({
   boardsPort,
   updatePort,
   mobileOs = detectMobileOs(),
+  distribution = distributionChannel(),
   onShowWelcome,
   now,
   erasePort,
@@ -396,7 +413,25 @@ export function Settings({
 
           <BoardSettings port={boardsPort} />
 
-          {mobileOs === null ? <UpdateCheck port={updatePort} /> : <StoreUpdates os={mobileOs} />}
+          {/*
+            Three cases, one rule: the manual check is offered only where the
+            updater plugin is actually in the binary.
+
+              a phone            -> the App Store or Google Play (L-80)
+              a Store desktop    -> the Microsoft Store (L-93)
+              everything else    -> the check, exactly as before
+
+            The last branch is the default in every ambiguous case on purpose.
+            A direct download wrongly told a store updates it has no route to a
+            security fix at all — see `platform/distribution.ts`.
+          */}
+          {mobileOs !== null ? (
+            <StoreUpdates os={mobileOs} />
+          ) : distribution === MICROSOFT_STORE ? (
+            <StoreUpdates os="windows" />
+          ) : (
+            <UpdateCheck port={updatePort} />
+          )}
 
           <section>
             <h2 className="font-medium text-ink">Getting started</h2>

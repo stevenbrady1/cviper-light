@@ -38,7 +38,37 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 # Upstream suggests `[target.'cfg(debug_assertions)'.dependencies]` instead.
 # That is weaker: it would put an automation server in EVERY debug build,
 # including a developer's own. An explicit opt-in feature is the narrower door.
+#
+# ============================================================================
+# `updater` IS ON BY DEFAULT AND IS OFF FOR THE MICROSOFT STORE (L-93).
+# ============================================================================
+# An installed MSIX's files are READ-ONLY. `tauri-plugin-updater` works by
+# replacing the installed binary, so in a Store build it cannot succeed — it can
+# only fail, on a machine where the Store is already handling updates properly.
+#
+# So the Store flavour is compiled WITHOUT it:
+#
+#     tauri build --features microsoft-store -- --no-default-features
+#
+# `optional = true` on the dependency below is what makes that a real gate
+# rather than a naming convention: with the feature off the crate is not
+# compiled and not even downloaded, exactly as with `wdio`.
+#
+# `default = ["updater"]` keeps every OTHER build — release.yml, smoke.yml,
+# ci.yml, a developer's `cargo check` — unchanged, and means a Store build has
+# to ASK for the plugin's absence rather than a normal build having to ask for
+# its presence. A gate that fails open is not a gate.
+#
+# `microsoft-store` compiles nothing of its own. It exists so the two halves
+# cannot come apart: `src/lib.rs` raises a `compile_error!` if it is ever on at
+# the same time as `updater`, so a Store build that did not receive
+# `--no-default-features` does not compile at all rather than quietly shipping
+# an updater that cannot work. `src/lib/msix-store-build.contract.test.ts` holds
+# the rest of the chain.
 [features]
+default = ["updater"]
+updater = ["dep:tauri-plugin-updater"]
+microsoft-store = []
 wdio = ["dep:tauri-plugin-wdio-webdriver"]
 
 [build-dependencies]
@@ -113,7 +143,11 @@ url = "2.5"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2"
+# Desktop-only AND feature-gated — read the `[features]` note above before
+# touching this line. `optional = true` is what lets the Microsoft Store flavour
+# be built without an updater that could never work on a read-only MSIX install;
+# it is in `default`, so nothing else changes.
+tauri-plugin-updater = { version = "2", optional = true }
 
 # iOS has no file-based keychain, and `keyring`'s default (`v1`) facade installs
 # NO store there: every `keyring::Entry::new` answers `NoDefaultStore`. The

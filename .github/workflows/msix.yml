@@ -1,0 +1,564 @@
+name: MSIX (Microsoft Store)
+
+# ============================================================================
+# THE MICROSOFT STORE PACKAGE (L-93).
+# ============================================================================
+# Builds the Store FLAVOUR of CViper Light with `tauri build`, packs it as an
+# MSIX with Microsoft's `winapp` CLI, and runs the Windows App Certification Kit
+# over the result. The `.msix` it uploads is the file the owner submits to
+# Partner Center — see docs/STORE-SUBMISSION.md.
+#
+# ----------------------------------------------------------------------------
+# WHY THE STORE AT ALL
+# ----------------------------------------------------------------------------
+# A Windows installer that opens without a SmartScreen warning normally means
+# buying a code-signing certificate. The Microsoft Store RE-SIGNS what it
+# accepts, which makes it the only zero-cost route to a warning-free install.
+# It does not re-sign an .msi or .exe — policy 10.2.9 requires those to be
+# signed by a certificate chaining to the Microsoft Trusted Root Program — so
+# for Windows it is MSIX or a purchased certificate, and nothing else.
+#
+# ----------------------------------------------------------------------------
+# WHY IT IS `tauri build` AND NOT `cargo build --release`
+# ----------------------------------------------------------------------------
+# The L-95 spike proved a release-built MSIX passes WACK, but it built with
+# plain `cargo build --release` — which names the binary after the Cargo package
+# (`light.exe`) rather than `productName` ("CViper Light.exe"), lays resources
+# out differently, and skips `beforeBuildCommand` entirely. So the artefact
+# anybody would actually SUBMIT had never been built, let alone tested. This
+# workflow closes that: the package is made from the real thing.
+#
+# `--no-bundle` is in the build command because we want the compiled executable,
+# not an NSIS or MSI installer. winapp builds the MSIX from a folder; Tauri's
+# own Windows bundlers are irrelevant here and would add minutes producing
+# artefacts that are thrown away. This is NOT release.yml — nothing here is
+# signed with the updater key, nothing is published, and no release is touched.
+#
+# ----------------------------------------------------------------------------
+# WHY IT IS NOT A PULL-REQUEST GATE
+# ----------------------------------------------------------------------------
+# A release Rust build, an MSIX pack and a full WACK pass is tens of minutes of
+# Windows runner time, which bills at twice the Linux rate, to re-answer a
+# question that only changes when the packaging does. The things that CAN break
+# silently between runs are guarded in `pnpm test` instead, where they cost
+# nothing: `src/lib/msix-store-build.contract.test.ts` holds the updater out of
+# the Store flavour, and `src/packaging/msixAssets.contract.test.ts` holds every
+# Store asset to its declared size. Those run on every commit; this runs when
+# somebody is about to submit.
+on:
+  workflow_dispatch:
+    inputs:
+      run_wack:
+        description: >-
+          Run the Windows App Certification Kit over the package. Adds roughly
+          ten minutes. Turn it off only while iterating on the packaging itself
+          — never before a submission.
+        type: boolean
+        default: true
+
+  # --------------------------------------------------------------------------
+  # TEMPORARY. DELETE THIS BLOCK BEFORE MERGE.
+  # --------------------------------------------------------------------------
+  # GitHub will not dispatch a workflow that is not already on the default
+  # branch: "This event will only trigger a workflow run if the workflow file
+  # exists on the default branch." So a brand-new packaging workflow cannot be
+  # run from the pull request that introduces it — which is the one place it has
+  # to run, because the whole claim of that pull request is that the packaging
+  # works.
+  #
+  # Scoped to this one branch. It cannot fire on main, it cannot fire on anyone
+  # else's branch, and it goes when the branch does. The permanent trigger is
+  # the workflow_dispatch above.
+  push:
+    branches:
+      - feat/msix-store-package
+
+# Least privilege, and `contents: read` is named explicitly: a job with a
+# `permissions:` block that omits it cannot check the repository out.
+permissions:
+  contents: read
+
+# Deliberately NOT cancel-in-progress. Cancelling a forty-minute package because
+# somebody pushed a typo fix wastes the forty minutes.
+concurrency:
+  group: msix-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Corepack asks, interactively, before downloading a package manager it has
+  # not seen. On a runner that prompt is a long hang ending in a timeout with no
+  # useful log.
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+  # ==========================================================================
+  # THE FRONTEND HALF OF THE STORE FLAVOUR. IT TRAVELS WITH THE CARGO HALF.
+  # ==========================================================================
+  # `pnpm build:msix` compiles the Rust side WITHOUT the updater plugin. This
+  # tells the web layer the same thing, so Settings names the Microsoft Store
+  # instead of drawing a "Check for updates" button that would call a plugin
+  # that is not there.
+  #
+  # The two cannot come apart by accident:
+  # `src/lib/msix-store-build.contract.test.ts` fails the build if a workflow
+  # compiles the Store flavour without setting this, or sets this without
+  # compiling the Store flavour.
+  VITE_CVIPER_DISTRIBUTION: microsoft-store
+
+jobs:
+  package:
+    name: build the Store flavour and pack it as MSIX
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Before setup-node, because `cache: pnpm` needs a pnpm binary to ask
+      # where the store lives.
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/light/src-tauri
+          # Its own key: this job compiles a DIFFERENT feature set from ci.yml
+          # and smoke.yml, so sharing their cache entry would thrash all three.
+          key: msix
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Work out where everything goes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # THREE directories, and keeping them apart is a security decision,
+          # not tidiness. Only OUT_DIR is uploaded. The development certificate
+          # lives in PACK_DIR precisely so that no glob, no reordered step and
+          # no future edit can publish a private key from a public repository.
+          "LAYOUT_DIR=${{ runner.temp }}/layout" >> $env:GITHUB_ENV
+          "PACK_DIR=${{ runner.temp }}/pack"     >> $env:GITHUB_ENV
+          "OUT_DIR=${{ runner.temp }}/out"       >> $env:GITHUB_ENV
+          New-Item -ItemType Directory -Force -Path `
+            "${{ runner.temp }}/layout", "${{ runner.temp }}/pack", "${{ runner.temp }}/out" | Out-Null
+
+          # A push event carries no inputs, so the default has to be stated
+          # here rather than relied on. WACK on unless somebody said otherwise.
+          $wack = '${{ inputs.run_wack }}'
+          if ($wack -eq 'false') { "RUN_WACK=no" >> $env:GITHUB_ENV }
+          else                   { "RUN_WACK=yes" >> $env:GITHUB_ENV }
+          Write-Host "run WACK: $(if ($wack -eq 'false') { 'no' } else { 'yes' })"
+
+      # ----------------------------------------------------------------------
+      # ASK THE DEPENDENCY GRAPH, DO NOT TAKE THE FEATURE FLAG'S WORD FOR IT.
+      # ----------------------------------------------------------------------
+      # `src/lib/msix-store-build.contract.test.ts` proves the SOURCE is shaped
+      # so that the Store flavour cannot carry the updater. This proves that
+      # cargo agrees, on this machine, for this feature set — which is a
+      # different claim and the one that decides what is in the binary.
+      #
+      # Both directions are asked, and that matters more than the first one. A
+      # probe that looked for a crate name and found nothing would report
+      # success just as loudly if `cargo tree` had failed, printed an error, or
+      # started spelling names differently. So the SAME probe is also run
+      # against the default feature set, where the crate must be present; if it
+      # is not, the probe itself is broken and the job says so rather than
+      # reporting a clean result it did not earn.
+      - name: The updater is absent from the Store graph, and present in the default one
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifest = 'apps/light/src-tauri/Cargo.toml'
+          $crate = 'tauri-plugin-updater'
+
+          $store = (cargo tree --manifest-path $manifest --edges normal `
+                      --no-default-features --features microsoft-store) | Out-String
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error title=cargo tree failed::The Store feature set could not be resolved, so nothing was proved either way."
+            exit 1
+          }
+
+          $default = (cargo tree --manifest-path $manifest --edges normal) | Out-String
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error title=cargo tree failed::The default feature set could not be resolved, so the anti-inert half of this check could not run."
+            exit 1
+          }
+
+          if ($default -notmatch [regex]::Escape($crate)) {
+            Write-Host "::error title=This probe is broken::$crate was not found in the DEFAULT dependency graph either, so finding it absent from the Store graph proves nothing. Fix the probe before trusting any result from it."
+            exit 1
+          }
+
+          if ($store -match [regex]::Escape($crate)) {
+            Write-Host "::error title=The Store build carries the updater::$crate is in the dependency graph for --no-default-features --features microsoft-store. An installed MSIX is read-only, so that plugin can only fail there."
+            exit 1
+          }
+
+          Write-Host "$crate is in the default graph and absent from the Store graph, as intended."
+
+      # ----------------------------------------------------------------------
+      # THE BUILD. `pnpm build:msix` is the whole command, in one place.
+      # ----------------------------------------------------------------------
+      # It lives in the root package.json rather than being spelled out here so
+      # that the `--no-default-features` half cannot be present in one caller
+      # and missing in another. The contract test reads that script.
+      #
+      # `tauri build` runs `beforeBuildCommand` itself, so the web bundle is
+      # built as part of this step and is the real one — not a `pnpm build`
+      # somebody remembered to run first.
+      - name: Build the Microsoft Store flavour
+        run: pnpm build:msix
+
+      # ----------------------------------------------------------------------
+      # WHAT DID TAURI ACTUALLY EMIT? Answer it, do not assume it.
+      # ----------------------------------------------------------------------
+      # The official winapp guide copies only `<app>.exe` into the layout. That
+      # is right for a boilerplate app and silently wrong for one with sidecars
+      # (`bundle.externalBin`), extra `bundle.resources`, or a DLL that must sit
+      # beside the binary: the MSIX installs cleanly and then fails at runtime,
+      # which is the worst possible bug to find after a submission.
+      #
+      # This repository has no externalBin, no sidecar and no bundle.resources,
+      # so "the executable alone" is the expectation — and an expectation is not
+      # evidence, so the real directory listing goes into the artefact.
+      - name: Inventory what the build produced
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $target = 'apps/light/src-tauri/target/release'
+          $inventory = Join-Path $env:OUT_DIR 'target-inventory.txt'
+
+          # Top level only: deps/, build/, .fingerprint/ and incremental/ are
+          # cargo's intermediates and are never part of an app.
+          $files = Get-ChildItem -Path $target -File | Sort-Object Length -Descending
+
+          $lines = @("Top-level files in $target", ('=' * 72))
+          $lines += $files | ForEach-Object { '{0,-44} {1,12:N0} bytes' -f $_.Name, $_.Length }
+          $lines += ''
+          $lines += 'Sub-directories:'
+          $lines += (Get-ChildItem -Path $target -Directory | ForEach-Object { '  ' + $_.Name })
+
+          $lines | Tee-Object -FilePath $inventory | Out-Null
+          Write-Host ($lines -join "`n")
+
+      - name: Stage the MSIX layout
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $target = 'apps/light/src-tauri/target/release'
+          $layout = $env:LAYOUT_DIR
+
+          # Discovered, not hardcoded. `tauri build` renames the binary to
+          # `productName` ("CViper Light.exe"); a plain cargo build leaves the
+          # Cargo package name ("light.exe"). Both are accepted and the manifest
+          # is rewritten to whichever was really staged, because a hardcoded
+          # name produces a confident, wrong package: an MSIX with a dangling
+          # entry point installs and then does not launch.
+          #
+          # Deliberately not a wildcard over every .exe — cargo also drops build
+          # scripts and test harnesses at the top level in some configurations,
+          # and packaging one of those would be a silent disaster.
+          $candidates = @(Get-ChildItem -Path $target -Filter '*.exe' -File |
+                          Where-Object { $_.BaseName -in 'light', 'CViper Light' })
+
+          if ($candidates.Count -ne 1) {
+            Write-Host "::error title=Cannot identify the application executable::Expected exactly one of 'light.exe' or 'CViper Light.exe' in $target, found $($candidates.Count)."
+            Get-ChildItem -Path $target -Filter '*.exe' -File | ForEach-Object { Write-Host "  candidate: $($_.Name)" }
+            exit 1
+          }
+
+          $exe = $candidates[0]
+          Write-Host "Application executable: $($exe.Name)"
+          Copy-Item $exe.FullName -Destination $layout
+
+          # ==================================================================
+          # STAGE THE EXECUTABLE ONLY. This is a finding, not a preference.
+          # ==================================================================
+          # target/release also holds `light_lib.dll`, the cdylib output of this
+          # crate's own crate-type list. `main.rs` links that crate as an rlib —
+          # statically — so nothing loads the DLL at runtime. Copying it in adds
+          # dead weight and, worse, hands the certification kit a SECOND binary
+          # to scan for blocked APIs. An earlier draft of the L-95 spike did
+          # exactly that and manufactured a failure caused entirely by
+          # packaging, indistinguishable in the report from a real one.
+          #
+          # Anything OTHER than that known by-product is reported as a warning
+          # rather than silently swept in or silently dropped: a genuine runtime
+          # dependency has to surface as a decision a person makes.
+          foreach ($dll in @(Get-ChildItem -Path $target -Filter '*.dll' -File)) {
+            if ($dll.Name -eq 'light_lib.dll') {
+              Write-Host "  not staging $($dll.Name): cdylib by-product of this crate, never loaded at runtime"
+            } else {
+              Write-Host "::warning title=An unexpected DLL was not staged::$($dll.Name) sits beside the executable and was NOT put in the package. If the app loads it at runtime this package is incomplete - resolve that before submitting."
+            }
+          }
+
+          # Tauri writes `bundle.resources` into a `resources` folder beside the
+          # binary. None are configured, so this is a tripwire rather than an
+          # expectation.
+          $resources = Join-Path $target 'resources'
+          if (Test-Path $resources) {
+            Write-Host 'Found a resources/ directory - staging it.'
+            Copy-Item $resources -Destination $layout -Recurse
+          }
+
+          # Every generated Store asset. `pnpm assets:msix` produces them and
+          # `msixAssets.contract.test.ts` holds each one to its declared pixel
+          # size, so a missing or mis-sized asset is already a red `pnpm test`
+          # rather than a rejected submission.
+          $assets = Join-Path $layout 'Assets'
+          New-Item -ItemType Directory -Force -Path $assets | Out-Null
+          $generated = @(Get-ChildItem -Path 'apps/light/src-tauri/icons/msix' -Filter '*.png' -File)
+          if ($generated.Count -lt 30) {
+            Write-Host "::error title=The Store assets are missing::Only $($generated.Count) PNGs were found in apps/light/src-tauri/icons/msix. Run ``pnpm assets:msix``."
+            exit 1
+          }
+          $generated | ForEach-Object { Copy-Item $_.FullName -Destination $assets }
+          Write-Host "Staged $($generated.Count) Store assets."
+
+          # Point the manifest at the executable actually staged. The rewritten
+          # copy goes in PACK_DIR; a copy also goes to OUT_DIR so the artefact
+          # records exactly what was packed.
+          $manifestSource = 'apps/light/src-tauri/msix/Package.appxmanifest'
+          $manifestPacked = Join-Path $env:PACK_DIR 'Package.appxmanifest'
+          (Get-Content $manifestSource -Raw) -replace 'Executable="[^"]*"', ('Executable="' + $exe.Name + '"') |
+            Set-Content $manifestPacked -Encoding UTF8
+          Copy-Item $manifestPacked -Destination (Join-Path $env:OUT_DIR 'Package.appxmanifest')
+          Write-Host "Manifest Executable rewritten to: $($exe.Name)"
+
+          "MANIFEST_PATH=$manifestPacked" >> $env:GITHUB_ENV
+
+          Write-Host ''
+          Write-Host 'Final layout:'
+          Get-ChildItem -Path $layout -Recurse -File | ForEach-Object {
+            Write-Host ('  ' + $_.FullName.Substring($layout.Length))
+          }
+
+      # ----------------------------------------------------------------------
+      # winapp CLI, pinned twice over.
+      # ----------------------------------------------------------------------
+      # Chosen over `winget install microsoft.winappcli`, whose documented
+      # invocation is "install, or update to the latest version" — a tool in
+      # public preview resolving to whatever shipped this morning turns a red
+      # run into a research project.
+      #
+      # So: the ACTION is pinned to an immutable commit SHA rather than a moving
+      # `@v0.2` tag (the same reasoning that pins gitleaks by version AND
+      # checksum in ci.yml), and the CLI is pinned to v0.6.0, the latest stable.
+      - name: Install winapp CLI 0.6.0
+        uses: microsoft/setup-WinAppCli@b93bbddc1f7abc061ca0d3a8119e3a0c7dd71495 # v0.2
+        with:
+          version: v0.6.0
+
+      - name: Record the winapp version actually installed
+        shell: pwsh
+        run: winapp --version
+
+      # ----------------------------------------------------------------------
+      # A DEVELOPMENT CERTIFICATE. IT EXISTS TO TEST, NOT TO SHIP.
+      # ----------------------------------------------------------------------
+      # The Microsoft Store re-signs what it accepts, so the submitted package
+      # needs no purchased certificate and this one is never submitted. But an
+      # MSIX must be signed by SOMETHING for Windows to open it, and the
+      # certification kit deploys the package in order to test it, so the signer
+      # has to be trusted on this machine.
+      #
+      # `--manifest` makes the certificate's publisher match the manifest's
+      # Publisher; if the two disagree the package will not install and WACK
+      # never gets to run. `--install` puts it in the machine store.
+      #
+      # The password is the tool's own documented default. This is a self-signed
+      # certificate for a placeholder publisher, generated on a throwaway runner
+      # and destroyed with it. It is written into PACK_DIR, which is never
+      # uploaded — the L-95 spike published one by accident, and "close to
+      # harmless" is not a reason to publish a private key.
+      - name: Generate and trust a self-signed development certificate
+        shell: pwsh
+        working-directory: ${{ env.PACK_DIR }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          winapp cert generate --manifest Package.appxmanifest --output devcert.pfx `
+            --password password --if-exists Overwrite --install
+          if (-not (Test-Path 'devcert.pfx')) {
+            Write-Host '::error title=No development certificate::winapp cert generate reported success but produced no certificate file.'
+            exit 1
+          }
+
+      - name: Pack the MSIX
+        shell: pwsh
+        working-directory: ${{ env.PACK_DIR }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $output = Join-Path $env:OUT_DIR 'CViperLight-store.msix'
+
+          winapp pack "$env:LAYOUT_DIR" --manifest Package.appxmanifest `
+            --cert devcert.pfx --cert-password password --output $output
+
+          # The ARTEFACT is the assertion. A step that "did not fail" proves
+          # nothing; a package that exists does.
+          if (-not (Test-Path $output)) {
+            Write-Host '::error title=No package::winapp pack reported success and produced no .msix.'
+            exit 1
+          }
+          $msix = Get-Item $output
+          Write-Host ('MSIX: {0} ({1:N0} bytes)' -f $msix.Name, $msix.Length)
+          "MSIX_PATH=$($msix.FullName)" >> $env:GITHUB_ENV
+
+      # ----------------------------------------------------------------------
+      # THE CERTIFICATION KIT. Rule 71: a failed check must never take the same
+      # branch as a passed one.
+      # ----------------------------------------------------------------------
+      # `appcert.exe` is PREINSTALLED on windows-latest — established by the
+      # L-95 spike, which also settled that Session 0 is a non-issue here (the
+      # job runs in session 2). No SDK install is needed.
+      #
+      # There is no `|| true` and no `2>$null` anywhere near `appcert`, on
+      # purpose: that idiom has twice silenced every cron alarm in the sibling
+      # repository, because it makes a broken check and a healthy system produce
+      # identical output.
+      #
+      # Three outcomes, three visibly different behaviours:
+      #
+      #   1. The kit never produced a report  -> RED. "WACK COULD NOT RUN."
+      #      An ENVIRONMENT result, and not a verdict on the app.
+      #   2. The report says overall FAIL     -> RED, naming every failed check.
+      #   3. The report says overall PASS     -> GREEN, and the summary still
+      #      lists any OPTIONAL failures as a submission risk rather than
+      #      swallowing them.
+      #
+      # (3) is the expected result and is not the same as "everything passed".
+      # The L-95 spike recorded one optional failure, "Blocked executables",
+      # originating in WebView2 and reproducing on release builds; Microsoft
+      # documents that the Store "may apply all tests from this workflow", so an
+      # optional failure is a risk to state, not a non-event.
+      - name: Run the Windows App Certification Kit
+        if: env.RUN_WACK == 'yes'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # A native command's non-zero exit must NOT throw here: the report has
+          # to be read to tell outcome 1 from outcome 2.
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          $appcert = "${env:ProgramFiles(x86)}\Windows Kits\10\App Certification Kit\appcert.exe"
+          if (-not (Test-Path $appcert)) {
+            Write-Host "::error title=WACK COULD NOT RUN::appcert.exe is not at $appcert on this runner. This is an ENVIRONMENT result and says nothing about whether the package passes certification."
+            exit 1
+          }
+
+          $report = Join-Path $env:OUT_DIR 'wack-report.xml'
+          Write-Host "Session id of this process: $((Get-Process -Id $PID).SessionId)"
+          Write-Host "Package under test: $env:MSIX_PATH"
+
+          & $appcert reset
+          Write-Host "appcert reset exit code: $LASTEXITCODE"
+
+          & $appcert test -appxpackagepath "$env:MSIX_PATH" -reportoutputpath "$report"
+          $testExit = $LASTEXITCODE
+          Write-Host "appcert test exit code: $testExit"
+
+          if (-not (Test-Path $report)) {
+            $message = "WACK COULD NOT RUN. appcert exited $testExit and produced no report. This is an ENVIRONMENT result and says nothing about whether CViper Light passes certification."
+            "## MSIX: INCONCLUSIVE`n`n$message`n" >> $env:GITHUB_STEP_SUMMARY
+            Write-Host "::error title=WACK could not run::$message"
+            exit 1
+          }
+
+          "WACK_REPORT=$report" >> $env:GITHUB_ENV
+          Write-Host "Report written: $report"
+
+      - name: Read the verdict out of the report
+        if: env.RUN_WACK == 'yes' && env.WACK_REPORT != ''
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [xml]$xml = Get-Content $env:WACK_REPORT -Raw
+
+          # The real shape, confirmed against the report the L-95 spike produced:
+          #
+          #   <TEST NAME="..." OPTIONAL="TRUE|FALSE">
+          #     <RESULT>PASS|FAIL</RESULT>
+          #     <MESSAGES><MESSAGE TEXT="..."/></MESSAGES>
+          #   </TEST>
+          #
+          # RESULT is a CHILD ELEMENT, not an attribute. The spike's first
+          # parser searched for //*[@RESULT], matched nothing at all, and then
+          # printed "Every check passed" while a test was failing. A count over
+          # an empty set is not evidence, so no <TEST> elements is a hard stop.
+          $tests = @($xml.SelectNodes('//TEST'))
+          if ($tests.Count -eq 0) {
+            Write-Host '::error title=The report could not be read::It parsed but contains no <TEST> elements, so the kit schema has changed and no summary from it can be trusted.'
+            exit 1
+          }
+
+          $failed = @($tests | Where-Object { $_.SelectSingleNode('RESULT').InnerText.Trim() -ne 'PASS' })
+          $overall = $xml.DocumentElement.GetAttribute('OVERALL_RESULT')
+
+          $sb = [System.Text.StringBuilder]::new()
+          [void]$sb.AppendLine('## Windows App Certification Kit')
+          [void]$sb.AppendLine('')
+          [void]$sb.AppendLine("Overall result: **$overall**  ")
+          [void]$sb.AppendLine("$($tests.Count) tests run, $($tests.Count - $failed.Count) passed, $($failed.Count) failed.")
+          [void]$sb.AppendLine('')
+
+          if ($failed.Count -gt 0) {
+            [void]$sb.AppendLine('| Test | Result | Optional |')
+            [void]$sb.AppendLine('| --- | --- | --- |')
+            foreach ($test in $failed) {
+              [void]$sb.AppendLine("| $($test.GetAttribute('NAME')) | $($test.SelectSingleNode('RESULT').InnerText.Trim()) | $($test.GetAttribute('OPTIONAL')) |")
+            }
+            [void]$sb.AppendLine('')
+            [void]$sb.AppendLine('An OPTIONAL failure does not stop the overall result being PASS, and it is not nothing: Microsoft documents that the Store "may apply all tests from this workflow". Treat it as a submission risk to state, not a non-event.')
+            [void]$sb.AppendLine('')
+            [void]$sb.AppendLine('<details><summary>Detail from the failing checks</summary>')
+            [void]$sb.AppendLine('')
+            [void]$sb.AppendLine('```')
+            foreach ($test in $failed) {
+              [void]$sb.AppendLine("=== $($test.GetAttribute('NAME')) ===")
+              foreach ($message in $test.SelectNodes('.//MESSAGE')) {
+                [void]$sb.AppendLine('  ' + $message.GetAttribute('TEXT'))
+              }
+              [void]$sb.AppendLine('')
+            }
+            [void]$sb.AppendLine('```')
+            [void]$sb.AppendLine('</details>')
+          } else {
+            [void]$sb.AppendLine('Every check passed.')
+          }
+
+          $summary = $sb.ToString()
+          $summary >> $env:GITHUB_STEP_SUMMARY
+          Set-Content -Path (Join-Path $env:OUT_DIR 'wack-verdict.md') -Value $summary
+          Write-Host $summary
+
+          # The gate. An overall FAIL is a package that must not be submitted,
+          # and it goes red — unlike the L-95 spike, where discovering a failure
+          # WAS the deliverable and a red X would have read as "the experiment
+          # broke". This is a pipeline, not an experiment.
+          if ($overall -ne 'PASS') {
+            Write-Host "::error title=The package did not pass certification::Overall result $overall. See the job summary for which checks failed."
+            exit 1
+          }
+
+      # `always()` so the inventory and any partial report survive a failure —
+      # a run that died is exactly when you most want to look at the files.
+      #
+      # Only OUT_DIR. The development certificate is in PACK_DIR and is never
+      # uploaded: a build artefact is a download link for anyone signed in, and
+      # this repository is public.
+      - name: Upload the package, the manifest and the certification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cviper-light-msix
+          path: ${{ runner.temp }}/out
+          if-no-files-found: warn
+          retention-days: 14
