@@ -1,0 +1,183 @@
+name: Smoke
+
+# ============================================================================
+# THE SECOND PLACE `tauri build` IS RUN, AND THE ONLY PLACE THE RESULT IS DRIVEN.
+# ============================================================================
+# CLAUDE.md forbids an agent from running `tauri build`. The cost of that rule
+# was that nothing in this repository had ever been verified in the binary a
+# user actually runs: every test is Vitest against jsdom, or `cargo test --lib`.
+# The WebView2 runtime, the Tauri IPC bridge, the capability file and the
+# bundled `frontendDist` sit between those tests and a working app, and none of
+# them can fail a single existing check.
+#
+# This workflow builds twice, on purpose, and the reason is a security one:
+#
+#   1. a CLEAN installer, with no test feature, which is the artefact uploaded;
+#   2. an INSTRUMENTED binary (`--features wdio --no-bundle`), never bundled and
+#      never uploaded, which is the thing the spec drives.
+#
+# The app serves WebDriver itself when built with `wdio`; there is no external
+# driver. See apps/light/e2e/smoke.spec.ts and the note above the build steps.
+#
+# ============================================================================
+# WHY A SEPARATE WORKFLOW AND NOT A JOB IN ci.yml
+# ============================================================================
+# Three reasons, in order of weight:
+#
+#   1. ci.yml's `verify` job IS the five checks, and its own comments say
+#      "NEVER `tauri build`" about that job. Adding a bundling step to it would
+#      make the file argue with itself.
+#   2. ci.yml has `cancel-in-progress` over one concurrency group. A fifteen
+#      minute build in that group delays the three-minute feedback that the
+#      five checks exist to give.
+#   3. The repository already puts heavy platform work in its own file —
+#      ios.yml for the Mac leg, release.yml for bundling. This is the same
+#      shape as those.
+#
+# The trigger is ios.yml's, deliberately: every pull request, plus pushes to
+# main. NO PATH FILTER. A change-detection rule that skipped this on a
+# "frontend-only" commit is exactly how a latent failure ends up sitting on a
+# green main — the thing ci.yml's header warns about.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+jobs:
+  built-app:
+    name: build the app and drive the real binary
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Its own cache key. This job compiles in DEBUG, and twice — once without
+      # the `wdio` feature and once with it — so its artefacts are not the ones
+      # `cargo check` leaves behind in ci.yml, and changing the feature set
+      # invalidates only the top crate rather than the whole tree.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/light/src-tauri
+          key: smoke-debug
+
+      # ------------------------------------------------------------------
+      # THERE IS NO EXTERNAL DRIVER STEP HERE ANY MORE, AND THAT IS THE FIX.
+      # ------------------------------------------------------------------
+      # This job used to `cargo install tauri-driver` and download an
+      # msedgedriver matched to the WebView2 runtime. Runs #1, #2 and #3 all
+      # died the same way, sixty seconds into the smoke step:
+      #
+      #     session not created: DevToolsActivePort file doesn't exist
+      #
+      # The version pairing was exact (msedgedriver 152.0.4191.66 against
+      # WebView2 152.0.4191.66), the binary path was right, and tauri-driver
+      # v2.0.6 was listening. What failed was the handoff: msedgedriver drives
+      # a WebView2 app over the Chrome DevTools Protocol, and that path is
+      # brittle. WebdriverIO's ADR-0002 records the identical symptom — "when a
+      # CI runner's Edge/WebView2 bumped to 150 and broke the elevated-host CDP
+      # path for the external and CrabNebula routes on Windows, the embedded
+      # driver stayed green" — and notes that `tauri-driver` is now the
+      # deprecated `external` provider.
+      #
+      # So the external driver is gone. The app serves WebDriver itself, from
+      # the `wdio` feature (see src-tauri/Cargo.toml), and the spec connects
+      # straight to it. No msedgedriver, no tauri-driver, no CDP, and one fewer
+      # version pairing to keep in step for ever.
+
+      # ------------------------------------------------------------------
+      # `createUpdaterArtifacts` IS TURNED OFF FOR THIS BUILD, AND MUST BE.
+      # ------------------------------------------------------------------
+      # tauri.conf.json sets it true, which makes `tauri build` sign the
+      # updater artefacts — and RELEASE-SIGNING.md records what happens with no
+      # signing key in the environment: "`tauri build` with updater artifacts:
+      # Fails outright." That is the correct behaviour for a release, and it is
+      # not what this job is for. There are no secrets here by design, so the
+      # override is what lets an unsigned, un-updatable, perfectly drivable
+      # installer come out.
+      #
+      # Nothing this job produces is shippable, and nothing here publishes it.
+      # release.yml remains the only path to a signed artefact.
+      #
+      # ==================================================================
+      # BUILD ONE: THE CLEAN INSTALLER. THIS IS THE ONLY THING UPLOADED.
+      # ==================================================================
+      # No `--features wdio`, so no automation server is compiled in. This is
+      # the artefact a person may download and install.
+      #
+      # An earlier version of this workflow built ONCE, with the feature on,
+      # and uploaded THOSE installers. That was a real hole, not an untidiness:
+      # the `wdio` plugin runs an unauthenticated HTTP server on
+      # 127.0.0.1:4445 exposing execute-script, screenshot, cookie and element
+      # handlers, with no Origin or Host check. The artefact carried the normal
+      # product name and version, and on a public repository any signed-in user
+      # can download it. The Cargo feature gate was doing its job — it is
+      # release.yml that it protects — and this job was quietly publishing an
+      # instrumented build through a different door.
+      - name: Build the shippable installer (no test feature)
+        shell: bash
+        run: pnpm --filter @cviper/light tauri build --debug --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      # Uploaded here, between the two builds, so what leaves this job is
+      # unambiguously the clean one. `if-no-files-found: error` makes the
+      # upload itself an assertion: a job that "did not fail" proves nothing,
+      # an installer that exists does.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cviper-light-windows-installers
+          path: |
+            apps/light/src-tauri/target/debug/bundle/msi/*.msi
+            apps/light/src-tauri/target/debug/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          # Unsigned debug-profile builds for inspection after a red run, not
+          # releases. release.yml produces the shippable, signed ones.
+          retention-days: 7
+
+      # ==================================================================
+      # BUILD TWO: THE INSTRUMENTED BINARY. `--no-bundle` IS LOAD-BEARING.
+      # ==================================================================
+      # `wdio` compiles in the embedded WebDriver server the spec drives. It is
+      # a TEST-ONLY feature — see the long comment in src-tauri/Cargo.toml.
+      #
+      # `--no-bundle` means no `.msi` and no `-setup.exe` is ever PRODUCED from
+      # this build, so an instrumented installer cannot be uploaded by accident,
+      # by a reordered step, or by a future edit to the paths above. Ordering
+      # the steps would have been a convention; not creating the file is a
+      # property. The contract test asserts that any `tauri build` carrying
+      # `--features wdio` also carries `--no-bundle`.
+      #
+      # `--debug` is required in tandem and is enforced rather than trusted:
+      # src-tauri/src/lib.rs raises a `compile_error!` when `wdio` is enabled
+      # without debug assertions, so the feature on a release profile does not
+      # compile at all.
+      #
+      # This overwrites target/debug/light.exe with the instrumented binary,
+      # which is exactly what the spec then drives. It never leaves the runner.
+      - name: Build the instrumented binary (wdio feature, never bundled)
+        shell: bash
+        run: pnpm --filter @cviper/light tauri build --debug --features wdio --no-bundle
+
+      - name: Smoke-test the real binary
+        run: pnpm smoke

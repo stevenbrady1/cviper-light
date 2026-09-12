@@ -202,6 +202,35 @@ Run by a human or by CI, never as part of routine development. A signed release
 that existing installs can update to also needs a signing key — see
 [`apps/light/src-tauri/RELEASE-SIGNING.md`](apps/light/src-tauri/RELEASE-SIGNING.md).
 
+### The built-app smoke test
+
+```
+pnpm smoke
+```
+
+Four questions asked of the real built executable — the window opens, the
+first-run welcome is shown, Settings opens, the Privacy section is visible.
+Everything else in this repository tests jsdom or a pure function; this is the
+only check that can fail because of the WebView2 runtime, the Tauri IPC bridge,
+the capability file or the bundled frontend.
+
+The app serves WebDriver itself, from `tauri-plugin-wdio-webdriver` behind the
+**test-only `wdio` Cargo feature**. There is no external driver to install and
+nothing to keep in version step. That feature must never be on in anything a
+person installs — it opens an HTTP automation server on a local port — so it is
+gated three ways: the dependency is `optional`, `src-tauri/src/lib.rs` fails to
+compile if the feature is enabled without debug assertions, and
+`src/lib/no-automation-server-in-shipped-builds.contract.test.ts` fails if it
+joins a default feature list or if any workflow but the smoke job enables it.
+
+It does **not** build the app, deliberately: run it without a build and it says
+so rather than starting one. CI does the build in its own step
+(`.github/workflows/smoke.yml`, on every pull request), which is also the only
+place the build is allowed to happen — see the hard rules in
+[CLAUDE.md](CLAUDE.md). To run it on your own machine, build once with
+`pnpm --filter @cviper/light tauri build --debug --features wdio`, then
+`pnpm smoke`.
+
 ## Layout
 
 | Path                       | What it is                                  |

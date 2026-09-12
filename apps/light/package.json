@@ -39,8 +39,10 @@
     "@types/node": "^26.2.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/selenium-webdriver": "^4.1.30",
     "@vitejs/plugin-react": "^6.0.5",
     "jsdom": "^30.0.1",
+    "selenium-webdriver": "^4.37.0",
     "tailwindcss": "^4.3.3",
     "typescript": "catalog:",
     "vite": "^8.2.1"

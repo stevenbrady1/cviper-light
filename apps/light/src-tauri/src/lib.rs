@@ -37,6 +37,32 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
 
+    // ========================================================================
+    // THE TRIPWIRE. A RELEASE BUILD CARRYING THE AUTOMATION SERVER WILL NOT
+    // COMPILE.
+    // ========================================================================
+    // `wdio` (see Cargo.toml) compiles in an embedded WebDriver server that
+    // listens on a local HTTP port and can drive this window. CI turns it on to
+    // smoke-test the real binary; anything a user runs must not have it.
+    //
+    // A convention would be "remember not to pass --features wdio to a
+    // release". This is not a convention: enabling the feature in a build
+    // without debug assertions is a hard compile error, so the release path
+    // cannot acquire an automation server by anyone forgetting anything.
+    #[cfg(all(feature = "wdio", not(debug_assertions)))]
+    compile_error!(
+        "the `wdio` feature compiles an HTTP automation server into the app and must never be \
+         enabled for a release build. It exists only for .github/workflows/smoke.yml, which \
+         builds with --debug. If you reached this from release.yml, the answer is to remove the \
+         feature flag, not to relax this guard."
+    );
+
+    // Registered ONLY under the feature. `cfg` rather than a runtime `if`, so
+    // with the feature off there is no server, no port and no code path to it —
+    // the same shape as the `#[cfg(desktop)]` updater above.
+    #[cfg(feature = "wdio")]
+    let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
+
     builder
         // Custom commands are allow-by-default: only PLUGIN commands are
         // gated by capabilities/default.json, so the secret commands need no

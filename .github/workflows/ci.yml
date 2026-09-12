@@ -84,10 +84,13 @@ jobs:
       - name: Cargo test
         run: pnpm cargo:test
 
-      # The Vite build only. NEVER `tauri build` — a release bundle is a signed
-      # artefact produced by release.yml, which alone is given the signing
-      # secrets. Running it here would burn ten minutes producing nothing
-      # shippable.
+      # The Vite build only. NEVER `tauri build` in THIS job. Bundling happens
+      # in exactly two places: release.yml, which alone is given the signing
+      # secrets and alone produces something shippable, and smoke.yml, which
+      # builds an unsigned debug bundle purely so the real binary can be driven
+      # (L-88). Running it here would burn ten minutes producing nothing
+      # shippable, inside the concurrency group whose whole purpose is fast
+      # feedback on the five checks.
       - name: Build the frontend
         run: pnpm --filter @cviper/light build
 

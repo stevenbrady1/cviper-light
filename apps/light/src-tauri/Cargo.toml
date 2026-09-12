@@ -14,6 +14,33 @@ edition = "2021"
 name = "light_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# ============================================================================
+# `wdio` IS A TEST-ONLY FEATURE. IT MUST NEVER BE ON IN ANYTHING THAT SHIPS.
+# ============================================================================
+# It compiles `tauri-plugin-wdio-webdriver` in: an embedded W3C WebDriver
+# server listening on a local HTTP port. That is exactly what the CI smoke job
+# needs in order to drive the real app, and exactly what must never reach a
+# user. The plugin's own README puts it plainly: "This plugin exposes
+# automation capabilities via HTTP. Never include it in production builds."
+#
+# It is deliberately absent from any `default` list. `.github/workflows/smoke.yml`
+# turns it on explicitly; release.yml does not and cannot do so by accident.
+# Three independent things hold that line:
+#
+#   1. the dependency below is `optional`, so without the feature it is neither
+#      compiled nor even fetched;
+#   2. `src/lib.rs` carries a `compile_error!` that fails the build outright if
+#      the feature is ever enabled without debug assertions — i.e. in a release;
+#   3. `apps/light/src/lib/no-automation-server-in-shipped-builds.contract.test.ts`
+#      fails if this feature joins a default list, if `lib.rs` registers the
+#      plugin unguarded, or if release.yml or ci.yml ever pass `--features wdio`.
+#
+# Upstream suggests `[target.'cfg(debug_assertions)'.dependencies]` instead.
+# That is weaker: it would put an automation server in EVERY debug build,
+# including a developer's own. An explicit opt-in feature is the narrower door.
+[features]
+wdio = ["dep:tauri-plugin-wdio-webdriver"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -28,6 +55,11 @@ tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-process = "2"
+# Test-only, behind the `wdio` feature declared above — read that comment before
+# touching this line. `optional = true` is what makes the feature a real gate
+# rather than a naming convention: with the feature off, this is not compiled
+# into the binary and is not even downloaded.
+tauri-plugin-wdio-webdriver = { version = "1.4.0", optional = true }
 # Secret storage. We write our own Tauri commands over this in Phase 1 — there is
 # no official Tauri keyring plugin, and the crates.io lookalike is abandoned.
 # Default features (= "v1") pull in the OS-native stores, incl. windows-native.
