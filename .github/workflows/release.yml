@@ -28,38 +28,40 @@ jobs:
             target: ''
             args: ''
           # ------------------------------------------------------------------
-          # macOS IS COMMENTED OUT UNTIL THERE IS AN APPLE DEVELOPER ACCOUNT.
+          # macOS. WHAT IS OUTSTANDING IS A CERTIFICATE, NOT AN ACCOUNT.
           # ------------------------------------------------------------------
-          # It is not that the build is broken. It reached codesigning and died
-          # there, on light-v0.1.0:
+          # The Apple Developer Program account exists (team TT8K4YT4TQ). What
+          # does not yet exist is a DEVELOPER ID APPLICATION certificate and the
+          # five repository secrets that carry it:
+          #
+          #   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
+          #   APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
+          #
+          # Until all five are set this leg SKIPS, visibly, in a step of its own
+          # that says so — and the Windows leg still ships. What it must never
+          # do again is attempt to sign with blanks, which is how light-v0.1.0
+          # died:
           #
           #   failed codesign application: failed to run command security
           #   import: failed to import keychain certificate
           #
-          # The APPLE_* secrets below are referenced but not set, so GitHub
-          # expands each to an EMPTY STRING rather than leaving it undefined.
-          # Tauri sees APPLE_CERTIFICATE as present-and-blank, tries to import
-          # a certificate that is not there, and fails. An absent variable
-          # would have been skipped; an empty one is worse than none.
+          # An unset secret is not undefined. GitHub expands it to an EMPTY
+          # STRING, so an absent certificate arrives looking present and the
+          # bundler asks `security import` to import nothing. Telling those
+          # states apart is the whole job of the classifier step below.
           #
-          # Enabling it is not worth doing before enrolment either way: an
-          # unsigned .app is refused by Gatekeeper on every Mac but the one
-          # that built it, so the artefact would be unshippable even if the
-          # build went green.
+          # `target` and `args` differ ON PURPOSE. `target` is the list of
+          # rustup targets to INSTALL; `args` is what the bundler is asked to
+          # produce. `universal-apple-darwin` is NOT a rustup target — it is a
+          # Tauri pseudo-target lipo'd from the two real slices, so both have to
+          # be installed or the universal build cannot link.
           #
-          # TO TURN IT BACK ON: enrol in the Apple Developer Program, add
-          # APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_ID,
-          # APPLE_PASSWORD and APPLE_TEAM_ID as repository secrets, then
-          # uncomment the three lines below.
-          #
-          # Apple Silicon only, deliberately. A universal binary doubles the
-          # download for every user to serve Intel Macs Apple stopped selling,
-          # and the x86_64 slice cannot be tested on any machine this project
-          # has.
-          #
-          # - platform: macos-latest
-          #   target: aarch64-apple-darwin
-          #   args: '--target aarch64-apple-darwin'
+          # Universal, not Apple Silicon only: an aarch64 bundle handed to
+          # somebody on an Intel Mac does not run, and it fails on their machine
+          # rather than in CI.
+          - platform: macos-latest
+            target: aarch64-apple-darwin,x86_64-apple-darwin
+            args: '--target universal-apple-darwin'
 
     runs-on: ${{ matrix.platform }}
 
@@ -67,6 +69,94 @@ jobs:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
 
     steps:
+      # ======================================================================
+      # THE THREE STATES OF THE APPLE SIGNING SECRETS.
+      # ======================================================================
+      # FIRST, before the toolchain and the dependencies, so a misconfigured
+      # release fails in seconds instead of after a build.
+      #
+      # The `secrets` context is not available in a job-level `if:`, in
+      # `strategy`, or even in a step-level `if:` — only in `env`, `with` and
+      # `run`. So the question is asked HERE, once, in `env`, and the answer
+      # travels to the steps that need it as a step OUTPUT, which `if:` can
+      # read.
+      #
+      # Three states, three visibly different outcomes:
+      #
+      #   all five set  -> signing=yes, a notice, and a signed notarised build
+      #   none set      -> signing=no, a warning, no Mac artefact at all
+      #   SOME set      -> the job FAILS here, naming the missing ones
+      #
+      # The middle state is the dangerous one and it is why this step exists: a
+      # blank secret is indistinguishable from a real one to anything that only
+      # asks whether it is there.
+      #
+      # Only secret NAMES are ever printed. No value is echoed.
+      - name: Classify the Apple signing secrets
+        id: apple
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -eu
+
+          present=''
+          missing=''
+
+          record() {
+            if [ -n "$2" ]; then
+              present="$present $1"
+            else
+              missing="$missing $1"
+            fi
+          }
+
+          record APPLE_CERTIFICATE "${APPLE_CERTIFICATE:-}"
+          record APPLE_CERTIFICATE_PASSWORD "${APPLE_CERTIFICATE_PASSWORD:-}"
+          record APPLE_ID "${APPLE_ID:-}"
+          record APPLE_PASSWORD "${APPLE_PASSWORD:-}"
+          record APPLE_TEAM_ID "${APPLE_TEAM_ID:-}"
+
+          if [ -z "$missing" ]; then
+            echo "signing=yes" >> "$GITHUB_OUTPUT"
+            echo "::notice title=macOS will be signed::All five Apple secrets are set. This leg builds, signs and notarises a universal binary."
+            exit 0
+          fi
+
+          if [ -z "$present" ]; then
+            echo "signing=no" >> "$GITHUB_OUTPUT"
+            echo "::warning title=macOS leg skipped::No Apple signing secrets are set, so this run produces no macOS artefact. The Windows leg is unaffected."
+            exit 0
+          fi
+
+          echo "signing=partial" >> "$GITHUB_OUTPUT"
+          echo "::error title=macOS signing is misconfigured::SET:$present -- MISSING:$missing. A missing secret arrives as an empty string and would be handed to the signer as though it were real. Set the missing secrets, or unset all five to skip the leg deliberately."
+          exit 1
+
+      # A skipped macOS leg must never be mistakable for a built one. This step
+      # appears in the job only in the skip case, and writes the reason into the
+      # run summary where somebody looking at a green run will actually see it.
+      - name: macOS SKIPPED - no Developer ID certificate
+        if: runner.os == 'macOS' && steps.apple.outputs.signing == 'no'
+        shell: bash
+        run: |
+          set -eu
+          {
+            echo '## macOS: skipped, nothing was built'
+            echo ''
+            echo 'No Apple signing secrets are set on this repository, so this run produced NO macOS artefact.'
+            echo 'This is not a signed build and it is not a failed build - it is an absent one.'
+            echo ''
+            echo 'To switch it on: create a Developer ID Application certificate under team TT8K4YT4TQ,'
+            echo 'then set all five of APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_ID,'
+            echo 'APPLE_PASSWORD and APPLE_TEAM_ID as repository secrets.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/checkout@v5
 
       - name: Enable pnpm through corepack
@@ -77,6 +167,9 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # Comma-separated. On macOS this installs BOTH darwin slices, which is
+      # what `--target universal-apple-darwin` is lipo'd from; on Windows the
+      # matrix leaves it empty and nothing extra is installed.
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -88,7 +181,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The setup steps above run even on a skipped macOS leg. That is a couple
+      # of wasted minutes in the one case where nothing ships anyway, and it is
+      # preferred to putting the same `if:` on seven steps, where the cost of
+      # getting one of them wrong is a build that signs when it should not.
       - uses: tauri-apps/tauri-action@v0
+        # Windows always. macOS ONLY when the classifier found all five secrets
+        # — never on a partial set, which has already failed the job above, and
+        # never on none, which skipped with a notice.
+        if: runner.os != 'macOS' || steps.apple.outputs.signing == 'yes'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # ==================================================================
@@ -102,8 +203,9 @@ jobs:
           # installed copy can verify.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Apple notarisation. Only read on the macOS leg; absent on Windows,
-          # where they are simply unused rather than empty-and-wrong.
+          # Apple notarisation. Reachable only on the macOS leg and only when
+          # the classifier above proved all five are non-empty, so they are
+          # never blank here.
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
