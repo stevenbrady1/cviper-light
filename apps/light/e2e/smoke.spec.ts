@@ -48,21 +48,26 @@ import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { connect } from 'node:net';
-import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { Builder, By, Capabilities, until, type WebDriver } from 'selenium-webdriver';
 
-/** `tauri-driver`'s default. Named rather than assumed, and passed explicitly. */
-const DRIVER_PORT = 4444;
+/**
+ * The port the app's own WebDriver server listens on.
+ *
+ * `tauri-plugin-wdio-webdriver` reads `TAURI_WEBDRIVER_PORT` and otherwise
+ * falls back to 4445 (`DEFAULT_PORT` in that crate). It is passed explicitly
+ * below rather than relied on, so this file and the app agree in writing.
+ */
+const DRIVER_PORT = 4445;
 const DRIVER_URL = `http://127.0.0.1:${DRIVER_PORT}/`;
 
 /** How long to wait for an element. Generous: a cold WebView2 first paint is slow. */
 const ELEMENT_TIMEOUT = 20_000;
 
-/** How long to wait for `tauri-driver` to start listening. */
+/** How long to wait for the app's embedded WebDriver server to start listening. */
 const DRIVER_STARTUP_TIMEOUT = 30_000;
 
 /**
@@ -80,29 +85,24 @@ const HERE = fileURLToPath(new URL('.', import.meta.url));
  * A DEBUG BUILD, NOT A RELEASE ONE. THIS IS NOT AN OVERSIGHT.
  *
  * ============================================================================
- * Runs #1 and #2 of this workflow both died sixty seconds into the setup hook
- * with `session not created: DevToolsActivePort file doesn't exist`, pointed
- * at a RELEASE binary. Sixty seconds is msedgedriver's startup budget, so the
- * driver launched the app and then waited for something that never arrived.
+ * The binary this drives is built by `.github/workflows/smoke.yml` with
+ * `--debug --features wdio`, and those two go together by force rather than by
+ * habit: `src-tauri/src/lib.rs` raises a `compile_error!` if `wdio` is ever
+ * enabled without debug assertions. A release build carrying the automation
+ * server does not compile at all, so it cannot reach a user through anybody
+ * forgetting anything. Proven, not asserted — `cargo check --release
+ * --features wdio` fails with that error; `cargo check` alone does not even
+ * fetch the plugin.
  *
- * msedgedriver drives a WebView2 application over the Chrome DevTools
- * Protocol, and Tauri's debugging documentation is explicit that the inspector
- * "is only enabled in development and debug builds unless you enable it with a
- * Cargo feature". A release binary therefore offers nothing to attach to: it
- * starts perfectly well and is simply undriveable. That is also why the
- * canonical Tauri example builds with `--debug` and drives `target/debug`.
- *
- * The other way to fix it — adding the `devtools` Cargo feature — would turn
- * the inspector on in the binaries `release.yml` actually ships, to make a
- * test pass. A debug build is the better trade by a distance: it is still the
- * real application, compiled by the real toolchain, running the real WebView2
- * against the real bundled frontend, and Tauri's CLI documentation notes that
+ * A debug build is still the real application: the real toolchain, the real
+ * WebView2, the real bundled frontend. Tauri's CLI documentation notes that
  * with `--debug` "the bundler etc. will do the same as they would in the
- * actual release mode" — so the installers still come out. Only the Rust
- * optimisation level differs.
+ * actual release mode", so the same installers come out, under
+ * `target/debug/bundle`. Only the Rust optimisation level differs.
  *
- * Overridable so that a developer who has built the other profile by hand can
- * point this at it without editing the file.
+ * Overridable so a developer who has built the other profile by hand can point
+ * this at it without editing the file — though a release binary has no
+ * WebDriver server compiled into it, by design, so it will not be drivable.
  */
 const BUILD_PROFILE = process.env.SMOKE_PROFILE ?? 'debug';
 const BUILD_DIRECTORY = resolve(HERE, '..', 'src-tauri', 'target', BUILD_PROFILE);
@@ -145,24 +145,13 @@ function resolveApplication(): string {
   );
 }
 
-function resolveTauriDriver(): string {
-  const bin = join(homedir(), '.cargo', 'bin');
-  for (const name of ['tauri-driver.exe', 'tauri-driver']) {
-    const candidate = join(bin, name);
-    if (existsSync(candidate)) return candidate;
-  }
-  throw new Error(
-    `tauri-driver was not found in ${bin}. Install it with \`cargo install tauri-driver --locked\`.`,
-  );
-}
-
 /**
- * Wait until something is accepting connections on the port.
+ * Wait until the app's WebDriver server is accepting connections.
  *
- * The canonical example spawns `tauri-driver` and immediately builds a client
- * against it, which is a race it usually wins. "Usually" is how a CI job
- * becomes flaky, and a flaky guard is one people start re-running instead of
- * reading.
+ * The app has to boot, create its window and start the server before there is
+ * anything to talk to. Connecting immediately would be a race, and "usually
+ * wins the race" is how a CI job becomes flaky — a flaky guard is one people
+ * start re-running instead of reading.
  */
 async function waitForDriver(port: number, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -182,7 +171,9 @@ async function waitForDriver(port: number, timeoutMs: number): Promise<void> {
     if (listening) return;
     if (Date.now() > deadline) {
       throw new Error(
-        `tauri-driver never started listening on 127.0.0.1:${port} within ${timeoutMs}ms.`,
+        `The app's WebDriver server never started listening on 127.0.0.1:${port} within ` +
+          `${timeoutMs}ms. Was the binary built with \`--features wdio\`? Without it the ` +
+          'plugin is not compiled in and the app runs perfectly well with no server at all.',
       );
     }
     await new Promise((settle) => setTimeout(settle, 200));
@@ -190,7 +181,7 @@ async function waitForDriver(port: number, timeoutMs: number): Promise<void> {
 }
 
 let driver: WebDriver | undefined;
-let tauriDriver: ChildProcess | undefined;
+let app: ChildProcess | undefined;
 let shuttingDown = false;
 
 /**
@@ -222,55 +213,50 @@ describe('the built CViper Light binary', () => {
     async () => {
       const application = resolveApplication();
 
-      const args = ['--port', String(DRIVER_PORT)];
-      // Set by CI to the msedgedriver matching the WebView2 runtime. Absent
-      // locally, where tauri-driver falls back to whatever is on PATH.
-      const nativeDriver = process.env.MSEDGEDRIVER;
-      if (nativeDriver !== undefined && nativeDriver !== '') {
-        args.push('--native-driver', nativeDriver);
-      }
-
       // ------------------------------------------------------------------
-      // NO `WEBVIEW2_USER_DATA_FOLDER` HERE. NAMING ONE BREAKS THE SESSION.
+      // THE APP IS THE SERVER. NOTHING ELSE IS SPAWNED.
       // ------------------------------------------------------------------
-      // The first version of this file set it to a fresh temp directory, so
-      // that "first run" was guaranteed rather than inherited. That cost run
-      // #1 of this workflow: msedgedriver launches the app with a
-      // `--user-data-dir` of its own and then watches THAT directory for the
-      // `DevToolsActivePort` file. WebView2 obeyed the environment variable
-      // instead, wrote the file where msedgedriver was not looking, and the
-      // driver sat out its full 60-second startup timeout before reporting
-      // `session not created: DevToolsActivePort file doesn't exist`. A user
-      // data folder holds at most one WebView2 session, and naming two paths
-      // for it is how you end up with none.
+      // Runs #1-#3 spawned `tauri-driver`, which spawned `msedgedriver`, which
+      // launched the app and tried to attach to it over the Chrome DevTools
+      // Protocol. All three died identically, sixty seconds in:
+      // `session not created: DevToolsActivePort file doesn't exist`. The
+      // version pairing was exact and the paths were right; the CDP handoff
+      // was the thing that did not happen. WebdriverIO's ADR-0002 records the
+      // same symptom on Windows CI and calls `tauri-driver` the deprecated
+      // `external` provider.
       //
-      // So the driver owns the profile, exactly as the canonical Tauri
-      // example leaves it. The consequence is stated rather than hidden: the
+      // The app now carries its own W3C WebDriver server — 47 endpoints, via
+      // `tauri-plugin-wdio-webdriver` behind the `wdio` Cargo feature — so
+      // there is no external driver, no CDP, and no second version to keep in
+      // step with the WebView2 runtime for ever. Launch the binary, talk to it.
+      //
+      // `WEBVIEW2_USER_DATA_FOLDER` is deliberately still NOT set: run #1 was
+      // lost to it clashing with the driver's own `--user-data-dir`. The
       // first-run assertion below is guaranteed on a CI runner, which has
       // never run this app, and on a developer machine it holds only until
       // somebody dismisses the welcome for real.
-      tauriDriver = spawn(resolveTauriDriver(), args, {
+      app = spawn(application, [], {
         stdio: ['ignore', 'inherit', 'inherit'],
+        env: { ...process.env, TAURI_WEBDRIVER_PORT: String(DRIVER_PORT) },
       });
 
-      tauriDriver.on('exit', (code) => {
+      app.on('exit', (code) => {
         if (shuttingDown) return;
-        // Loud, not swallowed: a driver that died is not a test that passed.
-        console.error(`tauri-driver exited unexpectedly with code ${String(code)}`);
+        // Loud, not swallowed: an app that died is not a test that passed.
+        console.error(`the app exited unexpectedly with code ${String(code)}`);
         process.exitCode = 1;
       });
 
-      await waitForDriver(DRIVER_PORT, DRIVER_STARTUP_TIMEOUT);
+      // Printed because run #1 spent sixty seconds failing without anything in
+      // the log saying what it was pointed at.
+      console.log(`smoke: application = ${application}`);
+      console.log(`smoke: webdriver   = ${DRIVER_URL}`);
 
-      // Printed because run #1 spent sixty seconds failing without either of
-      // these paths appearing anywhere in the log. A driver that cannot start
-      // should at least say what it was pointed at.
-      console.log(`smoke: application   = ${application}`);
-      console.log(`smoke: native driver = ${nativeDriver ?? '(from PATH)'}`);
+      await waitForDriver(DRIVER_PORT, DRIVER_STARTUP_TIMEOUT);
 
       const capabilities = new Capabilities();
       capabilities.set('tauri:options', { application });
-      capabilities.setBrowserName('wry');
+      capabilities.setBrowserName('tauri');
 
       driver = await new Builder().withCapabilities(capabilities).usingServer(DRIVER_URL).build();
     },
@@ -279,10 +265,10 @@ describe('the built CViper Light binary', () => {
 
   after(async () => {
     shuttingDown = true;
-    // The session first: quitting closes the app window. Killing the driver
-    // out from under a live session leaves the app orphaned and CI hanging.
+    // The session first: quitting closes the window the server lives inside.
+    // Killing the process out from under a live session leaves CI hanging.
     if (driver !== undefined) await driver.quit();
-    tauriDriver?.kill();
+    app?.kill();
   });
 
   it('opens a window', { timeout: 60_000 }, async () => {

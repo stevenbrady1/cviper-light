@@ -76,58 +76,29 @@ jobs:
           workspaces: apps/light/src-tauri
           key: smoke-release
 
-      - name: Install tauri-driver
-        run: cargo install tauri-driver --locked
-
       # ------------------------------------------------------------------
-      # THE DRIVER MUST MATCH THE WEBVIEW2 RUNTIME, NOT THE EDGE BROWSER.
+      # THERE IS NO EXTERNAL DRIVER STEP HERE ANY MORE, AND THAT IS THE FIX.
       # ------------------------------------------------------------------
-      # `windows-latest` ships a preinstalled Edge WebDriver under
-      # C:\SeleniumWebDrivers\EdgeDriver, and it is the WRONG ONE: it is keyed
-      # to the installed Edge BROWSER, while a Tauri app embeds the WebView2
-      # Evergreen Runtime, which updates on its own schedule. On the machine
-      # this was written on they were a major version apart — WebView2
-      # 152.0.4191.66 against Edge 153.0.4234.32. A mismatch does not fail
-      # loudly; it hangs the session until the job times out.
+      # This job used to `cargo install tauri-driver` and download an
+      # msedgedriver matched to the WebView2 runtime. Runs #1, #2 and #3 all
+      # died the same way, sixty seconds into the smoke step:
       #
-      # So the WebView2 version is read from its own registry key and the
-      # exactly matching driver is downloaded. Tauri's own CI docs reach for
-      # `cargo install --git https://github.com/chippers/msedgedriver-tool`,
-      # which is an unpinned third-party git checkout — this repository pins
-      # gitleaks by version AND checksum, and an unreviewed build script is not
-      # a step to take for something four lines of PowerShell do.
+      #     session not created: DevToolsActivePort file doesn't exist
       #
-      # Every failure path here throws. A `|| echo` on a version lookup is how
-      # an alarm becomes indistinguishable from a healthy system.
-      - name: Install the Edge WebDriver matching the WebView2 runtime
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-
-          $keys = @(
-            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
-            'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
-          )
-
-          $version = $null
-          foreach ($key in $keys) {
-            try { $version = (Get-ItemProperty -Path $key -ErrorAction Stop).pv; break } catch { }
-          }
-          if (-not $version) {
-            throw "The WebView2 Evergreen Runtime version was not found in the registry. Tried: $($keys -join ', ')"
-          }
-          Write-Host "WebView2 Evergreen Runtime: $version"
-
-          $zip = Join-Path $env:RUNNER_TEMP 'edgedriver.zip'
-          $dir = Join-Path $env:RUNNER_TEMP 'edgedriver'
-          Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$version/edgedriver_win64.zip" -OutFile $zip
-          Expand-Archive -Path $zip -DestinationPath $dir -Force
-
-          $driver = Join-Path $dir 'msedgedriver.exe'
-          if (-not (Test-Path $driver)) { throw "msedgedriver.exe was not in the archive for $version." }
-          & $driver --version
-
-          "MSEDGEDRIVER=$driver" >> $env:GITHUB_ENV
+      # The version pairing was exact (msedgedriver 152.0.4191.66 against
+      # WebView2 152.0.4191.66), the binary path was right, and tauri-driver
+      # v2.0.6 was listening. What failed was the handoff: msedgedriver drives
+      # a WebView2 app over the Chrome DevTools Protocol, and that path is
+      # brittle. WebdriverIO's ADR-0002 records the identical symptom — "when a
+      # CI runner's Edge/WebView2 bumped to 150 and broke the elevated-host CDP
+      # path for the external and CrabNebula routes on Windows, the embedded
+      # driver stayed green" — and notes that `tauri-driver` is now the
+      # deprecated `external` provider.
+      #
+      # So the external driver is gone. The app serves WebDriver itself, from
+      # the `wdio` feature (see src-tauri/Cargo.toml), and the spec connects
+      # straight to it. No msedgedriver, no tauri-driver, no CDP, and one fewer
+      # version pairing to keep in step for ever.
 
       # ------------------------------------------------------------------
       # `createUpdaterArtifacts` IS TURNED OFF FOR THIS BUILD, AND MUST BE.
@@ -144,30 +115,27 @@ jobs:
       # release.yml remains the only path to a signed artefact.
       #
       # ------------------------------------------------------------------
-      # `--debug` IS LOAD-BEARING. DO NOT "OPTIMISE" IT TO A RELEASE BUILD.
+      # `--features wdio` IS THE WHOLE POINT, AND `--debug` IS NOT OPTIONAL.
       # ------------------------------------------------------------------
-      # Runs #1 and #2 of this workflow built RELEASE and both died sixty
-      # seconds into the smoke step with `session not created:
-      # DevToolsActivePort file doesn't exist` — msedgedriver's startup budget,
-      # spent waiting on an app that had in fact launched.
+      # `wdio` compiles in the embedded WebDriver server that this job drives.
+      # It is a TEST-ONLY feature: see the long comment in src-tauri/Cargo.toml.
+      # Nothing else in the repository enables it, and a contract test fails if
+      # release.yml or ci.yml ever do.
       #
-      # msedgedriver drives a WebView2 app over the Chrome DevTools Protocol,
-      # and Tauri's debugging docs say the inspector "is only enabled in
-      # development and debug builds unless you enable it with a Cargo
-      # feature". A release binary has nothing to attach to, so it is simply
-      # undriveable. The canonical Tauri example builds `--debug` for exactly
-      # this reason.
+      # `--debug` is required in tandem, and is enforced rather than trusted:
+      # src-tauri/src/lib.rs raises a `compile_error!` when `wdio` is enabled
+      # without debug assertions, so `--features wdio` on a release profile
+      # does not build at all. Passing one without the other is a compile
+      # failure, not a silently shipped automation server.
       #
-      # The alternative — the `devtools` Cargo feature — would ship the
-      # inspector enabled in the binaries release.yml distributes, to make a
-      # test pass. Not worth it. A debug build is still the real app, the real
-      # toolchain, the real WebView2 and the real bundled frontend; only the
-      # Rust optimisation level differs, and per Tauri's CLI docs the bundler
-      # "will do the same as they would in the actual release mode", so the
-      # installers still come out (under target/debug/bundle).
-      - name: Build the app (debug profile, unsigned, no updater artefacts)
+      # A debug build is still the real app: the real toolchain, the real
+      # WebView2, the real bundled frontend. Only the Rust optimisation level
+      # differs, and per Tauri's CLI docs the bundler with `--debug` "will do
+      # the same as they would in the actual release mode", so the installers
+      # still come out — under target/debug/bundle.
+      - name: Build the app (debug profile, wdio feature, unsigned)
         shell: bash
-        run: pnpm --filter @cviper/light tauri build --debug --config '{"bundle":{"createUpdaterArtifacts":false}}'
+        run: pnpm --filter @cviper/light tauri build --debug --features wdio --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
       # Uploaded BEFORE the smoke test runs, on purpose: when the smoke test
       # goes red the installer is the first thing anyone will want to open.
