@@ -91,6 +91,33 @@ also the cheapest next move: enrol as an individual developer (free, via
 storedeveloper.microsoft.com) and submit one build to find out what the gate
 actually does with it.
 
+### A consent gate now guards every cloud AI call (L-97, 2026-09-12)
+
+Apple App Review Guideline 5.1.2(i), effective 13 Nov 2025, requires an app to
+disclose IN THE APP, name the provider, and get explicit, revocable,
+per-provider consent before personal data reaches a third-party AI. A CV is
+personal data, and this repo already ships an iOS target (L-80), so this is
+owed on the next App Store submission, not a future nice-to-have.
+
+**This file had no earlier "provider disclosure, not a consent gate" passage
+to correct.** Checked against `git log -p -- docs/PLAN.md` and a full-text
+search of every markdown file in the repo before writing this: neither exists,
+here or anywhere else. Recording the decision fresh, rather than rewriting a
+passage that was never here.
+
+What shipped: a dialog in `apps/light/src/features/analysis/ConsentGate.tsx`,
+shown before the first run against OpenAI or Anthropic, naming the provider
+and saying plainly what is sent (the CV text and the job advert) and under
+whose key. It is enforced in `runAnalysis.ts`, not only in the UI — the
+transport factory is provably never built for a cloud kind until `hasConsent`
+answers `true` (`runAnalysis.consent.test.ts`), the same guarantee the keyword
+path already made about the network. Ollama is structurally exempt:
+`ConsentProviderKind` is `Exclude<ProviderId, 'ollama'>`, so there is no
+branch here for it to fall into — a local run never even asks the question.
+Consent is per provider, never global, and revocation is reachable from the
+analysis screen itself (`ConsentStatus`), not from Settings, because
+`Settings.tsx` was mid-flight in another change at the time this landed.
+
 ---
 
 ## Context
