@@ -11,17 +11,35 @@ unable to parse JSON Tauri config file ... because key must be a string
 So the notes that belong beside `plugins.updater` live here instead. Read this
 before touching that block.
 
-## 1. Generate the signing keypair — NOT in this repository
+## 1. The signing keypair — ALREADY GENERATED, AND NEVER TO BE REGENERATED
+
+> ### Do not generate a new updater key. Ever.
+>
+> `plugins.updater.pubkey` in `tauri.conf.json` holds the **live** minisign
+> public key, id **`7029FCBC6B4F158F`**. It is real and in use. Its private half
+> and that key's password are set in this repository's GitHub Actions secrets,
+> `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+>
+> Every installed copy verifies updates against the key that was baked into it
+> when it was built. Running `pnpm tauri signer generate` again and committing
+> the new public key **permanently stops every existing install from accepting
+> any future update** — silently, with no error the user can act on, and with no
+> way to repair it short of every one of those people downloading a fresh
+> installer by hand. The app checks one hardcoded key and there is no revocation
+> path, so this cannot be fixed by shipping another release.
+
+It was generated once, by the operator, with
 
 ```
 pnpm tauri signer generate -w ~/.tauri/cviper-light.key
 ```
 
-It writes two files and prints the public key.
+which wrote two files and printed the public key.
 
-- The **private** key and its password go into the GitHub repository secrets
+- The **private** key and its password went into the GitHub repository secrets
   `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
-- The **public** key replaces `plugins.updater.pubkey` in `tauri.conf.json`.
+- The **public** key is `plugins.updater.pubkey` in `tauri.conf.json`, set in
+  `ce13a96`.
 
 No keypair is generated, stored, or committed here — by anyone or anything,
 ever. A signing key in version control is a signing key that lets a stranger
@@ -35,7 +53,7 @@ same time as the pubkey. The tag in the URL stays `latest`. The tag in
 the URL stays `latest`: `release.yml` republishes `latest.json` on every
 release, so the endpoint is never edited again.
 
-## What the placeholder does today
+## Where the key is actually read
 
 Read out of `tauri-plugin-updater` 2.10.1 rather than assumed. The pubkey is
 decoded in `verify_signature`, which `updater.rs` calls at line 712 — inside the
@@ -43,18 +61,19 @@ DOWNLOAD path, after the bytes are in hand. `Builder::build()` merely clones the
 config into managed state, and `UpdaterBuilder::build()` validates the endpoint
 list and the architecture but never touches the key.
 
-| Operation                            | With the placeholder in place                                                      |
-| ------------------------------------ | ---------------------------------------------------------------------------------- |
-| `cargo check`, `cargo test`          | Pass. The pubkey is an opaque string to the build.                                 |
-| `pnpm tauri dev`                     | Runs. Nothing parses the key at startup.                                           |
-| **Check for updates** in Settings    | Works, and can report an update as available — a check compares versions only.     |
-| **Install** that update              | Fails at signature verification. Settings shows the message; nothing is installed. |
-| `tauri build` with updater artifacts | Fails outright. Correct — an unsigned update is not shippable.                     |
+| Operation                            | What the key does there                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| `cargo check`, `cargo test`          | Nothing. The pubkey is an opaque string to the build.                    |
+| `pnpm tauri dev`                     | Nothing. Nothing parses the key at startup.                              |
+| **Check for updates** in Settings    | Nothing. A check compares versions only.                                 |
+| **Install** that update              | Verifies the downloaded bundle. A signature that fails installs nothing. |
+| `tauri build` with updater artifacts | Signs the bundle with the private key from the Actions secrets.          |
 
-The consequence worth knowing: until the real key is in place, a build can OFFER
-an update it cannot install. That is the safe direction to fail in — a refused
-signature is the check working — but it is not a state to ship to users, which
-is why the release workflow needs the secrets before anything is published.
+The consequence worth knowing: a build whose baked-in public key does not match
+the private key a release was signed with can OFFER an update it cannot install.
+That is the safe direction to fail in — a refused signature is the check working
+— but it is why the key in `tauri.conf.json`, the secrets in this repository and
+every copy already installed have to stay in step with one another.
 
 ## Why `installMode` is `passive`
 

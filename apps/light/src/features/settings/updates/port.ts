@@ -40,9 +40,12 @@ export interface UpdatePort {
  * Whatever the plugin threw, as a sentence.
  *
  * The three cases worth naming are the three that actually happen: no network,
- * no release feed yet, and a signature that will not verify — which is exactly
- * what a build carrying the placeholder pubkey produces, and is the state this
- * repository ships in today.
+ * no release feed yet, and a signature that will not verify — which is what a
+ * build whose baked-in pubkey does not match the key the release was signed
+ * with produces. The key in `tauri.conf.json` is real (minisign id
+ * 7029FCBC6B4F158F) and its private half is in this repository's Actions
+ * secrets, so a correctly signed release verifies; a mismatch is still worth a
+ * sentence the user can act on.
  */
 export function describeUpdateFailure(thrown: unknown): UpdateProblem {
   const raw = thrown instanceof Error ? thrown.message : String(thrown);

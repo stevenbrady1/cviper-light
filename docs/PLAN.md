@@ -29,8 +29,9 @@ Two things the plan below says are no longer accurate, and both are deliberate:
    `apps/light/branding/README.md`.
 
 The remaining human-only tasks are the ones at the very bottom of this file, and
-they are the honest list: real API keys, the signing keypair, the public
-repository and its secrets, store enrolment, and the first tagged release.
+they are the honest list: real API keys, the public repository and its remaining
+secrets, store enrolment, and the first tagged release. The updater signing
+keypair is done — see task 5, and do not redo it.
 
 ---
 
@@ -384,7 +385,8 @@ The probe gets 500 ms; **the first chat gets 180 s** with a "loading model — f
 indicator, because cold VRAM load takes 5–30 s and silence reads as a hang.
 
 **Updater:** `createUpdaterArtifacts: true`, GitHub Releases `latest.json` endpoint,
-`PLACEHOLDER_REPLACE_BEFORE_FIRST_RELEASE` pubkey with a clear comment. A **"Check for updates"
+and a pubkey — which since `ce13a96` is the real minisign key, id `7029FCBC6B4F158F`,
+and must never be regenerated. A **"Check for updates"
 button only — no automatic check on launch.** A silent network call at startup in a product
 advertising "no telemetry" is a broken promise however benign the payload. Say so in About.
 
@@ -504,8 +506,10 @@ text editor and starts with `"schemaVersion": 1`.
 2. Pad `cviper-icon-source.png` to a square 1024×1024.
 3. Paste a real Anthropic or OpenAI key; judge analysis quality _(end of Phase 1)_.
 4. Register free Adzuna + Reed keys; confirm real results _(end of Phase 2)_.
-5. Generate the updater signing keypair (`pnpm tauri signer generate`); add the public key.
-   **An agent must never generate or handle a release signing key.**
+5. ~~Generate the updater signing keypair; add the public key.~~ **Done** in `ce13a96` —
+   key id `7029FCBC6B4F158F`, private half in the Actions secrets.
+   **An agent must never generate or handle a release signing key, and this one must never
+   be regenerated: every installed copy would stop accepting updates, permanently.**
 6. Create the public mirror repo; add all GitHub secrets.
 7. Apple / Microsoft Store enrolment.
 8. First tagged release and macOS notarization.

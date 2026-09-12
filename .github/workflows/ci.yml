@@ -85,8 +85,9 @@ jobs:
         run: pnpm cargo:test
 
       # The Vite build only. NEVER `tauri build` — a release bundle is a signed
-      # artefact produced by release.yml, and running it here would fail on the
-      # placeholder signing key while burning ten minutes to say so.
+      # artefact produced by release.yml, which alone is given the signing
+      # secrets. Running it here would burn ten minutes producing nothing
+      # shippable.
       - name: Build the frontend
         run: pnpm --filter @cviper/light build
 

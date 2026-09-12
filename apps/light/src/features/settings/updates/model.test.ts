@@ -51,7 +51,7 @@ describe('nextStateAfterCheck', () => {
   it('negative: keeps the failure message rather than replacing it', () => {
     // The port's messages already say what happened and what to do. Collapsing
     // them into "update check failed" throws away the only useful thing on the
-    // screen — and with a placeholder pubkey, the message IS the diagnosis.
+    // screen — when a signature will not verify, the message IS the diagnosis.
     const state = nextStateAfterCheck({
       ok: false,
       error: { message: 'The signature could not be verified.' },
