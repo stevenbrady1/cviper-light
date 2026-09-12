@@ -748,10 +748,87 @@ mod tests {
 
     // ── The guard ───────────────────────────────────────────────────────────
 
+    /// A temp path that belongs to THIS call and no other.
+    ///
+    /// L-94: `process::id()` is not a discriminator inside a test binary. Every
+    /// test here shares one process, so two tests that pick the same file name
+    /// were handed one path and raced on it — `a_cv_export_writes_the_text_verbatim`
+    /// and `a_json_resume_is_a_cv` both ask for "resume.json". The per-CALL
+    /// counter is what makes the answer unique; the pid still separates two
+    /// `cargo test` runs going at once, and gives the leftovers one name to sweep.
+    ///
+    /// The unique part is the PARENT DIRECTORY, deliberately never the file
+    /// name: `an_opened_cv_is_read_under_the_picker_guards` asserts the exact
+    /// name a CV arrives under, and `no_message_leaks_the_path` needs the
+    /// caller's own name to reach the code being tested.
     fn temp_path(name: &str) -> std::path::PathBuf {
+        static NEXT_CALL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let nth = NEXT_CALL.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
         let mut path = std::env::temp_dir();
+        path.push(format!("cviper-files-test-{}", std::process::id()));
+        path.push(nth.to_string());
+        fs::create_dir_all(&path).expect("a temp folder of this call's own");
+
         path.push(format!("cviper-files-test-{}-{name}", std::process::id()));
         path
+    }
+
+    #[test]
+    fn two_callers_asking_for_the_same_name_never_get_the_same_path() {
+        // L-94. Every test in this binary shares one process, so a discriminator
+        // built only from `process::id()` is the SAME for all of them: two tests
+        // that happen to pick the same file name get one file and race on it.
+        // `a_cv_export_writes_the_text_verbatim` and `a_json_resume_is_a_cv` both
+        // ask for "resume.json", which is exactly that collision.
+        const CALLERS: usize = 16;
+
+        let handles: Vec<_> = (0..CALLERS)
+            .map(|_| std::thread::spawn(|| temp_path("race.json")))
+            .collect();
+        let paths: std::collections::HashSet<std::path::PathBuf> =
+            handles.into_iter().map(|h| h.join().unwrap()).collect();
+
+        assert_eq!(
+            paths.len(),
+            CALLERS,
+            "{CALLERS} concurrent callers asked for \"race.json\" and got {} distinct \
+             path(s): they share a file and will clobber each other",
+            paths.len()
+        );
+    }
+
+    #[test]
+    fn two_writers_of_the_same_name_leave_each_other_alone() {
+        // The consequence, on a real disk: the first caller's bytes must still be
+        // the first caller's bytes after the second has written.
+        let first = temp_path("resume.json");
+        let second = temp_path("resume.json");
+
+        fs::write(&first, b"from the first caller").unwrap();
+        fs::write(&second, b"from the second caller").unwrap();
+
+        assert_eq!(fs::read(&first).unwrap(), b"from the first caller");
+        assert_eq!(fs::read(&second).unwrap(), b"from the second caller");
+
+        fs::remove_file(&first).ok();
+        fs::remove_file(&second).ok();
+    }
+
+    #[test]
+    fn the_unique_part_stays_out_of_the_file_name() {
+        // The uniqueness belongs in the PARENT DIRECTORY, not the file name:
+        // `an_opened_cv_is_read_under_the_picker_guards` asserts the name a CV
+        // arrives under is exactly `cviper-files-test-<pid>-opened.pdf`, and
+        // `no_message_leaks_the_path` depends on the caller's name surviving.
+        // A future refactor that moves the counter into the file name would pass
+        // the two tests above and silently break that contract.
+        let path = temp_path("opened.pdf");
+
+        assert_eq!(
+            path.file_name().and_then(|name| name.to_str()),
+            Some(format!("cviper-files-test-{}-opened.pdf", std::process::id()).as_str())
+        );
     }
 
     #[test]
