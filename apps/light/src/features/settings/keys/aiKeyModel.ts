@@ -47,6 +47,17 @@ import { MAX_KEY_BYTES } from './model';
  * Written as a union rather than a bare string so adding Anthropic later is a
  * compile error at every site that has to change, rather than a card that
  * silently reads the wrong credential.
+ *
+ * ============================================================================
+ * TWO GUARDS READ THIS DECLARATION. LEAVE IT HERE, SPELLED LIKE THIS.
+ * ============================================================================
+ *   * `privacy/configurableAi.contract.test.ts` parses it OUT OF THIS FILE with
+ *     a regular expression, to check the privacy paragraph and the generated
+ *     policy name every provider a user can actually configure. Moving the
+ *     declaration to another file empties that guard rather than failing it.
+ *   * `keys/aiKeyProviders.ts` mirrors it as a runtime VALUE, because
+ *     `analysis/providers.ts` has to decide what the picker may offer while the
+ *     app is running, and a type cannot answer that (L-102).
  */
 export type AiKeyProviderId = 'openai';
 
