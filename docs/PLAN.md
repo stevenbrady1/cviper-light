@@ -33,6 +33,64 @@ they are the honest list: real API keys, the public repository and its remaining
 secrets, store enrolment, and the first tagged release. The updater signing
 keypair is done — see task 5, and do not redo it.
 
+### The Microsoft Store route is viable (L-95, 2026-09-12)
+
+A Windows installer that opens without a SmartScreen warning normally means
+buying a code-signing certificate. The Microsoft Store is the free alternative —
+it re-signs what it accepts — and the price of entry is the Windows App
+Certification Kit. A spike packaged a release build as MSIX and ran WACK over it:
+run `34682301051`, green, WACK 10.0.26100.8249 on Windows Server 2025, x64, app
+type `Centennial`. The experiment itself is closed and unmerged; this is its
+result.
+
+**It passes.** `OVERALL_RESULT = PASS`, `PARTIAL_RUN = FALSE`, 24 tests, 23
+passed. The single failure is "Blocked executables" (requirement 25, the package
+sanity test) and it is marked `OPTIONAL = TRUE`, which is why the verdict is
+still PASS. The hits on `light.exe` are `kernel32.dll!CreateProcessW`,
+`shell32.dll!ShellExecuteW`, `shell32.dll!ShellExecuteExW`, and
+blocked-executable references to `bash`, `cmd`, `cmd.exe`, `\cmd.exe` and `reg`.
+
+**`tauri-apps/tauri#14935` reproduces on a RELEASE build.** The comfortable
+assumption is that it is a debug-build artefact; it is not, and three things say
+so: the job ran `cargo build --release`, `main.rs` sets
+`windows_subsystem = "windows"`, and WACK's own "Debug configuration" test — the
+one that would flag a debug binary — passed. The cause is intrinsic to the Tauri
+release binary on Windows, almost certainly the WebView2 dependency.
+
+**Packaging is not the cause, and very nearly looked like it.** The package held
+exactly one executable, `light.exe`, and WACK recorded two `<File>` entries. An
+earlier draft of the spike had also staged `light_lib.dll` — a `cdylib` artifact
+nothing loads at runtime, because `main.rs` links the crate as an rlib — which
+would have handed WACK a second binary to scan and produced a packaging-caused
+failure indistinguishable from a real confirmation of #14935. That confound was
+removed before this run.
+
+Three things worth keeping for a real attempt: `appcert.exe` is already installed
+on the `windows-latest` runner at
+`C:\Program Files (x86)\Windows Kits\10\App Certification Kit\`, so nothing needs
+setting up; session 0 was a non-issue, the job ran in session 2; and Tauri emits
+no sidecars, no `externalBin` and no `bundle.resources` for this app, so staging
+the executable alone was the correct minimal package.
+
+**What this does not show.** None of the following is done:
+
+1. The packaged app has never been RUN. WACK reported "Running tests without
+   application deployment" — static analysis only, no launch.
+2. The spike built with `cargo build --release` directly. The shipping path is
+   `release.yml` → `tauri build`, which names the executable differently and may
+   bundle differently. The artefact that would actually be submitted has never
+   been tested.
+3. Only x64 was tested. arm64 is untested.
+4. The manifest identity fields were placeholders, not a Store-assigned identity.
+
+**Viable, not blocked, and not proven.** Microsoft's own documentation says the
+Store "may apply all tests from this workflow", so WACK marking "Blocked
+executables" optional is not a guarantee that the Store's own gate ignores it
+too. That residual risk closes with a real submission and nothing else, which is
+also the cheapest next move: enrol as an individual developer (free, via
+storedeveloper.microsoft.com) and submit one build to find out what the gate
+actually does with it.
+
 ---
 
 ## Context
@@ -516,5 +574,13 @@ text editor and starts with `"schemaVersion": 1`.
    **An agent must never generate or handle a release signing key, and this one must never
    be regenerated: every installed copy would stop accepting updates, permanently.**
 6. Create the public mirror repo; add all GitHub secrets.
-7. Apple / Microsoft Store enrolment.
-8. First tagged release and macOS notarization.
+7. Apple enrolment — the Developer ID Application certificate and the five
+   `APPLE_*` repository secrets that carry it. The macOS release leg is built and
+   merged (L-96): a universal binary behind the three-state secret gate. It is
+   inert until those exist, and with none of them set it skips itself with a
+   warning while Windows still ships.
+8. Microsoft Store enrolment — **the recommended next step**, on the strength of
+   the WACK result recorded in Status. Free for an individual developer at
+   `storedeveloper.microsoft.com`, and the only way to settle what that result
+   cannot: submit one real build and see what the Store's own gate does with it.
+9. First tagged release and macOS notarization.
