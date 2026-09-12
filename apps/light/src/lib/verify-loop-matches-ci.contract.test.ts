@@ -1,0 +1,723 @@
+/**
+ * The verification-loop contract (L-98): `pnpm verify` must run everything the
+ * CI `verify` job runs.
+ *
+ * ============================================================================
+ * WHY THIS EXISTS
+ * ============================================================================
+ * CLAUDE.md documented a five-command loop — `tsc`, `lint`, `test`,
+ * `cargo:check`, `cargo:test` — and the root `verify` script chained exactly
+ * those five. The CI `verify` job runs SEVEN things: those five, then the
+ * frontend build, then `pnpm format:check`.
+ *
+ * So the loop under-reported, and it did it silently. All five green locally,
+ * push, and CI goes red minutes later. That is the worst shape a check can
+ * have: it is not wrong, it is INCOMPLETE, and nothing about a green local run
+ * says so.
+ *
+ * The two missing checks were not equally dangerous, and the difference is the
+ * reason this file is shaped the way it is:
+ *
+ *   * `format:check` is COSMETIC and SELF-ANNOUNCING. You lose a build to it,
+ *     `pnpm format` fixes it, nothing shipped is wrong.
+ *   * THE FRONTEND BUILD IS NOT. A change that breaks the production Vite
+ *     bundle passes `tsc`, `lint` and `test` perfectly happily — they compile
+ *     and exercise SOURCE, not the bundle. Leaving the build out means a broken
+ *     production build is locally green. That is a silent failure over a broken
+ *     artefact, which is the failure class this repository keeps repeating.
+ *
+ * The first draft of this guard fixed `format:check` and put the build on the
+ * exception list. That was the more dangerous half of the bug, preserved. It is
+ * required now, and the exception list is for environment setup only.
+ *
+ * ============================================================================
+ * WHAT IT ADJUDICATES
+ * ============================================================================
+ * Every command the `verify` job actually runs must be one of:
+ *
+ *   1. a root `package.json` script that `pnpm verify` also runs — recognised
+ *      either as `pnpm <script>` or because the command IS that script's body
+ *      verbatim, or
+ *   2. `pnpm verify` itself, or
+ *   3. registered in `OUTSIDE_THE_LOOP` below, with a reason.
+ *
+ * Case 1's second half is what lets CI spell a command out in full while the
+ * loop calls it by name. CI runs `pnpm --filter @cviper/light build`; the root
+ * `build` script IS that command, so the two are the same check and the guard
+ * says so. The alternative — a regex in the exception list matching a filter
+ * expression — excuses the check instead of comparing it, which is precisely
+ * how the build came to be missing.
+ *
+ * Anything else is an offence. Case 3 is the dangerous one and is deliberately
+ * narrow: an exception is for things that CANNOT FAIL BECAUSE THE CODE IS
+ * WRONG — installing pnpm, installing dependencies. If a step can go red over a
+ * change somebody made, it is a check and it belongs in the loop.
+ *
+ * Requiring every command to be classified is what makes this fail CLOSED. The
+ * obvious design — "collect the `pnpm <script>` calls on both sides and diff
+ * them" — passes quietly the day CI gains a check written as `npx some-tool` or
+ * `cargo audit`, because such a step contributes NOTHING to either side of the
+ * diff.
+ *
+ * The same closed-ness applies to the script: a segment of `verify` that is not
+ * a `pnpm <script>` call is an offence, because this guard cannot vouch for
+ * coverage it cannot read.
+ *
+ * ============================================================================
+ * WHAT IT DOES *NOT* COVER — read this before trusting it
+ * ============================================================================
+ *   * ONLY THE `verify` JOB, and only in `ci.yml`. Every other workflow and job
+ *     is out of scope, and `WORKFLOW_SCOPE` below records each one WITH ITS
+ *     REASON rather than leaving the list in prose nobody updates. A new
+ *     workflow file is RED until somebody classifies it.
+ *
+ *     THIS IS A SCOPE BOUNDARY, NOT AN EXEMPTION, AND THE DIFFERENCE MATTERS —
+ *     excusing a command inside the adjudicated job is what hid the frontend
+ *     build. The promise made here is "`pnpm verify` reproduces the `verify`
+ *     job", never "reproduces all of CI". `smoke.yml` is the clearest case: its
+ *     `built-app` job runs `tauri build` twice, and CLAUDE.md's first HARD RULE
+ *     forbids an agent from running `tauri build` at all. A check a developer
+ *     is forbidden to run cannot be in a developer's loop. `secret-scan` wants
+ *     the full history, a network and a pinned gitleaks binary; `release.yml`
+ *     and `ios.yml` want signing secrets and a Mac.
+ *
+ *     The honest cost: `smoke.yml` can go red on a change `pnpm verify` is
+ *     green on, and nothing local will catch that. That is a real gap. It is
+ *     bounded by the fact that those jobs cannot run here at all, and it is
+ *     written down rather than discovered.
+ *   * INVOCATIONS, NOT BEHAVIOUR. It proves `pnpm test` is invoked on both
+ *     sides, and that CI's build command is the one the `build` script wraps.
+ *     It cannot prove two invocations do the same WORK — a workflow-level
+ *     `env:`, or a script body that drifts from the command CI spells out,
+ *     would make them differ. The body comparison is exact-match after
+ *     whitespace collapsing, so a drifting body fails closed rather than open.
+ *   * NOT WHETHER THE CHECKS PASS. That is what running them is for.
+ *   * NOT ORDER. The script happens to chain in CI's order (see CLAUDE.md), but
+ *     that is a readability choice and is not asserted here.
+ *   * NOT `uses:` STEPS. A check hidden inside a composite action is invisible:
+ *     only `run:` commands are read. A new check arriving that way would pass.
+ *   * COMMENTS ARE STRIPPED, for the reason `repo-scan.ts` gives — a guard that
+ *     fires on the prose explaining the fix is a guard somebody deletes. A
+ *     commented-out step is therefore invisible, which is correct: it runs
+ *     nothing. The cost is that a `#` inside a `run:` command truncates that
+ *     command; there are none today and the truncation would fail closed.
+ *   * A LOOP STRICTER THAN CI IS ALLOWED. The contract is one-directional. A
+ *     script that runs more than CI cannot produce the surprise this exists to
+ *     prevent, because the surprise is always "CI knew something I did not".
+ *     The corollary is that a check DELETED from ci.yml is not reported here.
+ */
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+
+import { REPO_ROOT } from './repo-scan.ts';
+
+const WORKFLOW_DIRECTORY = '.github/workflows';
+const WORKFLOW_FILE = 'ci.yml';
+const WORKFLOW_PATH = `${WORKFLOW_DIRECTORY}/${WORKFLOW_FILE}`;
+const MANIFEST_PATH = 'package.json';
+
+/** The CI job that is meant to be reproducible with one local command. */
+const JOB = 'verify';
+/** The root script that is meant to reproduce it. */
+const SCRIPT = 'verify';
+
+const WORKFLOW = readFileSync(join(REPO_ROOT, WORKFLOW_PATH), 'utf8');
+
+export interface Offence {
+  readonly where: string;
+  readonly found: string;
+  readonly why: string;
+}
+
+/**
+ * Commands the `verify` job runs that are deliberately NOT part of the local
+ * loop, each with the reason it is excused.
+ *
+ * THE BAR FOR AN ENTRY HERE IS THAT THE STEP CANNOT FAIL BECAUSE THE CODE IS
+ * WRONG. Installing pnpm and installing dependencies qualify: they are the
+ * runner becoming a developer machine, and a developer already has both. A
+ * BUILD DOES NOT QUALIFY, however slow it is — it goes red over changes people
+ * make, which makes it a check. The frontend build was once listed here, and
+ * that exemption was the L-98 defect in its more dangerous form.
+ *
+ * Kept deliberately tight. A broad pattern here is how this guard would go
+ * quietly inert, so each entry describes one specific command rather than a
+ * category of them.
+ */
+export const OUTSIDE_THE_LOOP: ReadonlyArray<{ readonly pattern: RegExp; readonly why: string }> = [
+  {
+    pattern: /^corepack\s+enable\b/,
+    why: 'runner setup — a developer already has pnpm on PATH.',
+  },
+  {
+    pattern: /^pnpm\s+install\b/,
+    why: 'dependency install — a developer already has node_modules.',
+  },
+];
+
+/**
+ * Every workflow file, and whether this contract adjudicates it.
+ *
+ * The out-of-scope list used to live in the docblock as prose, which meant a
+ * new workflow was invisible: nothing went red, the list simply became wrong.
+ * L-88 added `smoke.yml` and proved the point. As DATA with a test over it, an
+ * unclassified workflow fails and a stale entry fails, so the scope of this
+ * guard cannot quietly drift out of date.
+ *
+ * This says nothing about whether a workflow is CORRECT — only whether somebody
+ * has decided, in writing, that `pnpm verify` is or is not meant to reproduce
+ * it.
+ */
+export const WORKFLOW_SCOPE: Readonly<Record<string, string>> = {
+  'ci.yml': 'ADJUDICATED — its `verify` job is the loop `pnpm verify` must reproduce.',
+  'smoke.yml':
+    'out of scope — its `built-app` job runs `tauri build` twice to drive the real binary ' +
+    '(L-88). CLAUDE.md HARD RULE 1 forbids an agent running `tauri build`, so this cannot be ' +
+    'part of a local loop.',
+  'release.yml': 'out of scope — bundles and signs a release; needs the signing secrets.',
+  'ios.yml': 'out of scope — needs a Mac runner and an Apple toolchain.',
+  'monorepo-split.yml': 'out of scope — publishes a filtered history; touches no check.',
+};
+
+function escapeForRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Whitespace collapsed, so YAML indentation cannot make two identical commands differ. */
+function normalise(text: string): string {
+  return text.trim().replace(/\s+/g, ' ');
+}
+
+/** The workflow as the runner sees it, with `#` commentary gone. */
+export function readableYaml(source: string): string {
+  return source.replaceAll('\r\n', '\n').replace(/(^|\s)#.*$/gm, '$1');
+}
+
+/** The `scripts` block of a `package.json`, as plain strings. */
+export function scriptsOf(manifest: string): Record<string, string> {
+  const parsed: unknown = JSON.parse(manifest);
+  const scripts: unknown = (parsed as { scripts?: unknown }).scripts;
+  if (typeof scripts !== 'object' || scripts === null) {
+    throw new Error(`${MANIFEST_PATH} has no "scripts" block to compare the CI job against.`);
+  }
+  return Object.fromEntries(
+    Object.entries(scripts as Record<string, unknown>).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string',
+    ),
+  );
+}
+
+const SCRIPTS: Readonly<Record<string, string>> = scriptsOf(
+  readFileSync(join(REPO_ROOT, MANIFEST_PATH), 'utf8'),
+);
+
+/**
+ * The body of one job, as text.
+ *
+ * Deliberately lexical — no YAML parser, matching the house style of the other
+ * repository guards (see `release-signing-gate.contract.test.ts`). The job key
+ * is only recognised after a top-level `jobs:`, so a `verify:` appearing
+ * anywhere else cannot be mistaken for it. An absent job yields `''`, which the
+ * premise below refuses to adjudicate.
+ */
+export function jobTextOf(workflow: string, job: string): string {
+  const header = new RegExp(String.raw`^(\s+)${escapeForRegExp(job)}:\s*$`);
+  const collected: string[] = [];
+  let seenJobs = false;
+  let indent = -1;
+
+  for (const line of workflow.split('\n')) {
+    if (!seenJobs) {
+      if (/^jobs:\s*$/.test(line)) seenJobs = true;
+      continue;
+    }
+    if (indent === -1) {
+      const match = header.exec(line);
+      if (match) indent = match[1]?.length ?? 0;
+      continue;
+    }
+    if (line.trim() === '') {
+      collected.push(line);
+      continue;
+    }
+    if (line.length - line.trimStart().length <= indent) break;
+    collected.push(line);
+  }
+
+  return collected.join('\n');
+}
+
+/**
+ * One shell command per entry.
+ *
+ * `&&`, `||` and `;` chain separate commands, so they are split on. A `|` pipe
+ * is NOT: its right-hand side is a continuation of one command, and splitting
+ * there would invent commands like `head -5` that nobody runs.
+ */
+function splitCommands(text: string): string[] {
+  return text
+    .split(/\n|&&|\|\||;/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function unquote(value: string): string {
+  return /^(['"])([\s\S]*)\1$/.exec(value)?.[2] ?? value;
+}
+
+/**
+ * Every command the job's `run:` keys carry, inline and block-scalar alike.
+ *
+ * A bare `run:` with no scalar (the `defaults: run: shell:` mapping) yields
+ * nothing, which is right — it configures commands rather than being one.
+ */
+export function runCommandsOf(jobText: string): string[] {
+  const lines = jobText.split('\n');
+  const commands: string[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = /^(\s*(?:-\s+)?)run:\s*(.*)$/.exec(lines[index] ?? '');
+    if (!match) continue;
+
+    const keyIndent = (match[1] ?? '').length;
+    const inline = (match[2] ?? '').trim();
+
+    if (!/^[|>][+-]?\d*$/.test(inline)) {
+      commands.push(...splitCommands(unquote(inline)));
+      continue;
+    }
+
+    const block: string[] = [];
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const body = lines[next] ?? '';
+      if (body.trim() !== '' && body.length - body.trimStart().length <= keyIndent) break;
+      block.push(body.trim());
+      index = next;
+    }
+    commands.push(...splitCommands(block.join('\n')));
+  }
+
+  return commands;
+}
+
+/**
+ * The root script a command invokes, or `null` if it invokes none.
+ *
+ * Two ways to be the same check: the command CALLS the script (`pnpm build`),
+ * or the command IS the script's body spelled out, which is how CI writes the
+ * frontend build. If two scripts shared a body the first declared would win;
+ * none do.
+ *
+ * The loop's own entry point is deliberately NEVER resolved by body. A `verify`
+ * consisting of a single command would otherwise match itself, mark itself
+ * covered, and report perfect coverage of nothing — the vacuous pass this whole
+ * file exists to prevent. Its own test caught exactly that.
+ */
+export function rootScriptInvokedBy(
+  command: string,
+  scripts: Readonly<Record<string, string>>,
+): string | null {
+  const called = /^pnpm(?:\s+run)?\s+(\S+)/.exec(command)?.[1];
+  if (called !== undefined && Object.hasOwn(scripts, called)) return called;
+
+  const target = normalise(command);
+  for (const [name, body] of Object.entries(scripts)) {
+    if (name === SCRIPT) continue;
+    if (normalise(body) === target) return name;
+  }
+  return null;
+}
+
+/** What the `verify` script chains, and any segment of it this guard cannot read. */
+export function loopOf(scripts: Readonly<Record<string, string>>): {
+  readonly runs: readonly string[];
+  readonly unreadable: readonly string[];
+} {
+  const body = scripts[SCRIPT];
+  if (body === undefined) {
+    throw new Error(
+      `${MANIFEST_PATH} has no "${SCRIPT}" script. The local loop has no entry point.`,
+    );
+  }
+
+  const runs: string[] = [];
+  const unreadable: string[] = [];
+  for (const segment of splitCommands(body)) {
+    const name = rootScriptInvokedBy(segment, scripts);
+    if (name === null) unreadable.push(segment);
+    else runs.push(name);
+  }
+  return { runs, unreadable };
+}
+
+/** Every way the job and the script could disagree. */
+export function loopDriftOffences(
+  jobText: string,
+  scripts: Readonly<Record<string, string>>,
+): Offence[] {
+  const { runs, unreadable } = loopOf(scripts);
+  const covered = new Set<string>(runs);
+  const offences: Offence[] = [];
+
+  for (const segment of unreadable) {
+    offences.push({
+      where: `the "${SCRIPT}" script`,
+      found: segment,
+      why:
+        'this is not a `pnpm <script>` call, so this guard cannot tell what it covers and will ' +
+        'not vouch for it. Express the check as a root script and chain that instead.',
+    });
+  }
+
+  for (const command of runCommandsOf(jobText)) {
+    const name = rootScriptInvokedBy(command, scripts);
+
+    if (name === SCRIPT) continue;
+    if (name !== null && covered.has(name)) continue;
+
+    if (name !== null) {
+      offences.push({
+        where: `the "${JOB}" job runs \`${command}\``,
+        found: `pnpm ${name}`,
+        why:
+          `CI runs \`pnpm ${name}\` and \`pnpm ${SCRIPT}\` does not, so the documented loop can ` +
+          'be green on a machine that CI is about to fail. Add it to the "verify" script — and ' +
+          'to the loop in CLAUDE.md.',
+      });
+      continue;
+    }
+
+    if (OUTSIDE_THE_LOOP.some((entry) => entry.pattern.test(command))) continue;
+
+    offences.push({
+      where: `the "${JOB}" job runs \`${command}\``,
+      found: command,
+      why:
+        'this command is neither a root script the loop runs nor a registered exception, so ' +
+        'nobody can say whether `pnpm verify` reproduces it. Make it a root script and chain it ' +
+        'into "verify". Do NOT add it to OUTSIDE_THE_LOOP unless it cannot fail because the code ' +
+        'is wrong — exempting a real check is how the frontend build went missing (L-98).',
+    });
+  }
+
+  return offences;
+}
+
+export function driftOffences(
+  workflow: string,
+  scripts: Readonly<Record<string, string>>,
+): Offence[] {
+  return loopDriftOffences(jobTextOf(readableYaml(workflow), JOB), scripts);
+}
+
+function explain(offences: readonly Offence[]): string {
+  return offences.map((o) => `${o.where}\n    [${o.found}]\n    -> ${o.why}`).join('\n');
+}
+
+/** A copy of a job with one more step bolted on, for proving the detector fires. */
+function withExtraStep(jobText: string, name: string, run: string): string {
+  const indent = /^(\s*)-\s/m.exec(jobText)?.[1] ?? '      ';
+  return `${jobText}\n${indent}- name: ${name}\n${indent}  run: ${run}\n`;
+}
+
+const REAL_JOB = jobTextOf(readableYaml(WORKFLOW), JOB);
+
+/** The loop as it must look: every check CI runs, none of them exempted. */
+const FULL_LOOP =
+  'pnpm tsc && pnpm lint && pnpm test && pnpm cargo:check && pnpm cargo:test && ' +
+  'pnpm build && pnpm format:check';
+
+// ── The premise ─────────────────────────────────────────────────────────────
+
+describe('the premise: there is a job and a script to compare', () => {
+  // Asserted FIRST. Everything below adjudicates a list of commands, so a
+  // parser that quietly returned an empty list would make the contract pass by
+  // having nothing to say. This is the leg that refuses to let that happen.
+
+  it(`ci.yml still has a "${JOB}" job with steps in it`, () => {
+    expect(
+      REAL_JOB,
+      `There is no "${JOB}" job in ${WORKFLOW_PATH} any more. If the job was renamed, rename ` +
+        'JOB here with it; if it was deleted, delete this contract rather than leaving it ' +
+        'adjudicating nothing.',
+    ).not.toBe('');
+    expect(REAL_JOB).toContain('steps:');
+  });
+
+  it('the guard reads real commands out of it', () => {
+    const commands = runCommandsOf(REAL_JOB);
+    expect(commands.length).toBeGreaterThanOrEqual(9);
+    // A named command, so a YAML restyle that defeated the parser is red here
+    // rather than silently green below.
+    expect(commands).toContain('pnpm tsc');
+  });
+
+  it(`the "${SCRIPT}" script is a readable chain of real root scripts`, () => {
+    const { runs, unreadable } = loopOf(SCRIPTS);
+    expect(unreadable).toEqual([]);
+    expect(runs.length).toBeGreaterThanOrEqual(7);
+    for (const name of runs) {
+      expect(
+        Object.hasOwn(SCRIPTS, name),
+        `"${SCRIPT}" chains \`pnpm ${name}\`, which does not exist`,
+      ).toBe(true);
+    }
+  });
+});
+
+// ── The scope ───────────────────────────────────────────────────────────────
+
+describe('every workflow is consciously in or out of scope', () => {
+  const names = readdirSync(join(REPO_ROOT, WORKFLOW_DIRECTORY))
+    .filter((name) => /\.ya?ml$/.test(name))
+    .sort();
+
+  it('reads the real workflow directory', () => {
+    // Anti-inert: a wrong path would return nothing and make every leg below
+    // pass by having no workflows to classify.
+    expect(names.length).toBeGreaterThanOrEqual(5);
+    expect(names).toContain(WORKFLOW_FILE);
+  });
+
+  it('classifies every workflow that exists', () => {
+    const unclassified = names.filter((name) => !Object.hasOwn(WORKFLOW_SCOPE, name));
+    expect(
+      unclassified,
+      `${unclassified.join(', ')} exists in ${WORKFLOW_DIRECTORY} and WORKFLOW_SCOPE does not ` +
+        'mention it. Decide whether `pnpm verify` is meant to reproduce it and write the reason ' +
+        'down — silence here is how the out-of-scope list went stale before.',
+    ).toEqual([]);
+  });
+
+  it('keeps no stale entry for a workflow that is gone', () => {
+    const stale = Object.keys(WORKFLOW_SCOPE).filter((name) => !names.includes(name));
+    expect(stale, `${stale.join(', ')} is classified but no longer exists`).toEqual([]);
+  });
+
+  it('adjudicates exactly one workflow, the one it actually reads', () => {
+    const adjudicated = Object.entries(WORKFLOW_SCOPE)
+      .filter(([, why]) => why.startsWith('ADJUDICATED'))
+      .map(([name]) => name);
+    expect(adjudicated).toEqual([WORKFLOW_FILE]);
+  });
+});
+
+// ── The contract ────────────────────────────────────────────────────────────
+
+describe(`\`pnpm ${SCRIPT}\` runs everything the "${JOB}" job runs`, () => {
+  it('the local loop has no gap', () => {
+    const offences = driftOffences(WORKFLOW, SCRIPTS);
+    expect(offences, `\n${explain(offences)}\n`).toEqual([]);
+  });
+});
+
+// ── Proof the detector can actually fail ────────────────────────────────────
+
+describe('the detector can actually fail', () => {
+  // These mutate a COPY of the REAL job text, never the workflow on disk, so
+  // they prove the parser works on the shape ci.yml actually has rather than on
+  // a six-line fixture that happens to suit it.
+
+  it('REQUIRES the frontend build — dropping it from the loop is an offence', () => {
+    // The half of L-98 that matters most. `tsc`, `lint` and `test` all pass on
+    // a change that breaks the production bundle, so a loop without the build
+    // is green over a broken artefact.
+    const withoutBuild: Record<string, string> = {
+      ...SCRIPTS,
+      build: 'pnpm --filter @cviper/light build',
+      [SCRIPT]: FULL_LOOP.replace(' && pnpm build', ''),
+    };
+    const offences = loopDriftOffences(REAL_JOB, withoutBuild);
+    expect(offences.map((offence) => offence.found)).toContain('pnpm build');
+  });
+
+  it('refuses to let the build be excused by an exception instead of run', () => {
+    // Guards the regression directly: no entry in OUTSIDE_THE_LOOP may match
+    // the build command, or the check is excused rather than compared.
+    const build = 'pnpm --filter @cviper/light build';
+    expect(OUTSIDE_THE_LOOP.some((entry) => entry.pattern.test(build))).toBe(false);
+  });
+
+  it('catches the original L-98 defect, transcribed', () => {
+    const beforeTheFix: Record<string, string> = {
+      ...SCRIPTS,
+      [SCRIPT]: 'pnpm tsc && pnpm lint && pnpm test && pnpm cargo:check && pnpm cargo:test',
+    };
+    const found = loopDriftOffences(REAL_JOB, beforeTheFix).map((offence) => offence.found);
+    expect(found).toContain('pnpm format:check');
+  });
+
+  it('catches a NEW root-script check appearing in the job', () => {
+    const baseline = loopDriftOffences(REAL_JOB, SCRIPTS).length;
+    const scripts: Record<string, string> = { ...SCRIPTS, licences: 'licence-check' };
+    const offences = loopDriftOffences(
+      withExtraStep(REAL_JOB, 'Check the licences', 'pnpm licences'),
+      scripts,
+    );
+    expect(offences).toHaveLength(baseline + 1);
+    expect(offences.at(-1)?.found).toBe('pnpm licences');
+  });
+
+  it('catches a NEW check that is not a root script at all', () => {
+    // The case a naive two-sided diff sleeps through: it contributes nothing to
+    // either side, so only a classify-everything guard notices it.
+    const baseline = loopDriftOffences(REAL_JOB, SCRIPTS).length;
+    const offences = loopDriftOffences(
+      withExtraStep(REAL_JOB, 'Audit', 'pnpm audit --audit-level high'),
+      SCRIPTS,
+    );
+    expect(offences).toHaveLength(baseline + 1);
+    expect(offences.at(-1)?.found).toBe('pnpm audit --audit-level high');
+  });
+
+  it('catches a new check hidden inside a block scalar', () => {
+    const baseline = loopDriftOffences(REAL_JOB, SCRIPTS).length;
+    const indent = /^(\s*)-\s/m.exec(REAL_JOB)?.[1] ?? '      ';
+    const offences = loopDriftOffences(
+      `${REAL_JOB}\n${indent}- name: Extra\n${indent}  run: |\n${indent}    cargo audit\n${indent}    cargo deny check\n`,
+      SCRIPTS,
+    );
+    expect(offences).toHaveLength(baseline + 2);
+    expect(offences.map((offence) => offence.found)).toContain('cargo deny check');
+  });
+
+  it('catches a check chained onto an existing step with &&', () => {
+    const baseline = loopDriftOffences(REAL_JOB, SCRIPTS).length;
+    const offences = loopDriftOffences(
+      REAL_JOB.replace('run: pnpm tsc', 'run: pnpm tsc && npx knip'),
+      SCRIPTS,
+    );
+    expect(offences).toHaveLength(baseline + 1);
+    expect(offences.map((offence) => offence.found)).toContain('npx knip');
+  });
+
+  it('catches a "verify" script this guard cannot read', () => {
+    const opaque: Record<string, string> = { ...SCRIPTS, [SCRIPT]: 'turbo run everything' };
+    expect(loopDriftOffences(REAL_JOB, opaque).map((offence) => offence.found)).toContain(
+      'turbo run everything',
+    );
+  });
+
+  it('catches a `build` script whose body has drifted from the command CI runs', () => {
+    // Body matching is exact after whitespace collapsing, so a script that no
+    // longer wraps CI's command stops covering it — fails closed, not open.
+    const drifted: Record<string, string> = {
+      ...SCRIPTS,
+      build: 'pnpm --filter @cviper/some-other-app build',
+      [SCRIPT]: FULL_LOOP,
+    };
+    const found = loopDriftOffences(REAL_JOB, drifted).map((offence) => offence.found);
+    expect(found).toContain('pnpm --filter @cviper/light build');
+  });
+
+  it('names the check and the reason', () => {
+    const beforeTheFix: Record<string, string> = {
+      ...SCRIPTS,
+      [SCRIPT]: 'pnpm tsc && pnpm lint && pnpm test && pnpm cargo:check && pnpm cargo:test',
+    };
+    const offence = loopDriftOffences(REAL_JOB, beforeTheFix).find(
+      (candidate) => candidate.found === 'pnpm format:check',
+    );
+    expect(offence?.where).toContain('pnpm format:check');
+    expect(offence?.why).toContain('CLAUDE.md');
+  });
+});
+
+// ── Proof it does not fire on the correct shape ──────────────────────────────
+
+describe('a loop that matches walks through', () => {
+  const scripts: Record<string, string> = {
+    tsc: 'turbo run typecheck',
+    lint: 'turbo run lint',
+    build: 'pnpm --filter @cviper/light build',
+    verify: 'pnpm tsc && pnpm lint && pnpm build',
+  };
+
+  const job = (...steps: string[]): string =>
+    ['jobs:', '  verify:', '    steps:', ...steps].join('\n');
+
+  it('accepts a job whose every check is in the loop', () => {
+    const offences = loopDriftOffences(
+      jobTextOf(job('      - run: pnpm tsc', '      - run: pnpm lint'), 'verify'),
+      scripts,
+    );
+    expect(offences, explain(offences)).toEqual([]);
+  });
+
+  it('accepts a job that simply runs `pnpm verify`', () => {
+    const offences = loopDriftOffences(
+      jobTextOf(job('      - run: pnpm verify'), 'verify'),
+      scripts,
+    );
+    expect(offences, explain(offences)).toEqual([]);
+  });
+
+  it('accepts `pnpm run <script>`, the long form of the same call', () => {
+    const offences = loopDriftOffences(
+      jobTextOf(job('      - run: pnpm run tsc'), 'verify'),
+      scripts,
+    );
+    expect(offences, explain(offences)).toEqual([]);
+  });
+
+  it('accepts a command CI spells out that a root script wraps verbatim', () => {
+    // CI writes `pnpm --filter @cviper/light build`; the loop calls it `pnpm
+    // build`. Same check, so no offence — and no exemption needed to say so.
+    const offences = loopDriftOffences(
+      jobTextOf(job('      - run: pnpm --filter @cviper/light build'), 'verify'),
+      scripts,
+    );
+    expect(offences, explain(offences)).toEqual([]);
+  });
+
+  it('accepts the registered setup steps, which are not checks', () => {
+    const offences = loopDriftOffences(
+      jobTextOf(
+        job('      - run: corepack enable pnpm', '      - run: pnpm install --frozen-lockfile'),
+        'verify',
+      ),
+      scripts,
+    );
+    expect(offences, explain(offences)).toEqual([]);
+  });
+
+  it('accepts a loop STRICTER than CI — the safe direction', () => {
+    const stricter: Record<string, string> = { ...scripts, verify: 'pnpm tsc && pnpm lint' };
+    const offences = loopDriftOffences(jobTextOf(job('      - run: pnpm tsc'), 'verify'), stricter);
+    expect(offences, explain(offences)).toEqual([]);
+  });
+
+  it('ignores a commented-out step, which runs nothing', () => {
+    const text = readableYaml(job('      - run: pnpm tsc', '      # - run: npx knip'));
+    expect(loopDriftOffences(jobTextOf(text, 'verify'), scripts)).toEqual([]);
+  });
+
+  it('reads only the named job, not its neighbours', () => {
+    const two = [
+      'jobs:',
+      '  verify:',
+      '    steps:',
+      '      - run: pnpm tsc',
+      '  secret-scan:',
+      '    steps:',
+      '      - run: ./gitleaks dir .',
+    ].join('\n');
+    expect(loopDriftOffences(jobTextOf(two, 'verify'), scripts)).toEqual([]);
+    expect(jobTextOf(two, 'verify')).not.toContain('gitleaks');
+  });
+
+  it('boundary: a job with no steps has nothing to say', () => {
+    expect(runCommandsOf('')).toEqual([]);
+    expect(loopDriftOffences('', scripts)).toEqual([]);
+  });
+
+  it('boundary: an absent job yields empty text rather than the whole file', () => {
+    expect(jobTextOf(readableYaml(WORKFLOW), 'no-such-job')).toBe('');
+  });
+
+  it('boundary: a bare `run:` mapping is not a command', () => {
+    expect(runCommandsOf('    defaults:\n      run:\n        shell: bash')).toEqual([]);
+  });
+});
