@@ -11,6 +11,22 @@
  * the code could not have made one.
  *
  * ============================================================================
+ * A CLOUD PATH WITHOUT CONSENT NEVER BUILDS A TRANSPORT EITHER (Apple 5.1.2(i))
+ * ============================================================================
+ * Apple's App Review Guideline 5.1.2(i), effective 13 Nov 2025, requires
+ * explicit, revocable, per-provider consent before a CV — personal data —
+ * reaches a named third-party AI. So `anthropic` and `openai` get the SAME
+ * guarantee the keyword path gets: `hasConsent` is checked, and the transport
+ * factory is provably never called, before the answer comes back `true`. See
+ * `runAnalysis.consent.test.ts` for the structural guard that keeps this order
+ * from drifting.
+ *
+ * `ollama` is a LOCAL kind — `ConsentProviderKind` is `Exclude<ProviderId,
+ * 'ollama'>`, so there is no branch here for it to fall into. `hasConsent` is
+ * never even called for it: 127.0.0.1 is exactly what 5.1.2(i) does not
+ * reach, and this file makes that structural rather than a rule to remember.
+ *
+ * ============================================================================
  * BOTH PATHS PRODUCE THE SAME `CvAnalysis`
  * ============================================================================
  * `scoreByKeywords` was written to return exactly the shape `analyzeCv`
@@ -32,7 +48,9 @@ import { KEYWORD_SCORING_VERSION, scoreByKeywords } from '@cviper/keyword-scorin
 
 import { createTauriTransport } from '../../ai/transport';
 
-import { type ProviderOption } from './providers';
+import { createTauriConsentPort, type ConsentProviderKind } from './consent';
+import { providerLabel } from './model';
+import { type ProviderKind, type ProviderOption } from './providers';
 
 export interface RunRequest {
   readonly option: ProviderOption;
@@ -64,6 +82,22 @@ export interface RunFailure {
  */
 const KEYWORD_MODEL = `keyword-v${KEYWORD_SCORING_VERSION}`;
 
+/** The two kinds that need the user's consent before a CV can reach them. */
+function isCloudKind(kind: ProviderKind): kind is ConsentProviderKind {
+  return kind === 'anthropic' || kind === 'openai';
+}
+
+/**
+ * The default consent check: reads the real store, fresh, on every call.
+ *
+ * Fails CLOSED like the port itself — see `consent.ts` — so a store that
+ * cannot be read is "not granted", never "granted".
+ */
+async function readStoredConsent(kind: ConsentProviderKind): Promise<boolean> {
+  const state = await createTauriConsentPort().read();
+  return state.ok && state.value[kind];
+}
+
 /** How a chosen option becomes a provider adapter. */
 function providerFor(option: ProviderOption, transport: ChatTransport): AiProvider | null {
   switch (option.kind) {
@@ -87,10 +121,16 @@ function providerFor(option: ProviderOption, transport: ChatTransport): AiProvid
  * `createTransport` is injected so the keyword path can be PROVED not to build
  * one. In the app it defaults to the real Tauri transport, which is the only
  * thing in the process that knows a provider call leaves the machine.
+ *
+ * `hasConsent` is injected for the same reason: in the app it defaults to
+ * reading the real consent store, and in tests it can be forced either way so
+ * the gate can be proved rather than assumed. It is asked about a SINGLE
+ * provider at a time — see `ConsentProviderKind` — never "AI in general".
  */
 export async function runAnalysis(
   request: RunRequest,
   createTransport: () => ChatTransport = createTauriTransport,
+  hasConsent: (kind: ConsentProviderKind) => Promise<boolean> = readStoredConsent,
 ): Promise<Result<RunSuccess, RunFailure>> {
   // ── The keyword path, and everything's input guard ───────────────────────
   // `scoreByKeywords` is pure, synchronous and free, and it refuses input there
@@ -115,6 +155,22 @@ export async function runAnalysis(
     // The same refusal, before a single token is generated or a single request
     // is billed. See above.
     return err({ message: scored.error.message });
+  }
+
+  // ── The consent gate (Apple 5.1.2(i)) ────────────────────────────────────
+  // Only the two cloud kinds reach this branch at all — `isCloudKind` narrows
+  // to `ConsentProviderKind`, which structurally excludes 'ollama'. Checked,
+  // and refused, BEFORE `createTransport()` is ever called: see the file
+  // header and `runAnalysis.consent.test.ts`.
+  if (isCloudKind(request.option.kind)) {
+    const consented = await hasConsent(request.option.kind);
+    if (!consented) {
+      return err({
+        message:
+          `${providerLabel(request.option.kind)} needs your permission before your CV and the ` +
+          'advert can be sent to it. Choose to allow it, or pick another way to run this.',
+      });
+    }
   }
 
   // ── The AI paths ─────────────────────────────────────────────────────────

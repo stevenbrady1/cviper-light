@@ -457,6 +457,11 @@ describe('the key never reaches anywhere it could be read', () => {
             'IFRS 9 impairment to the CRO. Python experience essential.',
         },
         () => refusing,
+        // A user who reaches a real 401 has already cleared the consent gate
+        // (L-97) — that is a separate screen this file does not drive. What
+        // this test is actually about is the 401 body itself never leaking,
+        // so consent is granted outright rather than re-tested here.
+        () => Promise.resolve(true),
       );
 
       expect(run.ok).toBe(false);
