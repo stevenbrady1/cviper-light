@@ -1,5 +1,5 @@
 /**
- * The five things the OpenAI key card does to the outside world, and nothing
+ * The four things the OpenAI key card does to the outside world, and nothing
  * else.
  *
  * ============================================================================
@@ -18,11 +18,12 @@
  * ============================================================================
  * NOTHING HERE CAN READ A KEY BACK
  * ============================================================================
- * `status` answers a bool and `hint` answers bullets plus at most four
- * characters, both computed in Rust. There is no command that answers anything
- * more — `secret_get` is deliberately not registered (see the module comment in
- * `src-tauri/src/secrets.rs`), so a reveal affordance is unimplementable rather
- * than merely absent.
+ * `status` answers a BOOL, and that is the whole of what this app can learn
+ * about a stored credential. There is no command that answers anything more:
+ * `secret_get` is deliberately not registered, and the `secret_hint` that once
+ * returned the last four characters was removed before it shipped (see the
+ * module comment in `src-tauri/src/secrets.rs`). A reveal affordance is
+ * unimplementable rather than merely absent.
  */
 import { invoke } from '@tauri-apps/api/core';
 
@@ -32,7 +33,6 @@ import { OPENAI_SECRET_KEY } from './aiKeyModel';
 
 /** The command names registered in `generate_handler!`. */
 const TEST_COMMAND = 'provider_test_key';
-const HINT_COMMAND = 'secret_hint';
 
 /** The `ProviderId` variant Rust expects, spelled as serde serialises it. */
 const OPENAI_PROVIDER = 'openai';
@@ -55,10 +55,8 @@ export interface AiKeyTestFailure {
 }
 
 export interface AiKeyPort {
-  /** Is a key saved? `null` = the store would not say. */
+  /** Is a key saved? `null` = the store would not say. Never the value. */
   status(): Promise<boolean | null>;
-  /** Bullets and at most the last four characters, or `null` if nothing is saved. */
-  hint(): Promise<string | null>;
   /** Prove this key works, WITHOUT saving it. */
   test(key: string): Promise<Result<void, AiKeyTestFailure>>;
   /** Write the key to the OS credential store. */
@@ -117,17 +115,6 @@ export function createTauriAiKeyPort(): AiKeyPort {
         // OpenAI option that cannot work.
         return typeof answer === 'boolean' ? answer : null;
       } catch {
-        return null;
-      }
-    },
-
-    async hint() {
-      try {
-        const answer = await invoke(HINT_COMMAND, { key: OPENAI_SECRET_KEY });
-        return typeof answer === 'string' ? answer : null;
-      } catch {
-        // A hint is a convenience. A store that will not answer is reported by
-        // `status`, which is what the card actually renders its state from.
         return null;
       }
     },

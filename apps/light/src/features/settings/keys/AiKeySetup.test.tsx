@@ -29,14 +29,20 @@ import {
 
 import { providerOptions, type ProviderOption } from '../../analysis/providers';
 import { runAnalysis } from '../../analysis/runAnalysis';
+import {
+  createFakeBrowserPort,
+  type FakeBrowserPort,
+} from '../../../platform/test/fakeBrowserPort';
 
 import { AiKeySetup } from './AiKeySetup';
 import {
-  AI_KEY_RATE_LIMITED,
+  AI_KEY_SAVED_MASK,
   AI_KEY_REFUSED,
   AI_KEY_TEST_SENTENCES,
   AI_KEY_UNREACHABLE,
+  AI_KEY_RATE_LIMITED,
   MAX_KEY_BYTES,
+  OPENAI_KEY_PROVIDER,
 } from './aiKeyModel';
 import { createFakeAiKeyPort, type FakeAiKeyPort } from './test/fakeAiKeyPort';
 
@@ -49,18 +55,26 @@ import { createFakeAiKeyPort, type FakeAiKeyPort } from './test/fakeAiKeyPort';
  */
 const SENTINEL = 'sk-proj-SENTINELVALUE1234';
 
-/** The only four characters of it anything is allowed to show. */
+/**
+ * Its last four characters.
+ *
+ * These used to be allowed on screen, when the card showed `••••1234`. Since
+ * the hint was removed they are forbidden like everything else, so this is now
+ * a thing to assert the ABSENCE of.
+ */
 const SENTINEL_TAIL = '1234';
 
 interface Harness {
   readonly user: ReturnType<typeof userEvent.setup>;
   readonly port: FakeAiKeyPort;
+  readonly browser: FakeBrowserPort;
 }
 
 function renderCard(port = createFakeAiKeyPort()): Harness {
   const user = userEvent.setup();
-  render(<AiKeySetup port={port} />);
-  return { user, port };
+  const browser = createFakeBrowserPort();
+  render(<AiKeySetup port={port} browser={browser} />);
+  return { user, port, browser };
 }
 
 /** Type a key into the box and press the button. */
@@ -130,16 +144,28 @@ describe('testing before saving', () => {
     );
   });
 
-  it('shows a masked hint so two keys can be told apart', async () => {
+  it('says a key is saved with bullets alone — never any part of it', async () => {
     renderCard(createFakeAiKeyPort(SENTINEL));
 
-    const hint = await screen.findByTestId('ai-key-hint-openai');
-    const shown = hint.textContent ?? '';
+    const saved = await screen.findByTestId('ai-key-saved-openai');
+    const shown = saved.textContent ?? '';
 
-    expect(shown).toContain('••••');
-    expect(shown).toContain(SENTINEL_TAIL);
-    // A hint, not the key.
+    expect(shown).toContain(AI_KEY_SAVED_MASK);
+    // The card once showed `••••1234`. It must not show even that much: the
+    // command behind it exposed a tail of EVERY stored credential.
+    expect(shown).not.toContain(SENTINEL_TAIL);
     expect(shown).not.toContain('SENTINELVALUE');
+  });
+
+  it('asks the store only whether a key exists, never for its value', async () => {
+    const port = createFakeAiKeyPort(SENTINEL);
+    renderCard(port);
+    await screen.findByTestId('ai-key-saved-openai');
+
+    // `status` answers a bool. There is no other read call to make, and the
+    // port has no method that could make one.
+    expect(port.calls.status).toBeGreaterThan(0);
+    expect(Object.keys(port.calls)).toEqual(['status', 'test', 'save', 'remove']);
   });
 
   it('negative: a key that worked but could not be stored says exactly that', async () => {
@@ -159,7 +185,7 @@ describe('testing before saving', () => {
   });
 });
 
-describe('the three sentences a failed test can produce', () => {
+describe('the sentences a failed test can produce', () => {
   it('negative: a network failure reads as a connection problem, not a bad key', async () => {
     const port = createFakeAiKeyPort();
     port.nextTest(err({ message: AI_KEY_UNREACHABLE }));
@@ -189,19 +215,38 @@ describe('the three sentences a failed test can produce', () => {
     expect(port.saved()).toBeNull();
   });
 
-  it('every sentence is distinct, and none of them mentions saving', async () => {
-    // Three outcomes, three fixes. A user who cannot tell a refused key from a
-    // dropped connection re-pastes a key that was never the problem.
-    expect(new Set(AI_KEY_TEST_SENTENCES).size).toBe(AI_KEY_TEST_SENTENCES.length);
+  /*
+   * ==========================================================================
+   * DRIVEN THROUGH THE CARD, NOT COMPARED WITH ITSELF.
+   * ==========================================================================
+   * This block used to assert properties of the constants — that they were
+   * distinct, contained no digits, and did not say "saved". Every one of those
+   * assertions would still have passed with the card deleted, because both
+   * sides of the comparison were the same constant. An inert test is worse
+   * than no test, because everybody believes it.
+   *
+   * So each sentence is now put through the real failure path and read back off
+   * the rendered alert. Delete the card, or stop rendering the transport's
+   * message, and every case here fails.
+   */
+  it.each(AI_KEY_TEST_SENTENCES.map((sentence) => [sentence]))(
+    'renders this failure verbatim and saves nothing: %s',
+    async (sentence: string) => {
+      const port = createFakeAiKeyPort();
+      port.nextTest(err({ message: sentence }));
+      const { user } = renderCard(port);
+      await screen.findByTestId('ai-key-card-openai');
 
-    for (const sentence of AI_KEY_TEST_SENTENCES) {
-      // Nothing was saved on any of these paths, so nothing may say it was.
-      expect(sentence.toLowerCase()).not.toContain('saved');
-      // No status code, and no fragment of a response.
-      expect(sentence).not.toMatch(/\d/);
-      expect(sentence).not.toContain('sk-');
-    }
-  });
+      await testKey(user, SENTINEL);
+
+      const alert = await screen.findByTestId('ai-key-problem-openai');
+      expect(alert.textContent ?? '').toBe(sentence);
+      // It is an alert, not a status: something went wrong and nothing was kept.
+      expect(alert.getAttribute('role')).toBe('alert');
+      expect(port.saved()).toBeNull();
+      expect(port.calls.save).toBe(0);
+    },
+  );
 });
 
 describe('what was typed, before anything is sent', () => {
@@ -281,20 +326,57 @@ describe('what was typed, before anything is sent', () => {
     );
     expect(over.port.calls.test).toBe(0);
   });
+
+  it('announces an invalid box to a screen reader, not just in colour', async () => {
+    // The pairing `NewApplicationForm` uses on every field: `aria-invalid` says
+    // something is wrong, `aria-describedby` says what. Colour alone reaches
+    // nobody using a screen reader, and this is the one control on the card.
+    const { user } = renderCard();
+    await screen.findByTestId('ai-key-card-openai');
+
+    const input = screen.getByTestId('ai-key-input-openai');
+    // Nothing is wrong yet, so nothing is announced.
+    expect(input.getAttribute('aria-invalid')).toBeNull();
+    expect(input.getAttribute('aria-describedby')).toBeNull();
+
+    await user.click(screen.getByTestId('ai-key-test-openai'));
+
+    const error = await screen.findByTestId('ai-key-error-openai');
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    // The link has to land on the element that actually holds the sentence.
+    expect(input.getAttribute('aria-describedby')).toBe(error.id);
+    expect(error.id.length).toBeGreaterThan(0);
+
+    // And it clears as soon as the user starts fixing it.
+    await user.type(input, 'k');
+    expect(input.getAttribute('aria-invalid')).toBeNull();
+  });
 });
 
-/*
- * The five sentences are declared in `providers.rs` and repeated in
- * `aiKeyModel.ts`, which is a thing that can drift. The guard for that lives on
- * the RUST side — `the_card_repeats_these_sentences_word_for_word` in
- * providers.rs reads `aiKeyModel.ts` with `include_str!`, the same idiom
- * `jobs.rs` already uses to read `port.ts`.
- *
- * It was tried here first and could not work: this file runs under jsdom, where
- * `import.meta.url` is not a `file:` URL, so `fileURLToPath` throws. Putting it
- * in Rust also means it runs under `pnpm cargo:test`, which CLAUDE.md names as
- * the check that stops a Rust guard going vacuous.
- */
+describe('where to get a key', () => {
+  it('opens OpenAI’s key page in the real browser, not in the app', async () => {
+    const { user, browser } = renderCard();
+    await screen.findByTestId('ai-key-card-openai');
+
+    await user.click(screen.getByTestId('ai-key-signup-openai'));
+
+    // The fake applies the REAL scheme check, so this also proves the app would
+    // have been allowed to open it.
+    expect(browser.opened()).toEqual(['https://platform.openai.com/api-keys']);
+  });
+
+  it('the link is a host the outbound registry knows about', async () => {
+    // Not a style rule. `outbound-hosts.contract.test.ts` fails the build on any
+    // host in shipped code that the registry does not list, and the privacy
+    // notice is generated from that same list — so a link the user can press is
+    // a link the notice tells them about.
+    const { OUTBOUND_HOST_NAMES } = await import('../../../lib/outbound-hosts');
+    const host = new URL(OPENAI_KEY_PROVIDER.signupUrl).hostname;
+
+    expect(host).toBe('platform.openai.com');
+    expect(OUTBOUND_HOST_NAMES.has(host)).toBe(true);
+  });
+});
 
 describe('the key never reaches anywhere it could be read', () => {
   /**
@@ -307,10 +389,15 @@ describe('the key never reaches anywhere it could be read', () => {
    * verbatim into the analysis error banner.
    *
    * Everything is watched at once: every `console.*` call, the error string the
-   * analysis returns, and the rendered DOM. The key may appear in NONE of them,
-   * and at most its last four characters may appear anywhere.
+   * analysis returns, and the rendered markup.
+   *
+   * `innerHTML`, NOT `textContent`. Text content is only what a person reads;
+   * a key leaked into `value=`, `title=`, `placeholder=` or a `data-*`
+   * attribute is every bit as exposed — it is in the DOM, in a screenshot of
+   * the inspector, and in anything that serialises the page — and
+   * `textContent` cannot see any of it.
    */
-  it('never appears in the DOM, in any console call, or in an analysis error', async () => {
+  it('never appears in the markup, in any console call, or in an analysis error', async () => {
     const spoken: string[] = [];
     const methods = ['log', 'info', 'warn', 'error', 'debug'] as const;
     const spies = methods.map((method) =>
@@ -328,9 +415,9 @@ describe('the key never reaches anywhere it could be read', () => {
       await screen.findByTestId('ai-key-result-openai');
       expect(port.saved()).toBe(SENTINEL);
 
-      // ── Look at the saved state ───────────────────────────────────────────
-      await screen.findByTestId('ai-key-hint-openai');
-      const rendered = document.body.textContent ?? '';
+      // ── Look at the saved state, attributes included ──────────────────────
+      await screen.findByTestId('ai-key-saved-openai');
+      const markup = document.body.innerHTML;
 
       // ── Run an analysis that 401s, with the key quoted in the body ────────
       const openai = providerOptions({
@@ -376,16 +463,17 @@ describe('the key never reaches anywhere it could be read', () => {
       const analysisError = run.ok ? '' : run.error.message;
 
       // ── The verdict ───────────────────────────────────────────────────────
-      const everywhere = [rendered, analysisError, ...spoken].join('\n');
+      const everywhere = [markup, analysisError, ...spoken].join('\n');
 
       expect(everywhere).not.toContain(SENTINEL);
       expect(everywhere).not.toContain('SENTINELVALUE');
       // Not even the distinctive prefix of a real OpenAI project key.
-      expect(analysisError).not.toContain('sk-proj');
-      expect(rendered).not.toContain('sk-proj');
+      expect(everywhere).not.toContain('sk-proj');
+      // And, since the hint was removed, not even the last four characters.
+      expect(markup).not.toContain(SENTINEL_TAIL);
 
-      // At most the last four characters, and only in the hint.
-      expect(rendered).toContain(SENTINEL_TAIL);
+      // The saved state is still shown — as bullets, which carry nothing.
+      expect(markup).toContain(AI_KEY_SAVED_MASK);
 
       // And the banner still says something useful about what went wrong.
       expect(analysisError).toContain('Settings');
@@ -424,6 +512,8 @@ describe('the card never claims a primary action', () => {
     expect((await screen.findByTestId('ai-key-state-openai')).getAttribute('data-state')).toBe(
       'missing',
     );
+    // The saved row goes with it.
+    expect(screen.queryByTestId('ai-key-saved-openai')).toBeNull();
   });
 
   it('reads a credential store that will not answer as unreadable, never as empty', async () => {

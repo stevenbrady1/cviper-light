@@ -1056,9 +1056,22 @@ mod tests {
 
     #[test]
     fn boundary_only_the_two_hundreds_count_as_a_working_key() {
-        // A 3xx is NOT a pass. Following a redirect off the API would be the
-        // one way a "working key" could be reported by something that never
-        // authenticated at all.
+        // Boundary on the SUCCESS range, which is the part that matters: 200
+        // and 299 pass, 199 and 300 do not.
+        //
+        // An earlier version of this comment claimed the 3xx arm stopped a
+        // redirect being mistaken for a working key. It does not, and saying so
+        // was worse than saying nothing: `client()` builds a plain
+        // `reqwest::Client`, whose DEFAULT redirect policy follows up to ten
+        // hops, so a 3xx is resolved inside `send()` and never reaches this
+        // function at all. What actually arrives is the status at the end of
+        // the chain.
+        //
+        // The arm is kept because the match must be total and an unreachable
+        // status should still map somewhere sane — not because it is a
+        // protection. Nothing here relies on a redirect policy, so none is
+        // added: changing the shipped transport to make a comment true would be
+        // the wrong way round.
         assert_eq!(key_test_outcome(199), Some(KeyTestOutcome::Rejected));
         assert_eq!(key_test_outcome(200), None);
         assert_eq!(key_test_outcome(299), None);

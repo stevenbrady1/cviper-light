@@ -15,7 +15,8 @@ import { type AiKeyPort, type AiKeyStoreError, type AiKeyTestFailure } from '../
  *
  * `saved()` is a test-only window into the fake and is deliberately not part of
  * `AiKeyPort` — the real port cannot hand a saved key back, because there is no
- * command that would let it.
+ * command that would let it. `status` answers a bool here for exactly the same
+ * reason it answers a bool there.
  */
 export interface FakeAiKeyPort extends AiKeyPort {
   /** What is currently "in the credential store". Test-only. */
@@ -28,30 +29,19 @@ export interface FakeAiKeyPort extends AiKeyPort {
   readonly makeUnreadable: () => void;
   /** Every key each `test` call was given, in order. */
   readonly tested: () => readonly string[];
-  readonly calls: Record<'status' | 'hint' | 'test' | 'save' | 'remove', number>;
+  readonly calls: Record<'status' | 'test' | 'save' | 'remove', number>;
 }
 
 const FAILURE: AiKeyStoreError = {
   message: 'The system credential store could not be opened. It may be locked.',
 };
 
-/**
- * The same masking rule `secret_hint` applies in Rust: bullets, and at most the
- * last four characters. Repeated here so the card is driven by a realistic
- * answer rather than a hand-written one.
- */
-export function fakeHint(value: string): string {
-  const characters = [...value];
-  if (characters.length <= 8) return '••••';
-  return `••••${characters.slice(-4).join('')}`;
-}
-
 export function createFakeAiKeyPort(initial: string | null = null): FakeAiKeyPort {
   let store: string | null = initial;
   let unreadable = false;
   const failing = new Set<'save' | 'remove'>();
   const testedWith: string[] = [];
-  const calls = { status: 0, hint: 0, test: 0, save: 0, remove: 0 };
+  const calls = { status: 0, test: 0, save: 0, remove: 0 };
 
   let outcome: Result<void, AiKeyTestFailure> = ok(undefined);
 
@@ -76,12 +66,6 @@ export function createFakeAiKeyPort(initial: string | null = null): FakeAiKeyPor
     async status() {
       calls.status += 1;
       return unreadable ? null : store !== null;
-    },
-
-    async hint() {
-      calls.hint += 1;
-      if (unreadable || store === null) return null;
-      return fakeHint(store);
     },
 
     async test(key) {

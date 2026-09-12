@@ -24,13 +24,18 @@
  * nothing but the credential store and the design tokens.
  *
  * ============================================================================
- * THE KEY STILL GOES IN AND DOES NOT COME BACK OUT
+ * THE KEY GOES IN AND NOT ONE CHARACTER COMES BACK
  * ============================================================================
- * There is no reveal affordance here either. The one thing that comes back is
- * `secret_hint` — bullets and at most the last four characters, computed in
- * Rust (see `secrets.rs`). That is a deliberate, bounded weakening of the rule
- * in `secrets.rs`, made so a user with two OpenAI keys can tell which one is
- * saved. It is not enough to authenticate with and it is not the key.
+ * There is no reveal affordance, and nothing here displays any part of a saved
+ * key. The saved state is a fixed row of bullets derived from the
+ * `secret_status` BOOL — it asks the credential store for nothing beyond "is
+ * there one?".
+ *
+ * An earlier version of this card showed `••••abcd`, the last four characters,
+ * computed in Rust. It was removed before shipping: the command it needed took
+ * any `SecretKey`, so it exposed a four-character tail of every credential the
+ * app stores — both AI keys and all three job-board ones — to answer a question
+ * only this card was asking. Telling two keys apart is not worth that.
  */
 import { OPENAI_DEFAULT_MODEL } from '../../analysis/providers';
 
@@ -47,6 +52,15 @@ export type AiKeyProviderId = 'openai';
 
 /** Spelled exactly as the `SecretKey` enum serialises it in Rust. */
 export const OPENAI_SECRET_KEY = 'openai_api_key';
+
+/**
+ * What a saved key looks like on screen: four bullets, and nothing else.
+ *
+ * A FIXED string, deliberately not one bullet per character. The length of an
+ * API key is a small fact about it, and rendering it would be one more thing a
+ * screenshot gives away in return for nothing.
+ */
+export const AI_KEY_SAVED_MASK = '••••';
 
 /**
  * The byte limit, borrowed rather than redeclared.
@@ -106,9 +120,9 @@ export function validateAiKey(value: string): string | null {
  * These are declared in Rust, in `provider_test_key` (`providers.rs`), because
  * that is the only place that knows what actually happened. They are repeated
  * here so this side can be tested without a socket, and
- * `AiKeySetup.test.tsx` reads `providers.rs` and asserts the two agree — a
- * reworded Rust sentence fails the build rather than quietly making these
- * constants a lie.
+ * `the_card_repeats_these_sentences_word_for_word` in `providers.rs` reads this
+ * file and asserts the two agree — a reworded Rust sentence fails the build
+ * rather than quietly making these constants a lie.
  *
  * Each one names a DIFFERENT fix. A refused key is re-pasted, a network fault
  * is retried, and a rate limit is waited out. Collapsing them into "something
@@ -171,9 +185,10 @@ export interface AiKeyProvider {
   readonly unlocks: string;
   /** Who pays, stated plainly. Never an estimate of how much. */
   readonly billing: string;
-  /** Where to get one. No link: see the note below. */
-  readonly whereFrom: string;
-  /** Where the key goes, and that it can never be shown back in full. */
+  /** OpenAI's own key page. Opened in the user's real browser. */
+  readonly signupUrl: string;
+  readonly signupLabel: string;
+  /** Where the key goes, and that it can never be shown back. */
   readonly privacyNote: string;
   readonly fieldLabel: string;
   readonly fieldHint: string;
@@ -181,18 +196,17 @@ export interface AiKeyProvider {
 
 /**
  * ============================================================================
- * THERE IS NO "GET A KEY" LINK HERE, AND THAT IS NOT AN OVERSIGHT
+ * THE SIGNUP LINK IS A REGISTERED HOST, NOT A CONVENIENCE
  * ============================================================================
- * The two job-board cards link to their signup pages because
- * `developer.adzuna.com` and `www.reed.co.uk` are entries in
- * `lib/outbound-hosts.ts`. OpenAI's key page is on `platform.openai.com`, which
- * is NOT in that registry, and `outbound-hosts.contract.test.ts` fails the
- * build on any host that is not.
+ * `platform.openai.com` is an entry in `lib/outbound-hosts.ts` with a stated
+ * reason, exactly as `developer.adzuna.com` and `www.reed.co.uk` are for the
+ * two job boards. `outbound-hosts.contract.test.ts` fails the build on any host
+ * that is not in that registry, and the privacy notice is GENERATED from it —
+ * so adding the link and telling the user about it are the same act.
  *
- * That guard is right and this card obeys it. Adding the host is a product
- * decision rather than a code change — the registry's own header says so — so
- * the card names the place in words and opens nothing. `api.openai.com` is
- * already registered, which is what the test request uses.
+ * The app never loads the page. It hands the address to the user's own browser
+ * through `platform/browser.ts`, which is why the registry files it under
+ * `opened-in-your-browser` rather than anything that carries a credential.
  */
 export const OPENAI_KEY_PROVIDER: AiKeyProvider = {
   id: 'openai',
@@ -205,14 +219,13 @@ export const OPENAI_KEY_PROVIDER: AiKeyProvider = {
   billing:
     'An OpenAI key is not free. OpenAI bills your own account for what you use, at their ' +
     'published rates. CViper adds nothing to that, takes no cut, and never sees your bill.',
-  whereFrom:
-    'Create one in the API keys section of your OpenAI account, then paste the whole value here.',
+  signupUrl: 'https://platform.openai.com/api-keys',
+  signupLabel: 'Where do I get a key?',
   privacyNote:
     'The key is stored in this computer’s own credential store — Windows Credential Manager, ' +
     'macOS Keychain, or the Linux Secret Service. It is never written to a file, never put in ' +
     'your backup, and never sent anywhere except to OpenAI. CViper cannot show it back to you ' +
-    'afterwards: the last four characters are all it will ever display, so if you lose it, ' +
-    'paste it again.',
+    'afterwards — not even the last few characters — so if you lose it, paste it again.',
   fieldLabel: 'API key',
   fieldHint: 'Paste the whole value, including the prefix.',
 };

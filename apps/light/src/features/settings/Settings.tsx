@@ -391,7 +391,7 @@ export function Settings({
             and tests its keys with `job_test_credentials`, a command that
             REFUSES an AI credential by design — see the note in `aiKeyModel.ts`.
           */}
-          <AiKeySetup port={aiKeyPort} />
+          <AiKeySetup port={aiKeyPort} browser={browserPort} />
 
           <BoardSettings port={boardsPort} />
 

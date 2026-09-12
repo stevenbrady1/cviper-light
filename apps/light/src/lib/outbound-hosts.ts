@@ -65,6 +65,11 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     why: 'The page where you register your own Adzuna key. Opened in your browser from Settings; the app does not load it.',
   },
   {
+    host: 'platform.openai.com',
+    purpose: 'opened-in-your-browser',
+    why: 'The page where you create your own OpenAI API key. The OpenAI card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.',
+  },
+  {
     host: 'www.linkedin.com',
     purpose: 'opened-in-your-browser',
     why: 'A keyless search link for LinkedIn, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.',

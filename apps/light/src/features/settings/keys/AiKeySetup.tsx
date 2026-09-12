@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
+import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 import { combineKeyState, type KeyState } from '../../../status/environment';
 
 import {
   AI_KEY_PASS,
   AI_KEY_REMOVED,
+  AI_KEY_SAVED_MASK,
   AI_KEY_SAVE_REFUSED,
   OPENAI_KEY_PROVIDER,
   normaliseAiKey,
@@ -32,13 +34,13 @@ import { KEY_STATE_LABEL, KEY_STATE_TONE } from './model';
  * old key is still in place for the whole time the new one is being checked.
  *
  * ============================================================================
- * WHAT COMES BACK OUT, AND WHAT DOES NOT
+ * NOT ONE CHARACTER OF A SAVED KEY IS DISPLAYED
  * ============================================================================
- * The key itself never returns to JavaScript: `secret_get` is Rust-only and
- * `generate_handler!` does not register it. What this card shows is
- * `secret_hint` — bullets and at most the last four characters, computed in
- * Rust — so somebody with two OpenAI keys can tell which one is in the store
- * without the app ever holding the value.
+ * The saved row is a FIXED string of bullets, rendered from the `secret_status`
+ * bool. It asks the credential store for nothing beyond "is there one?", and
+ * there is no command that would answer anything more — `secret_get` is
+ * Rust-only, and the `secret_hint` that briefly returned the last four
+ * characters was removed before it shipped (see `secrets.rs`).
  *
  * ============================================================================
  * NO PRIMARY BUTTON HERE
@@ -58,40 +60,40 @@ interface CardOutcome {
 
 const NOTHING: CardOutcome = { passed: null, problem: null };
 
+/** The input's id, reused by the label and by `aria-describedby`. */
+const INPUT_ID = 'ai-key-input-openai';
+const ERROR_ID = `${INPUT_ID}-error`;
+
 export interface AiKeySetupProps {
   /** Injected by tests. Defaults to the real keyring-and-transport port. */
   readonly port?: AiKeyPort | undefined;
+  /** Injected by tests: the real one opens the user's browser. */
+  readonly browser?: BrowserPort | undefined;
 }
 
-export function AiKeySetup({ port }: AiKeySetupProps = {}) {
+export function AiKeySetup({ port, browser }: AiKeySetupProps = {}) {
   // Built once. A new port object every render would restart the status effect
   // on every keystroke.
   const keyPort = useMemo(() => port ?? createTauriAiKeyPort(), [port]);
+  const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
 
   const provider = OPENAI_KEY_PROVIDER;
 
   const [answer, setAnswer] = useState<boolean | null>(null);
-  const [hint, setHint] = useState<string | null>(null);
   const [value, setValue] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<CardOutcome>(NOTHING);
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    // Concurrently: the hint is a convenience and must not delay the state the
-    // card actually renders from.
-    const [saved, masked] = await Promise.all([keyPort.status(), keyPort.hint()]);
-    setAnswer(saved);
-    setHint(masked);
+    setAnswer(await keyPort.status());
   }, [keyPort]);
 
   useEffect(() => {
     let cancelled = false;
 
-    void Promise.all([keyPort.status(), keyPort.hint()]).then(([saved, masked]) => {
-      if (cancelled) return;
-      setAnswer(saved);
-      setHint(masked);
+    void keyPort.status().then((saved) => {
+      if (!cancelled) setAnswer(saved);
     });
 
     return () => {
@@ -196,23 +198,35 @@ export function AiKeySetup({ port }: AiKeySetupProps = {}) {
         <p className="mt-1 text-ink-muted">{provider.unlocks}</p>
         <p className="mt-1 text-xs text-ink-faint">{provider.billing}</p>
 
+        <div className="mt-2">
+          <button
+            type="button"
+            data-testid="ai-key-signup-openai"
+            onClick={() => void browserPort.open(provider.signupUrl)}
+            className={`${QUIET_BUTTON} px-0 text-blue hover:bg-card hover:text-navy`}
+          >
+            {provider.signupLabel} →
+          </button>
+          <span className="ml-2 text-xs text-ink-faint">Opens in your browser.</span>
+        </div>
+
         {/*
-          The masked hint. Bullets and at most four characters, computed in Rust
-          — enough to tell two keys apart, and not enough to be one.
+          A saved key, said without showing any of it. Fixed bullets from a
+          bool — nothing here has ever seen the value.
         */}
-        {hint === null ? null : (
-          <p data-testid="ai-key-hint-openai" className="mt-2 text-xs text-ink-muted">
-            Saved <span className="font-mono tabular-nums">{hint}</span>
+        {answer === true ? (
+          <p data-testid="ai-key-saved-openai" className="mt-2 text-xs text-ink-muted">
+            Saved <span className="font-mono">{AI_KEY_SAVED_MASK}</span>
           </p>
-        )}
+        ) : null}
 
         <div className="mt-3">
-          <label htmlFor="ai-key-input-openai" className="block text-xs font-medium text-ink-muted">
+          <label htmlFor={INPUT_ID} className="block text-xs font-medium text-ink-muted">
             {provider.fieldLabel}
           </label>
           <input
-            id="ai-key-input-openai"
-            data-testid="ai-key-input-openai"
+            id={INPUT_ID}
+            data-testid={INPUT_ID}
             /*
               A password field, with no reveal toggle. The value is a credential,
               this window is the sort of thing people screenshot when asking for
@@ -225,19 +239,27 @@ export function AiKeySetup({ port }: AiKeySetupProps = {}) {
             spellCheck={false}
             value={value}
             disabled={busy}
+            /*
+              Announced, not just coloured. A screen reader gets "invalid" and
+              is pointed at the sentence saying why — the same pairing
+              `NewApplicationForm` uses for every one of its fields.
+            */
+            aria-invalid={fieldError === null ? undefined : true}
+            aria-describedby={fieldError === null ? undefined : ERROR_ID}
             onChange={(event) => {
               setValue(event.currentTarget.value);
               // The error belonged to the old value. Keeping it while the user
               // fixes the thing it complained about is just noise.
               setFieldError(null);
             }}
-            className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+            className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
+              fieldError === null ? 'border-line' : 'border-danger'
+            }`}
           />
           <p className="mt-1 text-xs text-ink-faint">{provider.fieldHint}</p>
-          <p className="mt-1 text-xs text-ink-faint">{provider.whereFrom}</p>
 
           {fieldError === null ? null : (
-            <p data-testid="ai-key-error-openai" className="mt-1 text-xs text-danger">
+            <p id={ERROR_ID} data-testid="ai-key-error-openai" className="mt-1 text-xs text-danger">
               {fieldError}
             </p>
           )}

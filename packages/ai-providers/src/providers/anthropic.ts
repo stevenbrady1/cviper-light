@@ -35,6 +35,7 @@ import {
 import {
   TRUNCATED_MESSAGE,
   decodeJsonBody,
+  detailUnlessAuth,
   httpError,
   readArray,
   readObject,
@@ -100,7 +101,14 @@ export function createAnthropicProvider(transport: ChatTransport): AiProvider {
       if (!decoded.ok) return decoded;
 
       if (response.value.status < 200 || response.value.status >= 300) {
-        return err(httpError(PROVIDER, response.value.status, errorDetail(decoded.value)));
+        // `detailUnlessAuth`, not the raw detail. An auth body is the one place
+        // a provider is liable to quote the rejected credential back, and this
+        // message is rendered verbatim in the analysis error banner. See the
+        // note in `shared.ts`; OpenAI does exactly that.
+        const status = response.value.status;
+        return err(
+          httpError(PROVIDER, status, detailUnlessAuth(status, errorDetail(decoded.value))),
+        );
       }
 
       const content = readArray(decoded.value, 'content') ?? [];
@@ -139,7 +147,11 @@ export function createAnthropicProvider(transport: ChatTransport): AiProvider {
       if (!decoded.ok) return decoded;
 
       if (response.value.status < 200 || response.value.status >= 300) {
-        return err(httpError(PROVIDER, response.value.status, errorDetail(decoded.value)));
+        // Same rule on the model list: a 401 here carries the same body.
+        const status = response.value.status;
+        return err(
+          httpError(PROVIDER, status, detailUnlessAuth(status, errorDetail(decoded.value))),
+        );
       }
 
       const data = readArray(decoded.value, 'data');

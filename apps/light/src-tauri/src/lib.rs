@@ -50,11 +50,6 @@ pub fn run() {
             secrets::secret_set,
             secrets::secret_delete,
             secrets::secret_status,
-            // Bullets and at most the last four characters of a saved key, so
-            // somebody with two keys can tell which one is in the store. The
-            // masking happens in Rust; see the module comment in secrets.rs for
-            // why this is the one bounded exception to "nothing comes back out".
-            secrets::secret_hint,
             // The provider transport. Rust owns every base URL and injects the
             // API key from the keyring, so a compromised frontend can still
             // only reach the three APIs named in providers.rs.
