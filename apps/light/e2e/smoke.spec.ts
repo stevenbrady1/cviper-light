@@ -797,14 +797,6 @@ describe('the built CViper Light binary', () => {
       const scanned = makeScannedPdf(SCANNED_PAGE_COUNT);
       const earlier = seen();
 
-      // TEMPORARY — L-104 plant, removed before merge. A page-side fetch to a
-      // host `connect-src` does not allow, issued on the scanned path only, so
-      // the violation lands after L-103's snapshot was taken and can only be
-      // caught by the check below. See the PR body for the red run it produced.
-      await session().executeScript(
-        "fetch('https://l104-planted-violation.invalid/csp-probe').catch(function () {});",
-      );
-
       const started = await session().executeScript<string>(
         RUN_PDF_PARSE,
         Buffer.from(scanned).toString('base64'),
