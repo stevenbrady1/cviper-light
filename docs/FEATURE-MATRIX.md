@@ -18,9 +18,11 @@ first-run introduction and the app icon. There are no placeholder views left.
 three deliberate — and the CV parsing column, where extraction is done and
 structured parsing is not.
 
-**Needs a human before it ships**: the updater is wired and tested but the
-signing key in `tauri.conf.json` is a placeholder, so no release can currently
-be verified by an installed copy. See
+**Needs a human before it ships**: the first tagged release. The updater is
+wired, tested and signed — `tauri.conf.json` carries the real minisign public
+key, id `7029FCBC6B4F158F`, and its private half is in this repository's GitHub
+Actions secrets. That key must never be regenerated: doing so stops every
+installed copy from accepting any future update, permanently. See
 [`apps/light/src-tauri/RELEASE-SIGNING.md`](../apps/light/src-tauri/RELEASE-SIGNING.md).
 
 `apps/cloud` is an empty stub directory. There is no cloud code of any kind.
@@ -45,7 +47,7 @@ be verified by an installed copy. See
 | Data export/import              | Yes — user-initiated file in/out                 | Yes — plus migration to/from Light | Built                     |
 | Delete everything               | Yes — database, keys and preferences             | Yes — account deletion             | Built                     |
 | Privacy notice                  | Yes — generated from the host registry           | Policy page                        | Built                     |
-| App updates                     | Yes — manual check only, never on launch         | Not applicable                     | Built, unsigned           |
+| App updates                     | Yes — manual check only, never on launch         | Not applicable                     | Built, signed             |
 | iPhone build (Road A)           | Yes — same code, unsigned simulator build in CI  | Not applicable                     | CI only, unsigned         |
 | Open a CV from the share sheet  | Yes — "Open in CViper Light" for PDF, Word, JSON | Not applicable                     | Built, untested on device |
 | First-run introduction          | Yes — three cards, reopenable in Settings        | Not applicable                     | Built                     |
@@ -72,12 +74,14 @@ be verified by an installed copy. See
   as names it, or if the Settings copy stops saying no data is sent. Saying
   nothing about telemetry is also what an app WITH telemetry does; this is
   checkable in a second instead.
-- **"Built, unsigned" means the feature works and the key does not exist yet.**
-  The updater checks, reports and installs, and every state is tested against a
-  fake port. `plugins.updater.pubkey` is a placeholder, so a real check against a
-  real release fails signature verification — which is the correct outcome for
-  an unsigned build, and is shown to the user as a sentence rather than a
-  silence.
+- **"Built, signed" means the feature works and the key is real.** The updater
+  checks, reports and installs, and every state is tested against a fake port.
+  `plugins.updater.pubkey` is the live minisign public key, id
+  `7029FCBC6B4F158F`, and its private half is in this repository's GitHub
+  Actions secrets, so a release signed by CI verifies against it. A signature
+  that does not verify is refused, and is shown to the user as a sentence rather
+  than a silence. The key must never be regenerated — see
+  [`apps/light/src-tauri/RELEASE-SIGNING.md`](../apps/light/src-tauri/RELEASE-SIGNING.md).
 - **Nothing is checked at launch.** No update check, no version ping, no
   analytics. Two guards keep it that way: one asserts the updater plugin has a
   single import site, and one mounts the whole app and asserts zero calls before

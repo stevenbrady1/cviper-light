@@ -82,6 +82,11 @@ pub fn run() {
             providers::provider_chat,
             providers::provider_list_models,
             providers::ollama_probe,
+            // Testing an AI key the user has just typed and has NOT saved: one
+            // cheap metadata request, the candidate key passed straight in, the
+            // response body never read, nothing written anywhere. Same
+            // test-before-save shape as jobs::job_test_credentials.
+            providers::provider_test_key,
             // The job-board transport. Same shape: Rust owns both base URLs,
             // reads Adzuna's two keys and Reed's one from the keyring, and
             // enforces the minimum gap between submits — a disabled button

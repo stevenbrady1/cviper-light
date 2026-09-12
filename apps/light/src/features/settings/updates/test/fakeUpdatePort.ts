@@ -49,7 +49,7 @@ export const AN_UPDATE: UpdateInfo = {
   date: '2026-09-01',
 };
 
-/** A failure the port would produce on a build signed with the placeholder key. */
+/** A failure the port would produce when a downloaded update's signature will not verify. */
 export const UNVERIFIABLE: Result<UpdateInfo | null, UpdateProblem> = err({
   message: 'The update could not be verified as genuine, so nothing was downloaded.',
 });

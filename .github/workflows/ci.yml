@@ -84,11 +84,13 @@ jobs:
       - name: Cargo test
         run: pnpm cargo:test
 
-      # The Vite build only. NEVER `tauri build` in THIS job — bundling belongs
-      # to release.yml (signed, shippable) and smoke.yml (unsigned, driven by
-      # tauri-driver, L-88). Running it here would burn fifteen minutes inside
-      # the concurrency group whose whole purpose is fast feedback on the five
-      # checks, and would fail on the placeholder signing key to say so.
+      # The Vite build only. NEVER `tauri build` in THIS job. Bundling happens
+      # in exactly two places: release.yml, which alone is given the signing
+      # secrets and alone produces something shippable, and smoke.yml, which
+      # builds an unsigned debug bundle purely so the real binary can be driven
+      # (L-88). Running it here would burn ten minutes producing nothing
+      # shippable, inside the concurrency group whose whole purpose is fast
+      # feedback on the five checks.
       - name: Build the frontend
         run: pnpm --filter @cviper/light build
 
