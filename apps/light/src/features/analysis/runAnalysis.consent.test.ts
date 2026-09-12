@@ -28,6 +28,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ok, type Result } from '@cviper/core-types';
 import {
+  ANTHROPIC_DEFAULT_MODEL,
   type ChatTransport,
   type ProviderError,
   type ProviderHttpResponse,
@@ -54,7 +55,39 @@ const AVAILABLE = providerOptions({
   openaiKey: true,
 });
 
+/**
+ * Anthropic, built here rather than taken from `providerOptions`.
+ *
+ * ============================================================================
+ * WHY THE FIXTURE STOPPED USING THE PICKER FOR THIS ONE
+ * ============================================================================
+ * Since L-102 the picker does not OFFER Anthropic: there is no key card for it
+ * in Settings, and the app offers only what it can set up. None of that changes
+ * what this file is about. `ProviderKind` still carries `'anthropic'`,
+ * `ConsentProviderKind` still has two members, and `runAnalysis` still has a
+ * live Anthropic branch — so the property below, that consent is PER PROVIDER
+ * and not one global "I agree to AI", is still real and still needs two
+ * distinct cloud providers to be stated at all.
+ *
+ * Taking the option from `providerOptions` tied that property to a merchandising
+ * decision, which is the wrong coupling in both directions: it would make the
+ * consent gate untestable the moment a provider is hidden, and it would quietly
+ * stop testing anything rather than fail loudly. So the option is a literal, and
+ * the boundary tests below go on proving what they always proved.
+ */
+const ANTHROPIC_OPTION: ProviderOption = {
+  key: 'anthropic',
+  kind: 'anthropic',
+  label: `Anthropic · ${ANTHROPIC_DEFAULT_MODEL}`,
+  note: 'The strongest reading. Your CV and the advert are sent to Anthropic.',
+  model: ANTHROPIC_DEFAULT_MODEL,
+  local: false,
+  needsKey: true,
+};
+
 function optionOf(kind: 'keyword' | 'ollama' | 'anthropic' | 'openai'): ProviderOption {
+  if (kind === 'anthropic') return ANTHROPIC_OPTION;
+
   const option = AVAILABLE.find((candidate) => candidate.kind === kind);
   if (option === undefined) throw new Error(`no ${kind} option in the fixture`);
   return option;

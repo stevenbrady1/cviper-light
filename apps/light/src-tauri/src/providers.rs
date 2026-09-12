@@ -99,8 +99,14 @@ impl ProviderId {
     /// What to tell the user when the key they need is not saved.
     fn missing_key_message(self) -> &'static str {
         match self {
+            // L-102: there is no Anthropic key card in Settings, so "Add one in
+            // Settings" sent the user looking for a screen that does not exist.
+            // `only_a_provider_with_a_key_card_is_told_to_add_one_in_settings`
+            // reads the card registry and ties this arm to it, so adding an
+            // Anthropic card makes THIS sentence the thing that fails the build.
             ProviderId::Anthropic => {
-                "No Anthropic API key is saved. Add one in Settings before using this provider."
+                "No Anthropic API key is saved, and this version of CViper has no screen for \
+                 adding one."
             }
             ProviderId::Openai => {
                 "No OpenAI API key is saved. Add one in Settings before using this provider."
@@ -886,6 +892,55 @@ mod tests {
         let message = describe_request_failure(ProviderId::Ollama, RequestFailure::Connect);
         assert!(message.contains("Ollama"));
         assert!(!message.contains("internet"));
+    }
+
+    #[test]
+    fn only_a_provider_with_a_key_card_is_told_to_add_one_in_settings() {
+        // ====================================================================
+        // THE COPY HALF OF L-102, TIED TO THE REGISTRY RATHER THAN REMEMBERED.
+        // ====================================================================
+        // "Add one in Settings" is only honest for a provider that HAS a card
+        // there. Anthropic had no card and said it anyway, which is the same
+        // defect as offering the option: the app pointing at a screen it never
+        // built. Adding an Anthropic card must therefore flip this sentence
+        // back, and this test is what makes that a build failure rather than
+        // something the next person has to notice.
+        //
+        // The registry is read as text because it is TypeScript. Substring
+        // matching is a fair proxy here — the union and the list name the same
+        // ids, and `offeredProviders.contract.test.ts` proves that list matches
+        // the cards that really exist.
+        const KEY_CARDS_TS: &str = include_str!("../../src/features/settings/keys/aiKeyProviders.ts");
+
+        // Anti-inert: prove the haystack is the real registry, and not the
+        // empty string a moved or renamed file would hand us.
+        assert!(
+            KEY_CARDS_TS.contains("AI_KEY_PROVIDER_IDS"),
+            "the AI key-card registry was not found where this test expects it"
+        );
+        assert!(
+            KEY_CARDS_TS.contains("'openai'"),
+            "the registry no longer names the one card that does exist"
+        );
+
+        for provider in ALL {
+            // Ollama needs no key, so it has no card and nothing to say here.
+            if provider.secret().is_none() {
+                continue;
+            }
+
+            let serialised = serde_json::to_string(&provider).unwrap();
+            let id = serialised.trim_matches('"');
+            let has_card = KEY_CARDS_TS.contains(&format!("'{id}'"));
+            let message = provider.missing_key_message();
+
+            assert_eq!(
+                has_card,
+                message.contains("in Settings"),
+                "{id}: a provider is told to add a key \"in Settings\" if and only if a key \
+                 card exists for it. Message was: {message}"
+            );
+        }
     }
 
     #[test]

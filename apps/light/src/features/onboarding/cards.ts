@@ -20,7 +20,8 @@
  * a new user should meet is the feature that works before they have configured
  * anything. Leading with job search would lead with "you need two API keys".
  */
-import { SUGGESTED_OLLAMA_MODEL, type Availability } from '../analysis/providers';
+import { providerLabel } from '../analysis/model';
+import { SUGGESTED_OLLAMA_MODEL, providerOptions, type Availability } from '../analysis/providers';
 
 import { type ViewId } from '../../app/views';
 
@@ -152,10 +153,15 @@ export function localModelLine(availability: Availability): string {
     );
   }
 
-  const keys = [
-    availability.anthropicKey ? 'Anthropic' : null,
-    availability.openaiKey ? 'OpenAI' : null,
-  ].filter((name): name is string => name !== null);
+  // Derived from the options the picker will ACTUALLY show, not from the raw
+  // availability flags (L-102). "The full analysis is available" has to be true
+  // of the screen the user is about to open, and a key the app has no card for
+  // is never offered there — so reading `availability.anthropicKey` directly
+  // would make this card promise a row that does not exist. One rule, in
+  // `providerOptions`, and this sentence follows it by construction.
+  const keys = providerOptions(availability)
+    .filter((option) => option.needsKey)
+    .map((option) => providerLabel(option.kind));
 
   if (keys.length > 0) {
     return `Your ${keys.join(' and ')} key is saved, so the full analysis is available.`;
