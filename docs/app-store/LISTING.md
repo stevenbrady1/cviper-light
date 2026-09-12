@@ -118,8 +118,12 @@ them.)
 > proxy the request and we receive nothing. No key is needed to review any
 > screen.
 >
-> The app makes no network request on launch and none the user did not start
-> by pressing a button. There is no analytics or crash-reporting SDK. Settings
+> This iPhone build makes no network request on launch, and none the user did
+> not start by pressing a button. The updater is not compiled into an iOS build
+> at all — the App Store delivers updates here — so the launch update check the
+> desktop build has does not exist on this one, and the Updates screen says so
+> instead of offering a check. There is no analytics or crash-reporting SDK.
+> Settings
 > → Privacy lists every address the app is allowed to contact. The source is
 > public: https://github.com/stevenbrady1/cviper-light
 

@@ -145,3 +145,53 @@ jobs:
 
       - name: Scan the built bundle
         run: ./gitleaks dir --no-banner --redact --config .gitleaks.toml --exit-code 1 apps/light/dist
+
+  # ------------------------------------------------------------------
+  # THE WORK-ITEM NUMBER REGISTRY (L-92).
+  # ------------------------------------------------------------------
+  # A number is claimed by an issue titled `[L-NNN] <one line>`. Two sessions
+  # can claim the same one seconds apart — there is nowhere to take a lock —
+  # so the registry is a RECORD, not a lock, and this is the thing that makes
+  # a collision visible within minutes instead of a week.
+  #
+  # ITS OWN JOB, NOT A STEP IN `verify`, AND NOT A VITEST TEST.
+  # It needs a network, a token and the `gh` binary. In the `verify` job there
+  # is no token, so it would fail for a reason unrelated to the change under
+  # review; on a developer's machine `gh` may be absent, so a test would either
+  # fail spuriously or SKIP — a guard reporting green while inspecting nothing.
+  # `pnpm verify` has to stay something a developer can run offline.
+  #
+  # The half that holds the judgement is pure and IS in the loop:
+  # apps/light/src/numbering/lNumbers.ts, unit-tested by `pnpm test`. This job
+  # is only the shell that fetches the titles.
+  l-numbers:
+    runs-on: ubuntu-latest
+
+    # `contents: read` is named explicitly: a job with a `permissions:` block
+    # that omits it cannot check the repository out. `issues: read` is what the
+    # listing actually needs.
+    permissions:
+      contents: read
+      issues: read
+
+    env:
+      # Without a repository to resolve, `gh` dies with "failed to determine
+      # base repo". This is the cheapest way to give it one.
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # No `pnpm install`: the checker imports nothing but Node builtins and
+      # two source files of its own.
+      - name: No work-item number is claimed twice
+        run: pnpm check:l-numbers

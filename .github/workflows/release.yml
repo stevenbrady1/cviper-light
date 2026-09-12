@@ -15,6 +15,14 @@ on:
     tags:
       - 'light-v*'
   workflow_dispatch:
+    inputs:
+      promote_tag:
+        description: >-
+          Publish the updater manifest from an ALREADY-PUBLISHED release, e.g.
+          light-v0.1.0. Leave this empty to bundle a new draft instead. See
+          "Promoting the manifest" in apps/light/src-tauri/RELEASE-SIGNING.md.
+        required: false
+        default: ''
 
 # `contents: write` because the job creates a release and uploads assets to it.
 # Nothing else is granted.
@@ -23,6 +31,11 @@ permissions:
 
 jobs:
   bundle:
+    # A "promote the manifest" dispatch must not also bundle a fresh draft.
+    # Those are two different acts: one produces artefacts for a person to
+    # review, the other publishes a manifest for artefacts already reviewed.
+    if: github.event_name != 'workflow_dispatch' || inputs.promote_tag == ''
+
     strategy:
       # One platform failing must not cancel the other. A Windows build that
       # succeeded is still worth having in the draft while macOS is fixed.
@@ -234,3 +247,117 @@ jobs:
           # installers no existing copy of the app can ever discover.
           includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+  # ==========================================================================
+  # PROMOTE THE MANIFEST. THE SECOND PRESS, AFTER A PERSON HAS LOOKED.
+  # ==========================================================================
+  # THE HUMAN STEPS, IN ORDER. Nothing below happens on its own.
+  #
+  #   1. Push a `light-v*` tag. The `bundle` job above builds and uploads a
+  #      DRAFT release. Nothing is public and no installed copy can see it.
+  #   2. REVIEW THE DRAFT. Download the installer, run it, check the version.
+  #      This is the step the draft gate exists to make possible.
+  #   3. PUBLISH THE DRAFT AS A PRE-RELEASE. Pre-release, not latest, because
+  #      the direct-download installers are unsigned and SmartScreen warns
+  #      about them — they are not a headline download.
+  #   4. Run this workflow by hand (Actions -> Release -> Run workflow) with
+  #      `promote_tag` set to the tag you just published. THAT is the moment
+  #      existing installs start seeing the update.
+  #
+  # WHY A JOB AND NOT "COPY THE FILE ACROSS BY HAND".
+  # Copying by hand has none of the properties that matter here: it runs no
+  # verification, it leaves no record of what was published or by whom, it can
+  # upload the wrong file, and it can forget `--clobber` and silently leave the
+  # old manifest in place. It is also the step that gets skipped at eleven at
+  # night. A dispatch job cannot skip its own verification, and every promotion
+  # leaves a log.
+  #
+  # Step 4 is deliberately SEPARATE from step 1 rather than being chained onto
+  # a published-release trigger: a release can be published for reasons that
+  # have nothing to do with the updater — re-uploading an asset, fixing the
+  # notes — and none of those should re-point every installed copy.
+  promote-manifest:
+    if: github.event_name == 'workflow_dispatch' && inputs.promote_tag != ''
+
+    runs-on: ubuntu-latest
+
+    # `contents: write` because it uploads an asset. Named explicitly so the
+    # job can also check the repository out.
+    permissions:
+      contents: write
+
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      # Without a repository to resolve, `gh` dies with "failed to determine
+      # base repo".
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ inputs.promote_tag }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # A DRAFT's assets are not downloadable by anyone but a collaborator, so
+      # promoting one would publish a manifest pointing at URLs that 404 for
+      # every user. This fails loudly rather than producing a broken channel.
+      - name: Refuse a release that is still a draft
+        run: |
+          set -euo pipefail
+          draft=$(gh release view "$TAG" --json isDraft --jq .isDraft)
+          echo "$TAG isDraft=$draft"
+          if [ "$draft" != "false" ]; then
+            echo "::error title=That release is still a draft::$TAG has not been published. A draft's assets are not downloadable by users, so the manifest would point at URLs that 404 for everyone. Publish it as a pre-release first."
+            exit 1
+          fi
+
+      # Every asset, so the installers the manifest names sit next to it and
+      # the verifier can check the signatures against the real bytes.
+      - name: Download the release assets
+        run: |
+          set -euo pipefail
+          mkdir -p promote
+          gh release download "$TAG" --dir promote --clobber
+          ls -l promote
+
+      # ====================================================================
+      # THE GATE. NOTHING IS PUBLISHED PAST THIS LINE WITHOUT IT PASSING.
+      # ====================================================================
+      # Missing manifest, unparseable manifest, or a signature made by a key
+      # the shipped binaries do not carry -> this exits 1 and the job stops.
+      # `--bundle-dir` makes it a real signature verification against the
+      # downloaded installers rather than only a key-id check.
+      - name: Verify the manifest before anything is published
+        run: pnpm verify:updater-manifest promote/latest.json --bundle-dir promote
+
+      # The permanent release the endpoint in tauri.conf.json points at. It is
+      # created once and then only ever has its asset replaced. A pre-release
+      # so it never takes GitHub's "Latest" badge from a real version.
+      - name: Make sure the permanent updater release exists
+        run: |
+          set -euo pipefail
+          if gh release view updater >/dev/null 2>&1; then
+            echo "The updater release already exists; its asset will be replaced."
+          else
+            echo "Creating the permanent updater release."
+            gh release create updater \
+              --title "Updater manifest" \
+              --prerelease \
+              --notes "Not a download. This release exists only to hold \`latest.json\` at an address that never changes, which is what every installed copy of CViper Light reads to discover a new version. Its contents are replaced by the Release workflow. See apps/light/src-tauri/RELEASE-SIGNING.md."
+          fi
+
+      - name: Publish the manifest
+        run: |
+          set -euo pipefail
+          gh release upload updater promote/latest.json --clobber
+          echo "### Updater manifest promoted" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`latest.json\` from **$TAG** is now live at the fixed updater endpoint." >> "$GITHUB_STEP_SUMMARY"
+          echo "Every installed copy will see this version on its next check." >> "$GITHUB_STEP_SUMMARY"

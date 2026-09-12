@@ -46,12 +46,104 @@ ever. A signing key in version control is a signing key that lets a stranger
 ship a signed binary to every user this app has, and there is no revocation
 story for an app that checks one hardcoded public key.
 
-## 2. Set the real owner and repository
+## 2. The endpoint is a FIXED tag, and `/releases/latest/` is a trap
 
 `plugins.updater.endpoints` points at `stevenbrady1/cviper-light`, set at the
-same time as the pubkey. The tag in the URL stays `latest`. The tag in
-the URL stays `latest`: `release.yml` republishes `latest.json` on every
-release, so the endpoint is never edited again.
+same time as the pubkey. The address is
+
+```
+https://github.com/stevenbrady1/cviper-light/releases/download/updater/latest.json
+```
+
+`updater` is a permanent release whose single `latest.json` asset is
+**overwritten** on every release. The address never changes; its contents do.
+
+It used to end `/releases/latest/download/latest.json`, which reads as "whatever
+the newest release is" and is not. GitHub resolves `/releases/latest/` to the
+newest release that is **neither a draft nor a pre-release**, and this project
+produces neither:
+
+- `release.yml` always produces a DRAFT — see `releaseDraft` below, which is
+  deliberate.
+- Unsigned direct-download installers ship as PRE-RELEASES, because an installer
+  SmartScreen warns about is not a headline download.
+
+So the old endpoint 404ed with nothing published, and would have gone on 404ing
+after the first real release — failing in the direction nobody investigates. The
+user presses "Check for updates", is told there is nothing to compare against,
+and concludes they are up to date.
+
+`apps/light/src/lib/updater-endpoint.contract.test.ts` forbids the trap coming
+back.
+
+### How this was verified, rather than assumed
+
+Read out of `tauri-plugin-updater` 2.10.1, the version pinned in `Cargo.lock`:
+
+- `RemoteReleaseInner` (`updater.rs`) is an **untagged** enum whose `Static`
+  variant is `{ platforms: HashMap<String, ReleaseManifestPlatform> }`. A static
+  signed JSON file is a first-class supported shape, not a workaround.
+- The check is a plain `GET` with `Accept: application/json` that requires a
+  success status and parses the body. Nothing requires the URL to contain a tag,
+  a version or a `{{target}}` placeholder — the `{{…}}` substitutions are
+  optional string replacements applied before the request.
+- `validate_endpoints` (`config.rs`) enforces exactly one thing in a release
+  build: the scheme is `https`.
+- GitHub answers `/releases/download/<tag>/<asset>` with a 302 to its object
+  store, and `reqwest` follows redirects by default.
+
+A 204 from an endpoint means "no update"; a 404 is an error, which is why the
+old address produced a failure message rather than a silent "you are current".
+
+## 3. Releasing: the human steps, in order
+
+Nothing about a release is automatic. The workflow produces a draft; a person
+decides everything after that.
+
+1. **Push a `light-v*` tag.** The `bundle` job in `release.yml` builds the
+   installers and uploads them to a **draft** release, with `latest.json`
+   beside them. Nothing is public, and no installed copy can see any of it.
+2. **Review the draft.** Download the installer, run it, check the version is
+   what you expect. This is what the draft gate exists to make possible.
+   `releaseDraft: true` is deliberate and is not a setting to flip: publishing
+   is the moment every existing install starts downloading.
+3. **Publish the draft as a PRE-RELEASE.** Pre-release rather than latest,
+   because the direct-download installers are unsigned, SmartScreen warns about
+   them, and they are not a headline download.
+4. **Promote the manifest.** Actions → Release → _Run workflow_, with
+   `promote_tag` set to the tag you just published. **This is the moment
+   existing installs begin to see the new version.** Nothing before this step
+   changes what the updater serves.
+
+### Why step 4 is a workflow rather than "copy the file across"
+
+A manual copy has none of the properties that matter here:
+
+- **It runs no verification.** The promote job cannot skip its own gate. A
+  missing `latest.json`, one that will not parse, or one carrying a signature
+  made by a key the shipped binaries do not trust all fail the run _before_
+  anything is uploaded — `pnpm verify:updater-manifest`, run with
+  `--bundle-dir` so the signatures are checked against the real downloaded
+  installers rather than by key id alone.
+- **It leaves no record.** A workflow run says what was promoted, from which
+  tag, and who pressed it.
+- **It can go wrong quietly** — the wrong file, or a forgotten `--clobber` that
+  leaves the previous manifest in place while looking like it worked.
+- **It is the step that gets skipped at eleven at night.**
+
+It is also deliberately separate from publishing the release. Releases get
+published for reasons that have nothing to do with the updater — re-uploading an
+asset, fixing the notes — and none of those should re-point every installed copy.
+
+### The `updater` release
+
+The promote job creates it on first use if it is not there: a permanent
+pre-release tagged `updater` whose only job is to hold `latest.json` at an
+address that never changes. It is a pre-release so that it never takes GitHub's
+"Latest" badge from a real version.
+
+**Do not delete it.** The endpoint compiled into every shipped binary points at
+it, and there is no way to tell an installed copy to look somewhere else.
 
 ## Where the key is actually read
 

@@ -26,14 +26,29 @@ describe('before anything is pressed', () => {
     expect(port.calls.check).toBe(0);
   });
 
-  it('says out loud that it never checks on its own', async () => {
+  it('says which of the two things it does, and the note follows the setting', async () => {
+    // This used to assert only that the absence of a launch check was stated.
+    // There are two behaviours now and the user picks between them (L-92), so
+    // the note has to be true of whichever is IN FORCE — a screen saying "never
+    // checks on its own" while a launch check was running would teach the
+    // reader that nothing else on it can be trusted either.
+    const user = userEvent.setup();
     const port = createFakeUpdatePort();
     render(<UpdateCheck port={port} version="0.1.0" />);
 
-    // The absence has to be legible. Without this line a user cannot tell a
-    // deliberate silence from a feature nobody built.
-    const note = (await screen.findByTestId('settings-update-note')).textContent ?? '';
-    expect(note.toLowerCase()).toContain('never checks on its own');
+    const note = await screen.findByTestId('settings-update-note');
+    const toggle = screen.getByTestId('settings-update-on-launch');
+
+    // The default is on, and the note says what that means.
+    expect((note.textContent ?? '').toLowerCase()).toContain('once when it starts');
+
+    await user.click(toggle);
+    // Switched off, the original sentence is exactly true again.
+    expect((note.textContent ?? '').toLowerCase()).toContain('never checks on its own');
+
+    // Put back, so this test leaves no stored preference behind for the next.
+    await user.click(toggle);
+    expect((note.textContent ?? '').toLowerCase()).toContain('once when it starts');
   });
 
   it('shows no status line at all until asked', () => {

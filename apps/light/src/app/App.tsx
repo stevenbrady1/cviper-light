@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { type Result } from '@cviper/core-types';
 
@@ -14,6 +14,11 @@ import {
   type OpenedCvPort,
   type PickedCv,
 } from '../platform/files';
+import { UpdateBanner } from '../features/settings/updates/UpdateBanner';
+import { updateCheckOnLaunchEnabled } from '../features/settings/updates/launchCheck';
+import { nextStateAfterCheck } from '../features/settings/updates/model';
+import { createTauriUpdatePort } from '../features/settings/updates/port';
+import { detectMobileOs } from '../platform/os';
 import { readEnvironmentStatus, type EnvironmentStatus } from '../status/environment';
 
 import { BottomNav } from './BottomNav';
@@ -100,6 +105,14 @@ export interface AppProps {
   readonly boardsPort?: SettingsProps['boardsPort'];
   /** Injected by tests: the real one talks to the updater plugin. */
   readonly updatePort?: SettingsProps['updatePort'];
+  /**
+   * Injected by tests ONLY to prove the ORDER of the read and the request.
+   *
+   * The real answer comes from `launchCheck.ts`. A check that fires and
+   * consults the preference afterwards has already made the request the user
+   * switched off, and nothing but the order can show that.
+   */
+  readonly readUpdateCheckOnLaunch?: () => boolean;
   /** Injected by tests, for the same reason as `trackerPort`. */
   readonly searchPort?: SearchProps['port'];
   /** Injected by tests so no credential store is read for the provider toggles. */
@@ -121,6 +134,7 @@ export default function App({
   browser,
   boardsPort,
   updatePort,
+  readUpdateCheckOnLaunch,
   searchPort,
   readKeyStates,
   newId,
@@ -131,6 +145,73 @@ export default function App({
   const [welcomeOpen, setWelcomeOpen] = useState(() => !hasSeenWelcome());
   const [incomingCv, setIncomingCv] = useState<Result<PickedCv, FileError> | null>(null);
   const viewport = useViewportClass();
+
+  /**
+   * The update offered by the check on launch, or `null` for the usual case.
+   *
+   * ============================================================================
+   * ONE PORT, SHARED WITH SETTINGS
+   * ============================================================================
+   * `install` can only install the update the last `check` found, and that
+   * handle lives inside the port. A second port here would leave the banner's
+   * Install button with nothing to install.
+   */
+  const updatePortInstance = useMemo(() => updatePort ?? createTauriUpdatePort(), [updatePort]);
+  const [offeredUpdate, setOfferedUpdate] = useState<{
+    readonly version: string;
+    readonly notes: string | null;
+  } | null>(null);
+  const [installPhase, setInstallPhase] = useState<'idle' | 'installing' | 'installed'>('idle');
+
+  /**
+   * Look for a newer version once, at startup, unless the user said not to.
+   *
+   * ============================================================================
+   * THE PREFERENCE IS READ BEFORE ANYTHING IS REQUESTED
+   * ============================================================================
+   * That ordering is the whole promise. Reading it afterwards would mean the
+   * request the user switched off had already been made, and no amount of
+   * "we only use the result if..." undoes a packet that has left.
+   *
+   * It is SILENT about failure. Nobody asked for this check, so a banner saying
+   * GitHub could not be reached would be an error message for an action the
+   * user did not take. The button in Settings is where a failure is worth
+   * reporting, because somebody is waiting for that answer.
+   *
+   * Once, on mount, and deliberately not on view changes: "check when the user
+   * opens a screen" is still a request they did not ask for.
+   */
+  useEffect(() => {
+    const readToggle = readUpdateCheckOnLaunch ?? updateCheckOnLaunchEnabled;
+    if (!readToggle()) return;
+
+    // Not on a phone. The store delivers updates there and the updater plugin
+    // is not compiled into those builds at all (L-80).
+    if (detectMobileOs() !== null) return;
+
+    let cancelled = false;
+    void updatePortInstance.check().then((result) => {
+      if (cancelled) return;
+      const next = nextStateAfterCheck(result);
+      if (next.kind === 'available') {
+        setOfferedUpdate({ version: next.version, notes: next.notes });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const onInstallUpdate = useCallback(async () => {
+    setInstallPhase('installing');
+
+    const installed = await updatePortInstance.install();
+    // Never swallowed. A failed install must not leave the strip looking like
+    // it worked; it goes back to offering, and Settings is where the reason
+    // can be read in full.
+    setInstallPhase(installed.ok ? 'installed' : 'idle');
+  }, [updatePortInstance]);
 
   useEffect(() => {
     const port = openedCv ?? createTauriOpenedCvPort();
@@ -247,7 +328,22 @@ export default function App({
     >
       {narrow ? null : <Sidebar activeView={activeView} onSelect={onSelect} status={status} />}
 
-      <main className="flex min-h-0 min-w-0 flex-1">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {/*
+          A strip above the view, never a modal over it. The app stays usable
+          behind it and "Not now" installs nothing — see `UpdateBanner`.
+        */}
+        {offeredUpdate === null ? null : (
+          <UpdateBanner
+            version={offeredUpdate.version}
+            notes={offeredUpdate.notes}
+            installing={installPhase === 'installing'}
+            installed={installPhase === 'installed'}
+            onInstall={() => void onInstallUpdate()}
+            onDismiss={() => setOfferedUpdate(null)}
+          />
+        )}
+
         {renderView(activeView, {
           search: {
             port: searchPort,
@@ -285,7 +381,7 @@ export default function App({
             keyPort,
             browser,
             boardsPort,
-            updatePort,
+            updatePort: updatePortInstance,
             onShowWelcome,
             onErased,
             now,

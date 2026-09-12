@@ -10,24 +10,68 @@ import { type Result } from '@cviper/core-types';
 import { type UpdateInfo, type UpdateProblem } from './port';
 
 /**
- * The sentence that makes the absence of a launch-time check legible.
+ * What the Updates section says, in each of the two states it can be in.
  *
  * ============================================================================
- * SAY IT, BECAUSE AN ABSENCE LOOKS LIKE AN OVERSIGHT.
+ * SAY WHICH ONE IT IS, BECAUSE THE USER CANNOT SEE A REQUEST
  * ============================================================================
- * This app tells the user it collects nothing. A silent HTTPS request on launch
- * — even one carrying only an IP address and a version string — would make that
- * false, on a screen that says otherwise. So there is no automatic check.
+ * There are now two honest sentences here rather than one, because there are
+ * two behaviours and the user chooses between them (L-92). Whichever is on
+ * screen has to be TRUE of the build the person is looking at — a note that
+ * says "never checks on its own" while a launch check is switched on is worse
+ * than no note, because it teaches the reader that this screen lies.
  *
- * But a missing feature and a deliberate omission look identical from the
- * outside. Without this sentence the honest choice reads as something nobody
- * got round to, and the user learns nothing about what the app does with their
- * network. With it, the design is visible.
+ * Both sentences say the same three things in the same order: when a request
+ * happens, what it carries, and what the other setting would do. Neither is
+ * reassurance; both are descriptions somebody could go and check.
+ */
+
+/**
+ * The note when the launch check is OFF.
+ *
+ * ============================================================================
+ * AN ABSENCE LOOKS LIKE AN OVERSIGHT UNLESS YOU NAME IT.
+ * ============================================================================
+ * A missing feature and a deliberate omission look identical from the outside.
+ * Without this sentence the honest choice reads as something nobody got round
+ * to, and the user learns nothing about what the app does with their network.
+ *
+ * Left byte-for-byte as it was: it is still exactly true when the switch is
+ * off, and `model.test.ts` holds it to the two facts it has to state.
  */
 export const NO_AUTOMATIC_CHECK_NOTE =
   'CViper Light never checks on its own — not at startup, not in the ' +
   'background. Nothing leaves this machine until you press it, and what leaves ' +
   'is a request for a version number.';
+
+/**
+ * The note when the launch check is ON, which is the default.
+ *
+ * ============================================================================
+ * THE DEFAULT HAS TO EXPLAIN ITSELF, NOT JUST BE DISCLOSED
+ * ============================================================================
+ * This is the state most people will be in without choosing it, so the
+ * sentence has to do more than be technically accurate: it says WHEN (once, at
+ * startup), WHAT (a version number and nothing else), and WHAT THE OTHER
+ * SETTING DOES (no request at all, rather than a quieter one).
+ *
+ * "unless you press the button" is load-bearing and must not be tidied away —
+ * an absolute claim with its exception stated in the same breath is an honest
+ * claim, and `privacy-promise.contract.test.ts` recognises the shape.
+ */
+export const AUTOMATIC_CHECK_NOTE =
+  'CViper Light looks for a new version once when it starts, and asks for ' +
+  'nothing but a version number — no account, no identifier, nothing about ' +
+  'you. Switch it off and it makes no update request at all: nothing leaves ' +
+  'this machine unless you press the button.';
+
+/** The switch itself. Plain, and it names the app so the scope is obvious. */
+export const UPDATE_CHECK_TOGGLE_LABEL = 'Check for updates when CViper Light starts';
+
+/** The note that belongs with the setting as it currently stands. */
+export function updateCheckNote(checksOnLaunch: boolean): string {
+  return checksOnLaunch ? AUTOMATIC_CHECK_NOTE : NO_AUTOMATIC_CHECK_NOTE;
+}
 
 export type UpdateState =
   | { readonly kind: 'idle' }
