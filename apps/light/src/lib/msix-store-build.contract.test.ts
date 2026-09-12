@@ -637,3 +637,75 @@ describe('the detectors bite, and let the honest shapes through', () => {
     expect(placeholders).toHaveLength(1);
   });
 });
+
+// ── One binary in the package, and no second one ─────────────────────────────
+
+/**
+ * Lines that would copy a DLL into the MSIX layout.
+ *
+ * Comments are stripped first, for the reason `repo-scan.ts` gives: the
+ * paragraph explaining why DLLs are excluded names `light_lib.dll` repeatedly,
+ * and a guard that fired on its own rationale is a guard somebody deletes.
+ */
+export function dllCopiesIntoTheLayout(workflowText: string): string[] {
+  return workflowText
+    .split('\n')
+    .map((line) => line.replace(/#.*$/, ''))
+    .filter((line) => /Copy-Item/i.test(line) && /\.dll\b/i.test(line))
+    .map((line) => line.trim());
+}
+
+describe('the package contains one binary, and the kit scans only that', () => {
+  /**
+   * ==========================================================================
+   * WHY THIS MATTERS MORE THAN IT LOOKS
+   * ==========================================================================
+   * `target/release` holds `light_lib.dll`, a cdylib nothing loads at runtime
+   * because `main.rs` links the crate as an rlib. Staging it would hand the
+   * certification kit a SECOND binary to scan for blocked APIs — and an earlier
+   * draft of the L-95 spike did exactly that, manufacturing a "Blocked
+   * executables" failure caused entirely by packaging and indistinguishable in
+   * the report from a real one.
+   *
+   * The workflow already copies only the one discovered executable. Nothing
+   * held that shape, so a future `Copy-Item *.dll` would have been green here
+   * and wrong in the package. This is the fast half — the workflow also asserts
+   * the real staged tree holds exactly one PE and no DLLs, which catches a DLL
+   * this scan cannot see, such as one arriving inside `bundle.resources`.
+   */
+  const MSIX_WORKFLOW = read(`${WORKFLOW_DIRECTORY}/msix.yml`);
+
+  it('anti-inert: the workflow really does stage files with Copy-Item', () => {
+    // A scan that found no copying at all would report "no DLL copies" while
+    // inspecting nothing.
+    const copies = MSIX_WORKFLOW.split('\n').filter((line) => /Copy-Item/i.test(line));
+    expect(copies.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('copies no DLL into the layout', () => {
+    const offenders = dllCopiesIntoTheLayout(MSIX_WORKFLOW);
+    expect(
+      offenders,
+      'Staging a second binary changes what the certification kit scans for blocked APIs, and ' +
+        'produces a failure about our packaging that reads exactly like a failure about the app.',
+    ).toEqual([]);
+  });
+
+  it('asserts the staged layout, rather than trusting the copying', () => {
+    // The artefact-level half. Named here so that deleting it from the
+    // workflow is a failing test rather than a silent loss of cover.
+    expect(MSIX_WORKFLOW).toMatch(/\$stagedDlls/);
+    expect(MSIX_WORKFLOW).toMatch(/stagedExes\.Count -ne 1/);
+  });
+
+  it('the detector bites, and lets the honest lines through', () => {
+    expect(dllCopiesIntoTheLayout('  Copy-Item $d.FullName -Destination $layout # a.dll')).toEqual(
+      [],
+    );
+    expect(
+      dllCopiesIntoTheLayout("Copy-Item (Join-Path $target '*.dll') -Destination $layout"),
+    ).toHaveLength(1);
+    expect(dllCopiesIntoTheLayout('Copy-Item $exe.FullName -Destination $layout')).toEqual([]);
+    expect(dllCopiesIntoTheLayout('Write-Host "not staging light_lib.dll"')).toEqual([]);
+  });
+});
