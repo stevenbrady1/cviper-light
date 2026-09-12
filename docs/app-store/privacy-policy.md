@@ -17,7 +17,7 @@ We — the people who make CViper Light — receive nothing from it. Not your CV
 
 ## Every address the app can contact
 
-This is not a summary. It is the exact set of addresses the code is allowed to name; a test fails the build if one is added without appearing here.
+This is not a summary. It is the exact set of addresses the code is allowed to name; a test fails the build if one is added without appearing here. Two things below have no fixed address — the advert page you choose, and Windows itself — so they are described instead of named.
 
 ### Sent with your own key, when you ask
 
@@ -33,6 +33,7 @@ These carry a key you pasted into Settings, under an account that is yours. The 
 A plain request with nothing about you in it beyond the request itself.
 
 - `github.com` — The update check reads a small signed file from this app’s public GitHub releases. It happens when you press “Check for updates”, and carries no data about you beyond the request itself. The source code is also opened in your browser from Settings → About.
+- **any job-advert page you ask it to open — only when you press Fetch** — You paste a link and press Fetch, and the app reads that one page so it can fill in the form. The address is whichever one you pasted, so it cannot be listed here in advance. It carries no cookies, no sign-in and no key, it cannot reach your saved keys, it follows no links, and addresses on your own computer or home network are refused. The site sees your IP address, exactly as it would if you had clicked the link yourself.
 
 ### Opened in your browser, never by the app
 
@@ -56,6 +57,12 @@ A program running on this same machine. The request never reaches the internet.
 
 - `127.0.0.1` — Ollama, if you installed it. The request goes to a program on this computer, not to the internet.
 - `localhost` — Named only so the fetch-from-link guard can refuse it. Never contacted.
+
+### Done by Windows, not by this app
+
+Part of the operating system, around the app rather than inside it. It is listed because it is a real request leaving your PC, and left out it would look like something this app was hiding.
+
+- **Microsoft, for the Windows WebView2 runtime this app draws in** — WebView2 is part of Windows, not part of this app. It updates itself and checks downloads with SmartScreen on Microsoft’s schedule. CViper Light does not start those requests, cannot see them and cannot switch them off; they happen for every program on your PC that uses WebView2, whether or not this one is running.
 
 ## Services you may choose to use
 
