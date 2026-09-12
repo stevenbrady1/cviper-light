@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  ============================================================================
+  SPIKE MANIFEST (L-95). PLACEHOLDER IDENTITY. NEVER SUBMITTED.
+  ============================================================================
+  This exists so `.github/workflows/msix-wack-spike.yml` can build an MSIX and
+  run the Windows App Certification Kit against it. It answers one question:
+  does a RELEASE-built CViper Light pass WACK? It is not a Store artefact.
+
+  The Identity block below is deliberately fake. Real Store identity
+  (`Name` and `Publisher`) is assigned by Partner Center at enrolment and
+  cannot be guessed; a real submission replaces all three Identity fields and
+  both display names. Nothing here is a decision about what the app will be
+  called.
+
+  WHY THIS FILE IS CHECKED IN RATHER THAN GENERATED
+  `winapp init` prompts — package name, publisher, version, entry point — and a
+  prompt on a runner is a hang that ends in a timeout with no useful log. The
+  CLI does have non-interactive generation (`winapp manifest generate
+  --package-name ... --if-exists Skip`), but a generated manifest is one nobody
+  reviewed: the version format and the asset paths are exactly the two things
+  this experiment must get right, and they would be invisible in the diff. So
+  the manifest is source, and the workflow only rewrites `Executable=`.
+
+  VERSION MUST BE QUAD-FORMAT ENDING IN .0
+  `0.1.0.0`, not `0.1.0`. The Microsoft Store reserves the fourth number for
+  its own use and rejects a package that sets it to anything else. The app's
+  own version (`tauri.conf.json`, `Cargo.toml`) is the three-part `0.1.0`; the
+  trailing `.0` is added here and belongs only here.
+
+  ASSETS
+  `Square150x150Logo`, `Square44x44Logo` and `StoreLogo` are the three the
+  packaging needs, and all three already exist in `../icons/` at exactly the
+  sizes MSIX wants (150x150, 44x44, 50x50) because `tauri icon` generates the
+  Store set. The workflow copies them into `Assets\` in the layout.
+
+  There is deliberately no `<uap:DefaultTile>`: it requires
+  `Wide310x150Logo.png`, which `../icons/` does not contain. Referencing an
+  asset that is not there fails WACK's "Application manifest resources" test —
+  a failure about OUR packaging, which would be indistinguishable in the report
+  from the WebView2 failure this spike is actually looking for. An absent
+  optional element is silent; a broken reference is noise in the answer.
+-->
+
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  IgnorableNamespaces="uap rescap uap10">
+
+  <Identity
+    Name="CViperLight.WackSpike"
+    Publisher="CN=CViper Light WACK Spike"
+    Version="0.1.0.0" />
+
+  <Properties>
+    <DisplayName>CViper Light</DisplayName>
+    <PublisherDisplayName>CViper Light WACK Spike</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <uap10:PackageIntegrity>
+      <uap10:Content Enforcement="on" />
+    </uap10:PackageIntegrity>
+  </Properties>
+
+  <Dependencies>
+    <!--
+      MaxVersionTested matches the only Windows SDK on the windows-latest
+      runner image (10.0.26100.0). Claiming a version the build machine does
+      not have is a claim nothing tested.
+    -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.18362.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-gb" />
+  </Resources>
+
+  <Applications>
+    <!--
+      `Executable` is REWRITTEN BY THE WORKFLOW before packing, to whatever the
+      release build actually produced. It is not a constant: a plain
+      `cargo build --release` emits a binary named after the Cargo package
+      (`light.exe`), while `tauri build` renames it to `productName`
+      ("CViper Light.exe"). Hardcoding either one means the manifest silently
+      points at a file that is not in the layout, and an MSIX with a dangling
+      entry point installs and then fails to launch.
+    -->
+    <Application
+      Id="CViperLight"
+      Executable="light.exe"
+      EntryPoint="Windows.FullTrustApplication"
+      uap10:TrustLevel="mediumIL"
+      uap10:RuntimeBehavior="packagedClassicApp">
+      <uap:VisualElements
+        DisplayName="CViper Light"
+        Description="Local-first CV and job-search desktop app"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!--
+      A packaged desktop (Win32) app runs full trust. This is what
+      `packagedClassicApp` above implies and what every Tauri/Electron MSIX
+      declares. It is not a broad permission grab: it is the capability that
+      says "this is a desktop app in a package", not a UWP one.
+    -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

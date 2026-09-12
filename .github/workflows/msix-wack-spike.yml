@@ -1,0 +1,533 @@
+name: MSIX WACK spike (L-95)
+
+# ============================================================================
+# A ONE-OFF EXPERIMENT. IT ANSWERS ONE QUESTION AND IS THEN DELETED.
+# ============================================================================
+# The question: does a RELEASE-built CViper Light pass the Windows App
+# Certification Kit (WACK) when packaged as MSIX?
+#
+# Why it is worth a workflow: tauri-apps/tauri#14935 is open and unfixed. A
+# boilerplate Tauri v2 app failed WACK's "Blocked Executables" test on
+# kernel32!CreateProcessW, shell32!ShellExecuteW and cmd.exe, and a Tauri
+# maintainer wrote "i think this is impossible to fix... this is mostly
+# WebView2". If that is real, the Microsoft Store route is shut for this app
+# and nobody should spend weeks on a submission.
+#
+# But the evidence says it may be a false alarm, and the whole design of this
+# workflow turns on that word RELEASE:
+#
+#   - Microsoft's own WACK documentation says "The debug build of an app will
+#     fail this test even if the app uses only APIs for UWP apps."
+#   - Nobody in #14935 confirmed testing a release build.
+#   - The rejection email quoted in that thread was about undeclared hardware
+#     requirements, which is a different subject entirely.
+#   - WSL-UI, a real Tauri app, is on the Microsoft Store today.
+#
+# So this builds RELEASE. Testing a debug build here would faithfully reproduce
+# a documented, meaningless failure and would send everyone the wrong way. The
+# `compare_debug` input below exists to make that contrast measurable rather
+# than assumed — see its comment.
+#
+# WHEN THIS SPIKE HAS ANSWERED, DELETE THIS FILE. A manually-triggered
+# experiment left lying around becomes a workflow nobody runs and nobody trusts.
+
+# ----------------------------------------------------------------------------
+# workflow_dispatch ONLY. Never on push.
+# ----------------------------------------------------------------------------
+# A release Rust build plus a possible Windows SDK install plus a full WACK pass
+# is tens of minutes of Windows runner time, which bills at 2x. This answers a
+# question once; it is not a gate, and running it on every commit would spend
+# real money re-answering something already known.
+on:
+  workflow_dispatch:
+    inputs:
+      compare_debug:
+        description: >-
+          Also build and test a DEBUG package as a control. Only useful if the
+          release leg fails Blocked Executables — it tells you whether the
+          failure is the documented debug-build artefact or something real.
+          Roughly doubles the run time.
+        type: boolean
+        default: false
+
+# Least privilege. `contents: read` is named explicitly: a job with a
+# `permissions:` block that omits it cannot check the repository out.
+permissions:
+  contents: read
+
+# Deliberately NOT cancel-in-progress. Cancelling a forty-minute experiment
+# because somebody pressed the button twice wastes the forty minutes.
+concurrency:
+  group: msix-wack-spike-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Corepack asks, interactively, before downloading a package manager it has
+  # not seen. On a runner that prompt is a long hang ending in a timeout with
+  # no useful log.
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+jobs:
+  wack:
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    strategy:
+      # The debug leg failing must not cancel the release leg. The release leg
+      # is the answer; debug is only context for it.
+      fail-fast: false
+      matrix:
+        profile: ${{ fromJSON(inputs.compare_debug && '["release","debug"]' || '["release"]') }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Before setup-node, because `cache: pnpm` needs a pnpm binary to ask
+      # where the store lives.
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/light/src-tauri
+          # Two profiles would otherwise fight over one cache entry.
+          key: wack-${{ matrix.profile }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Record which profile this leg is
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ('${{ matrix.profile }}' -eq 'release') {
+            "CARGO_PROFILE_FLAG=--release"                   >> $env:GITHUB_ENV
+            "TARGET_DIR=apps/light/src-tauri/target/release" >> $env:GITHUB_ENV
+          } else {
+            "CARGO_PROFILE_FLAG="                          >> $env:GITHUB_ENV
+            "TARGET_DIR=apps/light/src-tauri/target/debug"  >> $env:GITHUB_ENV
+          }
+          "WACK_DIR=${{ runner.temp }}/wack"     >> $env:GITHUB_ENV
+          "LAYOUT_DIR=${{ runner.temp }}/layout" >> $env:GITHUB_ENV
+          New-Item -ItemType Directory -Force -Path "${{ runner.temp }}/wack", "${{ runner.temp }}/layout" | Out-Null
+
+      # ----------------------------------------------------------------------
+      # The web bundle must exist BEFORE cargo runs.
+      # ----------------------------------------------------------------------
+      # `tauri.conf.json` sets `frontendDist: "../dist"`, and tauri-build embeds
+      # those files into the binary at COMPILE time via generate_context!. A
+      # cargo build with no dist/ next to it fails in build.rs, not at runtime.
+      - name: Build the web bundle
+        run: pnpm --filter @cviper/light build
+
+      # ----------------------------------------------------------------------
+      # cargo build, NOT `tauri build`.
+      # ----------------------------------------------------------------------
+      # Three independent reasons, any one of which is sufficient:
+      #
+      # 1. release.yml opens with "THE ONLY PLACE `tauri build` IS EVER RUN."
+      #    That invariant is worth more than the convenience of reusing it, and
+      #    this spike has no business bundling a release.
+      # 2. `bundle.createUpdaterArtifacts` is true, so `tauri build` demands
+      #    TAURI_SIGNING_PRIVATE_KEY and fails at the bundling step without it.
+      #    This experiment needs no signing secret and should not be handed one.
+      # 3. We want the bare compiled exe, not an NSIS/MSI installer. winapp
+      #    builds the MSIX from a folder; Tauri's own bundlers are irrelevant
+      #    here and would add minutes producing artefacts we throw away.
+      #
+      # This is also exactly what Microsoft's own Tauri sample test does
+      # (samples/tauri-app/test.Tests.ps1 in microsoft/winappCli):
+      # `cargo build --release --manifest-path src-tauri\Cargo.toml`.
+      - name: Build the Rust binary (${{ matrix.profile }})
+        run: cargo build ${{ env.CARGO_PROFILE_FLAG }} --manifest-path apps/light/src-tauri/Cargo.toml
+
+      # ----------------------------------------------------------------------
+      # WHAT DOES TAURI ACTUALLY EMIT? Answer it, do not assume it.
+      # ----------------------------------------------------------------------
+      # The official winapp guide copies ONLY `<app>.exe` into the layout. That
+      # is correct for a boilerplate app and silently wrong for one with
+      # sidecars (`bundle.externalBin`), extra resources (`bundle.resources`) or
+      # a DLL that must sit beside the binary. An MSIX missing one of those
+      # installs cleanly and fails at runtime, which is the worst possible
+      # shape of bug to discover after a Store submission.
+      #
+      # A grep of this repo finds no externalBin, no sidecar and no
+      # bundle.resources, so the expectation is "exe only" — but an expectation
+      # is not evidence. This step prints the real contents of the target
+      # directory into the log and the artefact so the claim is checkable.
+      - name: Inventory what the build produced
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $target = "$env:TARGET_DIR"
+          $inventory = Join-Path $env:WACK_DIR 'target-inventory.txt'
+
+          # Top level only. deps/, build/, .fingerprint/ and incremental/ are
+          # cargo's intermediates and are never part of an app.
+          $files = Get-ChildItem -Path $target -File |
+                   Sort-Object Length -Descending |
+                   Select-Object Name, Length, Extension
+
+          $lines = @("Top-level files in $target", ('=' * 72))
+          $lines += $files | ForEach-Object { '{0,-44} {1,12:N0} bytes' -f $_.Name, $_.Length }
+          $lines += ''
+          $lines += 'Sub-directories:'
+          $lines += (Get-ChildItem -Path $target -Directory | ForEach-Object { '  ' + $_.Name })
+
+          $lines | Tee-Object -FilePath $inventory
+          Write-Host ''
+          Write-Host 'Shippable candidates (exe/dll at top level):'
+          $files | Where-Object { $_.Extension -in '.exe', '.dll' } |
+                   ForEach-Object { Write-Host ('  ' + $_.Name) }
+
+      # ----------------------------------------------------------------------
+      # Stage the app. Discover the exe rather than hardcoding its name.
+      # ----------------------------------------------------------------------
+      # A plain cargo build names the binary after the Cargo package (`light`),
+      # while `tauri build` renames it to `productName` ("CViper Light"). If
+      # the build system ever changes under us, a hardcoded name produces a
+      # confident, wrong package. Zero or several candidates is a real problem
+      # and stops the job here, loudly, rather than packaging the wrong file.
+      - name: Stage the MSIX layout
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $target = "$env:TARGET_DIR"
+          $layout = "$env:LAYOUT_DIR"
+
+          # `light` is the [package] name in src-tauri/Cargo.toml. Deliberately
+          # not a wildcard over every .exe: cargo also drops build-script and
+          # test harness executables at the top level in some configurations,
+          # and picking one of those would be a silent disaster.
+          $candidates = @(Get-ChildItem -Path $target -Filter '*.exe' -File |
+                          Where-Object { $_.BaseName -in 'light', 'CViper Light' })
+
+          if ($candidates.Count -ne 1) {
+            Write-Host "::error::Expected exactly one application exe in $target, found $($candidates.Count)."
+            Get-ChildItem -Path $target -Filter '*.exe' -File | ForEach-Object { Write-Host "  candidate: $($_.Name)" }
+            exit 1
+          }
+
+          $exe = $candidates[0]
+          Write-Host "Application executable: $($exe.Name)"
+          Copy-Item $exe.FullName -Destination $layout
+
+          # Any DLL sitting beside the binary is part of the app. Tauri v2 on
+          # MSVC statically links WebView2Loader, so the expectation is none —
+          # but if one appears, it belongs in the package, and the log says so.
+          $dlls = @(Get-ChildItem -Path $target -Filter '*.dll' -File)
+          if ($dlls.Count -gt 0) {
+            Write-Host "Staging $($dlls.Count) DLL(s) found beside the exe:"
+            $dlls | ForEach-Object { Write-Host "  $($_.Name)"; Copy-Item $_.FullName -Destination $layout }
+          } else {
+            Write-Host 'No DLLs beside the exe (expected: WebView2Loader is statically linked).'
+          }
+
+          # Tauri writes bundle.resources into a `resources` folder next to the
+          # binary at BUNDLE time. We do not bundle, and none are configured,
+          # so this is a tripwire rather than an expectation.
+          $resources = Join-Path $target 'resources'
+          if (Test-Path $resources) {
+            Write-Host 'Found a resources/ directory — staging it.'
+            Copy-Item $resources -Destination $layout -Recurse
+          }
+
+          # The three MSIX assets the manifest names. Already the right sizes
+          # (150x150, 44x44, 50x50) because `tauri icon` generates the Store set.
+          $assets = Join-Path $layout 'Assets'
+          New-Item -ItemType Directory -Force -Path $assets | Out-Null
+          foreach ($a in 'Square150x150Logo.png', 'Square44x44Logo.png', 'StoreLogo.png') {
+            Copy-Item "apps/light/src-tauri/icons/$a" -Destination $assets
+          }
+
+          # Point the manifest at the exe we actually staged.
+          $manifestSrc = 'apps/light/src-tauri/msix/appxmanifest.xml'
+          $manifestDst = Join-Path $env:WACK_DIR 'appxmanifest.xml'
+          (Get-Content $manifestSrc -Raw) -replace 'Executable="[^"]*"', ('Executable="' + $exe.Name + '"') |
+            Set-Content $manifestDst -Encoding UTF8
+          Write-Host "Manifest Executable rewritten to: $($exe.Name)"
+
+          "MANIFEST_PATH=$manifestDst" >> $env:GITHUB_ENV
+          Write-Host ''
+          Write-Host 'Final layout:'
+          Get-ChildItem -Path $layout -Recurse | ForEach-Object { Write-Host "  $($_.FullName.Substring($layout.Length))" }
+
+      # ----------------------------------------------------------------------
+      # winapp CLI, pinned twice over.
+      # ----------------------------------------------------------------------
+      # Chosen over `winget install microsoft.winappcli` (the route the docs
+      # give) and over the npm package, because:
+      #
+      #   - winget's documented invocation is "install, or update to the latest
+      #     version if you already have it". A tool in PUBLIC PREVIEW that
+      #     resolves to whatever shipped this morning turns a red run into a
+      #     research project. Preview tools change under you; that is the one
+      #     thing we were told about this one.
+      #   - The npm package (@microsoft/winappcli) is a programmatic TypeScript
+      #     API wrapping the same binary. It would pin fine, but it adds a
+      #     dependency to a repo whose lockfile is checked and whose CI runs
+      #     --frozen-lockfile, for a throwaway experiment.
+      #   - This action is Microsoft's own and exists precisely for CI.
+      #
+      # So: the ACTION is pinned to an immutable commit SHA (a moving `@v0.2`
+      # tag is a supply-chain step nobody reviewed — the same reasoning that
+      # pins gitleaks by version AND checksum in ci.yml), and the CLI VERSION
+      # is pinned to v0.6.0, the latest STABLE release (12 Aug 2026). v0.6.1
+      # exists and is flagged prerelease; a preview tool's prerelease is not
+      # what you want underneath a result you intend to act on.
+      - name: Install winapp CLI 0.6.0
+        uses: microsoft/setup-WinAppCli@b93bbddc1f7abc061ca0d3a8119e3a0c7dd71495 # v0.2
+        with:
+          version: v0.6.0
+
+      - name: Record the winapp version actually installed
+        shell: pwsh
+        run: winapp --version
+
+      # ----------------------------------------------------------------------
+      # The dev certificate. Needed to TEST, not to ship.
+      # ----------------------------------------------------------------------
+      # Microsoft re-signs Store packages for free, so a real submission needs
+      # no purchased certificate. But an MSIX must be signed by SOMETHING for
+      # Windows to open it, and WACK deploys the package to test it — so the
+      # signer has to be trusted on this machine.
+      #
+      # `--install` puts it in the machine store in the same step, which is why
+      # there is no separate `winapp cert install`. `--manifest` makes the
+      # certificate's publisher match the manifest's Publisher; if they
+      # disagree the package will not install and WACK never gets to run.
+      #
+      # The password is the tool's own documented default. This is a
+      # self-signed certificate generated on a throwaway runner, valid for a
+      # fake publisher, destroyed with the VM. It is not a secret and there is
+      # nothing here to leak.
+      - name: Generate and trust a self-signed dev certificate
+        shell: pwsh
+        working-directory: ${{ env.WACK_DIR }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          winapp cert generate --manifest appxmanifest.xml --output devcert.pfx --password password --if-exists Overwrite --install
+          if (-not (Test-Path 'devcert.pfx')) {
+            Write-Host '::error::winapp cert generate reported success but produced no devcert.pfx.'
+            exit 1
+          }
+
+      - name: Pack the MSIX
+        shell: pwsh
+        working-directory: ${{ env.WACK_DIR }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          winapp pack "$env:LAYOUT_DIR" --manifest appxmanifest.xml --cert devcert.pfx --cert-password password --output "CViperLight-${{ matrix.profile }}.msix"
+
+          $msix = Get-ChildItem -Path . -Filter '*.msix' -File | Select-Object -First 1
+          if (-not $msix) {
+            Write-Host '::error::winapp pack produced no .msix file.'
+            exit 1
+          }
+          Write-Host ('MSIX: {0} ({1:N0} bytes)' -f $msix.Name, $msix.Length)
+          "MSIX_PATH=$($msix.FullName)" >> $env:GITHUB_ENV
+
+      # ----------------------------------------------------------------------
+      # Find appcert.exe. It is very probably NOT on this image.
+      # ----------------------------------------------------------------------
+      # windows-latest is Windows Server 2025 and carries exactly one Windows
+      # SDK (10.0.26100.0), but the App Certification Kit is a separate SDK
+      # FEATURE (OptionId.WindowsSoftwareLogoToolkit) and neither "appcert" nor
+      # that option id appears anywhere in actions/runner-images. So this step
+      # searches, and installs the feature from Microsoft's SDK setup if the
+      # search comes up empty.
+      #
+      # The download is not checksum-pinned, and that is a deliberate, stated
+      # gap rather than an oversight: go.microsoft.com/fwlink/?linkid=2272610
+      # is Microsoft's own evergreen SDK bundle and its bytes change when the
+      # SDK does, so there is no stable digest to pin to. The SHA256 of what
+      # was actually fetched is printed into the log, which is the most this
+      # can honestly offer. It is acceptable HERE because this is a
+      # manually-triggered diagnostic that ships nothing; it would not be
+      # acceptable in a workflow that produces a release artefact.
+      - name: Locate the Windows App Certification Kit
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          function Find-AppCert {
+            $roots = @(
+              "${env:ProgramFiles(x86)}\Windows Kits\10\App Certification Kit",
+              "$env:ProgramFiles\Windows Kits\10\App Certification Kit"
+            )
+            foreach ($r in $roots) {
+              $p = Join-Path $r 'appcert.exe'
+              if (Test-Path $p) { return $p }
+            }
+            return $null
+          }
+
+          $appcert = Find-AppCert
+          if ($appcert) {
+            Write-Host "Found: $appcert"
+          } else {
+            Write-Host 'appcert.exe not present. Installing the App Certification Kit SDK feature.'
+            $setup = Join-Path $env:RUNNER_TEMP 'winsdksetup.exe'
+            Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/?linkid=2272610' -OutFile $setup
+            Write-Host ('Downloaded winsdksetup.exe, SHA256: ' + (Get-FileHash $setup -Algorithm SHA256).Hash)
+
+            $p = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @(
+              '/features', 'OptionId.WindowsSoftwareLogoToolkit', '/quiet', '/norestart', '/ceip', 'off'
+            )
+            Write-Host "winsdksetup exit code: $($p.ExitCode)"
+
+            $appcert = Find-AppCert
+          }
+
+          if (-not $appcert) {
+            # DISTINCT FAILURE MODE: the kit is unavailable. This is NOT a
+            # statement about the app. See rule 71 note on the next step.
+            "WACK_STATUS=kit-unavailable" >> $env:GITHUB_ENV
+            Write-Host '::error::WACK COULD NOT RUN - appcert.exe is unavailable on this runner even after installing the SDK feature. This says NOTHING about whether the app passes.'
+            exit 1
+          }
+
+          "APPCERT_PATH=$appcert" >> $env:GITHUB_ENV
+          Write-Host "Using: $appcert"
+
+      # ----------------------------------------------------------------------
+      # RUN WACK. Rule 71: a failed check must never take the same branch as a
+      # passed one.
+      # ----------------------------------------------------------------------
+      # There is no `|| true` and no `2>$null` anywhere in this step, on
+      # purpose. This repository has twice had every cron alarm silenced by
+      # exactly that idiom, because it makes a broken check and a healthy
+      # system produce identical output.
+      #
+      # Three outcomes, three different behaviours:
+      #
+      #   1. The kit never produced a report  -> JOB FAILS. "WACK did not run".
+      #   2. The report exists and says FAIL  -> JOB PASSES, summary shouts.
+      #   3. The report exists and says PASS  -> JOB PASSES, summary says so.
+      #
+      # (2) is green DELIBERATELY, and it is the only place in this repo where
+      # that would be right: the entire purpose of a spike is to discover a
+      # failure, and a red X here would mean "the experiment worked" — which is
+      # exactly the confusion rule 71 exists to prevent. The verdict lives in
+      # the job summary and in verdict.txt, never in the tick.
+      #
+      # appcert exits non-zero when tests fail, so the branch is decided by
+      # whether a REPORT EXISTS, not by the exit code. The exit code is
+      # recorded either way.
+      - name: Run the Windows App Certification Kit
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # A native command's non-zero exit must NOT throw here: we need to
+          # read the report and distinguish outcome 1 from outcome 2 ourselves.
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          $appcert = $env:APPCERT_PATH
+          $report  = Join-Path $env:WACK_DIR 'wack-report.xml'
+
+          # WACK must run in an active user session and cannot run in Session 0.
+          # A hosted runner's agent is a service, so if this prints 0 and the
+          # kit then refuses, that is the reason — recorded up front so the
+          # failure is diagnosable instead of mysterious.
+          Write-Host "Session id of this process: $((Get-Process -Id $PID).SessionId)"
+          Write-Host "Package under test: $env:MSIX_PATH"
+
+          & $appcert reset
+          Write-Host "appcert reset exit code: $LASTEXITCODE"
+
+          & $appcert test -appxpackagepath "$env:MSIX_PATH" -reportoutputpath "$report"
+          $testExit = $LASTEXITCODE
+          Write-Host "appcert test exit code: $testExit"
+          "APPCERT_EXIT=$testExit" >> $env:GITHUB_ENV
+
+          if (-not (Test-Path $report)) {
+            "WACK_STATUS=did-not-run" >> $env:GITHUB_ENV
+            $msg = "WACK COULD NOT RUN. appcert exited $testExit and produced no report at $report. This is an ENVIRONMENT result and says nothing about whether CViper Light passes certification."
+            Set-Content -Path (Join-Path $env:WACK_DIR 'verdict.txt') -Value $msg
+            "## MSIX WACK spike (${{ matrix.profile }}): INCONCLUSIVE`n`n$msg`n" >> $env:GITHUB_STEP_SUMMARY
+            Write-Host "::error::$msg"
+            exit 1
+          }
+
+          "WACK_STATUS=ran" >> $env:GITHUB_ENV
+          Write-Host "Report written: $report"
+
+      - name: Read the verdict out of the report
+        # Runs whenever the kit produced a report. Skipped when it did not,
+        # because there is nothing to read and the previous step already said so.
+        if: env.WACK_STATUS == 'ran'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $report = Join-Path $env:WACK_DIR 'wack-report.xml'
+          [xml]$xml = Get-Content $report -Raw
+
+          # Every element carrying a RESULT attribute, whatever the schema
+          # version calls them. Parsing defensively beats hardcoding a shape
+          # that a future kit release quietly changes.
+          $results = @($xml.SelectNodes('//*[@RESULT]'))
+          $failed  = @($results | Where-Object { $_.GetAttribute('RESULT') -notmatch '^(PASS|PASSED)$' })
+
+          $overall = if ($xml.DocumentElement.GetAttribute('OVERALL_RESULT')) {
+            $xml.DocumentElement.GetAttribute('OVERALL_RESULT')
+          } elseif ($failed.Count -eq 0) { 'PASS' } else { 'FAIL' }
+
+          $sb = [System.Text.StringBuilder]::new()
+          [void]$sb.AppendLine("## MSIX WACK spike - ${{ matrix.profile }} build")
+          [void]$sb.AppendLine('')
+          [void]$sb.AppendLine("**WACK ran.** Overall result: **$overall**  ")
+          [void]$sb.AppendLine("appcert exit code: ``$env:APPCERT_EXIT`` - checks with a result: $($results.Count), not passing: $($failed.Count)")
+          [void]$sb.AppendLine('')
+
+          if ($failed.Count -eq 0) {
+            [void]$sb.AppendLine('Every check passed. No Blocked Executables failure, so tauri-apps/tauri#14935 did not reproduce on a release build.')
+          } else {
+            [void]$sb.AppendLine('### Checks that did not pass')
+            [void]$sb.AppendLine('')
+            [void]$sb.AppendLine('| Check | Result |')
+            [void]$sb.AppendLine('| --- | --- |')
+            foreach ($f in $failed) {
+              $n = $f.GetAttribute('NAME'); if (-not $n) { $n = $f.LocalName }
+              [void]$sb.AppendLine("| $n | $($f.GetAttribute('RESULT')) |")
+            }
+            [void]$sb.AppendLine('')
+            # The API and binary names behind a Blocked Executables failure —
+            # CreateProcessW, ShellExecuteW, cmd.exe — live in the message text,
+            # not in the attributes. This is the detail #14935 is about.
+            [void]$sb.AppendLine('<details><summary>Detail from the failing checks</summary>')
+            [void]$sb.AppendLine('')
+            [void]$sb.AppendLine('```')
+            foreach ($f in $failed) {
+              $n = $f.GetAttribute('NAME'); if (-not $n) { $n = $f.LocalName }
+              [void]$sb.AppendLine("--- $n ---")
+              $t = ($f.InnerText -replace '\s+', ' ').Trim()
+              if ($t.Length -gt 4000) { $t = $t.Substring(0, 4000) + ' ...[truncated, see the artefact]' }
+              [void]$sb.AppendLine($t)
+              [void]$sb.AppendLine('')
+            }
+            [void]$sb.AppendLine('```')
+            [void]$sb.AppendLine('</details>')
+          }
+
+          $summary = $sb.ToString()
+          $summary >> $env:GITHUB_STEP_SUMMARY
+          Set-Content -Path (Join-Path $env:WACK_DIR 'verdict.txt') -Value $summary
+          Write-Host $summary
+
+      # `always()` so the inventory and any partial report survive a failure —
+      # a run that died is exactly when you most want to look at the files.
+      - name: Upload the MSIX, the WACK report and the build inventory
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: msix-wack-${{ matrix.profile }}
+          path: ${{ runner.temp }}/wack
+          if-no-files-found: warn
+          retention-days: 14
