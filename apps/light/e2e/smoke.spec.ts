@@ -1,5 +1,5 @@
 /**
- * Eight questions asked of the REAL built binary (L-88, extended by L-103).
+ * Nine questions asked of the REAL built binary (L-88, extended by L-103, L-104).
  *
  * ============================================================================
  * WHY THIS EXISTS
@@ -35,16 +35,17 @@
  *      which is the difference between a useful red and a confusing one.
  *
  * ============================================================================
- * EIGHT ASSERTIONS, ONE SESSION, IN ORDER
+ * NINE ASSERTIONS, ONE SESSION, IN ORDER
  * ============================================================================
  * The window opens, the first-run welcome is shown, Settings opens, and the
  * Privacy section is visible. Then an observer goes into the page, a generated
  * PDF is parsed by the app's own pdf.js, the real worker is proved to have run,
- * and the whole run is adjudicated for Content-Security-Policy violations. They
- * share one app session and each moves it along, so they run in declaration
- * order — `node:test` guarantees that within a file. No API key, no network:
- * everything asserted here is true of a machine that has never seen this app
- * and is offline.
+ * the whole run is adjudicated for Content-Security-Policy violations, and
+ * finally a generated SCAN — real pages, no text layer — goes through the same
+ * pdf.js under the same policy. They share one app session and each moves it
+ * along, so they run in declaration order — `node:test` guarantees that within a
+ * file. No API key, no network: everything asserted here is true of a machine
+ * that has never seen this app and is offline.
  *
  * ============================================================================
  * WHY THE PDF HALF EXISTS (L-103)
@@ -62,6 +63,58 @@
  *
  * So this drives the real binary through a real PDF and watches what the page
  * says while it happens.
+ *
+ * ============================================================================
+ * WHY THE SCANNED HALF EXISTS, AND WHY NO FIXTURE COULD DO BETTER (L-104)
+ * ============================================================================
+ * L-103's fixture is a TEXT PDF, and text extraction never reaches an image
+ * decoder. The image decoders — JBIG2 and JPEG2000 — are the actual WebAssembly
+ * callers named above, so the one document class that could still trip
+ * `script-src 'self'` was the one class never driven: a scan. "Text extraction
+ * should not reach those paths" was, again, reasoning.
+ *
+ * So `makeScannedPdf` is parsed here too, in the same session, under the same
+ * policy, and what the WASM probe saw is printed either way. That is the
+ * EXECUTED half: a document with real pages and no text layer goes through the
+ * packaged app's own pdf.js, and the policy refuses nothing.
+ *
+ * The other half is STRUCTURAL, and it is the stronger of the two, because it
+ * holds for every document rather than for one fixture. The image decoders are
+ * unreachable from this app BY CONSTRUCTION, behind two independent barriers:
+ *
+ *   1. NOTHING CAN ASK FOR A RENDER. `PdfPageLike`
+ *      (packages/cv-parsing/src/pdfjs.ts:51-53) declares exactly one method,
+ *      `getTextContent()`. There is no `render` and no `getOperatorList` on this
+ *      app's own type for a page, so a call to either does not compile. The only
+ *      page loop in the codebase, `harvestPages`
+ *      (packages/cv-parsing/src/pdf.ts:97-113), calls `getPage()` and then
+ *      `getTextContent()`, and nothing else. pdfjs.ts:190-192 already says it in
+ *      words: "we never draw a page".
+ *   2. THE DECODER MODULES ARE NOT SHIPPED. `configurePdfJsAssets`
+ *      (apps/light/src/parsing/pdfjs-assets.ts:58-69) sets `workerSrc`,
+ *      `cMapUrl` and `standardFontDataUrl` and deliberately leaves `wasmUrl` and
+ *      `iccUrl` unset, so `pdfDocumentInit` (pdfjs.ts:198-212) omits both keys
+ *      and pdf.js has no decoder module to fetch in the first place.
+ *
+ * Swept for counter-examples rather than assumed: the only `.render(` in shipped
+ * source is `ReactDOM.createRoot(...).render(` (apps/light/src/main.tsx:18), and
+ * there is no `getOperatorList`, canvas, `drawImage`, `ImageData`,
+ * `createImageBitmap`, `OffscreenCanvas` or `toDataURL` anywhere under
+ * `packages/` or `apps/light/src/`. pdfjs-dist has exactly two production
+ * importers — the loader at pdfjs.ts:123 and the worker URL at
+ * pdfjs-assets.ts:31. No preview, no thumbnail, no second consumer.
+ *
+ * WHICH MAKES THE FIXTURE'S LIMIT A NON-ISSUE, AND IT IS STILL WORTH STATING.
+ * `makeScannedPdf`'s pages carry `0.5 g 0 0 612 792 re f` — a grey VECTOR
+ * rectangle, not an encoded image — because what its unit tests need is the
+ * property a scan has (`numPages > 0`, no text items) and not a JPEG. So this
+ * spec does not drive a JBIG2, JPX or DCTDecode stream. Embedding one to force
+ * that would be testing pdf.js rather than testing this app, down a path
+ * barrier 1 makes unreachable regardless. The honest claim is the pair:
+ * no-text-layer documents are EXECUTED clean under the policy, and image
+ * decoding is EXCLUDED by construction. Should a page preview ever land — the
+ * note at pdfjs-assets.ts:62 anticipates exactly that — barrier 2 falls,
+ * `wasmUrl` gets set, and this reasoning must be redone against a real raster.
  *
  * ============================================================================
  * THE APP'S OWN UPLOAD BUTTON CANNOT BE DRIVEN, AND THAT IS BY DESIGN
@@ -102,7 +155,7 @@ import { Builder, By, Capabilities, until, type WebDriver } from 'selenium-webdr
 // emits an uncompressed ~600-byte PDF with a real, computed xref table, from
 // source a person can read. No binary fixture is ever committed here — see the
 // header of that file for why.
-import { makeMinimalPdf } from '../../../packages/cv-parsing/src/test/fixtures.ts';
+import { makeMinimalPdf, makeScannedPdf } from '../../../packages/cv-parsing/src/test/fixtures.ts';
 
 /**
  * The port the app's own WebDriver server listens on.
@@ -423,11 +476,16 @@ return 'installed';
  * a second call rather than returned from an async script, so this does not
  * depend on the plugin's `execute/async` behaving; a synchronous script and a
  * poll work the same way on every implementation.
+ *
+ * The slot it parks in is named by `arguments[1]`, defaulting to L-103's, so a
+ * second document (L-104's scan) can be driven through this same script without
+ * the two runs overwriting each other's result.
  */
 const RUN_PDF_PARSE = String.raw`
 const base64 = arguments[0];
+const resultKey = arguments[1] || '__l103run';
 const w = window;
-w.__l103run = { state: 'running' };
+w[resultKey] = { state: 'running' };
 
 (async function () {
   try {
@@ -492,7 +550,7 @@ w.__l103run = { state: 'running' };
     const pageCount = doc.numPages;
     await task.destroy();
 
-    w.__l103run = {
+    w[resultKey] = {
       state: 'done',
       text: text,
       pageCount: pageCount,
@@ -502,7 +560,7 @@ w.__l103run = { state: 'running' };
       cmapProbe: cmapProbe.status,
     };
   } catch (error) {
-    w.__l103run = { state: 'failed', error: String((error && error.stack) || error) };
+    w[resultKey] = { state: 'failed', error: String((error && error.stack) || error) };
   }
 })();
 
@@ -520,6 +578,26 @@ function seen(): PageObservations {
   }
   return observations;
 }
+
+// ── L-104: the scanned document, under the same policy ──────────────────────
+
+/**
+ * Pages in the generated scan.
+ *
+ * Two rather than one, so a run that silently reparsed L-103's one-page text
+ * fixture cannot satisfy this test: the page count tells the two documents
+ * apart on its own, and without that the violation check could come back green
+ * for the wrong document.
+ */
+const SCANNED_PAGE_COUNT = 2;
+
+/**
+ * Where the scanned run parks its result.
+ *
+ * A slot of its own. L-103's assertions read `__l103run` and a shared slot
+ * would make each run's result depend on the order of the other.
+ */
+const SCANNED_RESULT_KEY = '__l104run';
 
 describe('the built CViper Light binary', () => {
   before(
@@ -709,4 +787,86 @@ describe('the built CViper Light binary', () => {
       `The page logged a Content-Security-Policy refusal:\n${refusals.join('\n')}`,
     );
   });
+
+  // ── L-104: the scanned document, under the same policy ────────────────────
+
+  it(
+    'parses a generated scan — pages, no text layer — with no policy violation',
+    { timeout: 180_000 },
+    async () => {
+      const scanned = makeScannedPdf(SCANNED_PAGE_COUNT);
+      const earlier = seen();
+
+      const started = await session().executeScript<string>(
+        RUN_PDF_PARSE,
+        Buffer.from(scanned).toString('base64'),
+        SCANNED_RESULT_KEY,
+      );
+      assert.equal(started, 'started');
+
+      await session().wait(async () => {
+        const state = await session().executeScript<string | null>(
+          `return window.${SCANNED_RESULT_KEY} ? window.${SCANNED_RESULT_KEY}.state : null;`,
+        );
+        return state === 'done' || state === 'failed';
+      }, PARSE_TIMEOUT);
+
+      const scanRun = await session().executeScript<ParseRun>(
+        `return window.${SCANNED_RESULT_KEY};`,
+      );
+
+      // Read FRESH rather than reusing L-103's snapshot. The observer's record
+      // is one accumulating object, so this is everything the page has seen
+      // across BOTH parses; sliced against the earlier snapshot, what is left is
+      // what this parse alone caused.
+      const total = await session().executeScript<PageObservations>('return window.__l103;');
+      const newConsole = total.console.slice(earlier.console.length);
+      const newWorkers = total.workers.slice(earlier.workers.length);
+
+      // Printed unconditionally, before any assertion can end the test.
+      console.log(
+        `smoke: scan run   = state=${scanRun.state} pages=${String(scanRun.pageCount)} ` +
+          `chars=${String(scanRun.text?.length)} font=${String(scanRun.fontProbe)} ` +
+          `cmap=${String(scanRun.cmapProbe)}`,
+      );
+      console.log(`smoke: scan workers    = ${JSON.stringify(newWorkers)}`);
+      // REPORTED, NOT ASSERTED. Whether pdf.js reaches for WebAssembly on a
+      // document with no text layer is the open question this run answers out
+      // loud; pinning it to `[]` would freeze today's answer into a rule. The
+      // assertion that matters is the violation check below — a refused
+      // `WebAssembly.compile` raises `script-src`, and that is caught there.
+      console.log(`smoke: scan wasm calls = ${JSON.stringify(total.wasm)}`);
+      console.log(`smoke: scan violations = ${JSON.stringify(total.violations)}`);
+      for (const line of newConsole) console.log(`smoke: scan page > ${line}`);
+
+      assert.equal(
+        scanRun.state,
+        'done',
+        `the in-page scanned-PDF parse failed: ${scanRun.error ?? '(no detail reported)'}`,
+      );
+
+      // Two pages and not one character of text: proof this was the SCAN, not a
+      // silent second run of the one-page text fixture. Without it the violation
+      // check could pass on the wrong document.
+      assert.equal(scanRun.pageCount, SCANNED_PAGE_COUNT);
+      assert.equal(
+        scanRun.text,
+        '',
+        'a scan has no text layer, so pdf.js should have returned no text items. ' +
+          `Got: ${JSON.stringify(scanRun.text)}`,
+      );
+
+      // THE assertion. Cumulative, so a violation raised by either parse fails
+      // here; L-103's own check reads its snapshot from before this parse
+      // existed, so that one stays answerable for the text PDF alone.
+      assert.deepEqual(
+        total.violations,
+        [],
+        'The policy refused something while the app parsed a SCANNED PDF:\n' +
+          total.violations
+            .map((entry) => `  ${entry.directive} blocked ${entry.blocked} (${entry.source})`)
+            .join('\n'),
+      );
+    },
+  );
 });
