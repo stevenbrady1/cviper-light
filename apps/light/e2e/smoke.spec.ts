@@ -1,5 +1,5 @@
 /**
- * Four questions asked of the REAL built binary (L-88).
+ * Eight questions asked of the REAL built binary (L-88, extended by L-103).
  *
  * ============================================================================
  * WHY THIS EXISTS
@@ -35,16 +35,58 @@
  *      which is the difference between a useful red and a confusing one.
  *
  * ============================================================================
- * FOUR ASSERTIONS, ONE SESSION, IN ORDER
+ * EIGHT ASSERTIONS, ONE SESSION, IN ORDER
  * ============================================================================
  * The window opens, the first-run welcome is shown, Settings opens, and the
- * Privacy section is visible. They share one app session and each moves it
- * along, so they run in declaration order — `node:test` guarantees that within
- * a file. Four cheap questions, no API key, no network: everything asserted
- * here is true of a machine that has never seen this app and is offline.
+ * Privacy section is visible. Then an observer goes into the page, a generated
+ * PDF is parsed by the app's own pdf.js, the real worker is proved to have run,
+ * and the whole run is adjudicated for Content-Security-Policy violations. They
+ * share one app session and each moves it along, so they run in declaration
+ * order — `node:test` guarantees that within a file. No API key, no network:
+ * everything asserted here is true of a machine that has never seen this app
+ * and is offline.
  *
- * The point is NOT coverage. It is that the binary starts, paints, and
- * responds to a click. Everything deeper is cheaper to test in Vitest, and is.
+ * ============================================================================
+ * WHY THE PDF HALF EXISTS (L-103)
+ * ============================================================================
+ * PR #32 replaced `"csp": null` with a real policy. The four assertions above
+ * exercise it for app START and NAVIGATION, and nothing else — so the policy
+ * was proven for the two cheapest things it governs and unproven for the one
+ * reviewers actually flagged. pdf.js runs a worker and calls
+ * `WebAssembly.instantiate` for JBIG2, OpenJPEG and ICC, and `script-src 'self'`
+ * blocks WASM compilation without `'wasm-unsafe-eval'`. The standing argument
+ * is that `wasmUrl` is left unset so those paths degrade to a warning — which
+ * is REASONING, and `csp.contract.test.ts` can only assert it BY CONSTRUCTION,
+ * because a CSP breaks things in a built app and nothing else. A policy never
+ * executed against the feature most likely to break it is a configuration file.
+ *
+ * So this drives the real binary through a real PDF and watches what the page
+ * says while it happens.
+ *
+ * ============================================================================
+ * THE APP'S OWN UPLOAD BUTTON CANNOT BE DRIVEN, AND THAT IS BY DESIGN
+ * ============================================================================
+ * `analysis-upload` calls `pick_and_read_cv`, which opens the OS file dialog
+ * in RUST (`src-tauri/src/files.rs`) precisely so that JavaScript can never
+ * name a path. A WebDriver session lives inside the web view and cannot touch a
+ * native dialog, so that route ends at a modal this spec cannot answer. The
+ * second ingestion route, the `cv-opened` event, is compiled only for macOS,
+ * iOS and Android (`lib.rs`), and this job runs on Windows. There is therefore
+ * NO non-dialog path into `Analysis.tsx`'s `ingest()` on this platform, and
+ * manufacturing one would mean either automating a native dialog with
+ * keystrokes or shipping a test-only seam in the web bundle — and that bundle
+ * is the same one the CLEAN installer carries, so the seam would reach users.
+ *
+ * What is driven instead is the app's OWN pdf.js: the chunk Vite emitted, the
+ * worker Vite emitted, the font and cmap directories the Vite plugin copied,
+ * inside the built binary, under the shipped policy. Every CSP-relevant thing
+ * `extractText` would do is done here. What is NOT covered is the React wiring
+ * between the dialog and `extractText`, which `Analysis.test.tsx` covers in
+ * jsdom and no CSP can affect. That gap is stated rather than papered over.
+ *
+ * The point is NOT coverage. It is that the binary starts, paints, responds to
+ * a click, and reads a PDF without the policy refusing anything. Everything
+ * deeper is cheaper to test in Vitest, and is.
  */
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -55,6 +97,12 @@ import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { Builder, By, Capabilities, until, type WebDriver } from 'selenium-webdriver';
+
+// The repository's own fixture builder, reused rather than re-implemented: it
+// emits an uncompressed ~600-byte PDF with a real, computed xref table, from
+// source a person can read. No binary fixture is ever committed here — see the
+// header of that file for why.
+import { makeMinimalPdf } from '../../../packages/cv-parsing/src/test/fixtures.ts';
 
 /**
  * The port the app's own WebDriver server listens on.
@@ -211,6 +259,268 @@ async function click(selector: string): Promise<void> {
   await element.click();
 }
 
+// ── L-103: the PDF path, under the policy ───────────────────────────────────
+
+/** How long the in-page parse may take. A cold worker start on CI is slow. */
+const PARSE_TIMEOUT = 90_000;
+
+/**
+ * The text drawn into the generated PDF, and looked for in what comes back.
+ *
+ * Deliberately a string that appears NOWHERE else in the app. A sentinel like
+ * "Analyst" could already be on screen or in the bundle, and an assertion that
+ * can pass without anything having been parsed is not an assertion.
+ */
+const PDF_SENTINEL = 'L103 Sentinel Reinsurance Pricing Actuary Vellichor';
+
+/** Console text that means the policy refused something. */
+const CSP_IN_CONSOLE = /Refused to |Content Security Policy|violated directive/i;
+
+interface CspViolation {
+  readonly directive: string;
+  readonly blocked: string;
+  readonly source: string;
+}
+
+/** What the in-page observer saw. */
+interface PageObservations {
+  readonly console: readonly string[];
+  readonly violations: readonly CspViolation[];
+  readonly workers: readonly string[];
+  readonly wasm: readonly string[];
+}
+
+/** The result of the in-page parse. */
+interface ParseRun {
+  readonly state: 'running' | 'done' | 'failed';
+  readonly error?: string;
+  readonly text?: string;
+  readonly pageCount?: number;
+  readonly chunkUrl?: string;
+  readonly workerUrl?: string;
+  readonly fontProbe?: number;
+  readonly cmapProbe?: number;
+}
+
+/**
+ * Install the observer.
+ *
+ * ==========================================================================
+ * THE PAGE HAS TO WATCH ITSELF. THERE IS NO LOG ENDPOINT TO ASK.
+ * ==========================================================================
+ * W3C WebDriver has no console-log command, and `tauri-plugin-wdio-webdriver`
+ * implements none either — its 47 endpoints cover elements, scripts, cookies
+ * and actions, and nothing that reads what the page printed. So the console is
+ * captured by patching it from inside, which is the only mechanism available.
+ *
+ * `securitypolicyviolation` is the authoritative half, and it is the half that
+ * was PROVEN to bite. A CSP breakage very often does NOT throw: the resource is
+ * simply refused, the feature quietly does less, and the only trace is this
+ * event. It fires on the document for anything the document initiated —
+ * including a worker script the policy refuses — and carries the directive by
+ * name, which a scrape of console text can only guess at.
+ *
+ * WHICH HALF ACTUALLY CATCHES A VIOLATION, SETTLED BY EXPERIMENT. A page-side
+ * `fetch` to a host `connect-src` does not allow was planted in this function
+ * and the run went red naming `connect-src` — while the captured console buffer
+ * came back EMPTY. WebView2 emits a CSP refusal from the renderer itself rather
+ * than through the page's `console` object, so the console scrape alone would
+ * have been inert for exactly the class of failure this file exists to catch.
+ *
+ * Both are kept. The scrape is not decoration: it catches the messages the APP
+ * emits, and the loudest of those is pdf.js announcing it is "setting up fake
+ * worker" — the degradation that looks like success. But the listener is the
+ * one carrying the weight, and a future author tempted to drop it for the
+ * simpler-looking string match should read this paragraph first.
+ *
+ * `Worker` is proxied because "pdf.js worked" and "pdf.js fell back to running
+ * in the main thread because it could not start its worker" print almost the
+ * same thing and differ entirely. Recording the constructed worker URL settles
+ * it as a fact.
+ *
+ * `WebAssembly` is proxied to turn the `wasmUrl`-is-unset premise from an
+ * argument into an observation: whatever pdf.js does or does not attempt, the
+ * run says so out loud.
+ *
+ * LIMITATION, stated rather than discovered later: this is installed once the
+ * driver has a session, so anything refused during first paint is already gone,
+ * and a violation raised INSIDE the worker's own global scope fires there, not
+ * here. The worker-URL record is what covers the second gap — a worker that was
+ * refused never gets constructed.
+ */
+const INSTALL_OBSERVER = String.raw`
+const w = window;
+if (w.__l103 !== undefined) return 'already-installed';
+
+const record = { console: [], violations: [], workers: [], wasm: [] };
+w.__l103 = record;
+
+for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
+  const original = console[level].bind(console);
+  console[level] = function () {
+    const args = Array.prototype.slice.call(arguments);
+    try {
+      record.console.push(level + ': ' + args.map(function (a) { return String(a); }).join(' '));
+    } catch (e) {
+      record.console.push(level + ': <an argument that could not be stringified>');
+    }
+    return original.apply(console, args);
+  };
+}
+
+document.addEventListener('securitypolicyviolation', function (event) {
+  record.violations.push({
+    directive: String(event.violatedDirective),
+    blocked: String(event.blockedURI),
+    source: String(event.sourceFile) + ':' + String(event.lineNumber),
+  });
+});
+
+const NativeWorker = w.Worker;
+w.Worker = new Proxy(NativeWorker, {
+  construct: function (target, args) {
+    record.workers.push(String(args[0]));
+    return Reflect.construct(target, args);
+  },
+});
+
+for (const name of ['instantiate', 'instantiateStreaming', 'compile', 'compileStreaming']) {
+  const original = WebAssembly[name];
+  if (typeof original !== 'function') continue;
+  WebAssembly[name] = function () {
+    record.wasm.push(name);
+    return original.apply(WebAssembly, arguments);
+  };
+}
+
+return 'installed';
+`;
+
+/**
+ * Parse the PDF, in the page, with the app's own pdf.js.
+ *
+ * ==========================================================================
+ * THE ASSET URLS ARE DISCOVERED FROM THE BUNDLE, NOT GUESSED.
+ * ==========================================================================
+ * Vite hashes both the pdf.js chunk and the worker, so a name pinned here
+ * would go stale at the next build and fail as "no PDF support" rather than as
+ * "the test is out of date". They are read out of the entry chunk the page
+ * actually loaded: `pdfjs.ts` reaches pdf.js through `import('pdfjs-dist')`, so
+ * Vite emits it as its own chunk, and `pdfjs-assets.ts` imports the worker with
+ * `?url`, so that address is a literal in the same file. A miss throws with the
+ * URL it read and how many bytes it got, so a wrong guess can never look like a
+ * missing feature.
+ *
+ * The import resolves to the module instance the app would itself have used —
+ * same URL, same module map — so this is the shipped pdf.js, not a second copy.
+ *
+ * The two probes fetch a real font and a real cmap before parsing. They are
+ * cheap and they are the half a `getDocument` call would not reach on a Latin-1
+ * PDF: `connect-src 'self'` governs them, and a policy that refused them would
+ * break a CJK or Word-exported CV and nothing else.
+ *
+ * FIRE AND FORGET, THEN POLL. The result is parked on `window` and read back by
+ * a second call rather than returned from an async script, so this does not
+ * depend on the plugin's `execute/async` behaving; a synchronous script and a
+ * poll work the same way on every implementation.
+ */
+const RUN_PDF_PARSE = String.raw`
+const base64 = arguments[0];
+const w = window;
+w.__l103run = { state: 'running' };
+
+(async function () {
+  try {
+    const tag = document.querySelector('script[type="module"][src]');
+    if (tag === null) {
+      throw new Error('the page has no module <script src>, so the bundle cannot be located');
+    }
+    const entryUrl = tag.src;
+
+    const response = await fetch(entryUrl);
+    if (!response.ok) {
+      throw new Error('fetching the entry chunk ' + entryUrl + ' answered ' + response.status);
+    }
+    const entryText = await response.text();
+
+    const chunkMatch = entryText.match(/["'\x60](\.\/pdf-[A-Za-z0-9_-]+\.js)["'\x60]/);
+    if (chunkMatch === null) {
+      throw new Error(
+        'no ./pdf-<hash>.js dynamic-import literal in ' + entryUrl +
+          ' (' + entryText.length + ' bytes read)'
+      );
+    }
+    const workerMatch = entryText.match(/["'\x60](\/assets\/pdf\.worker[A-Za-z0-9_.\-]*\.mjs)["'\x60]/);
+    if (workerMatch === null) {
+      throw new Error('no /assets/pdf.worker-<hash>.mjs literal in ' + entryUrl);
+    }
+
+    const chunkUrl = new URL(chunkMatch[1], entryUrl).href;
+    const workerUrl = workerMatch[1];
+
+    const pdfjs = await import(chunkUrl);
+    if (typeof pdfjs.getDocument !== 'function') {
+      throw new Error(
+        chunkUrl + ' is not pdf.js: its exports are ' + Object.keys(pdfjs).join(',')
+      );
+    }
+    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+
+    const fontProbe = await fetch('/pdfjs/standard_fonts/FoxitSerif.pfb');
+    const cmapProbe = await fetch('/pdfjs/cmaps/78-EUC-H.bcmap');
+
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+
+    const task = pdfjs.getDocument({
+      data: bytes,
+      isEvalSupported: false,
+      cMapUrl: '/pdfjs/cmaps/',
+      cMapPacked: true,
+      standardFontDataUrl: '/pdfjs/standard_fonts/',
+    });
+
+    const doc = await task.promise;
+    let text = '';
+    for (let page = 1; page <= doc.numPages; page += 1) {
+      const content = await (await doc.getPage(page)).getTextContent();
+      for (const item of content.items) {
+        if (typeof item.str === 'string') text += item.str;
+      }
+    }
+    const pageCount = doc.numPages;
+    await task.destroy();
+
+    w.__l103run = {
+      state: 'done',
+      text: text,
+      pageCount: pageCount,
+      chunkUrl: chunkUrl,
+      workerUrl: workerUrl,
+      fontProbe: fontProbe.status,
+      cmapProbe: cmapProbe.status,
+    };
+  } catch (error) {
+    w.__l103run = { state: 'failed', error: String((error && error.stack) || error) };
+  }
+})();
+
+return 'started';
+`;
+
+/** Filled by the PDF test, read by the two that adjudicate it. */
+let observations: PageObservations | undefined;
+let parseRun: ParseRun | undefined;
+
+/** The observations, or a sentence saying why there are none. */
+function seen(): PageObservations {
+  if (observations === undefined) {
+    throw new Error('No page observations — the PDF parse test did not complete.');
+  }
+  return observations;
+}
+
 describe('the built CViper Light binary', () => {
   before(
     async () => {
@@ -293,5 +603,110 @@ describe('the built CViper Light binary', () => {
 
   it('shows the Privacy section in Settings', { timeout: 60_000 }, async () => {
     await visible('[data-testid="privacy-notice"]');
+  });
+
+  // ── L-103: the PDF path, under the policy ─────────────────────────────────
+
+  it('runs script in the page and installs the observer', { timeout: 60_000 }, async () => {
+    const installed = await session().executeScript<string>(INSTALL_OBSERVER);
+    assert.equal(
+      installed,
+      'installed',
+      'The observer did not install, which would leave every assertion below reading nothing.',
+    );
+  });
+
+  it('parses a generated PDF CV with the app’s own pdf.js', { timeout: 180_000 }, async () => {
+    const pdf = makeMinimalPdf(PDF_SENTINEL);
+
+    const started = await session().executeScript<string>(
+      RUN_PDF_PARSE,
+      Buffer.from(pdf).toString('base64'),
+    );
+    assert.equal(started, 'started');
+
+    await session().wait(async () => {
+      const state = await session().executeScript<string | null>(
+        'return window.__l103run ? window.__l103run.state : null;',
+      );
+      return state === 'done' || state === 'failed';
+    }, PARSE_TIMEOUT);
+
+    parseRun = await session().executeScript<ParseRun>('return window.__l103run;');
+    observations = await session().executeScript<PageObservations>('return window.__l103;');
+
+    // Printed unconditionally, before any assertion can end the test. A red run
+    // is read out of the CI log, and this is the only place any of it exists.
+    console.log(
+      `smoke: pdf run    = state=${parseRun.state} pages=${String(parseRun.pageCount)} ` +
+        `chars=${String(parseRun.text?.length)} font=${String(parseRun.fontProbe)} ` +
+        `cmap=${String(parseRun.cmapProbe)}`,
+    );
+    console.log(`smoke: pdf chunk  = ${String(parseRun.chunkUrl)}`);
+    console.log(`smoke: pdf worker = ${String(parseRun.workerUrl)}`);
+    console.log(`smoke: workers    = ${JSON.stringify(seen().workers)}`);
+    console.log(`smoke: wasm calls = ${JSON.stringify(seen().wasm)}`);
+    console.log(`smoke: violations = ${JSON.stringify(seen().violations)}`);
+    for (const line of seen().console) console.log(`smoke: page > ${line}`);
+
+    assert.equal(
+      parseRun.state,
+      'done',
+      `the in-page PDF parse failed: ${parseRun.error ?? '(no detail reported)'}`,
+    );
+    assert.equal(parseRun.pageCount, 1);
+    assert.ok(
+      parseRun.text?.includes(PDF_SENTINEL),
+      `the extracted text did not contain the sentinel. Got: ${JSON.stringify(parseRun.text)}`,
+    );
+    // The two directories the Vite plugin copies. A CV exported from Word leans
+    // on the standard-14 metrics and a CJK one needs the cmaps, so a policy or
+    // a build that refused these would break real CVs and no Latin-1 fixture.
+    assert.equal(parseRun.fontProbe, 200, 'the standard-font directory was not served');
+    assert.equal(parseRun.cmapProbe, 200, 'the cmap directory was not served');
+  });
+
+  it('drove pdf.js through its real, same-origin worker', { timeout: 60_000 }, async () => {
+    const workers = seen().workers;
+    const pdfWorkers = workers.filter((url) => /\/assets\/pdf\.worker/.test(url));
+
+    assert.ok(
+      pdfWorkers.length > 0,
+      'pdf.js constructed no worker at all. It falls back to running in the main thread when ' +
+        'the worker cannot start — which is exactly what `worker-src` refusing the script looks ' +
+        'like — and the text still comes out either way, so this is the only thing that tells ' +
+        `the two apart. Workers seen: ${JSON.stringify(workers)}`,
+    );
+
+    for (const url of pdfWorkers) {
+      assert.ok(
+        !url.startsWith('blob:'),
+        `pdf.js wrapped its worker in a blob: URL (${url}), which it only does when it judges ` +
+          'the script cross-origin. The policy names no blob: source, so a shipped build would ' +
+          'refuse it. See the same-origin note in packages/cv-parsing/src/pdfjs.ts.',
+      );
+    }
+  });
+
+  it('finished with no Content-Security-Policy violation', { timeout: 60_000 }, async () => {
+    // THE assertion this whole half exists for. A CSP breakage usually does not
+    // throw — the resource is refused, the feature quietly does less, and the
+    // only trace is this event and a console line.
+    const violations = seen().violations;
+    assert.deepEqual(
+      violations,
+      [],
+      'The policy refused something while the app parsed a PDF:\n' +
+        violations
+          .map((entry) => `  ${entry.directive} blocked ${entry.blocked} (${entry.source})`)
+          .join('\n'),
+    );
+
+    const refusals = seen().console.filter((line) => CSP_IN_CONSOLE.test(line));
+    assert.deepEqual(
+      refusals,
+      [],
+      `The page logged a Content-Security-Policy refusal:\n${refusals.join('\n')}`,
+    );
   });
 });
