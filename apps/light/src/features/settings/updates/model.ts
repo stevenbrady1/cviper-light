@@ -58,9 +58,9 @@ export function nextStateAfterCheck(result: Result<UpdateInfo | null, UpdateProb
  *
  * The failure branch passes the port's own message through untouched. Those
  * messages name the cause — no network, an unverifiable signature, a release
- * feed that is not there — and on a build carrying the placeholder signing key
- * the message IS the diagnosis. Replacing it with "update check failed" would
- * leave the reader with nothing to act on.
+ * feed that is not there — and when a signature will not verify the message IS
+ * the diagnosis. Replacing it with "update check failed" would leave the reader
+ * with nothing to act on.
  */
 export function describeUpdateState(state: UpdateState, currentVersion: string): string | null {
   switch (state.kind) {
