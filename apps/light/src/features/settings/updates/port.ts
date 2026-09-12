@@ -39,13 +39,18 @@ export interface UpdatePort {
 /**
  * Whatever the plugin threw, as a sentence.
  *
- * The three cases worth naming are the three that actually happen: no network,
- * no release feed yet, and a signature that will not verify — which is what a
- * build whose baked-in pubkey does not match the key the release was signed
- * with produces. The key in `tauri.conf.json` is real (minisign id
- * 7029FCBC6B4F158F) and its private half is in this repository's Actions
- * secrets, so a correctly signed release verifies; a mismatch is still worth a
- * sentence the user can act on.
+ * The four cases worth naming are the four that actually happen: no network, no
+ * release feed yet, a manifest that will not parse, and a signature that will
+ * not verify — the last being what a build whose baked-in pubkey does not match
+ * the key the release was signed with produces. The key in `tauri.conf.json` is
+ * real (minisign id 7029FCBC6B4F158F) and its private half is in this
+ * repository's Actions secrets, so a correctly signed release verifies; a
+ * mismatch is still worth a sentence the user can act on.
+ *
+ * The parse case became worth naming when the endpoint moved to a fixed URL
+ * whose asset is REPLACED on every release (L-92): a half-finished upload of
+ * `latest.json` is now a state the endpoint can genuinely be in, and serde's
+ * "expected value at line 1 column 1" means nothing to the person reading it.
  */
 export function describeUpdateFailure(thrown: unknown): UpdateProblem {
   const raw = thrown instanceof Error ? thrown.message : String(thrown);
@@ -65,6 +70,22 @@ export function describeUpdateFailure(thrown: unknown): UpdateProblem {
       message:
         'There are no published releases to compare against yet. Nothing is ' +
         'wrong with your copy.',
+    };
+  }
+
+  if (
+    lower.includes('expected value') ||
+    lower.includes('deserializ') ||
+    lower.includes('unexpected token') ||
+    lower.includes('invalid type') ||
+    lower.includes('eof while parsing') ||
+    lower.includes('json')
+  ) {
+    return {
+      message:
+        'The release information could not be read, so this check could not ' +
+        'finish and nothing was downloaded. Your copy of CViper Light is fine — ' +
+        'try again shortly.',
     };
   }
 

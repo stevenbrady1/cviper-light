@@ -149,15 +149,20 @@ describe('the list of what the app can contact is complete', () => {
     expect(item.textContent).toContain('cannot switch them off');
   });
 
-  it('the telemetry note now names the fetch as one of the requests', () => {
-    // The sentence this work item corrected. It listed a job search, a CV check
-    // and an update check, and omitted the one request that goes to a site the
-    // app has never spoken to before.
+  it('the telemetry note names the fetch AND the check that happens on launch', () => {
+    // L-91 corrected this sentence to include the advert fetch, which goes to a
+    // site the app has never spoken to before. L-92 corrected it again, and for
+    // a sharper reason: "the ones you START" stopped being true the moment an
+    // update check could happen at startup. A request the user CONSENTED to by
+    // leaving a switch on is not one they started, and quietly filing it under
+    // "ones you start" would be the screen telling a small lie about itself.
     renderSettings();
 
     const copy = screen.getByTestId('view-settings').textContent ?? '';
-    expect(copy).toContain('The only requests it ever makes are the ones you start');
+    expect(copy).toContain('The only requests it ever makes are ones you start or switched on');
     expect(copy).toContain('a job advert you ask it to fetch');
+    // Named explicitly, with when it happens and how to stop it.
+    expect(copy).toContain('once at startup');
   });
 
   it('the generated policy document carries the capabilities too', () => {

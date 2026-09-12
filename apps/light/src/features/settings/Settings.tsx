@@ -454,9 +454,10 @@ export function Settings({
 
             <p className="mt-1 text-xs text-ink-faint">
               There is no analytics library in this application, no crash reporter and no account.
-              The only requests it ever makes are the ones you start: a job search, a CV check
-              against a provider you chose, an update check you press, and a job advert you ask it
-              to fetch.
+              The only requests it ever makes are ones you start or switched on: a job search, a CV
+              check against a provider you chose, a job advert you ask it to fetch, and an update
+              check — when you press the button, and once at startup unless you switch that off
+              under Updates.
             </p>
 
             <PrivacyNotice />

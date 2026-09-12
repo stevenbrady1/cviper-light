@@ -32,7 +32,7 @@ These carry a key you pasted into Settings, under an account that is yours. The 
 
 A plain request with nothing about you in it beyond the request itself.
 
-- `github.com` — The update check reads a small signed file from this app’s public GitHub releases. It happens when you press “Check for updates”, and carries no data about you beyond the request itself. The source code is also opened in your browser from Settings → About.
+- `github.com` — The update check reads a small signed file from this app’s public GitHub releases. It happens when you press “Check for updates”, and once when the app starts unless you switch that off in Settings. It carries no data about you beyond the request itself. The source code is also opened in your browser from Settings → About.
 - **any job-advert page you ask it to open — only when you press Fetch** — You paste a link and press Fetch, and the app reads that one page so it can fill in the form. The address is whichever one you pasted, so it cannot be listed here in advance. It carries no cookies, no sign-in and no key, it cannot reach your saved keys, it follows no links, and addresses on your own computer or home network are refused. The site sees your IP address, exactly as it would if you had clicked the link yourself.
 
 ### Opened in your browser, never by the app

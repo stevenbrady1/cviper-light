@@ -11,8 +11,9 @@ view, the job-board clients (Adzuna and Reed request building, response
 normalisation, cross-post detection, the nine configurable keyless browser
 links and the daily request budget), the job search view, the API-key setup
 wizard, pasted-advert extraction and the review form it fills, fetching one
-advert from a link and the guards around it, the manual update check, the
-first-run introduction and the app icon. There are no placeholder views left.
+advert from a link and the guards around it, the update check and the switch
+that decides whether it runs at launch, the first-run introduction and the app
+icon. There are no placeholder views left.
 
 **Not built, and marked as such below**: accounts, sync and telemetry — all
 three deliberate — and the CV parsing column, where extraction is done and
@@ -27,33 +28,33 @@ installed copy from accepting any future update, permanently. See
 
 `apps/cloud` is an empty stub directory. There is no cloud code of any kind.
 
-| Feature                         | Light                                            | Cloud (future)                     | State                     |
-| ------------------------------- | ------------------------------------------------ | ---------------------------------- | ------------------------- |
-| Job search (Adzuna/Reed)        | Yes — user's own API keys, direct calls          | Yes — server-side, shared keys     | Built                     |
-| Cross-post detection            | Yes — flags duplicates, never merges             | Yes — merges, with a server undo   | Built                     |
-| Keyless browser search links    | Yes — nine UK boards, opens in browser           | Not applicable                     | Built                     |
-| Job-board list, user-edited     | Yes — enable, reorder, add your own              | Not applicable                     | Built                     |
-| API key setup                   | Yes — tested before saved, never read back       | Not applicable                     | Built                     |
-| Application tracker             | Yes — local SQLite                               | Yes — synced                       | Built                     |
-| Paste a job advert              | Yes — AI reads it, you check every box           | Yes — server-side                  | Built                     |
-| Fetch an advert from a link     | Yes — one page, on request, no credentials       | Yes — server-side, no user IP      | Built                     |
-| A link pasted in the advert box | Yes — spotted, never sent to a model             | No — not built there               | Built                     |
-| CV parsing                      | Yes — fully local                                | Yes — server-side                  | Extraction built          |
-| JSON Resume import              | Yes — any JSON Resume 1.0 file, read here        | Yes — server-side                  | Built                     |
-| JSON Resume export              | Yes — the file it came in as, `meta.cviper` only | Planned — cviper.ai/import         | Built                     |
-| CV analysis (BYO key)           | Yes — user's own provider key                    | Not applicable                     | Built                     |
-| CV analysis (local Ollama)      | Yes — offline, no key, no network                | No                                 | Built                     |
-| Keyword-only analysis           | Yes — no AI, no key, always available            | Yes                                | Built                     |
-| Data export/import              | Yes — user-initiated file in/out                 | Yes — plus migration to/from Light | Built                     |
-| Delete everything               | Yes — database, keys and preferences             | Yes — account deletion             | Built                     |
-| Privacy notice                  | Yes — generated from the host registry           | Policy page                        | Built                     |
-| App updates                     | Yes — manual check only, never on launch         | Not applicable                     | Built, signed             |
-| iPhone build (Road A)           | Yes — same code, unsigned simulator build in CI  | Not applicable                     | CI only, unsigned         |
-| Open a CV from the share sheet  | Yes — "Open in CViper Light" for PDF, Word, JSON | Not applicable                     | Built, untested on device |
-| First-run introduction          | Yes — three cards, reopenable in Settings        | Not applicable                     | Built                     |
-| Accounts                        | No — no login, no identity                       | Yes                                | Not built                 |
-| Sync                            | No — single device by design                     | Yes                                | Not built                 |
-| Telemetry                       | No — none, ever                                  | Opt-in                             | Absent, guarded           |
+| Feature                         | Light                                                 | Cloud (future)                     | State                     |
+| ------------------------------- | ----------------------------------------------------- | ---------------------------------- | ------------------------- |
+| Job search (Adzuna/Reed)        | Yes — user's own API keys, direct calls               | Yes — server-side, shared keys     | Built                     |
+| Cross-post detection            | Yes — flags duplicates, never merges                  | Yes — merges, with a server undo   | Built                     |
+| Keyless browser search links    | Yes — nine UK boards, opens in browser                | Not applicable                     | Built                     |
+| Job-board list, user-edited     | Yes — enable, reorder, add your own                   | Not applicable                     | Built                     |
+| API key setup                   | Yes — tested before saved, never read back            | Not applicable                     | Built                     |
+| Application tracker             | Yes — local SQLite                                    | Yes — synced                       | Built                     |
+| Paste a job advert              | Yes — AI reads it, you check every box                | Yes — server-side                  | Built                     |
+| Fetch an advert from a link     | Yes — one page, on request, no credentials            | Yes — server-side, no user IP      | Built                     |
+| A link pasted in the advert box | Yes — spotted, never sent to a model                  | No — not built there               | Built                     |
+| CV parsing                      | Yes — fully local                                     | Yes — server-side                  | Extraction built          |
+| JSON Resume import              | Yes — any JSON Resume 1.0 file, read here             | Yes — server-side                  | Built                     |
+| JSON Resume export              | Yes — the file it came in as, `meta.cviper` only      | Planned — cviper.ai/import         | Built                     |
+| CV analysis (BYO key)           | Yes — user's own provider key                         | Not applicable                     | Built                     |
+| CV analysis (local Ollama)      | Yes — offline, no key, no network                     | No                                 | Built                     |
+| Keyword-only analysis           | Yes — no AI, no key, always available                 | Yes                                | Built                     |
+| Data export/import              | Yes — user-initiated file in/out                      | Yes — plus migration to/from Light | Built                     |
+| Delete everything               | Yes — database, keys and preferences                  | Yes — account deletion             | Built                     |
+| Privacy notice                  | Yes — generated from the host registry                | Policy page                        | Built                     |
+| App updates                     | Yes — on launch by default, switchable, plus a button | Not applicable                     | Built, signed             |
+| iPhone build (Road A)           | Yes — same code, unsigned simulator build in CI       | Not applicable                     | CI only, unsigned         |
+| Open a CV from the share sheet  | Yes — "Open in CViper Light" for PDF, Word, JSON      | Not applicable                     | Built, untested on device |
+| First-run introduction          | Yes — three cards, reopenable in Settings             | Not applicable                     | Built                     |
+| Accounts                        | No — no login, no identity                            | Yes                                | Not built                 |
+| Sync                            | No — single device by design                          | Yes                                | Not built                 |
+| Telemetry                       | No — none, ever                                       | Opt-in                             | Absent, guarded           |
 
 ## Notes
 
@@ -61,9 +62,11 @@ installed copy from accepting any future update, permanently. See
   go to the OS credential store via the `keyring` crate, never to a file.
   "Local-first" is not "never uses the network": a job search, a cloud CV
   analysis, an update check and a link fetch are all outbound requests. Every
-  one of them is started by the user, none of them reaches a server of ours
-  because there is not one, and the app says which is which at the point of
-  use rather than in a policy page.
+  one of them is either started by the user or switched on by them — since L-92
+  the update check is the one that is not a button press, it runs once at launch
+  on the desktop, it is on by default, and Settings → Updates turns it off.
+  None of them reaches a server of ours because there is not one, and the app
+  says which is which at the point of use rather than in a policy page.
 - **Keyless first.** Every capability that can work without an API key has a
   keyless path, so the app is useful before the user configures anything.
 - **"No" in the Light column is a product decision, not a gap** — accounts,
@@ -82,10 +85,14 @@ installed copy from accepting any future update, permanently. See
   that does not verify is refused, and is shown to the user as a sentence rather
   than a silence. The key must never be regenerated — see
   [`apps/light/src-tauri/RELEASE-SIGNING.md`](../apps/light/src-tauri/RELEASE-SIGNING.md).
-- **Nothing is checked at launch.** No update check, no version ping, no
-  analytics. Two guards keep it that way: one asserts the updater plugin has a
-  single import site, and one mounts the whole app and asserts zero calls before
-  a button is pressed.
+- **One thing is checked at launch, and it can be switched off (L-92).** A
+  direct-download build has no store behind it, so nothing else can tell
+  somebody that a version with a security fix exists — the check is therefore on
+  by default. There is still no version ping of any other kind and no analytics.
+  Three guards hold it honest: the updater plugin has a single import site
+  (`noAutoCheck.test.ts`), switching the setting off produces ZERO requests, and
+  nothing is requested before the preference has been read (`launch.test.tsx`).
+  The result is offered in a dismissible strip and never forced.
 - **An embedding model is never offered as a chat model.** Current daemons say
   so themselves — `/api/tags` returns `capabilities: ["embedding"]`, verified
   against a live daemon — and that answer always wins. Older daemons omit the

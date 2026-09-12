@@ -19,8 +19,11 @@ Five more things worth saying out loud:
 - **No telemetry.** Not "anonymous statistics", not "crash reports", none. The
   Settings screen has a switch showing this, permanently off, and there is a
   test that fails the build if any code ever reads it as on.
-- **Nothing happens when you open the app.** It does not phone home, and it does
-  not even check for its own updates unless you press the button.
+- **Almost nothing happens when you open the app.** It does not phone home, and
+  it has no account to sign you in to. It does ask GitHub once whether there is
+  a newer version — a request for a version number, carrying nothing about you —
+  and Settings → Updates switches that off, after which it makes no update
+  request at all until you press the button.
 - **Your API keys go to the operating system's credential store**, never to a
   file in this app and never into the page. There is no way to read one back
   out — if you forget a key you paste a new one.
@@ -34,9 +37,10 @@ Five more things worth saying out loud:
   added to a job advert's URL when you click it.
 - **"Fetch" opens one page, and only when you press it.** See below.
 
-The only requests this app ever makes are ones you start: a job search, a CV
-check against a provider you chose, an update check you press, and a job advert
-you ask it to fetch.
+The only requests this app ever makes are ones you start or switched on: a job
+search, a CV check against a provider you chose, a job advert you ask it to
+fetch, and an update check — when you press the button, and once at startup
+unless you turn that off in Settings → Updates.
 
 ### When you press "Fetch" on a job advert
 

@@ -33,6 +33,51 @@ they are the honest list: real API keys, the public repository and its remaining
 secrets, store enrolment, and the first tagged release. The updater signing
 keypair is done — see task 5, and do not redo it.
 
+### Item numbers: how an `L-NNN` is claimed (L-92)
+
+A work-item number is claimed by creating a GitHub issue whose title STARTS with
+the number in square brackets:
+
+```
+gh issue create --title "[L-104] One line saying what it is"
+```
+
+Three things about that, written down because each has already caught somebody
+out:
+
+- **The issue's own number is NOT the L-number.** Issue #38 carries `[L-103]`.
+  GitHub hands issue numbers out in the order things happen and shares them with
+  pull requests; an L-number is a planning identifier a person chooses.
+- **A pull request REFERENCES a number, it does not claim one.** PR titles end
+  `(L-92)`. Only the bracketed form at the start of an ISSUE title is a claim,
+  which is why the check below ignores the other form — if it did not, every
+  merged pull request would look like a duplicate of the issue it closed.
+- **The next free number is the highest already claimed, plus one**, read from
+  the issue list rather than from this file.
+
+#### This file is a RECORD, not a LOCK
+
+Nothing here prevents a collision, and neither does the check. Two sessions can
+run `gh issue create` for `[L-104]` seconds apart and BOTH will succeed: there
+is nowhere to take a lock, GitHub accepts duplicate titles, and looking first
+does not close the window between the look and the create.
+
+**So same-minute races are not prevented.** Saying that plainly is the point. A
+registry described as preventing races, which does not, is worse than no
+registry at all, because people stop checking — they believe something is
+holding the door.
+
+What IS prevented is a collision going unnoticed. `pnpm check:l-numbers` runs in
+its own job on every push and fails on any duplicate label, so a clash surfaces
+in minutes instead of a week later when two branches both say L-104. The loser
+renames, and moves their branch and pull request with them.
+
+The check also asserts a FLOOR on how many labels it found, because "no
+duplicates among zero issues" is trivially true — an expired token, a rate limit
+or a changed search syntax all return an empty list, which would otherwise sail
+through looking exactly like a healthy registry. The logic, the floor and the
+reasoning live in `apps/light/src/numbering/lNumbers.ts`.
+
 ### The Microsoft Store route is viable (L-95, 2026-09-12)
 
 A Windows installer that opens without a SmartScreen warning normally means

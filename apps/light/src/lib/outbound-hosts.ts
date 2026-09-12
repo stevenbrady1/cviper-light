@@ -144,7 +144,7 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
   {
     host: 'github.com',
     purpose: 'fetched-on-request',
-    why: 'The update check reads a small signed file from this app’s public GitHub releases. It happens when you press “Check for updates”, and carries no data about you beyond the request itself. The source code is also opened in your browser from Settings → About.',
+    why: 'The update check reads a small signed file from this app’s public GitHub releases. It happens when you press “Check for updates”, and once when the app starts unless you switch that off in Settings. It carries no data about you beyond the request itself. The source code is also opened in your browser from Settings → About.',
   },
   {
     host: '127.0.0.1',
