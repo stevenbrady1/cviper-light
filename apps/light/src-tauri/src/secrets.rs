@@ -15,6 +15,19 @@
 //!     secret_delete  remove a key
 //!     secret_status  is there a key? — a bool, NEVER the value
 //!
+//! NOT ONE CHARACTER OF A SAVED KEY COMES BACK. A `secret_hint` command that
+//! returned bullets plus the last four characters was written, reviewed and
+//! removed before it shipped. The reason is worth keeping: it took a
+//! `SecretKey`, so it would have exposed a four-character tail of EVERY
+//! credential in the closed set — both AI keys and all three job-board ones —
+//! in order to answer a question only the OpenAI card was asking. The card now
+//! draws a fixed row of bullets from the `secret_status` bool it already has,
+//! which asks the store for nothing.
+//!
+//! `no_registered_command_returns_any_part_of_a_stored_secret` is the guard,
+//! and it is a forbid-list: it names what must be absent rather than what must
+//! be present, so a new reading command fails it by default.
+//!
 //! There is deliberately no `secret_get` command. `secret_get` exists, but it is
 //! a plain Rust function that `generate_handler!` does not know about, so there
 //! is no way to `invoke()` it. Later phases call it from Rust to build an
@@ -471,6 +484,64 @@ mod tests {
         let first = ios_store::ensure().map_err(|error| describe(&error));
         let second = ios_store::ensure().map_err(|error| describe(&error));
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn no_registered_command_returns_any_part_of_a_stored_secret() {
+        // ====================================================================
+        // A FORBID-LIST, NOT AN ALLOW-LIST (LESSON-033).
+        // ====================================================================
+        // The rule is "these must be ABSENT", so a reading command nobody has
+        // thought of yet still fails it. An allow-list of permitted commands
+        // would go green the day somebody renamed one.
+        //
+        // `secret_hint` is named here because it EXISTED. It returned bullets
+        // plus the last four characters of a saved key and was removed before
+        // it ever shipped: it took any `SecretKey`, so it exposed a
+        // four-character tail of EVERY credential the app stores — both AI keys
+        // and all three job-board ones — in order to answer a question only the
+        // OpenAI card was asking. The card now renders fixed bullets from the
+        // `secret_status` bool instead, and asks the store for nothing.
+        let handler = without_comments(include_str!("lib.rs"));
+        for forbidden in [
+            "secret_get",
+            "secret_hint",
+            "secret_reveal",
+            "secret_peek",
+            "secret_read",
+            "secret_value",
+        ] {
+            assert!(
+                !handler.contains(forbidden),
+                "{forbidden} must never be registered in generate_handler! — no command may \
+                 return any part of a stored secret"
+            );
+        }
+
+        // The one reading command that IS registered answers a bool. Pinning
+        // the signature means it cannot be widened to return a value without
+        // failing this line first.
+        let _: fn(SecretKey) -> Result<bool, String> = secret_status;
+
+        // And nothing in the shipped half of this module hands a password
+        // outward as an optional string — the shape every "just show a little
+        // of it" command has taken so far, including the one that was removed.
+        let whole = without_comments(include_str!("secrets.rs"));
+        let production = match whole.find("#[cfg(test)]") {
+            Some(index) => &whole[..index],
+            None => &whole[..],
+        };
+
+        // Anti-inert: a production slice that had shrunk to nothing would make
+        // the assertion below vacuously true for ever.
+        assert!(
+            production.contains("pub(crate) fn secret_status"),
+            "the production slice is suspiciously small"
+        );
+        assert!(
+            !production.contains("Option<String>"),
+            "a command appears to return part of a stored secret"
+        );
     }
 
     #[test]

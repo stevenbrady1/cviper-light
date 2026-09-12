@@ -161,17 +161,51 @@ describe('anthropic chatJson — the response envelope', () => {
     expect(result).toMatchObject({ ok: false, error: { kind: 'truncated' } });
   });
 
-  it('maps a 401 to auth and quotes the provider message', async () => {
+  it('maps a 401 to auth WITHOUT quoting the provider message', async () => {
+    // ========================================================================
+    // THIS TEST USED TO ASSERT THE OPPOSITE, AND THAT WAS THE BUG.
+    // ========================================================================
+    // It pinned `toContain('invalid x-api-key')` — the provider's own prose,
+    // passed through verbatim into the analysis error banner
+    // (`runAnalysis.ts` → `Analysis.tsx`). An auth body is the one place a
+    // provider is liable to quote the rejected credential back: OpenAI does it
+    // today, masked, and nothing stops Anthropic starting tomorrow.
+    //
+    // Changed with the owner's approval (L-89), so both cloud adapters now obey
+    // the same rule. The status still classifies — that is what tells the user
+    // it is the key and not the network — only the body is dropped.
     const transport = fakeTransport({
       chat: {
         status: 401,
-        body: '{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}',
+        body: '{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key sk-ant-****abcd"}}',
       },
     });
     const result = await createAnthropicProvider(transport).chatJson(REQUEST);
 
     expect(result).toMatchObject({ ok: false, error: { kind: 'auth', status: 401 } });
-    if (!result.ok) expect(result.error.message).toContain('invalid x-api-key');
+    if (!result.ok) {
+      expect(result.error.message).not.toContain('invalid x-api-key');
+      expect(result.error.message).not.toContain('sk-ant');
+      // The fixed sentence says the one thing the user can act on.
+      expect(result.error.message).toContain('Check it in Settings');
+    }
+  });
+
+  it('keeps the provider’s own prose on every status that is not an auth failure', async () => {
+    // The other half of the rule, and the reason this is not simply "drop all
+    // provider detail": on a 400 Anthropic's sentence is the only thing that
+    // names the schema keyword it refused.
+    const refused = await createAnthropicProvider(
+      fakeTransport({
+        chat: {
+          status: 400,
+          body: '{"type":"error","error":{"message":"output_config.format.schema: minimum is not supported"}}',
+        },
+      }),
+    ).chatJson(REQUEST);
+
+    expect(refused).toMatchObject({ ok: false, error: { kind: 'bad-request' } });
+    if (!refused.ok) expect(refused.error.message).toContain('minimum is not supported');
   });
 
   it('maps a 400 schema rejection to bad-request', async () => {

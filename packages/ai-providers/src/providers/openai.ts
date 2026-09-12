@@ -23,6 +23,7 @@ import {
 import {
   TRUNCATED_MESSAGE,
   decodeJsonBody,
+  detailUnlessAuth,
   httpError,
   readArray,
   readObject,
@@ -109,7 +110,13 @@ export function createOpenAiProvider(transport: ChatTransport): AiProvider {
       if (!decoded.ok) return decoded;
 
       if (response.value.status < 200 || response.value.status >= 300) {
-        return err(httpError(PROVIDER, response.value.status, errorDetail(decoded.value)));
+        // `detailUnlessAuth`, not the raw detail: OpenAI's 401 body quotes the
+        // rejected key back, masked, and this message is rendered verbatim in
+        // the analysis error banner. See the note in `shared.ts`.
+        const status = response.value.status;
+        return err(
+          httpError(PROVIDER, status, detailUnlessAuth(status, errorDetail(decoded.value))),
+        );
       }
 
       const choices = readArray(decoded.value, 'choices') ?? [];
@@ -157,7 +164,11 @@ export function createOpenAiProvider(transport: ChatTransport): AiProvider {
       if (!decoded.ok) return decoded;
 
       if (response.value.status < 200 || response.value.status >= 300) {
-        return err(httpError(PROVIDER, response.value.status, errorDetail(decoded.value)));
+        // Same rule on the model list: a 401 here carries the same body.
+        const status = response.value.status;
+        return err(
+          httpError(PROVIDER, status, detailUnlessAuth(status, errorDetail(decoded.value))),
+        );
       }
 
       const data = readArray(decoded.value, 'data');

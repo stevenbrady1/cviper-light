@@ -121,17 +121,60 @@ describe('openai chatJson — the response envelope', () => {
     if (!result.ok) expect(result.error.message).toContain('I cannot help with that.');
   });
 
-  it('maps a 401 to auth and quotes the provider message', async () => {
+  it('maps a 401 to auth WITHOUT quoting the provider message', async () => {
+    // ========================================================================
+    // THIS TEST USED TO ASSERT THE OPPOSITE, AND THAT WAS THE BUG.
+    // ========================================================================
+    // It pinned `toContain('Incorrect API key provided')` — the provider's own
+    // prose, passed through verbatim. OpenAI puts the rejected key IN that
+    // sentence, masked, and this message is rendered straight into the analysis
+    // error banner (`runAnalysis.ts` → `Analysis.tsx`), so a fragment of the
+    // user's credential reached the screen and any screenshot of it.
+    //
+    // Changed with the owner's approval (L-89). The status still classifies —
+    // that is what tells the user it is the key and not the network — only the
+    // body is dropped. See `detailUnlessAuth` in `shared.ts`.
     const transport = fakeTransport({
       chat: {
         status: 401,
-        body: '{"error":{"message":"Incorrect API key provided","type":"invalid_request_error","code":"invalid_api_key"}}',
+        body: '{"error":{"message":"Incorrect API key provided: sk-proj-****abcd","type":"invalid_request_error","code":"invalid_api_key"}}',
       },
     });
     const result = await createOpenAiProvider(transport).chatJson(REQUEST);
 
     expect(result).toMatchObject({ ok: false, error: { kind: 'auth', status: 401 } });
-    if (!result.ok) expect(result.error.message).toContain('Incorrect API key provided');
+    if (!result.ok) {
+      expect(result.error.message).not.toContain('Incorrect API key provided');
+      expect(result.error.message).not.toContain('sk-proj');
+      // The fixed sentence says the one thing the user can act on.
+      expect(result.error.message).toContain('Check it in Settings');
+    }
+  });
+
+  it('keeps the provider’s own prose on every status that is not an auth failure', async () => {
+    // The other half of the rule. Dropping ALL provider detail would be a
+    // regression of its own: on a 400 the provider's sentence is usually the
+    // only thing that says WHICH field it objected to.
+    const refused = await createOpenAiProvider(
+      fakeTransport({
+        chat: { status: 400, body: '{"error":{"message":"Unsupported value: temperature"}}' },
+      }),
+    ).chatJson(REQUEST);
+
+    expect(refused).toMatchObject({ ok: false, error: { kind: 'bad-request' } });
+    if (!refused.ok) expect(refused.error.message).toContain('Unsupported value: temperature');
+  });
+
+  it('negative: a 403 is redacted the same way a 401 is', async () => {
+    // 403 classifies as `auth` too, and its body carries the same material.
+    const result = await createOpenAiProvider(
+      fakeTransport({
+        chat: { status: 403, body: '{"error":{"message":"Key sk-proj-****wxyz is not allowed"}}' },
+      }),
+    ).chatJson(REQUEST);
+
+    expect(result).toMatchObject({ ok: false, error: { kind: 'auth', status: 403 } });
+    if (!result.ok) expect(result.error.message).not.toContain('sk-proj');
   });
 
   it('maps a 429 to rate-limit and a 503 to server', async () => {
