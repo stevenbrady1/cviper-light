@@ -66,12 +66,25 @@
  * ============================================================================
  * WHAT IT DOES *NOT* COVER — read this before trusting it
  * ============================================================================
- *   * ONLY THE `verify` JOB, and only in `ci.yml`. The `secret-scan` job is out
- *     of scope on purpose: it wants the full history, a network and a pinned
- *     gitleaks binary, so it is not something `pnpm verify` could ever run.
- *     `release.yml`, `ios.yml` and `monorepo-split.yml` are likewise out of
- *     scope — a developer cannot reproduce a signed release locally, and
- *     CLAUDE.md forbids trying.
+ *   * ONLY THE `verify` JOB, and only in `ci.yml`. Every other workflow and job
+ *     is out of scope, and `WORKFLOW_SCOPE` below records each one WITH ITS
+ *     REASON rather than leaving the list in prose nobody updates. A new
+ *     workflow file is RED until somebody classifies it.
+ *
+ *     THIS IS A SCOPE BOUNDARY, NOT AN EXEMPTION, AND THE DIFFERENCE MATTERS —
+ *     excusing a command inside the adjudicated job is what hid the frontend
+ *     build. The promise made here is "`pnpm verify` reproduces the `verify`
+ *     job", never "reproduces all of CI". `smoke.yml` is the clearest case: its
+ *     `built-app` job runs `tauri build` twice, and CLAUDE.md's first HARD RULE
+ *     forbids an agent from running `tauri build` at all. A check a developer
+ *     is forbidden to run cannot be in a developer's loop. `secret-scan` wants
+ *     the full history, a network and a pinned gitleaks binary; `release.yml`
+ *     and `ios.yml` want signing secrets and a Mac.
+ *
+ *     The honest cost: `smoke.yml` can go red on a change `pnpm verify` is
+ *     green on, and nothing local will catch that. That is a real gap. It is
+ *     bounded by the fact that those jobs cannot run here at all, and it is
+ *     written down rather than discovered.
  *   * INVOCATIONS, NOT BEHAVIOUR. It proves `pnpm test` is invoked on both
  *     sides, and that CI's build command is the one the `build` script wraps.
  *     It cannot prove two invocations do the same WORK — a workflow-level
@@ -93,14 +106,16 @@
  *     prevent, because the surprise is always "CI knew something I did not".
  *     The corollary is that a check DELETED from ci.yml is not reported here.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
 import { REPO_ROOT } from './repo-scan.ts';
 
-const WORKFLOW_PATH = '.github/workflows/ci.yml';
+const WORKFLOW_DIRECTORY = '.github/workflows';
+const WORKFLOW_FILE = 'ci.yml';
+const WORKFLOW_PATH = `${WORKFLOW_DIRECTORY}/${WORKFLOW_FILE}`;
 const MANIFEST_PATH = 'package.json';
 
 /** The CI job that is meant to be reproducible with one local command. */
@@ -141,6 +156,30 @@ export const OUTSIDE_THE_LOOP: ReadonlyArray<{ readonly pattern: RegExp; readonl
     why: 'dependency install — a developer already has node_modules.',
   },
 ];
+
+/**
+ * Every workflow file, and whether this contract adjudicates it.
+ *
+ * The out-of-scope list used to live in the docblock as prose, which meant a
+ * new workflow was invisible: nothing went red, the list simply became wrong.
+ * L-88 added `smoke.yml` and proved the point. As DATA with a test over it, an
+ * unclassified workflow fails and a stale entry fails, so the scope of this
+ * guard cannot quietly drift out of date.
+ *
+ * This says nothing about whether a workflow is CORRECT — only whether somebody
+ * has decided, in writing, that `pnpm verify` is or is not meant to reproduce
+ * it.
+ */
+export const WORKFLOW_SCOPE: Readonly<Record<string, string>> = {
+  'ci.yml': 'ADJUDICATED — its `verify` job is the loop `pnpm verify` must reproduce.',
+  'smoke.yml':
+    'out of scope — its `built-app` job runs `tauri build` twice to drive the real binary ' +
+    '(L-88). CLAUDE.md HARD RULE 1 forbids an agent running `tauri build`, so this cannot be ' +
+    'part of a local loop.',
+  'release.yml': 'out of scope — bundles and signs a release; needs the signing secrets.',
+  'ios.yml': 'out of scope — needs a Mac runner and an Apple toolchain.',
+  'monorepo-split.yml': 'out of scope — publishes a filtered history; touches no check.',
+};
 
 function escapeForRegExp(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -425,6 +464,43 @@ describe('the premise: there is a job and a script to compare', () => {
         `"${SCRIPT}" chains \`pnpm ${name}\`, which does not exist`,
       ).toBe(true);
     }
+  });
+});
+
+// ── The scope ───────────────────────────────────────────────────────────────
+
+describe('every workflow is consciously in or out of scope', () => {
+  const names = readdirSync(join(REPO_ROOT, WORKFLOW_DIRECTORY))
+    .filter((name) => /\.ya?ml$/.test(name))
+    .sort();
+
+  it('reads the real workflow directory', () => {
+    // Anti-inert: a wrong path would return nothing and make every leg below
+    // pass by having no workflows to classify.
+    expect(names.length).toBeGreaterThanOrEqual(5);
+    expect(names).toContain(WORKFLOW_FILE);
+  });
+
+  it('classifies every workflow that exists', () => {
+    const unclassified = names.filter((name) => !Object.hasOwn(WORKFLOW_SCOPE, name));
+    expect(
+      unclassified,
+      `${unclassified.join(', ')} exists in ${WORKFLOW_DIRECTORY} and WORKFLOW_SCOPE does not ` +
+        'mention it. Decide whether `pnpm verify` is meant to reproduce it and write the reason ' +
+        'down — silence here is how the out-of-scope list went stale before.',
+    ).toEqual([]);
+  });
+
+  it('keeps no stale entry for a workflow that is gone', () => {
+    const stale = Object.keys(WORKFLOW_SCOPE).filter((name) => !names.includes(name));
+    expect(stale, `${stale.join(', ')} is classified but no longer exists`).toEqual([]);
+  });
+
+  it('adjudicates exactly one workflow, the one it actually reads', () => {
+    const adjudicated = Object.entries(WORKFLOW_SCOPE)
+      .filter(([, why]) => why.startsWith('ADJUDICATED'))
+      .map(([name]) => name);
+    expect(adjudicated).toEqual([WORKFLOW_FILE]);
   });
 });
 
