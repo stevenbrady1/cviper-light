@@ -8,10 +8,10 @@
   generated assets and hands this file to `winapp pack`. The result is the
   `.msix` the owner uploads to Partner Center.
 
-  ----------------------------------------------------------------------------
+  ============================================================================
   THREE FIELDS ARE PLACEHOLDERS AND THE OWNER PASTES ALL THREE. NONE OF THEM
   CAN BE GUESSED.
-  ----------------------------------------------------------------------------
+  ============================================================================
   Partner Center assigns them when the app's name is reserved, and they are
   shown under Product -> Product identity. Copy them EXACTLY:
 
@@ -34,18 +34,18 @@
   placeholders: a real submission replacing all three is exactly what this file
   is for.
 
-  ----------------------------------------------------------------------------
+  ============================================================================
   THE VERSION'S FOURTH NUMBER MUST BE 0.
-  ----------------------------------------------------------------------------
+  ============================================================================
   `0.1.0.0`, not `0.1.0`. MSIX versions are four-part, and the Microsoft Store
   RESERVES the fourth number for its own use — a package that sets it to
   anything else is rejected at upload. The app's own version (`tauri.conf.json`,
   `Cargo.toml`) stays the three-part `0.1.0`; the trailing `.0` belongs here and
   only here.
 
-  ----------------------------------------------------------------------------
+  ============================================================================
   ASSETS ARE GENERATED, NOT COLLECTED.
-  ----------------------------------------------------------------------------
+  ============================================================================
   Every `Assets\...` path below is produced by `pnpm assets:msix` from the one
   square source icon, and `src/packaging/msixAssets.contract.test.ts` fails the
   build if any of them is missing or is not the size it is declared to be. A
