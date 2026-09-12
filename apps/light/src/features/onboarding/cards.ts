@@ -87,7 +87,7 @@ export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
  * to work out an answer we already know.
  *
  * ============================================================================
- * WHERE "ABOUT 2P" COMES FROM
+ * WHERE "ABOUT 2–3P" COMES FROM
  * ============================================================================
  * The model is `OPENAI_DEFAULT_MODEL` in `analysis/providers.ts`, which is
  * `gpt-4o`. One analysis sends a CV plus an advert and asks for a structured
@@ -100,9 +100,15 @@ export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
  *     output   1,500 / 1,000,000 x $10.00 = $0.015
  *     total                               = $0.030   (~2.4p at $1.27/£)
  *
- * So "about 2p" is the bottom of a 2-3p band, stated as the round number a
- * person can hold in their head. Deliberately NOT a range: a range invites the
- * reader to do arithmetic on a screen whose only job is to get them started.
+ * So the copy says "about 2–3p", and the band is the honest shape of it.
+ * $0.030 is 2.4p — the MIDDLE of that band, not the bottom — so rounding down
+ * to "about 2p" would quote the optimistic end of a real spread. A CV and an
+ * advert both vary in length, and the figure a user carries away from this
+ * screen should not be the best case they could have had.
+ *
+ * It also agrees with the landing page, which says a check costs "a few pence".
+ * A band sits comfortably inside that phrase; a single round number argues with
+ * it the first time somebody's CV runs long.
  *
  * ============================================================================
  * AND WHY IT SAYS PRICES CAN CHANGE
@@ -117,7 +123,7 @@ export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
  * must not be mistaken for a meter.
  */
 export const OPENAI_COST_LINE =
-  'A typical CV check costs about 2p, paid straight to OpenAI on your own account. ' +
+  'A typical CV check costs about 2–3p, paid straight to OpenAI on your own account. ' +
   'CViper takes no cut, and prices can change.';
 
 /**

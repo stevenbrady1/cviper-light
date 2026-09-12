@@ -111,7 +111,7 @@ describe('what a typical CV costs', () => {
     renderWelcome();
 
     const line = (await screen.findByTestId('welcome-cost')).textContent ?? '';
-    expect(line).toContain('2p');
+    expect(line).toContain('2–3p');
     // Who takes the money. CViper never sees it, and the screen must not imply
     // otherwise — the app has no payment path of any kind.
     expect(line).toContain('OpenAI');
