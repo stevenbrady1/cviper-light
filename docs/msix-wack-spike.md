@@ -7,7 +7,16 @@ weeks on a Microsoft Store submission.
 the Windows App Certification Kit?
 
 Run it: Actions → **MSIX WACK spike (L-95)** → *Run workflow*. It is
-`workflow_dispatch` only and never runs on a push.
+`workflow_dispatch` and never runs on a push to `main`.
+
+> **While this is still a pull request** it also carries a `push` trigger
+> scoped to the single branch `ci/L-95-msix-wack-spike`, and that block is
+> marked **delete before merge**. It exists because GitHub will not dispatch a
+> workflow that is not already on the default branch — "This event will only
+> trigger a workflow run if the workflow file exists on the default branch" —
+> so a new spike workflow cannot otherwise be run from the PR that introduces
+> it, which is the one place it needs to run. Merging first to make the button
+> appear would mean landing an experiment before it had produced its answer.
 
 ## Why it might not
 

@@ -50,6 +50,23 @@ on:
         type: boolean
         default: false
 
+  # --------------------------------------------------------------------------
+  # TEMPORARY. DELETE THIS BLOCK BEFORE MERGE.
+  # --------------------------------------------------------------------------
+  # GitHub will not dispatch a workflow that is not already on the default
+  # branch: "This event will only trigger a workflow run if the workflow file
+  # exists on the default branch." So a brand-new spike workflow cannot be run
+  # from its own pull request — which is the one place it needs to run. The
+  # entire point is to get the answer BEFORE anyone commits to the Store route;
+  # merging first so that the Run workflow button appears gets that backwards.
+  #
+  # Scoped to this one throwaway branch. It cannot fire on main, it cannot fire
+  # on anyone else's branch, and it disappears when the branch does. The
+  # permanent trigger is the workflow_dispatch above.
+  push:
+    branches:
+      - ci/L-95-msix-wack-spike
+
 # Least privilege. `contents: read` is named explicitly: a job with a
 # `permissions:` block that omits it cannot check the repository out.
 permissions:
