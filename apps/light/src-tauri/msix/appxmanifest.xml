@@ -17,9 +17,10 @@
   WHY THIS FILE IS CHECKED IN RATHER THAN GENERATED
   `winapp init` prompts — package name, publisher, version, entry point — and a
   prompt on a runner is a hang that ends in a timeout with no useful log. The
-  CLI does have non-interactive generation (`winapp manifest generate
-  --package-name ... --if-exists Skip`), but a generated manifest is one nobody
-  reviewed: the version format and the asset paths are exactly the two things
+  CLI does have non-interactive generation (`winapp manifest generate` with
+  explicit package-name, publisher-name and version flags), but a generated
+  manifest is one nobody reviewed: the version format and the asset paths are
+  exactly the two things
   this experiment must get right, and they would be invisible in the diff. So
   the manifest is source, and the workflow only rewrites `Executable=`.
 
@@ -81,7 +82,7 @@
     <!--
       `Executable` is REWRITTEN BY THE WORKFLOW before packing, to whatever the
       release build actually produced. It is not a constant: a plain
-      `cargo build --release` emits a binary named after the Cargo package
+      a plain release cargo build emits a binary named after the Cargo package
       (`light.exe`), while `tauri build` renames it to `productName`
       ("CViper Light.exe"). Hardcoding either one means the manifest silently
       points at a file that is not in the layout, and an MSIX with a dangling

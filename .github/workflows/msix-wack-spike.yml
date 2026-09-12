@@ -236,15 +236,27 @@ jobs:
           Write-Host "Application executable: $($exe.Name)"
           Copy-Item $exe.FullName -Destination $layout
 
-          # Any DLL sitting beside the binary is part of the app. Tauri v2 on
-          # MSVC statically links WebView2Loader, so the expectation is none —
-          # but if one appears, it belongs in the package, and the log says so.
-          $dlls = @(Get-ChildItem -Path $target -Filter '*.dll' -File)
-          if ($dlls.Count -gt 0) {
-            Write-Host "Staging $($dlls.Count) DLL(s) found beside the exe:"
-            $dlls | ForEach-Object { Write-Host "  $($_.Name)"; Copy-Item $_.FullName -Destination $layout }
-          } else {
-            Write-Host 'No DLLs beside the exe (expected: WebView2Loader is statically linked).'
+          # DELIBERATELY NOT a blanket copy of every DLL beside the binary.
+          # Run #1 of this spike is why. target/release contains
+          # `light_lib.dll` (2 MB), which is the `cdylib` output of this crate's
+          # own crate-type list. main.rs links light_lib as an RLIB —
+          # statically — so nothing ever loads that DLL at runtime.
+          #
+          # Copying it in would add dead weight, and worse, hand WACK a second
+          # PE binary to scan for blocked APIs. That is exactly how this
+          # experiment could manufacture a Blocked Executables failure that says
+          # nothing whatsoever about the app, which is the one outcome the whole
+          # spike exists to avoid.
+          #
+          # Anything OTHER than that known by-product is reported as a warning
+          # rather than silently swept in or silently dropped: a genuine runtime
+          # dependency has to surface as a decision a human makes.
+          foreach ($d in @(Get-ChildItem -Path $target -Filter '*.dll' -File)) {
+            if ($d.Name -eq 'light_lib.dll') {
+              Write-Host "  not staging $($d.Name): cdylib by-product of this crate, never loaded at runtime"
+            } else {
+              Write-Host "::warning::$($d.Name) sits beside the exe and was NOT staged. If the app loads it at runtime this package is incomplete - resolve before trusting the verdict."
+            }
           }
 
           # Tauri writes bundle.resources into a `resources` folder next to the
@@ -545,6 +557,13 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: msix-wack-${{ matrix.profile }}
-          path: ${{ runner.temp }}/wack
+          # devcert.pfx is EXCLUDED. This repository is public, so a build
+          # artefact is a download link for anyone. The certificate is a
+          # throwaway self-signed key for a fake publisher that nothing trusts,
+          # so the exposure is close to harmless — but "close to harmless" is
+          # not a reason to publish a private key, and run #1 did exactly that.
+          path: |
+            ${{ runner.temp }}/wack
+            !${{ runner.temp }}/wack/devcert.pfx
           if-no-files-found: warn
           retention-days: 14
