@@ -313,12 +313,25 @@ interface ParseRun {
  * and actions, and nothing that reads what the page printed. So the console is
  * captured by patching it from inside, which is the only mechanism available.
  *
- * `securitypolicyviolation` is the authoritative half. A CSP breakage very
- * often does NOT throw: the resource is simply refused, the feature quietly
- * does less, and the only trace is a console line. That event fires on the
- * document for anything the document initiated — including a worker script the
- * policy refuses — and carries the directive by name, which a scrape of console
- * text can only guess at.
+ * `securitypolicyviolation` is the authoritative half, and it is the half that
+ * was PROVEN to bite. A CSP breakage very often does NOT throw: the resource is
+ * simply refused, the feature quietly does less, and the only trace is this
+ * event. It fires on the document for anything the document initiated —
+ * including a worker script the policy refuses — and carries the directive by
+ * name, which a scrape of console text can only guess at.
+ *
+ * WHICH HALF ACTUALLY CATCHES A VIOLATION, SETTLED BY EXPERIMENT. A page-side
+ * `fetch` to a host `connect-src` does not allow was planted in this function
+ * and the run went red naming `connect-src` — while the captured console buffer
+ * came back EMPTY. WebView2 emits a CSP refusal from the renderer itself rather
+ * than through the page's `console` object, so the console scrape alone would
+ * have been inert for exactly the class of failure this file exists to catch.
+ *
+ * Both are kept. The scrape is not decoration: it catches the messages the APP
+ * emits, and the loudest of those is pdf.js announcing it is "setting up fake
+ * worker" — the degradation that looks like success. But the listener is the
+ * one carrying the weight, and a future author tempted to drop it for the
+ * simpler-looking string match should read this paragraph first.
  *
  * `Worker` is proxied because "pdf.js worked" and "pdf.js fell back to running
  * in the main thread because it could not start its worker" print almost the
@@ -362,18 +375,6 @@ document.addEventListener('securitypolicyviolation', function (event) {
     source: String(event.sourceFile) + ':' + String(event.lineNumber),
   });
 });
-
-// ---------------------------------------------------------------------
-// PLANTED, TEMPORARILY (L-103). THIS COMES OUT BEFORE THE PR IS MERGED.
-// ---------------------------------------------------------------------
-// Proof that the two checks at the bottom of this file are not inert.
-// connect-src names only 'self', ipc: and http://ipc.localhost, so this
-// request must be refused by the policy before DNS is ever consulted (the
-// .invalid TLD resolves to nothing anyway, so it cannot leave the machine
-// even if the policy failed). If the run stays GREEN with this in place,
-// the console capture and the violation listener are reading nothing and
-// every other assertion here is worthless.
-fetch('https://l103-planted-violation.invalid/csp-probe').catch(function () {});
 
 const NativeWorker = w.Worker;
 w.Worker = new Proxy(NativeWorker, {
