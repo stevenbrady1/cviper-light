@@ -50,8 +50,16 @@ describe('the paragraph at the top of Settings → Privacy', () => {
       'CViper Light runs on your computer. We have no server, no accounts, and no copy of your ' +
         'data. Your CV and your OpenAI key only ever go to the AI you choose — today ' +
         "that's OpenAI, or a model running on your own PC. Your job-board keys go only to Adzuna " +
-        'or Reed, and only when you search.',
+        'or Reed, and only when you search or test a key.',
     );
+  });
+
+  it('says a job-board key also leaves when it is TESTED, not only when you search', () => {
+    // `job_test_credentials` (jobs.rs) runs a real one-result search through
+    // `send_search` when the user presses "Test and save this key" in Settings.
+    // An earlier draft said "only when you search", which is defensible — it IS
+    // a search — but nobody pressing Save would call it searching.
+    expect(PRIVACY_SUMMARY).toContain('only when you search or test a key');
   });
 
   it('scopes each promise to the thing it is actually true of', () => {

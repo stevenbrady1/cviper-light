@@ -96,12 +96,23 @@ export const GROUPS: readonly Group[] = [
  * `Exclude<ProviderId, 'ollama'>`, so it already covers Anthropic and names it
  * at the moment of the call. Only this paragraph and the policy document have
  * to change, so nobody later assumes the consent work is also owed.
+ *
+ * ============================================================================
+ * "OR TEST A KEY" IS LOAD-BEARING. DO NOT TIDY IT AWAY.
+ * ============================================================================
+ * The draft before this one said the job-board keys leave "only when you
+ * search". That is not quite true: `job_test_credentials` (`src-tauri/src/jobs.rs`)
+ * runs a real one-result search through `send_search` when the user presses
+ * "Test and save this key" in Settings, so the key leaves the machine at SAVE
+ * time too. It is literally a search, which is why the shorter sentence reads
+ * as defensible — but nobody pressing Save would describe themselves as
+ * searching, and that gap is exactly the kind this paragraph exists to close.
  */
 export const PRIVACY_SUMMARY =
   'CViper Light runs on your computer. We have no server, no accounts, and no copy of your ' +
   'data. Your CV and your OpenAI key only ever go to the AI you choose — today ' +
   "that's OpenAI, or a model running on your own PC. Your job-board keys go only to Adzuna " +
-  'or Reed, and only when you search.';
+  'or Reed, and only when you search or test a key.';
 
 export function PrivacyNotice() {
   return (
