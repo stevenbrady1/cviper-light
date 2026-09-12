@@ -67,7 +67,7 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
   {
     host: 'platform.openai.com',
     purpose: 'opened-in-your-browser',
-    why: 'The page where you create your own OpenAI API key. The OpenAI card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.',
+    why: 'The page where you create your own OpenAI API key. The welcome screen and the OpenAI card in Settings hand the address to your browser when you tap it; the app never loads it, and nothing is added to the link.',
   },
   {
     host: 'www.linkedin.com',

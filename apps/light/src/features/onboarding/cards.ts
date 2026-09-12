@@ -75,6 +75,58 @@ export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
 ];
 
 /**
+ * What one AI-read analysis costs, and who is paid for it.
+ *
+ * ============================================================================
+ * A FIGURE, NOT A SHRUG.
+ * ============================================================================
+ * "Bring your own key" is only an honest offer if the user can find out what
+ * the key will cost them BEFORE they go and get one. cviper.ai promises that
+ * this screen "shows what a typical CV costs", and a card that said only "you
+ * pay OpenAI" would send somebody off to a pricing page written for developers
+ * to work out an answer we already know.
+ *
+ * ============================================================================
+ * WHERE "ABOUT 2–3P" COMES FROM
+ * ============================================================================
+ * The model is `OPENAI_DEFAULT_MODEL` in `analysis/providers.ts`, which is
+ * `gpt-4o`. One analysis sends a CV plus an advert and asks for a structured
+ * reading back — roughly 6,000 input tokens and 1,500 output tokens.
+ *
+ * At gpt-4o's published rates of $2.50 per million input tokens and $10.00 per
+ * million output tokens:
+ *
+ *     input    6,000 / 1,000,000 x $2.50  = $0.015
+ *     output   1,500 / 1,000,000 x $10.00 = $0.015
+ *     total                               = $0.030   (~2.4p at $1.27/£)
+ *
+ * So the copy says "about 2–3p", and the band is the honest shape of it.
+ * $0.030 is 2.4p — the MIDDLE of that band, not the bottom — so rounding down
+ * to "about 2p" would quote the optimistic end of a real spread. A CV and an
+ * advert both vary in length, and the figure a user carries away from this
+ * screen should not be the best case they could have had.
+ *
+ * It also agrees with the landing page, which says a check costs "a few pence".
+ * A band sits comfortably inside that phrase; a single round number argues with
+ * it the first time somebody's CV runs long.
+ *
+ * ============================================================================
+ * AND WHY IT SAYS PRICES CAN CHANGE
+ * ============================================================================
+ * This is a number from somebody else's price list, shipped inside a desktop
+ * binary a user may not update for a year. The sentence has to survive OpenAI
+ * repricing `gpt-4o` without becoming a lie, and "prices can change" is what
+ * makes it an estimate rather than a quote.
+ *
+ * A LIVE per-run cost, measured from the tokens an analysis actually used, is a
+ * different feature and is not this one. This constant is a static estimate and
+ * must not be mistaken for a meter.
+ */
+export const OPENAI_COST_LINE =
+  'A typical CV check costs about 2–3p, paid straight to OpenAI on your own account. ' +
+  'CViper takes no cut, and prices can change.';
+
+/**
  * What this machine can do for a CV check, in one line, read live.
  *
  * ============================================================================
