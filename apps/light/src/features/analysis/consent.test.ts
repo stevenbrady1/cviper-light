@@ -57,8 +57,13 @@ const plugin = vi.hoisted(() => {
 
 vi.mock('@tauri-apps/plugin-store', () => ({ load: plugin.load }));
 
-const { CONSENT_STORE_FILE, CONSENT_STORE_KEY, NO_CONSENT, createTauriConsentPort, parseConsentState } =
-  await import('./consent');
+const {
+  CONSENT_STORE_FILE,
+  CONSENT_STORE_KEY,
+  NO_CONSENT,
+  createTauriConsentPort,
+  parseConsentState,
+} = await import('./consent');
 
 beforeEach(() => {
   plugin.disk.clear();
@@ -77,7 +82,15 @@ describe('parseConsentState', () => {
   });
 
   it('negative: garbage becomes NO_CONSENT rather than throwing or granting anything', () => {
-    for (const garbage of [null, undefined, 'yes', 42, [], { anthropic: 'true' }, { anthropic: 1 }]) {
+    for (const garbage of [
+      null,
+      undefined,
+      'yes',
+      42,
+      [],
+      { anthropic: 'true' },
+      { anthropic: 1 },
+    ]) {
       expect(parseConsentState(garbage)).toEqual(NO_CONSENT);
     }
   });

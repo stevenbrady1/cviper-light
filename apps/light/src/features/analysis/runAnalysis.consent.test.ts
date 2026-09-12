@@ -89,7 +89,9 @@ function ollamaEnvelope(content: string): ProviderHttpResponse {
   return { status: 200, body: JSON.stringify({ message: { role: 'assistant', content } }) };
 }
 
-function fakeTransport(chat: (body: string) => Result<ProviderHttpResponse, ProviderError>): ChatTransport {
+function fakeTransport(
+  chat: (body: string) => Result<ProviderHttpResponse, ProviderError>,
+): ChatTransport {
   return {
     chat: (_provider, body) => Promise.resolve(chat(body)),
     listModels: () => Promise.resolve(ok({ status: 200, body: '{"data":[]}' })),
@@ -233,9 +235,7 @@ describe('the consent gate cannot be bypassed', () => {
   it('guard: the consent check is reached before the transport can ever be built', () => {
     // Reads the SHIPPED file, not a copy — a future refactor that reorders
     // this fails here, not in a code review nobody remembers to do.
-    const source = withoutComments(
-      readFileSync(join(HERE, 'runAnalysis.ts'), 'utf8'),
-    );
+    const source = withoutComments(readFileSync(join(HERE, 'runAnalysis.ts'), 'utf8'));
 
     const consentCheckIndex = source.indexOf('hasConsent(');
     const transportBuildIndex = source.indexOf('createTransport()');
