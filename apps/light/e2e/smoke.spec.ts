@@ -77,7 +77,7 @@ const DRIVER_STARTUP_TIMEOUT = 30_000;
  * proves the React bundle inside the installer actually rendered, rather than
  * the window merely existing with a title the OS took from the manifest.
  */
-const WELCOME_HEADING = 'Welcome to CViper Light';
+const WELCOME_HEADING = 'Three things this does.';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 
