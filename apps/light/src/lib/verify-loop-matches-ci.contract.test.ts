@@ -5,36 +5,59 @@
  * ============================================================================
  * WHY THIS EXISTS
  * ============================================================================
- * CLAUDE.md documents a five-command loop — `tsc`, `lint`, `test`,
+ * CLAUDE.md documented a five-command loop — `tsc`, `lint`, `test`,
  * `cargo:check`, `cargo:test` — and the root `verify` script chained exactly
- * those five. The CI `verify` job ran them too, and then ran a SIXTH step,
- * `pnpm format:check`, that the local loop never mentioned.
+ * those five. The CI `verify` job runs SEVEN things: those five, then the
+ * frontend build, then `pnpm format:check`.
  *
  * So the loop under-reported, and it did it silently. All five green locally,
- * push, and CI goes red on Prettier five minutes later. That is the worst shape
- * a check can have: it is not wrong, it is INCOMPLETE, and nothing about a
- * green local run says so. It cost a full build the day it was found.
+ * push, and CI goes red minutes later. That is the worst shape a check can
+ * have: it is not wrong, it is INCOMPLETE, and nothing about a green local run
+ * says so.
  *
- * The fix — folding `format:check` into the script — lasts exactly until the
- * next step is added to the job. This is the part that does not rot: it reads
- * BOTH files and refuses to let them disagree.
+ * The two missing checks were not equally dangerous, and the difference is the
+ * reason this file is shaped the way it is:
+ *
+ *   * `format:check` is COSMETIC and SELF-ANNOUNCING. You lose a build to it,
+ *     `pnpm format` fixes it, nothing shipped is wrong.
+ *   * THE FRONTEND BUILD IS NOT. A change that breaks the production Vite
+ *     bundle passes `tsc`, `lint` and `test` perfectly happily — they compile
+ *     and exercise SOURCE, not the bundle. Leaving the build out means a broken
+ *     production build is locally green. That is a silent failure over a broken
+ *     artefact, which is the failure class this repository keeps repeating.
+ *
+ * The first draft of this guard fixed `format:check` and put the build on the
+ * exception list. That was the more dangerous half of the bug, preserved. It is
+ * required now, and the exception list is for environment setup only.
  *
  * ============================================================================
  * WHAT IT ADJUDICATES
  * ============================================================================
  * Every command the `verify` job actually runs must be one of:
  *
- *   1. a root `package.json` script that `pnpm verify` also runs, or
+ *   1. a root `package.json` script that `pnpm verify` also runs — recognised
+ *      either as `pnpm <script>` or because the command IS that script's body
+ *      verbatim, or
  *   2. `pnpm verify` itself, or
  *   3. registered in `OUTSIDE_THE_LOOP` below, with a reason.
  *
- * Anything else is an offence. That third case is the whole point of the
- * design. The obvious guard — "collect the `pnpm <script>` calls on both sides
- * and diff them" — passes quietly the day CI gains a check written as
- * `npx some-tool` or `cargo audit`, because such a step contributes NOTHING to
- * either side of the diff. Requiring every command to be classified means a new
- * CI check is red until somebody either adds it to the loop or writes down why
- * it cannot be. It fails CLOSED.
+ * Case 1's second half is what lets CI spell a command out in full while the
+ * loop calls it by name. CI runs `pnpm --filter @cviper/light build`; the root
+ * `build` script IS that command, so the two are the same check and the guard
+ * says so. The alternative — a regex in the exception list matching a filter
+ * expression — excuses the check instead of comparing it, which is precisely
+ * how the build came to be missing.
+ *
+ * Anything else is an offence. Case 3 is the dangerous one and is deliberately
+ * narrow: an exception is for things that CANNOT FAIL BECAUSE THE CODE IS
+ * WRONG — installing pnpm, installing dependencies. If a step can go red over a
+ * change somebody made, it is a check and it belongs in the loop.
+ *
+ * Requiring every command to be classified is what makes this fail CLOSED. The
+ * obvious design — "collect the `pnpm <script>` calls on both sides and diff
+ * them" — passes quietly the day CI gains a check written as `npx some-tool` or
+ * `cargo audit`, because such a step contributes NOTHING to either side of the
+ * diff.
  *
  * The same closed-ness applies to the script: a segment of `verify` that is not
  * a `pnpm <script>` call is an offence, because this guard cannot vouch for
@@ -49,13 +72,15 @@
  *     `release.yml`, `ios.yml` and `monorepo-split.yml` are likewise out of
  *     scope — a developer cannot reproduce a signed release locally, and
  *     CLAUDE.md forbids trying.
- *   * NAMES, NOT BEHAVIOUR. It proves `pnpm test` is invoked on both sides. It
- *     cannot prove the two invocations do the same work — a workflow-level
- *     `env:` or a different `--filter` would be invisible here.
+ *   * INVOCATIONS, NOT BEHAVIOUR. It proves `pnpm test` is invoked on both
+ *     sides, and that CI's build command is the one the `build` script wraps.
+ *     It cannot prove two invocations do the same WORK — a workflow-level
+ *     `env:`, or a script body that drifts from the command CI spells out,
+ *     would make them differ. The body comparison is exact-match after
+ *     whitespace collapsing, so a drifting body fails closed rather than open.
  *   * NOT WHETHER THE CHECKS PASS. That is what running them is for.
- *   * NOT ORDER. CI runs its steps separately so a failure names itself; the
- *     script chains them with `&&` so the first failure stops the rest. Both
- *     are deliberate and neither is asserted.
+ *   * NOT ORDER. The script happens to chain in CI's order (see CLAUDE.md), but
+ *     that is a readability choice and is not asserted here.
  *   * NOT `uses:` STEPS. A check hidden inside a composite action is invisible:
  *     only `run:` commands are read. A new check arriving that way would pass.
  *   * COMMENTS ARE STRIPPED, for the reason `repo-scan.ts` gives — a guard that
@@ -66,6 +91,7 @@
  *   * A LOOP STRICTER THAN CI IS ALLOWED. The contract is one-directional. A
  *     script that runs more than CI cannot produce the surprise this exists to
  *     prevent, because the surprise is always "CI knew something I did not".
+ *     The corollary is that a check DELETED from ci.yml is not reported here.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -94,6 +120,13 @@ export interface Offence {
  * Commands the `verify` job runs that are deliberately NOT part of the local
  * loop, each with the reason it is excused.
  *
+ * THE BAR FOR AN ENTRY HERE IS THAT THE STEP CANNOT FAIL BECAUSE THE CODE IS
+ * WRONG. Installing pnpm and installing dependencies qualify: they are the
+ * runner becoming a developer machine, and a developer already has both. A
+ * BUILD DOES NOT QUALIFY, however slow it is — it goes red over changes people
+ * make, which makes it a check. The frontend build was once listed here, and
+ * that exemption was the L-98 defect in its more dangerous form.
+ *
  * Kept deliberately tight. A broad pattern here is how this guard would go
  * quietly inert, so each entry describes one specific command rather than a
  * category of them.
@@ -107,16 +140,15 @@ export const OUTSIDE_THE_LOOP: ReadonlyArray<{ readonly pattern: RegExp; readonl
     pattern: /^pnpm\s+install\b/,
     why: 'dependency install — a developer already has node_modules.',
   },
-  {
-    pattern: /^pnpm\s+--filter\s+\S+\s+build\b/,
-    why:
-      'the Vite build, which is a build and not a check. It stays out of the loop so the loop ' +
-      'is fast; if it ever needs to be in, put it in the script rather than widening this.',
-  },
 ];
 
 function escapeForRegExp(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Whitespace collapsed, so YAML indentation cannot make two identical commands differ. */
+function normalise(text: string): string {
+  return text.trim().replace(/\s+/g, ' ');
 }
 
 /** The workflow as the runner sees it, with `#` commentary gone. */
@@ -231,14 +263,32 @@ export function runCommandsOf(jobText: string): string[] {
   return commands;
 }
 
-/** The root script a command invokes, or `null` if it invokes none. */
+/**
+ * The root script a command invokes, or `null` if it invokes none.
+ *
+ * Two ways to be the same check: the command CALLS the script (`pnpm build`),
+ * or the command IS the script's body spelled out, which is how CI writes the
+ * frontend build. If two scripts shared a body the first declared would win;
+ * none do.
+ *
+ * The loop's own entry point is deliberately NEVER resolved by body. A `verify`
+ * consisting of a single command would otherwise match itself, mark itself
+ * covered, and report perfect coverage of nothing — the vacuous pass this whole
+ * file exists to prevent. Its own test caught exactly that.
+ */
 export function rootScriptInvokedBy(
   command: string,
   scripts: Readonly<Record<string, string>>,
 ): string | null {
-  const name = /^pnpm(?:\s+run)?\s+(\S+)/.exec(command)?.[1];
-  if (name === undefined) return null;
-  return Object.hasOwn(scripts, name) ? name : null;
+  const called = /^pnpm(?:\s+run)?\s+(\S+)/.exec(command)?.[1];
+  if (called !== undefined && Object.hasOwn(scripts, called)) return called;
+
+  const target = normalise(command);
+  for (const [name, body] of Object.entries(scripts)) {
+    if (name === SCRIPT) continue;
+    if (normalise(body) === target) return name;
+  }
+  return null;
 }
 
 /** What the `verify` script chains, and any segment of it this guard cannot read. */
@@ -308,7 +358,8 @@ export function loopDriftOffences(
       why:
         'this command is neither a root script the loop runs nor a registered exception, so ' +
         'nobody can say whether `pnpm verify` reproduces it. Make it a root script and chain it ' +
-        'into "verify", or add it to OUTSIDE_THE_LOOP with the reason it cannot be run locally.',
+        'into "verify". Do NOT add it to OUTSIDE_THE_LOOP unless it cannot fail because the code ' +
+        'is wrong — exempting a real check is how the frontend build went missing (L-98).',
     });
   }
 
@@ -334,6 +385,11 @@ function withExtraStep(jobText: string, name: string, run: string): string {
 
 const REAL_JOB = jobTextOf(readableYaml(WORKFLOW), JOB);
 
+/** The loop as it must look: every check CI runs, none of them exempted. */
+const FULL_LOOP =
+  'pnpm tsc && pnpm lint && pnpm test && pnpm cargo:check && pnpm cargo:test && ' +
+  'pnpm build && pnpm format:check';
+
 // ── The premise ─────────────────────────────────────────────────────────────
 
 describe('the premise: there is a job and a script to compare', () => {
@@ -353,7 +409,7 @@ describe('the premise: there is a job and a script to compare', () => {
 
   it('the guard reads real commands out of it', () => {
     const commands = runCommandsOf(REAL_JOB);
-    expect(commands.length).toBeGreaterThanOrEqual(8);
+    expect(commands.length).toBeGreaterThanOrEqual(9);
     // A named command, so a YAML restyle that defeated the parser is red here
     // rather than silently green below.
     expect(commands).toContain('pnpm tsc');
@@ -362,7 +418,7 @@ describe('the premise: there is a job and a script to compare', () => {
   it(`the "${SCRIPT}" script is a readable chain of real root scripts`, () => {
     const { runs, unreadable } = loopOf(SCRIPTS);
     expect(unreadable).toEqual([]);
-    expect(runs.length).toBeGreaterThanOrEqual(5);
+    expect(runs.length).toBeGreaterThanOrEqual(7);
     for (const name of runs) {
       expect(
         Object.hasOwn(SCRIPTS, name),
@@ -388,13 +444,33 @@ describe('the detector can actually fail', () => {
   // they prove the parser works on the shape ci.yml actually has rather than on
   // a six-line fixture that happens to suit it.
 
-  it('catches the L-98 defect itself, transcribed', () => {
+  it('REQUIRES the frontend build — dropping it from the loop is an offence', () => {
+    // The half of L-98 that matters most. `tsc`, `lint` and `test` all pass on
+    // a change that breaks the production bundle, so a loop without the build
+    // is green over a broken artefact.
+    const withoutBuild: Record<string, string> = {
+      ...SCRIPTS,
+      build: 'pnpm --filter @cviper/light build',
+      [SCRIPT]: FULL_LOOP.replace(' && pnpm build', ''),
+    };
+    const offences = loopDriftOffences(REAL_JOB, withoutBuild);
+    expect(offences.map((offence) => offence.found)).toContain('pnpm build');
+  });
+
+  it('refuses to let the build be excused by an exception instead of run', () => {
+    // Guards the regression directly: no entry in OUTSIDE_THE_LOOP may match
+    // the build command, or the check is excused rather than compared.
+    const build = 'pnpm --filter @cviper/light build';
+    expect(OUTSIDE_THE_LOOP.some((entry) => entry.pattern.test(build))).toBe(false);
+  });
+
+  it('catches the original L-98 defect, transcribed', () => {
     const beforeTheFix: Record<string, string> = {
       ...SCRIPTS,
       [SCRIPT]: 'pnpm tsc && pnpm lint && pnpm test && pnpm cargo:check && pnpm cargo:test',
     };
-    const offences = loopDriftOffences(REAL_JOB, beforeTheFix);
-    expect(offences.map((offence) => offence.found)).toContain('pnpm format:check');
+    const found = loopDriftOffences(REAL_JOB, beforeTheFix).map((offence) => offence.found);
+    expect(found).toContain('pnpm format:check');
   });
 
   it('catches a NEW root-script check appearing in the job', () => {
@@ -448,6 +524,18 @@ describe('the detector can actually fail', () => {
     );
   });
 
+  it('catches a `build` script whose body has drifted from the command CI runs', () => {
+    // Body matching is exact after whitespace collapsing, so a script that no
+    // longer wraps CI's command stops covering it — fails closed, not open.
+    const drifted: Record<string, string> = {
+      ...SCRIPTS,
+      build: 'pnpm --filter @cviper/some-other-app build',
+      [SCRIPT]: FULL_LOOP,
+    };
+    const found = loopDriftOffences(REAL_JOB, drifted).map((offence) => offence.found);
+    expect(found).toContain('pnpm --filter @cviper/light build');
+  });
+
   it('names the check and the reason', () => {
     const beforeTheFix: Record<string, string> = {
       ...SCRIPTS,
@@ -467,7 +555,8 @@ describe('a loop that matches walks through', () => {
   const scripts: Record<string, string> = {
     tsc: 'turbo run typecheck',
     lint: 'turbo run lint',
-    verify: 'pnpm tsc && pnpm lint',
+    build: 'pnpm --filter @cviper/light build',
+    verify: 'pnpm tsc && pnpm lint && pnpm build',
   };
 
   const job = (...steps: string[]): string =>
@@ -497,14 +586,20 @@ describe('a loop that matches walks through', () => {
     expect(offences, explain(offences)).toEqual([]);
   });
 
-  it('accepts the registered setup and build steps', () => {
+  it('accepts a command CI spells out that a root script wraps verbatim', () => {
+    // CI writes `pnpm --filter @cviper/light build`; the loop calls it `pnpm
+    // build`. Same check, so no offence — and no exemption needed to say so.
+    const offences = loopDriftOffences(
+      jobTextOf(job('      - run: pnpm --filter @cviper/light build'), 'verify'),
+      scripts,
+    );
+    expect(offences, explain(offences)).toEqual([]);
+  });
+
+  it('accepts the registered setup steps, which are not checks', () => {
     const offences = loopDriftOffences(
       jobTextOf(
-        job(
-          '      - run: corepack enable pnpm',
-          '      - run: pnpm install --frozen-lockfile',
-          '      - run: pnpm --filter @cviper/light build',
-        ),
+        job('      - run: corepack enable pnpm', '      - run: pnpm install --frozen-lockfile'),
         'verify',
       ),
       scripts,

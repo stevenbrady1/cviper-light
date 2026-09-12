@@ -18,25 +18,37 @@ job-search tool. See [docs/PLAN.md](docs/PLAN.md) and
 
 ## Verification loop
 
-All six must pass before anything is called done. Run from the repo root:
+All seven must pass before anything is called done. Run from the repo root:
 
 ```
-pnpm format:check # prettier --check .   — `pnpm format` fixes what it reports
 pnpm tsc          # turbo run typecheck  — tsc --noEmit in every package
 pnpm lint         # turbo run lint       — eslint, --max-warnings 0
 pnpm test         # vitest run
 pnpm cargo:check  # cargo check on apps/light/src-tauri
 pnpm cargo:test   # cargo test --lib on apps/light/src-tauri
+pnpm build        # the production Vite bundle — NOT `tauri build`
+pnpm format:check # prettier --check .   — `pnpm format` fixes what it reports
 ```
 
-`pnpm verify` runs all six in sequence, cheapest first.
+`pnpm verify` runs all seven in sequence, in CI's order — so a local failure and
+a CI failure arrive in the same sequence, and the check that can ship something
+broken (`build`) is reached before the one that only looks untidy
+(`format:check`).
 
 That list is exactly what the CI `verify` job runs, and it is kept that way by
 `apps/light/src/lib/verify-loop-matches-ci.contract.test.ts`, which reads
 `.github/workflows/ci.yml` and the root `package.json` and fails if the job runs
-a check the script does not. This said five for months while CI quietly ran a
-sixth: all five green locally, then a five-minute build lost to `format:check`
-(L-98). A loop that under-reports is worse than no loop, because it is believed.
+a check the script does not. This said five for months while CI quietly ran
+seven (L-98). `format:check` was the visible half — a build lost to Prettier.
+`build` was the dangerous half: `tsc`, `lint` and `test` all compile and exercise
+SOURCE, so a change that breaks the production bundle is green on all five and
+only fails after a push. A loop that under-reports is worse than no loop,
+because it is believed.
+
+An exception to the loop is for steps that CANNOT fail because the code is wrong
+(installing pnpm, installing dependencies). If a step goes red over a change
+somebody made, it is a check and it belongs in `verify` — exempting one is how
+`build` went missing.
 
 `cargo:check` does NOT compile `#[cfg(test)]` code, so it cannot run — or even
 typecheck — a single Rust test. Without `cargo:test` in the loop, every Rust
