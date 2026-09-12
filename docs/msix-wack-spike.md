@@ -6,7 +6,7 @@ weeks on a Microsoft Store submission.
 **The question:** does a **release**-built CViper Light, packaged as MSIX, pass
 the Windows App Certification Kit?
 
-Run it: Actions → **MSIX WACK spike (L-95)** → *Run workflow*. It is
+Run it: Actions → **MSIX WACK spike (L-95)** → _Run workflow_. It is
 `workflow_dispatch` and never runs on a push to `main`.
 
 > **While this is still a pull request** it also carries a `push` trigger
@@ -53,11 +53,11 @@ or something real.
 The tick on the run is **not** the answer. The answer is in the job summary and
 in `verdict.txt` inside the artefact.
 
-| Job | Summary says | Means |
-| --- | --- | --- |
-| red | `INCONCLUSIVE` / `WACK COULD NOT RUN` | The kit never produced a report. An **environment** result. Says nothing about the app. |
-| green | `WACK ran. Overall result: PASS` | The app passes certification. |
-| green | `WACK ran. Overall result: FAIL` | The app **fails**, and the table lists which checks and why. |
+| Job   | Summary says                          | Means                                                                                   |
+| ----- | ------------------------------------- | --------------------------------------------------------------------------------------- |
+| red   | `INCONCLUSIVE` / `WACK COULD NOT RUN` | The kit never produced a report. An **environment** result. Says nothing about the app. |
+| green | `WACK ran. Overall result: PASS`      | The app passes certification.                                                           |
+| green | `WACK ran. Overall result: FAIL`      | The app **fails**, and the table lists which checks and why.                            |
 
 A failing app is green on purpose. The whole point of a spike is to discover a
 failure, so a red X would read as "the experiment broke" when in fact it worked.
@@ -102,7 +102,7 @@ a submission.
 A grep of this repo finds **no `externalBin`, no sidecar and no
 `bundle.resources`**, so the expectation is "exe only". The workflow prints the
 real directory contents into the artefact anyway, because an expectation is not
-evidence. It also discovers the executable's *name* rather than hardcoding it: a
+evidence. It also discovers the executable's _name_ rather than hardcoding it: a
 plain cargo build emits `light.exe` (the Cargo package name) while `tauri build`
 renames it to `CViper Light.exe` (`productName`), and the manifest's
 `Executable=` is rewritten to whatever was actually staged.
