@@ -24,7 +24,7 @@ This is not a summary. It is the exact set of addresses the code is allowed to n
 These carry a key you pasted into Settings, under an account that is yours. The bill, if there is one, is between you and that provider.
 
 - `api.openai.com` — A CV analysis you start, sent with your own OpenAI key under your own OpenAI account.
-- `api.anthropic.com` — A CV analysis you start, sent with your own Anthropic key under your own Anthropic account.
+- `api.anthropic.com` — A CV analysis you start, but only if an Anthropic key is already in this computer’s credential store. This version has no screen for adding one, so for most people it is never contacted.
 - `api.adzuna.com` — A job search you start, sent with the free Adzuna key you registered yourself.
 - `www.reed.co.uk` — A job search you start, sent with the free Reed key you registered yourself. Reed’s developer page is also opened in your browser from Settings.
 

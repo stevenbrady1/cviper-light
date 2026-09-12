@@ -74,7 +74,18 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
   {
     host: 'api.anthropic.com',
     purpose: 'fetched-with-your-key',
-    why: 'A CV analysis you start, sent with your own Anthropic key under your own Anthropic account.',
+    // Scoped deliberately (L-105). `providers.rs` can reach Anthropic and
+    // `anthropic_api_key` is a real slot in the credential store — but since
+    // L-102 no screen in this build can put one there, so copy offering the
+    // reader "your own Anthropic key" described something no part of the app
+    // supports. The host STAYS: this list states reach, not choice, and
+    // dropping it would make the notice a summary. Only the sentence changed.
+    // `privacy/unconfigurableKeyClaims.contract.test.tsx` fails the build if a
+    // provider with no key card is ever described as one you hold a key for.
+    why:
+      'A CV analysis you start, but only if an Anthropic key is already in this computer’s ' +
+      'credential store. This version has no screen for adding one, so for most people it is ' +
+      'never contacted.',
   },
   {
     host: 'api.adzuna.com',
