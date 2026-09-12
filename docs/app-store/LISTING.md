@@ -4,6 +4,17 @@ Copy for App Store Connect. UK English throughout; the store shows it as
 written. Where the tone could go two ways, both are given — pick one and
 delete the other before pasting.
 
+> **Apple only.** The Microsoft Store listing is a different document with
+> different rules — see [`../STORE-SUBMISSION.md`](../STORE-SUBMISSION.md).
+> Do not paste this copy there: Microsoft's policy 10.8.3 constrains what a
+> free individual account's listing may lead with, and Apple's does not.
+
+> **One AI provider, not two.** Since L-102 the only AI key the app can SET UP
+> is OpenAI. An Anthropic key can still be read out of the OS credential store
+> if an older build ever wrote one, so `api.anthropic.com` remains in the
+> generated privacy policy — but no screen can save one and no picker can offer
+> one, so nothing below may tell a reviewer to paste one.
+
 ## App Information
 
 | Field              | Value                                                                                                           |
@@ -56,10 +67,9 @@ Pick one:
 >
 > IF YOU WANT MORE
 >
-> • Bring your own OpenAI or Anthropic key for a deeper analysis. The key is
-> stored in your phone's Keychain and never shown to the app's screen. The
-> request goes from you to them, under your account — we are not in the
-> middle.
+> • Bring your own OpenAI key for a deeper analysis. The key is stored in your
+> phone's Keychain and never shown to the app's screen. The request goes from
+> you to them, under your account — we are not in the middle.
 > • Bring your own free Adzuna or Reed key to search inside the app.
 >
 > WHAT IT NEVER DOES
@@ -112,11 +122,10 @@ them.)
 > The basic match runs on the device with no key.
 >
 > The app can optionally use an AI provider. That requires the user's OWN
-> OpenAI or Anthropic API key, which the user pastes into Settings; the key
-> is stored in the Keychain and the request is made from the device to that
-> provider under the user's own account. We do not supply a key, we do not
-> proxy the request and we receive nothing. No key is needed to review any
-> screen.
+> OpenAI API key, which the user pastes into Settings; the key is stored in the
+> Keychain and the request is made from the device to OpenAI under the user's
+> own account. We do not supply a key, we do not proxy the request and we
+> receive nothing. No key is needed to review any screen.
 >
 > This iPhone build makes no network request on launch, and none the user did
 > not start by pressing a button. The updater is not compiled into an iOS build

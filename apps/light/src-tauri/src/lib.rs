@@ -34,8 +34,37 @@ pub fn run() {
     // `capabilities/desktop.json`, scoped to desktop platforms for the same
     // reason: on iOS the plugin is not compiled in, and a capability naming
     // `updater:default` there fails the build (L-80).
+    //
+    // The second attribute is the Microsoft Store flavour (L-93). An installed
+    // MSIX's files are read-only, so an in-place update cannot succeed there —
+    // the Store replaces the package instead. `--no-default-features` drops the
+    // `updater` feature, and with it this registration and the crate itself.
+    // Both attributes apply: `cfg` attributes stack as an AND.
     #[cfg(desktop)]
+    #[cfg(feature = "updater")]
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+
+    // ========================================================================
+    // THE SECOND TRIPWIRE. A STORE BUILD CARRYING THE UPDATER WILL NOT COMPILE.
+    // ========================================================================
+    // The Store flavour is built with `--features microsoft-store` AND
+    // `--no-default-features`, and the second half is the one that actually
+    // removes the plugin. If it were ever dropped — a reworded script, a `--`
+    // swallowed by a shell, a copied command line — the build would succeed and
+    // produce a Store package whose "Check for updates" button downloads an
+    // installer it cannot write over a read-only install.
+    //
+    // That failure would appear on a user's machine and nowhere else. So the
+    // two flags are not a convention anybody has to remember: arriving with one
+    // and not the other is a hard compile error, and nothing ships.
+    #[cfg(all(feature = "updater", feature = "microsoft-store"))]
+    compile_error!(
+        "a `microsoft-store` build must not carry the updater: an installed MSIX is read-only, so \
+         tauri-plugin-updater can only fail there, and the Microsoft Store delivers updates \
+         instead. The Store build is `tauri build --features microsoft-store -- \
+         --no-default-features`; if you reached this, the `--no-default-features` half did not \
+         arrive. Fix the build command, not this guard."
+    );
 
     // ========================================================================
     // THE TRIPWIRE. A RELEASE BUILD CARRYING THE AUTOMATION SERVER WILL NOT
