@@ -25,7 +25,7 @@ pnpm tsc          # turbo run typecheck  — tsc --noEmit in every package
 pnpm lint         # turbo run lint       — eslint, --max-warnings 0
 pnpm test         # vitest run
 pnpm cargo:check  # cargo check on apps/light/src-tauri
-pnpm cargo:test   # cargo test --lib on apps/light/src-tauri
+pnpm cargo:test   # cargo test on apps/light/src-tauri — unit AND doc tests
 pnpm build        # the production Vite bundle — NOT `tauri build`
 pnpm format:check # prettier --check .   — `pnpm format` fixes what it reports
 ```
@@ -54,6 +54,14 @@ somebody made, it is a check and it belongs in `verify` — exempting one is how
 typecheck — a single Rust test. Without `cargo:test` in the loop, every Rust
 test in the repo is a guard that looks green because nothing ever asked it a
 question.
+
+`cargo:test` carries no target flag, and must not gain one. It said
+`cargo test --lib` for months, which runs the library's unit tests and nothing
+else — so a doc comment rustdoc could not compile sat red in
+`apps/light/src-tauri` while CI reported green (L-107). `--all-targets` is the
+same trap wearing a wider name: cargo excludes doc-tests from it.
+`cargo-test-runs-doctests.contract.test.ts` fails the build if a narrowing flag
+comes back.
 
 Never commit red. Never skip a check. Never weaken a config to make a check
 pass — if a guard fails, fix the thing it is protecting.

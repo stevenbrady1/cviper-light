@@ -5,7 +5,7 @@ name: Smoke
 # ============================================================================
 # CLAUDE.md forbids an agent from running `tauri build`. The cost of that rule
 # was that nothing in this repository had ever been verified in the binary a
-# user actually runs: every test is Vitest against jsdom, or `cargo test --lib`.
+# user actually runs: every test is Vitest against jsdom, or `cargo test`.
 # The WebView2 runtime, the Tauri IPC bridge, the capability file and the
 # bundled `frontendDist` sit between those tests and a working app, and none of
 # them can fail a single existing check.

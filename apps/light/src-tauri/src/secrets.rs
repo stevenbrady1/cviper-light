@@ -11,9 +11,16 @@
 //! ============================================================================
 //! Three commands are exposed to JavaScript:
 //!
-//!     secret_set     write a key
-//!     secret_delete  remove a key
-//!     secret_status  is there a key? — a bool, NEVER the value
+//! ```text
+//! secret_set     write a key
+//! secret_delete  remove a key
+//! secret_status  is there a key? — a bool, NEVER the value
+//! ```
+//!
+//! The fence says `text` and it has to. An indented block inside `//!` is
+//! RUST to rustdoc, which compiled these three lines as a program and failed
+//! on the em dash (L-107). An unfenced example in a doc comment is a doc-test
+//! nobody wrote.
 //!
 //! NOT ONE CHARACTER OF A SAVED KEY COMES BACK. A `secret_hint` command that
 //! returned bullets plus the last four characters was written, reviewed and
