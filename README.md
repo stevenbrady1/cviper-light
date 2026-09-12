@@ -102,7 +102,7 @@ it invents a job from the words in the address. The link is moved up to the
 link box, where Fetch can do something with it.
 
 This one needs an AI provider: free with [Ollama](https://ollama.com) on your
-own machine, or your own Anthropic or OpenAI key. Without one you add jobs by
+own machine, or your own OpenAI key. Without one you add jobs by
 typing them in, and everything else carries on as normal — the tracker and the
 browser job-search links never needed a key and still do not.
 
@@ -122,7 +122,7 @@ build if one of those lines ever reads or writes any state.
 | Save a CV back out as JSON Resume   | **No.** The file it arrived as, written where you choose.              |
 | Basic keyword CV match              | **No.** Runs locally, instantly.                                       |
 | CV analysis with a local model      | **No key** — needs [Ollama](https://ollama.com) installed and running. |
-| CV analysis with Anthropic / OpenAI | Yes — your own key, billed to you.                                     |
+| CV analysis with OpenAI             | Yes — your own key, billed to you.                                     |
 | Job search inside the app           | Yes — free Adzuna and/or Reed keys.                                    |
 | Job search in your browser          | **No.** One click, no key at all.                                      |
 | Paste a job advert into the tracker | Yes — a local Ollama model, or your own key.                           |

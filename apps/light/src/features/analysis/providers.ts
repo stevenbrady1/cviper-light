@@ -27,6 +27,8 @@
  */
 import { ANTHROPIC_DEFAULT_MODEL, type ModelInfo } from '@cviper/ai-providers';
 
+import { AI_KEY_PROVIDER_IDS } from '../settings/keys/aiKeyProviders';
+
 /** Which family an option belongs to. */
 export type ProviderKind = 'keyword' | 'ollama' | 'anthropic' | 'openai';
 
@@ -107,6 +109,38 @@ const KEYWORD_OPTION: ProviderOption = {
   needsKey: false,
 };
 
+/**
+ * The cloud providers Settings can actually set a key up for.
+ *
+ * ============================================================================
+ * THE APP OFFERS ONLY WHAT IT CAN SET UP (L-102)
+ * ============================================================================
+ * A saved key is not on its own a reason to offer a provider. Anthropic was the
+ * case that proved it: `SecretKey::AnthropicApiKey` exists, `secret_set` accepts
+ * it, and a credential store SURVIVES AN UNINSTALL — so `readAvailability` could
+ * report `anthropicKey: true` on a machine whose Settings screen has never had
+ * an Anthropic card and never will until somebody writes one. The picker offered
+ * it anyway, `runAnalysis` would have sent the user's CV to Anthropic, and the
+ * Rust transport told anyone who got there to "Add one in Settings".
+ *
+ * So the offer is gated on the SET-UP surface rather than on the credential
+ * store. Read from `AI_KEY_PROVIDER_IDS` rather than restated, so a card added
+ * later switches its option back on by itself, and
+ * `offeredProviders.contract.test.ts` fails the build if the two ever disagree.
+ *
+ * This gate lives HERE and deliberately not in `readAvailability`. `Availability`
+ * is a report of what this machine actually has, and a report that said `false`
+ * about a key genuinely sitting in the credential store would be a different
+ * claim altogether — "we cannot see it" instead of "we do not offer it". Only
+ * one of those is true.
+ */
+const CLOUD_PROVIDERS_WITH_A_KEY_CARD: ReadonlySet<string> = new Set(AI_KEY_PROVIDER_IDS);
+
+/** Can the user actually get a key for this provider into the app? */
+function canBeSetUp(kind: ProviderKind): boolean {
+  return CLOUD_PROVIDERS_WITH_A_KEY_CARD.has(kind);
+}
+
 export function providerOptions(availability: Availability): ProviderOption[] {
   const options: ProviderOption[] = [KEYWORD_OPTION];
 
@@ -129,7 +163,10 @@ export function providerOptions(availability: Availability): ProviderOption[] {
     });
   }
 
-  if (availability.anthropicKey) {
+  // Saved AND settable-up. Today `canBeSetUp('anthropic')` is false, so this
+  // branch does not run — that is the fix, not dead code: the option returns the
+  // moment an Anthropic card is added to `AI_KEY_PROVIDER_IDS`.
+  if (availability.anthropicKey && canBeSetUp('anthropic')) {
     options.push({
       key: 'anthropic',
       kind: 'anthropic',
@@ -144,7 +181,10 @@ export function providerOptions(availability: Availability): ProviderOption[] {
     });
   }
 
-  if (availability.openaiKey) {
+  // The same rule, applied to the provider that DOES have a card. Written the
+  // same way on purpose: the day OpenAI's card is removed, its option goes with
+  // it rather than being left behind pointing at a screen that is gone.
+  if (availability.openaiKey && canBeSetUp('openai')) {
     options.push({
       key: 'openai',
       kind: 'openai',

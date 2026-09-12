@@ -94,9 +94,25 @@ describe('localModelLine — the live detection shown on the analysis card', () 
     expect(line).toContain('works with nothing');
   });
 
-  it('mentions a saved cloud key when there is one', () => {
-    expect(localModelLine({ ...NOTHING, anthropicKey: true })).toContain('Anthropic');
+  it('mentions a saved cloud key only when that key can actually be used', () => {
+    // ========================================================================
+    // THE CARD MUST NOT PROMISE A ROW THE PICKER WILL NOT SHOW (L-102)
+    // ========================================================================
+    // This used to assert that a saved Anthropic key put "Anthropic" in the
+    // line — "Your Anthropic key is saved, so the full analysis is available."
+    // The analysis screen has no Anthropic option and no way to set one up, so
+    // that sentence sent a new user to a picker that did not contain what they
+    // had just been told was there.
+    //
+    // The line is now derived from `providerOptions`, so it cannot say this
+    // about a provider that is not offered — and it still says it for the one
+    // that is.
     expect(localModelLine({ ...NOTHING, openaiKey: true })).toContain('OpenAI');
+
+    expect(localModelLine({ ...NOTHING, anthropicKey: true })).not.toContain('Anthropic');
+    // The machine reads exactly like one with nothing saved, which is the state
+    // it is actually in as far as running an analysis goes.
+    expect(localModelLine({ ...NOTHING, anthropicKey: true })).toBe(localModelLine(NOTHING));
   });
 
   it('boundary: a machine with everything reports the local model, not the key', () => {
