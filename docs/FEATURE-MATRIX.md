@@ -26,6 +26,16 @@ Actions secrets. That key must never be regenerated: doing so stops every
 installed copy from accepting any future update, permanently. See
 [`apps/light/src-tauri/RELEASE-SIGNING.md`](../apps/light/src-tauri/RELEASE-SIGNING.md).
 
+**Two Windows flavours, and only one of them updates itself (L-93).** A copy
+downloaded from the releases page checks for updates and installs them. A copy
+installed from the Microsoft Store cannot: an installed MSIX's files are
+read-only, so the updater plugin is compiled OUT of that build entirely
+(`--no-default-features`) and the Store replaces the whole package instead.
+Settings names whichever is true of the build in front of you. The package
+itself is built and certification-tested in CI and has never been submitted —
+enrolment and submission are the owner's, by hand. See
+[`STORE-SUBMISSION.md`](STORE-SUBMISSION.md).
+
 `apps/cloud` is an empty stub directory. There is no cloud code of any kind.
 
 | Feature                         | Light                                                 | Cloud (future)                     | State                     |
@@ -48,7 +58,9 @@ installed copy from accepting any future update, permanently. See
 | Data export/import              | Yes — user-initiated file in/out                      | Yes — plus migration to/from Light | Built                     |
 | Delete everything               | Yes — database, keys and preferences                  | Yes — account deletion             | Built                     |
 | Privacy notice                  | Yes — generated from the host registry                | Policy page                        | Built                     |
-| App updates                     | Yes — on launch by default, switchable, plus a button | Not applicable                     | Built, signed             |
+| App updates (direct download)   | Yes — on launch by default, switchable, plus a button | Not applicable                     | Built, signed             |
+| App updates (Microsoft Store)   | No — the Store replaces the package; updater absent   | Not applicable                     | Built, guarded            |
+| Microsoft Store package (MSIX)  | Yes — packed in CI from a real `tauri build`          | Not applicable                     | CI only, not submitted    |
 | iPhone build (Road A)           | Yes — same code, unsigned simulator build in CI       | Not applicable                     | CI only, unsigned         |
 | Open a CV from the share sheet  | Yes — "Open in CViper Light" for PDF, Word, JSON      | Not applicable                     | Built, untested on device |
 | First-run introduction          | Yes — three cards, reopenable in Settings             | Not applicable                     | Built                     |

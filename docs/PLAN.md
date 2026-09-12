@@ -239,6 +239,41 @@ remains the only channel that is warning-free from the very first download** —
 true independently of the account-type question, and the one part of this entry
 the correction did not touch.
 
+### The Store package exists, and the artefact is now the real one (L-93, 2026-09-12)
+
+L-95 answered "would a Windows package pass certification" and left the thing
+anybody would actually submit untested: it built with `cargo build --release`,
+which names the binary after the Cargo package rather than `productName`, lays
+resources out differently and never runs `beforeBuildCommand`. That gap is
+closed. `.github/workflows/msix.yml` builds with **`tauri build`**, packs the
+result with Microsoft's `winapp` CLI and runs the certification kit over it.
+
+**The Store flavour has no updater, structurally.** An installed MSIX's files
+are read-only, so `tauri-plugin-updater` there can only fail — on a machine
+where Windows was already updating the app properly. So the crate is now
+`optional` behind a `default = ["updater"]` feature, the Store build is compiled
+`--no-default-features`, and `lib.rs` carries a `compile_error!` that refuses to
+build a Store flavour with the updater switched on. If the flag is ever dropped
+from the build command the compiler stops, rather than a package shipping whose
+update button cannot work. Settings names the Microsoft Store instead, reusing
+the pattern L-80 built for the iPhone.
+
+**What is not proven, and cannot be from here.** The certification kit is a
+local approximation of the Store's gate, not the gate; the packaged app has
+never been RUN (the kit's own report says "Running tests without application
+deployment"); only x64 is built; and the identity fields are placeholders until
+a name is reserved. The one optional failure L-95 found — "Blocked executables",
+WebView2, `tauri-apps/tauri#14935` — still reproduces and is still a submission
+risk rather than a non-event, because Microsoft documents that the Store "may
+apply all tests from this workflow".
+
+Everything the owner has to do by hand is in
+[`STORE-SUBMISSION.md`](STORE-SUBMISSION.md), including the two policy
+constraints L-99 recorded: the listing leads with the keyless features
+(10.8.3), and the publisher display name is the owner's own (10.14). The 10.14
+trade-or-profession tension is carried forward there as an accepted open risk,
+not a cleared one.
+
 ---
 
 ## Context
@@ -736,4 +771,14 @@ text editor and starts with `"schemaVersion": 1`.
    to lead with the keyless features. It remains the only way to settle what the
    WACK result cannot: submit one real build and see what the Store's own gate
    does with it.
+
+   **The package and the paperwork are ready** (L-93). Run the **MSIX
+   (Microsoft Store)** workflow, download the `.msix`, and follow
+   [`STORE-SUBMISSION.md`](STORE-SUBMISSION.md) — it has the enrolment steps,
+   the listing copy in the order policy 10.8.3 requires, the three identity
+   fields to paste, the age rating and generative-AI answers, and the four
+   screenshots to take. Two things are owed before submitting: the
+   `cviper.ai/privacy` page has to be live, and the name has to be reserved
+   before the identity fields exist to paste.
+
 9. First tagged release and macOS notarization.

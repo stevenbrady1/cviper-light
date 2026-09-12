@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  ============================================================================
+  THE MICROSOFT STORE PACKAGE MANIFEST (L-93).
+  ============================================================================
+  `.github/workflows/msix.yml` stages the `tauri build` output beside the
+  generated assets and hands this file to `winapp pack`. The result is the
+  `.msix` the owner uploads to Partner Center.
+
+  ----------------------------------------------------------------------------
+  THREE FIELDS ARE PLACEHOLDERS AND THE OWNER PASTES ALL THREE. NONE OF THEM
+  CAN BE GUESSED.
+  ----------------------------------------------------------------------------
+  Partner Center assigns them when the app's name is reserved, and they are
+  shown under Product -> Product identity. Copy them EXACTLY:
+
+    Package/Identity/@Name              <- "Package/Identity/Name"
+    Package/Identity/@Publisher         <- "Package/Identity/Publisher" (CN=...)
+    Package/Properties/PublisherDisplayName
+                                        <- "Publisher display name"
+
+  Every one of them is marked `PLACEHOLDER-` below. `docs/STORE-SUBMISSION.md`
+  has the step-by-step.
+
+  Two things people expect to find here and will not, because they are NOT
+  manifest fields: the Package Family Name and the Store ID. Partner Center
+  derives both from the identity above; nothing is pasted back in.
+
+  ALL THREE, OR NONE. A half-filled identity is the dangerous state — it looks
+  finished and is rejected at upload — so
+  `src/lib/msix-store-build.contract.test.ts` fails the build if some of the
+  three are placeholders and others are not. It never asks that they BE
+  placeholders: a real submission replacing all three is exactly what this file
+  is for.
+
+  ----------------------------------------------------------------------------
+  THE VERSION'S FOURTH NUMBER MUST BE 0.
+  ----------------------------------------------------------------------------
+  `0.1.0.0`, not `0.1.0`. MSIX versions are four-part, and the Microsoft Store
+  RESERVES the fourth number for its own use — a package that sets it to
+  anything else is rejected at upload. The app's own version (`tauri.conf.json`,
+  `Cargo.toml`) stays the three-part `0.1.0`; the trailing `.0` belongs here and
+  only here.
+
+  ----------------------------------------------------------------------------
+  ASSETS ARE GENERATED, NOT COLLECTED.
+  ----------------------------------------------------------------------------
+  Every `Assets\...` path below is produced by `pnpm assets:msix` from the one
+  square source icon, and `src/packaging/msixAssets.contract.test.ts` fails the
+  build if any of them is missing or is not the size it is declared to be. A
+  dangling asset reference fails the certification kit's manifest-resources
+  check at SUBMISSION time, which is the worst moment to find out.
+
+  Windows resolves each name below to a scaled or target-size variant sitting
+  beside it (`Square44x44Logo.scale-200.png` and the rest). The unqualified file
+  is present too, so the reference resolves even if the package is ever built
+  without a resource index.
+-->
+
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  IgnorableNamespaces="uap rescap uap10">
+
+  <Identity
+    Name="PLACEHOLDER-Partner-Center-Identity-Name"
+    Publisher="CN=PLACEHOLDER-Partner-Center-Publisher-Id"
+    Version="0.1.0.0" />
+
+  <Properties>
+    <DisplayName>CViper Light</DisplayName>
+    <!--
+      Store policy 10.14: on a free INDIVIDUAL account this must be the owner's
+      own personal name. "CViper" would read to a reasonable consumer as a
+      business entity, which requires a company account.
+    -->
+    <PublisherDisplayName>PLACEHOLDER-Owners-Own-Name</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <uap10:PackageIntegrity>
+      <uap10:Content Enforcement="on" />
+    </uap10:PackageIntegrity>
+  </Properties>
+
+  <Dependencies>
+    <!--
+      MinVersion 10.0.18362.0 is Windows 10 1903, the oldest build that still
+      receives WebView2. MaxVersionTested matches the Windows SDK on the
+      `windows-latest` runner that actually packs this: claiming a version no
+      machine in the chain has tested is a claim nothing stands behind.
+    -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.18362.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-gb" />
+  </Resources>
+
+  <Applications>
+    <!--
+      `Executable` is REWRITTEN BY THE WORKFLOW to whatever was actually staged.
+      It is not a constant: `tauri build` names the binary after `productName`
+      ("CViper Light.exe") while a plain `cargo build` emits the Cargo package
+      name ("light.exe"). Hardcoding either produces a package that installs
+      cleanly and then fails to launch, which is the worst shape of bug to
+      discover after a submission.
+    -->
+    <Application
+      Id="CViperLight"
+      Executable="CViper Light.exe"
+      EntryPoint="Windows.FullTrustApplication"
+      uap10:TrustLevel="mediumIL"
+      uap10:RuntimeBehavior="packagedClassicApp">
+      <uap:VisualElements
+        DisplayName="CViper Light"
+        Description="Check your CV against a job advert and track every application, on your own computer."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile
+          ShortName="CViper Light"
+          Wide310x150Logo="Assets\Wide310x150Logo.png"
+          Square71x71Logo="Assets\Square71x71Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!--
+      A packaged desktop (Win32) app runs at full trust. This is what
+      `packagedClassicApp` above implies and what every Tauri or Electron MSIX
+      declares. It is not a broad permission grab: it is the capability that
+      says "this is a desktop app in a package" rather than a UWP one.
+
+      Nothing else is declared. CViper Light asks Windows for no camera, no
+      location, no microphone and no broad filesystem access, and a capability
+      the app does not use is one Store review is entitled to ask about.
+    -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

@@ -178,6 +178,10 @@ export const WORKFLOW_SCOPE: Readonly<Record<string, string>> = {
     'part of a local loop.',
   'release.yml': 'out of scope — bundles and signs a release; needs the signing secrets.',
   'ios.yml': 'out of scope — needs a Mac runner and an Apple toolchain.',
+  'msix.yml':
+    'out of scope — packages the Microsoft Store flavour (L-93). It runs `tauri build`, which ' +
+    'CLAUDE.md HARD RULE 1 forbids an agent from running, and then the `winapp` CLI and the ' +
+    'Windows App Certification Kit, neither of which exists on a developer machine.',
   'monorepo-split.yml': 'out of scope — publishes a filtered history; touches no check.',
 };
 
