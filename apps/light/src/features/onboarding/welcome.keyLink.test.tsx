@@ -176,8 +176,9 @@ describe('the free story survives all of it', () => {
     // The cost line must sit ALONGSIDE the keyless sentence, never replace it.
     renderWelcome();
 
-    const local = ((await screen.findByTestId('welcome-local-model')).textContent ?? '')
-      .toLowerCase();
+    const local = (
+      (await screen.findByTestId('welcome-local-model')).textContent ?? ''
+    ).toLowerCase();
     expect(local).toContain('works with nothing');
   });
 
