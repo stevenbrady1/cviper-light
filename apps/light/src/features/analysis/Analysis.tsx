@@ -28,6 +28,14 @@ import { APP_NAME } from '../settings/backup';
 
 import { AnalysisResult } from './AnalysisResult';
 import { readAvailability } from './availability';
+import { ConsentGate, ConsentStatus } from './ConsentGate';
+import {
+  createTauriConsentPort,
+  NO_CONSENT,
+  type ConsentPort,
+  type ConsentProviderKind,
+  type ConsentState,
+} from './consent';
 import {
   exportJsonResume,
   jobAdvertText,
@@ -45,6 +53,7 @@ import {
   ollamaHint,
   optionByKey,
   providerOptions,
+  type ProviderOption,
 } from './providers';
 import { runAnalysis } from './runAnalysis';
 import { type ChatTransport } from '@cviper/ai-providers';
@@ -118,6 +127,16 @@ export interface AnalysisProps {
   readonly onIncomingCvHandled?: (() => void) | undefined;
   /** Injected by tests: the real one opens the user's browser (the L-87 signpost). */
   readonly browser?: BrowserPort | undefined;
+  /**
+   * Injected by tests. Defaults to the real `tauri-plugin-store`-backed port
+   * (Apple 5.1.2(i)) — see `consent.ts`.
+   */
+  readonly consentPort?: ConsentPort | undefined;
+}
+
+/** Which of the two cloud kinds this option is, or `null` for keyword/Ollama. */
+function consentKindFor(kind: ProviderOption['kind']): ConsentProviderKind | null {
+  return kind === 'anthropic' || kind === 'openai' ? kind : null;
 }
 
 export function Analysis({
@@ -128,12 +147,14 @@ export function Analysis({
   incomingCv,
   onIncomingCvHandled,
   browser,
+  consentPort,
 }: AnalysisProps = {}) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke in the advert box.
   const analysisPort = useMemo(() => port ?? createDbAnalysisPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
   const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
+  const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
 
   const [cvs, setCvs] = useState<readonly Cv[]>([]);
   /**
@@ -174,8 +195,42 @@ export function Analysis({
   const [error, setError] = useState<string | null>(null);
   const [uploadProblem, setUploadProblem] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<readonly string[]>([]);
+  /** Per-provider agreement to send a CV to a named cloud AI (Apple 5.1.2(i)). */
+  const [consent, setConsent] = useState<ConsentState>(NO_CONSENT);
+  /**
+   * The cloud option waiting on the consent dialog, or `null` when nothing is.
+   * Carries the resolved `ConsentProviderKind` alongside the option so the
+   * dialog and the accept handler never have to re-derive it.
+   */
+  const [pendingConsent, setPendingConsent] = useState<{
+    readonly option: ProviderOption;
+    readonly kind: ConsentProviderKind;
+  } | null>(null);
 
   // ── Loading ──────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void consentStore
+      .read()
+      .then((result) => {
+        // A failed read leaves `consent` at `NO_CONSENT` — the safe default.
+        // Not surfaced as an error: an unreadable consent file is not
+        // something the user did wrong, and every cloud option is simply
+        // asked for again, which is the fail-CLOSED behaviour this whole
+        // feature depends on.
+        if (!cancelled && result.ok) setConsent(result.value);
+      })
+      .catch(() => {
+        // Defence in depth: `consentStore.read()` never throws, but a mount
+        // effect must not let anything escape uncaught either.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [consentStore]);
 
   useEffect(() => {
     let cancelled = false;
@@ -380,58 +435,111 @@ export function Analysis({
     };
   }, [incomingCv, ingest, onIncomingCvHandled]);
 
+  /**
+   * Run one option that has ALREADY cleared the consent question — either it
+   * never needed one (keyword, Ollama), or the gate was just answered yes.
+   */
+  const performRun = useCallback(
+    async (option: ProviderOption, cv: Cv) => {
+      setError(null);
+      setRunning(true);
+      setElapsed(0);
+
+      const run = await runAnalysis(
+        {
+          option,
+          cvText: cv.extracted_text ?? '',
+          jobText,
+        },
+        // Passed, never called here on the keyword path — see `runAnalysis.ts`.
+        createTransport ?? createTauriTransport,
+        // Reads the SAME store this screen shows and revokes through, fresh,
+        // rather than a snapshot of the `consent` state — so a run started
+        // the instant after a grant is never judged against a stale value.
+        (kind) => consentStore.read().then((result) => result.ok && result.value[kind]),
+      );
+
+      setRunning(false);
+
+      if (!run.ok) {
+        setResult(null);
+        setError(run.error.message);
+        return;
+      }
+
+      setResult(run.value);
+
+      const record = newAnalysisRecord({
+        id: crypto.randomUUID(),
+        cvId: cv.id,
+        // Not wired to a specific job yet: the advert is free text, and guessing
+        // which tracked job it came from would attach the result to the wrong
+        // advert. `job_id` is nullable precisely for this.
+        jobId: null,
+        provider: run.value.provider,
+        model: run.value.model,
+        analysis: run.value.analysis,
+        now: (now ?? new Date()).toISOString(),
+      });
+
+      const saved = await analysisPort.saveAnalysis(record);
+      if (!saved.ok) {
+        // The result stays on screen. It is real, the user is reading it, and
+        // throwing it away because a write failed would be a second failure.
+        setError(`The result could not be saved to your history: ${saved.error.message}`);
+        return;
+      }
+
+      setHistory((current) => [record, ...current]);
+    },
+    [analysisPort, consentStore, createTransport, jobText, now],
+  );
+
   const onRun = useCallback(async () => {
     if (selectedCv === null || selectedOption === null) return;
 
-    setError(null);
-    setRunning(true);
-    setElapsed(0);
-
-    const run = await runAnalysis(
-      {
-        option: selectedOption,
-        cvText: selectedCv.extracted_text ?? '',
-        jobText,
-      },
-      // Passed, never called here. The keyword path returns before it asks the
-      // factory for anything, which is what makes "the basic match cannot reach
-      // the network" a provable statement rather than an intention.
-      createTransport ?? createTauriTransport,
-    );
-
-    setRunning(false);
-
-    if (!run.ok) {
-      setResult(null);
-      setError(run.error.message);
+    const kind = consentKindFor(selectedOption.kind);
+    if (kind !== null && !consent[kind]) {
+      // Blocked on the gate (Apple 5.1.2(i)): nothing is sent, and nothing has
+      // started running, until the user answers.
+      setPendingConsent({ option: selectedOption, kind });
       return;
     }
 
-    setResult(run.value);
+    await performRun(selectedOption, selectedCv);
+  }, [consent, performRun, selectedCv, selectedOption]);
 
-    const record = newAnalysisRecord({
-      id: crypto.randomUUID(),
-      cvId: selectedCv.id,
-      // Not wired to a specific job yet: the advert is free text, and guessing
-      // which tracked job it came from would attach the result to the wrong
-      // advert. `job_id` is nullable precisely for this.
-      jobId: null,
-      provider: run.value.provider,
-      model: run.value.model,
-      analysis: run.value.analysis,
-      now: (now ?? new Date()).toISOString(),
-    });
+  /** "Send to X" in the dialog: persist the grant, then run the option it named. */
+  const onConsentAccept = useCallback(async () => {
+    const pending = pendingConsent;
+    setPendingConsent(null);
+    if (pending === null || selectedCv === null) return;
 
-    const saved = await analysisPort.saveAnalysis(record);
-    if (!saved.ok) {
-      // The result stays on screen. It is real, the user is reading it, and
-      // throwing it away because a write failed would be a second failure.
-      setError(`The result could not be saved to your history: ${saved.error.message}`);
+    const granted = await consentStore.grant(pending.kind);
+    if (!granted.ok) {
+      setError(granted.error.message);
       return;
     }
+    setConsent(granted.value);
+    await performRun(pending.option, selectedCv);
+  }, [consentStore, pendingConsent, performRun, selectedCv]);
 
-    setHistory((current) => [record, ...current]);
-  }, [analysisPort, createTransport, jobText, now, selectedCv, selectedOption]);
+  /** "Not now": closes the dialog. Nothing is sent, and nothing else changes. */
+  const onConsentDecline = useCallback(() => {
+    setPendingConsent(null);
+  }, []);
+
+  /** The reachable half of "revocable" — see `ConsentGate.tsx`. */
+  const onWithdrawConsent = useCallback(
+    async (kind: ConsentProviderKind) => {
+      const revoked = await consentStore.revoke(kind);
+      if (revoked.ok) setConsent(revoked.value);
+      else setError(revoked.error.message);
+    },
+    [consentStore],
+  );
+
+  const grantedConsents = (['anthropic', 'openai'] as const).filter((kind) => consent[kind]);
 
   // ── Rendering ────────────────────────────────────────────────────────────
 
@@ -645,6 +753,17 @@ export function Analysis({
                 {localModelHint}
               </p>
             )}
+
+            {/*
+              Reachable regardless of which option is currently picked — a
+              consent granted earlier must stay visible and revocable even
+              after switching to Ollama or the basic match. See
+              `ConsentGate.tsx` for why this lives here and not in Settings.
+            */}
+            <ConsentStatus
+              granted={grantedConsents}
+              onWithdraw={(kind) => void onWithdrawConsent(kind)}
+            />
           </div>
 
           {/* ── 4. Run ────────────────────────────────────────────────── */}
@@ -764,6 +883,14 @@ export function Analysis({
           </DetailPane>
         ) : null}
       </div>
+
+      {pendingConsent === null ? null : (
+        <ConsentGate
+          kind={pendingConsent.kind}
+          onAccept={() => void onConsentAccept()}
+          onDecline={onConsentDecline}
+        />
+      )}
     </section>
   );
 }

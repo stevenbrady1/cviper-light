@@ -39,7 +39,7 @@ A plain request with nothing about you in it beyond the request itself.
 The app hands the address to your own browser and is not involved from then on. What that site sees is what your browser shows it.
 
 - `developer.adzuna.com` — The page where you register your own Adzuna key. Opened in your browser from Settings; the app does not load it.
-- `platform.openai.com` — The page where you create your own OpenAI API key. The OpenAI card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.
+- `platform.openai.com` — The page where you create your own OpenAI API key. The welcome screen and the OpenAI card in Settings hand the address to your browser when you tap it; the app never loads it, and nothing is added to the link.
 - `www.linkedin.com` — A keyless search link for LinkedIn, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `uk.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.totaljobs.com` — A keyless search link for Totaljobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.

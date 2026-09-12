@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { type ViewId } from '../../app/views';
+import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { readAvailability } from '../analysis/availability';
 import { type Availability } from '../analysis/providers';
+import { OPENAI_KEY_PROVIDER } from '../settings/keys/aiKeyModel';
 
-import { ONBOARDING_CARDS, localModelLine } from './cards';
+import { ONBOARDING_CARDS, OPENAI_COST_LINE, localModelLine } from './cards';
 
 /**
  * The first screen, and the only one that ever explains the whole product.
@@ -48,10 +50,21 @@ export interface WelcomeProps {
    * detection in the app, not two that can disagree on screen.
    */
   readonly detect?: (() => Promise<Availability>) | undefined;
+  /**
+   * Injected by tests. The real one hands an address to the user's own browser
+   * — the same port the Settings key card uses, so the two cannot disagree
+   * about what "open this page" means.
+   */
+  readonly browser?: BrowserPort | undefined;
 }
 
-export function Welcome({ onDismiss, detect }: WelcomeProps) {
+export function Welcome({ onDismiss, detect, browser }: WelcomeProps) {
   const [availability, setAvailability] = useState<Availability | null>(null);
+
+  // Built once. A new port object on every render would be a new identity for
+  // nothing — there is no effect depending on it, and there should not need to
+  // be one for this to stay cheap.
+  const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,6 +157,63 @@ export function Welcome({ onDismiss, detect }: WelcomeProps) {
                   ? 'Looking for a local model on this machine…'
                   : localModelLine(availability)}
               </p>
+            ) : null}
+
+            {/*
+              The key, priced and signposted — and deliberately BELOW the live
+              detection above, which is the free answer. A reader who already
+              has Ollama never needs any of this; a reader who does not gets the
+              cost before the link, so "where do I get one" is a question they
+              ask having already seen what it costs.
+
+              Neither control is primary. Blue means "the thing this screen is
+              for" exactly once per view (`app/buttons.ts`), the welcome spends
+              it on the tracker card, and a link that took it would make the
+              zero-setup product look like it was selling something.
+            */}
+            {card.id === 'analysis' ? (
+              <div data-testid="welcome-key-help" className="mt-2">
+                <p data-testid="welcome-cost" className="text-xs text-ink-muted">
+                  {OPENAI_COST_LINE}
+                </p>
+
+                <div className="mt-1 flex flex-wrap items-center gap-x-3">
+                  <button
+                    type="button"
+                    data-testid="welcome-key-link"
+                    /*
+                      Handed to the user's own browser through
+                      `platform/browser.ts`, never rendered as an `<a href>`: a
+                      plain anchor inside a Tauri window navigates the APP, so
+                      the user would watch CViper turn into openai.com.
+
+                      The address is `OPENAI_KEY_PROVIDER.signupUrl` — the same
+                      constant the Settings card opens, not a second copy. Two
+                      literals would drift silently, both still working, both
+                      pointing somewhere slightly different.
+                    */
+                    onClick={() => void browserPort.open(OPENAI_KEY_PROVIDER.signupUrl)}
+                    className={`${QUIET_BUTTON} px-0 text-blue hover:bg-card hover:text-navy`}
+                  >
+                    {OPENAI_KEY_PROVIDER.signupLabel} →
+                  </button>
+                  <span className="text-xs text-ink-faint">Opens in your browser.</span>
+                </div>
+
+                {/*
+                  No new routing. `onDismiss` already takes any `ViewId` and
+                  `App.onDismissWelcome` already calls `setActiveView` with it,
+                  which is how all three card buttons work.
+                */}
+                <button
+                  type="button"
+                  data-testid="welcome-key-settings"
+                  onClick={() => onDismiss('settings')}
+                  className={`${QUIET_BUTTON} mt-1 px-0 text-blue hover:bg-card hover:text-navy`}
+                >
+                  Paste a key in Settings →
+                </button>
+              </div>
             ) : null}
 
             <button
