@@ -414,3 +414,93 @@ export function centreOnCanvas(source: Rgba, width: number, height: number): Rgb
 
   return { width, height, data: out };
 }
+
+/**
+ * Colour precisions tried, in order, when an asset will not fit.
+ *
+ * 8 first, so every asset that fits is byte-for-byte lossless and only the
+ * handful that do not pay anything at all.
+ */
+export const PRECISION_LADDER: readonly number[] = [8, 7, 6, 5, 4];
+
+export interface EncodedPng {
+  readonly bytes: Uint8Array;
+  /** Bits kept per COLOUR channel. 8 means the image was not touched. */
+  readonly bitsPerChannel: number;
+}
+
+/**
+ * Drop the low bits of each colour channel, leaving alpha alone.
+ *
+ * ============================================================================
+ * ALPHA IS NOT REDUCED, AND THAT IS THE WHOLE TRICK
+ * ============================================================================
+ * The artwork is a badge on a transparent field, so every curve of it is an
+ * alpha ramp. Posterising alpha would put visible stair-steps on the outline at
+ * exactly the sizes people look at closely. Posterising COLOUR, on flat brand
+ * artwork with one navy and one white, is close to invisible — measured at
+ * 6 bits it still leaves ~3,100 distinct colours in a 620px tile.
+ *
+ * The high bits are replicated down into the vacated low bits rather than
+ * zeroed, so white stays 255 rather than drifting to 252 and the image does not
+ * darken as precision drops.
+ */
+export function reducePrecision(image: Rgba, bits: number): Rgba {
+  if (bits >= 8) return image;
+  if (bits < 1) throw new Error(`refusing to reduce colour to ${bits} bits a channel.`);
+
+  const keep = (0xff << (8 - bits)) & 0xff;
+  const data = new Uint8Array(image.data.length);
+
+  for (let index = 0; index < image.data.length; index += BPP) {
+    for (let channel = 0; channel < 3; channel += 1) {
+      const value = image.data[index + channel] ?? 0;
+      data[index + channel] = (value & keep) | (value >> bits);
+    }
+    data[index + 3] = image.data[index + 3] ?? 0;
+  }
+
+  return { width: image.width, height: image.height, data };
+}
+
+/**
+ * Encode losslessly if it fits, and only give up precision if it does not.
+ *
+ * ============================================================================
+ * WHY THIS IS NOT "JUST COMPRESS HARDER"
+ * ============================================================================
+ * The Windows App Certification Kit rejects a visual asset of 204,800 bytes or
+ * more, and it found two of ours on packaging run 34713983212. Deflate was
+ * already at level 9 with per-row adaptive filtering; 620x620 of anti-aliased
+ * artwork is simply more than 200KB of truecolour PNG. The only remaining lever
+ * is how many colours are in it.
+ *
+ * So the ladder is walked from the top: 30 of the 32 generated assets fit at
+ * full 8-bit precision and are untouched, and the two large tiles that do not
+ * lose colour precision until they fit — and the caller is TOLD which, because
+ * a generator that quietly degrades artwork is one nobody can review.
+ *
+ * `limit` is EXCLUSIVE, matching the kit's own wording: "must be smaller than
+ * 204800 bytes".
+ *
+ * If even the bottom of the ladder will not fit, this throws rather than
+ * writing a file that certification will reject. An asset that cannot be made
+ * to fit is a decision for a person — shrink the artwork, or drop the variant —
+ * not something to discover on a Windows runner twenty minutes into a job.
+ */
+export function encodeUnderLimit(image: Rgba, limit: number): EncodedPng {
+  let smallest = Number.POSITIVE_INFINITY;
+
+  for (const bitsPerChannel of PRECISION_LADDER) {
+    const bytes = encodePng(reducePrecision(image, bitsPerChannel));
+    if (bytes.length < limit) return { bytes, bitsPerChannel };
+    smallest = Math.min(smallest, bytes.length);
+  }
+
+  throw new Error(
+    `a ${image.width}x${image.height} asset could not be encoded under ${limit} bytes: the ` +
+      `smallest this reached was ${smallest} bytes, at ${PRECISION_LADDER.at(-1)} bits a colour ` +
+      'channel. Reduce the artwork or drop this variant from the asset table — do not raise the ' +
+      'limit, which is the certification kit’s and not ours.',
+  );
+}

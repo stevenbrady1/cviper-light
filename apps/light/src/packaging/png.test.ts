@@ -8,7 +8,16 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { centreOnCanvas, decodePng, downscale, encodePng, readPngHeader } from './png.ts';
+import {
+  PRECISION_LADDER,
+  centreOnCanvas,
+  decodePng,
+  downscale,
+  encodePng,
+  encodeUnderLimit,
+  readPngHeader,
+  reducePrecision,
+} from './png.ts';
 
 /** A solid block of one colour, as raw RGBA. */
 function solid(
@@ -22,6 +31,35 @@ function solid(
     data[index * 4 + 1] = g;
     data[index * 4 + 2] = b;
     data[index * 4 + 3] = a;
+  }
+  return { width, height, data };
+}
+
+/**
+ * A deterministic noisy image, big enough that PNG container overhead is
+ * negligible beside the pixel data.
+ *
+ * The `encodeUnderLimit` tests need artwork that precision reduction actually
+ * SHRINKS. A solid block does not qualify — it is already maximally
+ * compressible, and every rung of the ladder produces byte-identical output. A
+ * tiny block does not qualify either: a 64x64 image encodes to about 190 bytes,
+ * of which roughly 60 are IHDR/IDAT/IEND overhead that no amount of colour
+ * reduction can touch. Both of those were fixtures here, and both made the
+ * function throw while the function was behaving correctly.
+ */
+function noisy(width: number, height: number) {
+  const data = new Uint8Array(width * height * 4);
+  let seed = 0x2545f491;
+  for (let index = 0; index < width * height; index += 1) {
+    // xorshift32: no dependency, and the same bytes on every machine.
+    seed ^= seed << 13;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;
+    seed >>>= 0;
+    data[index * 4] = seed & 0xff;
+    data[index * 4 + 1] = (seed >>> 8) & 0xff;
+    data[index * 4 + 2] = (seed >>> 16) & 0xff;
+    data[index * 4 + 3] = 255;
   }
   return { width, height, data };
 }
@@ -159,6 +197,94 @@ describe('downscale', () => {
   it('boundary: an entirely transparent area stays entirely transparent', () => {
     const result = downscale(solid(4, 4, [200, 100, 50, 0]), 1, 1);
     expect(pixelAt(result, 0, 0)).toEqual([0, 0, 0, 0]);
+  });
+});
+
+describe('reducePrecision', () => {
+  it('leaves an image alone at full precision', () => {
+    const source = solid(4, 4, [1, 2, 3, 4]);
+    expect(reducePrecision(source, 8)).toBe(source);
+  });
+
+  it('keeps white at white rather than letting the image darken', () => {
+    // The high bits are replicated down into the vacated low bits. Zeroing them
+    // instead would turn 255 into 252 at 6 bits, and every asset would get very
+    // slightly darker each time the ladder stepped down.
+    const reduced = reducePrecision(solid(2, 2, [255, 255, 255, 255]), 4);
+    expect(pixelAt(reduced, 0, 0)).toEqual([255, 255, 255, 255]);
+  });
+
+  it('does NOT touch alpha, which is where the artwork’s edge lives', () => {
+    // Posterising alpha would put stair-steps on the badge outline. Colour is
+    // reduced; the alpha ramp is not.
+    const reduced = reducePrecision(solid(2, 2, [200, 100, 50, 137]), 4);
+    expect(pixelAt(reduced, 0, 0)[3]).toBe(137);
+  });
+
+  it('actually removes colours', () => {
+    const data = new Uint8Array(256 * 4);
+    for (let index = 0; index < 256; index += 1) {
+      data[index * 4] = index;
+      data[index * 4 + 3] = 255;
+    }
+    const distinct = (image: { data: Uint8Array }) =>
+      new Set([...image.data.filter((_, index) => index % 4 === 0)]).size;
+
+    expect(distinct({ data })).toBe(256);
+    expect(distinct(reducePrecision({ width: 256, height: 1, data }, 4))).toBe(16);
+  });
+
+  it('negative: refuses a precision that is not a precision', () => {
+    expect(() => reducePrecision(solid(2, 2, [0, 0, 0, 255]), 0)).toThrow(/refusing to reduce/);
+  });
+});
+
+describe('encodeUnderLimit', () => {
+  it('stays lossless when the image already fits', () => {
+    const image = solid(8, 8, [12, 34, 56, 255]);
+    const result = encodeUnderLimit(image, 1_000_000);
+
+    expect(result.bitsPerChannel).toBe(8);
+    expect([...decodePng(result.bytes).data]).toEqual([...image.data]);
+  });
+
+  it('gives up precision, in order, only as far as it must', () => {
+    const image = noisy(256, 256);
+    const full = encodePng(image).length;
+    const atSeven = encodePng(reducePrecision(image, 7)).length;
+
+    // The premise, asserted rather than assumed: this fixture must be one where
+    // dropping a single bit actually helps. If it were not, the expectation
+    // below would pass for the wrong reason on a ladder that had skipped rungs.
+    expect(atSeven).toBeLessThan(full);
+
+    // A limit of exactly `full` means 8-bit does NOT fit, because the limit is
+    // exclusive. The next rung does, so that is where it must stop — 7, not the
+    // bottom of the ladder.
+    const result = encodeUnderLimit(image, full);
+
+    expect(result.bitsPerChannel).toBe(7);
+    expect(result.bytes.length).toBeLessThan(full);
+    expect(PRECISION_LADDER).toContain(result.bitsPerChannel);
+  });
+
+  it('negative: throws rather than writing a file certification would reject', () => {
+    // The limit is the certification kit's, not ours. An asset that cannot be
+    // made to fit is a decision for a person, and the generator must stop.
+    expect(() => encodeUnderLimit(solid(64, 64, [1, 2, 3, 255]), 10)).toThrow(
+      /could not be encoded under 10 bytes/,
+    );
+  });
+
+  it('boundary: the limit is exclusive, matching "must be smaller than"', () => {
+    // The kit's wording is "must be SMALLER than 204800 bytes", so a file of
+    // exactly the limit is already too big. One byte either side of its own
+    // encoded size is what proves the comparison is `<` and not `<=`.
+    const image = noisy(256, 256);
+    const exact = encodePng(image).length;
+
+    expect(encodeUnderLimit(image, exact + 1).bitsPerChannel).toBe(8);
+    expect(encodeUnderLimit(image, exact).bitsPerChannel).toBeLessThan(8);
   });
 });
 

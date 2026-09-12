@@ -32,7 +32,7 @@
  * assets" while inspecting an empty set, which is this repository's
  * most-repeated failure.
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,6 +40,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MSIX_ASSETS,
+  MSIX_ASSET_BYTE_LIMIT,
   MSIX_ASSET_DIRECTORY,
   assetsNamedIn,
   sizeClaimedByName,
@@ -236,5 +237,43 @@ describe('the detectors bite, and let the honest shapes through', () => {
   it('negative: says so rather than guessing at a name it does not know', () => {
     expect(sizeClaimedByName('SplashScreen.png')).toBeNull();
     expect(sizeClaimedByName('whatever.png')).toBeNull();
+  });
+});
+
+// ── The size limit the certification kit enforces ────────────────────────────
+
+describe('no asset reaches the size the certification kit rejects', () => {
+  /**
+   * This rule exists because the kit found what this repository did not.
+   * Packaging run 34713983212 passed overall and reported "App resources" as
+   * failed: `Square310x310Logo.scale-200.png` was 364,684 bytes against a
+   * 204,800 limit. Nothing local had anything to say about it, so the first
+   * thing that could was a Windows runner, twenty minutes in, on the second
+   * packaging attempt.
+   */
+  const sizes = ON_DISK.map((file) => ({
+    file,
+    bytes: statSync(join(ASSET_DIRECTORY, file)).size,
+  }));
+
+  it('anti-inert: it is reading real byte counts, not zeroes', () => {
+    // A stat that returned 0 for everything would make the rule below pass for
+    // ever while inspecting nothing.
+    expect(sizes.length).toBeGreaterThanOrEqual(30);
+    expect(Math.max(...sizes.map((entry) => entry.bytes))).toBeGreaterThan(10_000);
+  });
+
+  it('every generated asset is under the limit', () => {
+    // "must be SMALLER than 204800 bytes" — exclusive, so `>=` is the offence.
+    const tooBig = sizes
+      .filter((entry) => entry.bytes >= MSIX_ASSET_BYTE_LIMIT)
+      .map((entry) => `${entry.file}: ${entry.bytes} bytes (limit ${MSIX_ASSET_BYTE_LIMIT})`);
+
+    expect(
+      tooBig,
+      'The Windows App Certification Kit fails its "App resources" check on any visual asset ' +
+        'this size. Regenerate with `pnpm assets:msix`, which reduces colour precision on the ' +
+        'few assets that need it rather than shipping one the kit will reject.',
+    ).toEqual([]);
   });
 });

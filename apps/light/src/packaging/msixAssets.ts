@@ -45,6 +45,29 @@ export const MSIX_ASSET_SOURCE = 'apps/light/branding/cviper-icon-1024.png';
 /** The folder name the manifest addresses assets through, inside the package. */
 export const MANIFEST_ASSET_FOLDER = 'Assets';
 
+/**
+ * The largest a Store visual asset may be, in bytes.
+ *
+ * ============================================================================
+ * NOT A GUESS. THIS IS QUOTED FROM THE FAILURE IT CAUSED.
+ * ============================================================================
+ * The Windows App Certification Kit enforces it, and it caught this repository
+ * out on MSIX packaging run 34713983212, under the "App resources" check:
+ *
+ *     The image file "Assets\Square310x310Logo.scale-200.png" must be smaller
+ *     than 204800 bytes.
+ *
+ * Note "must be SMALLER than", so the limit is exclusive: 204800 itself is too
+ * big. Two generated assets were over it — the 200% large tile at 364,684 bytes
+ * and the 400% medium tile at 342,966 — and the second one is in Microsoft's
+ * own stated minimum set, so it could not simply be dropped.
+ *
+ * `generateMsixAssets.ts` now encodes under this limit rather than hoping, and
+ * `msixAssets.contract.test.ts` fails the build if any asset reaches it. A size
+ * rule that only a Windows runner discovers is a fifteen-minute feedback loop.
+ */
+export const MSIX_ASSET_BYTE_LIMIT = 204800;
+
 export interface MsixAsset {
   /** File name, exactly as it must appear on disk and in the package. */
   readonly file: string;

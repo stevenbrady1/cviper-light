@@ -34,8 +34,13 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { MSIX_ASSETS, MSIX_ASSET_DIRECTORY, MSIX_ASSET_SOURCE } from './msixAssets.ts';
-import { centreOnCanvas, decodePng, downscale, encodePng } from './png.ts';
+import {
+  MSIX_ASSETS,
+  MSIX_ASSET_BYTE_LIMIT,
+  MSIX_ASSET_DIRECTORY,
+  MSIX_ASSET_SOURCE,
+} from './msixAssets.ts';
+import { centreOnCanvas, decodePng, downscale, encodeUnderLimit } from './png.ts';
 
 /** The monorepo root: `apps/light/src/packaging` → four levels up. */
 const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -57,15 +62,22 @@ function main(): void {
   mkdirSync(outputDirectory, { recursive: true });
 
   let bytes = 0;
+  const reduced: string[] = [];
   for (const asset of MSIX_ASSETS) {
     const image =
       asset.shape === 'wide'
         ? centreOnCanvas(source, asset.width, asset.height)
         : downscale(source, asset.width, asset.height);
 
-    const encoded = encodePng(image);
+    // Lossless where it fits; colour precision given up only where the
+    // certification kit's size limit forces it, and said out loud when it is.
+    const result = encodeUnderLimit(image, MSIX_ASSET_BYTE_LIMIT);
+    const encoded = result.bytes;
     writeFileSync(join(outputDirectory, asset.file), encoded);
     bytes += encoded.length;
+    if (result.bitsPerChannel < 8) {
+      reduced.push(`${asset.file} (${result.bitsPerChannel}-bit colour)`);
+    }
 
     console.log(
       `  ${asset.file.padEnd(48)} ${String(asset.width).padStart(4)}x${String(asset.height).padEnd(4)} ` +
@@ -74,6 +86,18 @@ function main(): void {
   }
 
   console.log('');
+
+  // Said out loud, every run. A generator that quietly degraded artwork to fit
+  // a limit would be one nobody could review, and the reduction is the only
+  // lossy thing this script does.
+  if (reduced.length > 0) {
+    console.log(
+      `colour precision reduced on ${reduced.length} of ${MSIX_ASSETS.length} assets, to fit ` +
+        `under the certification kit's ${MSIX_ASSET_BYTE_LIMIT}-byte limit:`,
+    );
+    for (const entry of reduced) console.log(`  ${entry}`);
+    console.log('');
+  }
   console.log(
     `wrote ${MSIX_ASSETS.length} assets (${bytes.toLocaleString('en-GB')} bytes) into ` +
       MSIX_ASSET_DIRECTORY,
