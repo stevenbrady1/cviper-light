@@ -1,5 +1,7 @@
 import {
+  OUTBOUND_CAPABILITIES,
   OUTBOUND_HOSTS,
+  type OutboundCapability,
   type OutboundHost,
   type OutboundPurpose,
 } from '../../../lib/outbound-hosts';
@@ -36,6 +38,13 @@ export interface PolicyInputs {
   readonly version: string;
   readonly hosts: readonly OutboundHost[];
   readonly locations: readonly DataLocation[];
+  /**
+   * Destinations with no fixed address (L-91). Defaults to NONE, because a pure
+   * renderer renders what it is handed — `currentPrivacyPolicy` supplies the
+   * real list, and `policyDocument.test.ts` asserts the rendered document
+   * carries every one of them.
+   */
+  readonly capabilities?: readonly OutboundCapability[] | undefined;
 }
 
 function hostsFor(hosts: readonly OutboundHost[], purpose: OutboundPurpose): OutboundHost[] {
@@ -85,16 +94,24 @@ export function renderPrivacyPolicy(inputs: PolicyInputs): string {
     '## Every address the app can contact',
     '',
     'This is not a summary. It is the exact set of addresses the code is allowed to name; a ' +
-      'test fails the build if one is added without appearing here.',
+      'test fails the build if one is added without appearing here. Two things below have no ' +
+      'fixed address — the advert page you choose, and Windows itself — so they are described ' +
+      'instead of named.',
     '',
   );
 
   for (const group of GROUPS) {
     const hosts = hostsFor(inputs.hosts, group.purpose);
-    if (hosts.length === 0) continue;
+    const capabilities = (inputs.capabilities ?? []).filter(
+      (entry) => entry.purpose === group.purpose,
+    );
+    if (hosts.length === 0 && capabilities.length === 0) continue;
     push(`### ${group.heading}`, '', group.meaning, '');
     for (const entry of hosts) {
       push(`- \`${entry.host}\` — ${entry.why}`);
+    }
+    for (const entry of capabilities) {
+      push(`- **${entry.what}** — ${entry.why}`);
     }
     push('');
   }
@@ -102,7 +119,7 @@ export function renderPrivacyPolicy(inputs: PolicyInputs): string {
   push(
     '## Services you may choose to use',
     '',
-    'If you paste an API key for OpenAI, Anthropic, Adzuna or Reed, the app sends the request ' +
+    'If you paste an API key for OpenAI, Adzuna or Reed, the app sends the request ' +
       'you start to that service under your own account, and that service handles what it ' +
       'receives under its own privacy policy, not this one. The key itself is stored in your ' +
       "device's credential store (the Keychain on Apple devices, Credential Manager on " +
@@ -142,5 +159,6 @@ export function currentPrivacyPolicy(): string {
     version: APP_VERSION,
     hosts: OUTBOUND_HOSTS,
     locations: DATA_LOCATIONS,
+    capabilities: OUTBOUND_CAPABILITIES,
   });
 }

@@ -24,7 +24,8 @@ import { type AiKeyPort } from './keys/aiKeyPort';
 import { KeySetup } from './keys/KeySetup';
 import { Signpost } from '../signposts/Signpost';
 
-import { PrivacyNotice } from './privacy/PrivacyNotice';
+import { PRIVACY_SUMMARY, PrivacyNotice } from './privacy/PrivacyNotice';
+import { ReportProblem } from './report/ReportProblem';
 import { TELEMETRY_ENABLED, TELEMETRY_NOTE } from './telemetry';
 import { type KeyPort } from './keys/port';
 import { StoreUpdates } from './updates/StoreUpdates';
@@ -427,6 +428,16 @@ export function Settings({
           <section>
             <h2 className="font-medium text-ink">Privacy</h2>
 
+            {/*
+              The owner's own paragraph, first, before the switch and before the
+              list. `privacyCopy.test.tsx` pins the wording — see the note there
+              for why this one paragraph is held still when the rest of the app's
+              copy deliberately is not.
+            */}
+            <p data-testid="settings-privacy-summary" className="mt-1 text-ink-muted">
+              {PRIVACY_SUMMARY}
+            </p>
+
             <label className="mt-2 flex items-start gap-2">
               <input
                 type="checkbox"
@@ -444,7 +455,8 @@ export function Settings({
             <p className="mt-1 text-xs text-ink-faint">
               There is no analytics library in this application, no crash reporter and no account.
               The only requests it ever makes are the ones you start: a job search, a CV check
-              against a provider you chose, and an update check you press.
+              against a provider you chose, an update check you press, and a job advert you ask it
+              to fetch.
             </p>
 
             <PrivacyNotice />
@@ -456,6 +468,8 @@ export function Settings({
           </section>
 
           <About browser={browserPort} />
+
+          <ReportProblem browser={browserPort} />
 
           <EraseEverything port={erasePort} backupPort={backupPort} onErased={onErased} />
         </div>

@@ -1,4 +1,8 @@
-import { OUTBOUND_HOSTS, type OutboundPurpose } from '../../../lib/outbound-hosts';
+import {
+  OUTBOUND_CAPABILITIES,
+  OUTBOUND_HOSTS,
+  type OutboundPurpose,
+} from '../../../lib/outbound-hosts';
 
 import { DATA_LOCATIONS } from './dataLocations';
 
@@ -47,7 +51,68 @@ export const GROUPS: readonly Group[] = [
     heading: 'Stays on this computer',
     meaning: 'A program running on this same machine. The request never reaches the internet.',
   },
+  {
+    purpose: 'made-by-your-system',
+    heading: 'Done by Windows, not by this app',
+    meaning:
+      'Part of the operating system, around the app rather than inside it. It is listed because ' +
+      'it is a real request leaving your PC, and left out it would look like something this app ' +
+      'was hiding.',
+  },
 ];
+
+/**
+ * The paragraph at the top of Settings → Privacy. The owner's own words.
+ *
+ * ============================================================================
+ * THE ENUMERATION IS OF WHAT CAN BE CONFIGURED TODAY, NOT OF WHAT EXISTS
+ * ============================================================================
+ * "today that's OpenAI, or a model running on your own PC" is a statement about
+ * what a user can SET UP from this build's Settings screen. It is deliberately
+ * NOT a statement about what the code can reach: `src-tauri/src/providers.rs`
+ * has a third variant, Anthropic, with a live base URL (`api.anthropic.com`),
+ * a live `/v1/messages` path and a live `anthropic_api_key` slot in the
+ * credential store. There is simply no key card that can create one — the card
+ * list is `keys/model.ts` (Adzuna, Reed) plus the single OpenAI card in
+ * `keys/aiKeyModel.ts`, whose `AiKeyProviderId` union has one member.
+ *
+ * The honest disclosure of Anthropic is a few inches further down this SAME
+ * screen: `api.anthropic.com` is a registered entry in `lib/outbound-hosts.ts`
+ * and is rendered in the generated host list below this paragraph. This
+ * sentence narrows the CHOICE; that list states the REACH. Both are true, and
+ * neither is hiding the other.
+ *
+ * ============================================================================
+ * WHOEVER ADDS AN ANTHROPIC KEY CARD MUST UPDATE THIS PARAGRAPH AND THE
+ * GENERATED POLICY IN THE SAME CHANGE.
+ * ============================================================================
+ * `configurableAi.contract.test.ts` fails the build if an AI provider becomes
+ * configurable and this paragraph does not name it. It watches the KEY-CARD
+ * list, not the Rust enum — see its docblock for why that distinction is the
+ * whole point.
+ *
+ * The per-provider consent gate in `runAnalysis.ts` (L-97, PR #35) needs NO
+ * update when that happens: its `ConsentProviderKind` is
+ * `Exclude<ProviderId, 'ollama'>`, so it already covers Anthropic and names it
+ * at the moment of the call. Only this paragraph and the policy document have
+ * to change, so nobody later assumes the consent work is also owed.
+ *
+ * ============================================================================
+ * "OR TEST A KEY" IS LOAD-BEARING. DO NOT TIDY IT AWAY.
+ * ============================================================================
+ * The draft before this one said the job-board keys leave "only when you
+ * search". That is not quite true: `job_test_credentials` (`src-tauri/src/jobs.rs`)
+ * runs a real one-result search through `send_search` when the user presses
+ * "Test and save this key" in Settings, so the key leaves the machine at SAVE
+ * time too. It is literally a search, which is why the shorter sentence reads
+ * as defensible — but nobody pressing Save would describe themselves as
+ * searching, and that gap is exactly the kind this paragraph exists to close.
+ */
+export const PRIVACY_SUMMARY =
+  'CViper Light runs on your computer. We have no server, no accounts, and no copy of your ' +
+  'data. Your CV and your OpenAI key only ever go to the AI you choose — today ' +
+  "that's OpenAI, or a model running on your own PC. Your job-board keys go only to Adzuna " +
+  'or Reed, and only when you search or test a key.';
 
 export function PrivacyNotice() {
   return (
@@ -67,12 +132,17 @@ export function PrivacyNotice() {
         <h3 className="font-medium text-ink">Every place this app can contact</h3>
         <p className="mt-1 text-xs text-ink-faint">
           This list is not a summary. It is the exact set of addresses the code is allowed to name;
-          a test fails the build if one is added without appearing here.
+          a test fails the build if one is added without appearing here. Two things below have no
+          fixed address — the advert page you choose, and Windows itself — so they are described
+          instead of named.
         </p>
 
         {GROUPS.map((group) => {
           const hosts = OUTBOUND_HOSTS.filter((entry) => entry.purpose === group.purpose);
-          if (hosts.length === 0) return null;
+          const capabilities = OUTBOUND_CAPABILITIES.filter(
+            (entry) => entry.purpose === group.purpose,
+          );
+          if (hosts.length === 0 && capabilities.length === 0) return null;
           return (
             <section key={group.purpose} className="mt-3">
               <h4 className="text-sm font-medium text-ink">{group.heading}</h4>
@@ -81,6 +151,16 @@ export function PrivacyNotice() {
                 {hosts.map((entry) => (
                   <li key={entry.host} data-testid={`privacy-host-${entry.host}`}>
                     <code className="text-ink">{entry.host}</code> — {entry.why}
+                  </li>
+                ))}
+                {/*
+                  Not a `<code>`: these are descriptions, not addresses, and
+                  setting them in the address face would read as though the app
+                  contacted something literally called "any job-advert page".
+                */}
+                {capabilities.map((entry) => (
+                  <li key={entry.id} data-testid={`privacy-capability-${entry.id}`}>
+                    <span className="text-ink">{entry.what}</span> — {entry.why}
                   </li>
                 ))}
               </ul>
