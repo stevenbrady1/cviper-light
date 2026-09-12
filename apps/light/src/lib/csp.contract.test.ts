@@ -223,6 +223,54 @@ describe('the bundle’s own assets are all same-origin, so the policy is suffic
   });
 });
 
+describe('the policy is not quietly disabled in development', () => {
+  /**
+   * A review note on this PR said the CSP is applied only in non-dev builds, so
+   * `pnpm tauri dev` would never surface a break. That is the opposite of what
+   * Tauri does, and the difference matters:
+   *
+   *     fn csp(&self) -> Option<Csp> {
+   *       if !crate::is_dev() { self.config.app.security.csp.clone() }
+   *       else { self.config.app.security.dev_csp.clone()
+   *                .or_else(|| self.config.app.security.csp.clone()) }
+   *     }
+   *                          — tauri-2.11.5/src/manager/mod.rs
+   *
+   * In dev it takes `devCsp` IF ONE IS SET and otherwise FALLS BACK to `csp`.
+   * So this policy already applies under `tauri dev`, and adding a `devCsp`
+   * is the one edit that would switch it off there — leaving a developer to
+   * meet their first CSP break in a packaged build. Hence a forbid-list: no
+   * `devCsp`.
+   */
+  it('sets no devCsp, which is what would switch this policy off in dev', () => {
+    const security = (CONFIG.app?.security ?? {}) as Record<string, unknown>;
+    expect(
+      security['devCsp'] ?? null,
+      'Tauri falls back to `csp` in dev only while `devCsp` is absent. Setting one means ' +
+        '`pnpm tauri dev` stops exercising the shipped policy, and the first person to meet a ' +
+        'CSP break is a user with a packaged build.',
+    ).toBeNull();
+  });
+
+  it('configures no pdf.js wasm URL, so script-src can stay tight', () => {
+    /*
+     * pdf.js calls `WebAssembly.instantiate` for JBIG2, OpenJPEG and ICC — all
+     * of which `script-src 'self'` blocks without `'wasm-unsafe-eval'`. Those
+     * paths are never reached here because `wasmUrl` is left unset, so pdf.js
+     * degrades to a warning instead. This asserts the premise rather than
+     * trusting it: set a `wasmUrl` and the policy silently stops being
+     * sufficient for the feature you just enabled.
+     */
+    const source = readFileSync(PDFJS_ASSETS_PATH, 'utf8');
+    expect(source).not.toMatch(/^\s*wasmUrl\s*:/m);
+    expect(source).not.toMatch(/^\s*iccUrl\s*:/m);
+    // Anti-inert: the keys it DOES set are present, so a renamed option object
+    // cannot make both assertions vacuous.
+    expect(source).toMatch(/workerSrc\s*:/);
+    expect(source).toMatch(/cMapUrl\s*:/);
+  });
+});
+
 describe('the detector can actually fail', () => {
   // Without this block, a regression in `parseCsp` or `webSourcesIn` that
   // returned nothing would clear every assertion above while the real policy

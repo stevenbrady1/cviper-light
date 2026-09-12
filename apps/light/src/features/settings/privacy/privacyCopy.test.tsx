@@ -47,17 +47,30 @@ function renderSettings() {
 describe('the paragraph at the top of Settings → Privacy', () => {
   it('is the owner’s wording, exactly', () => {
     expect(PRIVACY_SUMMARY).toBe(
-      'CViper Light runs on your computer. We have no server, no accounts, and no copy of ' +
-        'your data. Your key and your CV never leave your machine except to reach the AI ' +
-        'provider you choose — OpenAI, or a model running on your own PC.',
+      'CViper Light runs on your computer. We have no server, no accounts, and no copy of your ' +
+        'data. Your CV and your OpenAI key only ever go to the AI you choose — today ' +
+        "that's OpenAI, or a model running on your own PC. Your job-board keys go only to Adzuna " +
+        'or Reed, and only when you search.',
     );
   });
 
-  it('keeps the amendment: the destination is the provider you choose, not OpenAI alone', () => {
-    // The specific regression. The first draft named OpenAI as the only place a
-    // key or a CV could go, which is not true of a model running locally — and
-    // reads as though it were true of the whole app, which it is not either.
-    expect(PRIVACY_SUMMARY).toContain('the AI provider you choose');
+  it('scopes each promise to the thing it is actually true of', () => {
+    // Two drafts were rejected here, both for over-reaching. The first named
+    // OpenAI as the only destination a key or CV could reach. The second said
+    // "your key", which reads as ALL keys — but the Adzuna and Reed keys do
+    // leave the machine and neither is an AI provider.
+    //
+    // So each clause now names its own subject: the CV and the OpenAI key go
+    // to the chosen AI; the job-board keys go to the job boards.
+    expect(PRIVACY_SUMMARY).toContain('Your CV and your OpenAI key');
+    expect(PRIVACY_SUMMARY).toContain('Your job-board keys go only to Adzuna or Reed');
+  });
+
+  it('says "today", so the list reads as this build rather than for ever', () => {
+    // The word doing the work. `providers.rs` can reach Anthropic; no key card
+    // can configure it. "today that's…" is a claim about what is choosable in
+    // this build, and `configurableAi.contract.test.ts` is what keeps it true.
+    expect(PRIVACY_SUMMARY).toContain("today that's OpenAI");
     expect(PRIVACY_SUMMARY).toContain('a model running on your own PC');
   });
 

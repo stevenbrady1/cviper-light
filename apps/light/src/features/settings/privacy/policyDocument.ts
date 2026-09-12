@@ -119,7 +119,7 @@ export function renderPrivacyPolicy(inputs: PolicyInputs): string {
   push(
     '## Services you may choose to use',
     '',
-    'If you paste an API key for OpenAI, Anthropic, Adzuna or Reed, the app sends the request ' +
+    'If you paste an API key for OpenAI, Adzuna or Reed, the app sends the request ' +
       'you start to that service under your own account, and that service handles what it ' +
       'receives under its own privacy policy, not this one. The key itself is stored in your ' +
       "device's credential store (the Keychain on Apple devices, Credential Manager on " +

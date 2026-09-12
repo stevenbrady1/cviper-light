@@ -64,18 +64,44 @@ export const GROUPS: readonly Group[] = [
 /**
  * The paragraph at the top of Settings → Privacy. The owner's own words.
  *
- * The last sentence is the owner's AMENDMENT to their first draft, which named
- * OpenAI as the only destination. It is not the only one: the app also reaches
- * job boards with the user's own keys, whichever advert page they press Fetch
- * on, and GitHub for an update check. "except to reach the AI provider you
- * choose" is scoped to the two things it names — the key and the CV — which is
- * exactly what is true of those two, and `privacyCopy.test.tsx` pins the
- * wording so it cannot drift back into a promise about everything.
+ * ============================================================================
+ * THE ENUMERATION IS OF WHAT CAN BE CONFIGURED TODAY, NOT OF WHAT EXISTS
+ * ============================================================================
+ * "today that's OpenAI, or a model running on your own PC" is a statement about
+ * what a user can SET UP from this build's Settings screen. It is deliberately
+ * NOT a statement about what the code can reach: `src-tauri/src/providers.rs`
+ * has a third variant, Anthropic, with a live base URL (`api.anthropic.com`),
+ * a live `/v1/messages` path and a live `anthropic_api_key` slot in the
+ * credential store. There is simply no key card that can create one — the card
+ * list is `keys/model.ts` (Adzuna, Reed) plus the single OpenAI card in
+ * `keys/aiKeyModel.ts`, whose `AiKeyProviderId` union has one member.
+ *
+ * The honest disclosure of Anthropic is a few inches further down this SAME
+ * screen: `api.anthropic.com` is a registered entry in `lib/outbound-hosts.ts`
+ * and is rendered in the generated host list below this paragraph. This
+ * sentence narrows the CHOICE; that list states the REACH. Both are true, and
+ * neither is hiding the other.
+ *
+ * ============================================================================
+ * WHOEVER ADDS AN ANTHROPIC KEY CARD MUST UPDATE THIS PARAGRAPH AND THE
+ * GENERATED POLICY IN THE SAME CHANGE.
+ * ============================================================================
+ * `configurableAi.contract.test.ts` fails the build if an AI provider becomes
+ * configurable and this paragraph does not name it. It watches the KEY-CARD
+ * list, not the Rust enum — see its docblock for why that distinction is the
+ * whole point.
+ *
+ * The per-provider consent gate in `runAnalysis.ts` (L-97, PR #35) needs NO
+ * update when that happens: its `ConsentProviderKind` is
+ * `Exclude<ProviderId, 'ollama'>`, so it already covers Anthropic and names it
+ * at the moment of the call. Only this paragraph and the policy document have
+ * to change, so nobody later assumes the consent work is also owed.
  */
 export const PRIVACY_SUMMARY =
   'CViper Light runs on your computer. We have no server, no accounts, and no copy of your ' +
-  'data. Your key and your CV never leave your machine except to reach the AI provider you ' +
-  'choose — OpenAI, or a model running on your own PC.';
+  'data. Your CV and your OpenAI key only ever go to the AI you choose — today ' +
+  "that's OpenAI, or a model running on your own PC. Your job-board keys go only to Adzuna " +
+  'or Reed, and only when you search.';
 
 export function PrivacyNotice() {
   return (
