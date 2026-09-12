@@ -39,18 +39,36 @@ export interface UpdatePort {
 /**
  * Whatever the plugin threw, as a sentence.
  *
- * The four cases worth naming are the four that actually happen: no network, no
- * release feed yet, a manifest that will not parse, and a signature that will
- * not verify — the last being what a build whose baked-in pubkey does not match
- * the key the release was signed with produces. The key in `tauri.conf.json` is
- * real (minisign id 7029FCBC6B4F158F) and its private half is in this
- * repository's Actions secrets, so a correctly signed release verifies; a
- * mismatch is still worth a sentence the user can act on.
+ * The four cases worth naming are the four that actually happen: nothing
+ * published yet, no network, a manifest that will not parse, and a signature
+ * that will not verify — the last being what a build whose baked-in pubkey does
+ * not match the key the release was signed with produces. The key in
+ * `tauri.conf.json` is real (minisign id 7029FCBC6B4F158F) and its private half
+ * is in this repository's Actions secrets, so a correctly signed release
+ * verifies; a mismatch is still worth a sentence the user can act on.
  *
- * The parse case became worth naming when the endpoint moved to a fixed URL
- * whose asset is REPLACED on every release (L-92): a half-finished upload of
- * `latest.json` is now a state the endpoint can genuinely be in, and serde's
- * "expected value at line 1 column 1" means nothing to the person reading it.
+ * ============================================================================
+ * THE ORDER MATTERS, AND ONE CASE IS COUNTER-INTUITIVE
+ * ============================================================================
+ * "Nothing is published yet" does NOT arrive as a 404. Read out of
+ * tauri-plugin-updater 2.10.1 rather than assumed: a non-success status is
+ * logged WITHOUT setting `last_error` (`updater.rs`, the `else` at the end of
+ * the response match), so the endpoint loop ends with no release and no error,
+ * and `check()` returns `Error::ReleaseNotFound` — whose `#[error(...)]` text
+ * in `error.rs` is "Could not fetch a valid release JSON from the remote".
+ *
+ * That sentence contains the word JSON and NEITHER "404" NOR "not found", so it
+ * has to be matched BEFORE the parse branch below. Matched after, the user is
+ * told their release information is unreadable when the truth is that nothing
+ * has been published — blaming the download for the absence of one.
+ *
+ * It is not a corner case: until the permanent `updater` release exists every
+ * check lands here, so this is the message every user sees on first launch.
+ *
+ * The parse case is still reachable and still worth naming: a serde failure
+ * DOES set `last_error`, so its own text ("expected value at line 1 column 1")
+ * is what arrives, and a half-finished upload of `latest.json` is a state a
+ * fixed URL can genuinely be in (L-92).
  */
 export function describeUpdateFailure(thrown: unknown): UpdateProblem {
   const raw = thrown instanceof Error ? thrown.message : String(thrown);
@@ -65,7 +83,16 @@ export function describeUpdateFailure(thrown: unknown): UpdateProblem {
     };
   }
 
-  if (lower.includes('404') || lower.includes('not found')) {
+  // BEFORE the parse branch, deliberately — see the note above. The plugin's
+  // own words for "nothing is published" contain "JSON" and would otherwise
+  // fall through it. `404`/`not found` are kept for transport-level errors that
+  // do carry a status.
+  if (
+    lower.includes('release json') ||
+    lower.includes('releasenotfound') ||
+    lower.includes('404') ||
+    lower.includes('not found')
+  ) {
     return {
       message:
         'There are no published releases to compare against yet. Nothing is ' +

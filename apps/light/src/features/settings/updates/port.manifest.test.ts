@@ -93,15 +93,54 @@ describe('the manifest carries a signature that does not VERIFY', () => {
   });
 });
 
-describe('the endpoint is not there at all', () => {
-  it('negative: a 404 says nothing is wrong with this copy', async () => {
-    // The state the old `/releases/latest/` endpoint was permanently in.
-    plugin.check.mockRejectedValue(new Error('404 Not Found'));
+describe('the endpoint has nothing published behind it', () => {
+  it('negative: says nothing is published YET, not that the manifest is unreadable', async () => {
+    // ========================================================================
+    // THE STRING BELOW IS THE PLUGIN'S OWN, VERBATIM. DO NOT "TIDY" IT.
+    // ========================================================================
+    // An earlier version of this test fed a synthetic `404 Not Found`, which is
+    // a string this code path NEVER produces — a guard sitting green over a
+    // path it never touched.
+    //
+    // What actually happens, read out of tauri-plugin-updater 2.10.1: on a
+    // non-success status `updater.rs` logs it and does NOT set `last_error`
+    // (the `else` at the end of the response match). The endpoint loop then
+    // ends with no release AND no error, so `check()` returns
+    // `Error::ReleaseNotFound`, whose `#[error(...)]` text in `error.rs` is
+    // exactly the sentence below.
+    //
+    // Note what it contains: the word "JSON", and NEITHER "404" NOR "not
+    // found". That is precisely how it used to fall through into the
+    // malformed-manifest branch and tell the user their release information
+    // could not be read, when the truth is that nothing has been published.
+    //
+    // This is not a corner case. Until the permanent `updater` release exists,
+    // EVERY check lands here, so this is the message every user sees.
+    plugin.check.mockRejectedValue(
+      new Error('Could not fetch a valid release JSON from the remote'),
+    );
 
     const result = await createTauriUpdatePort().check();
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
+    expect(result.error.message).toContain('no published releases to compare against yet');
     expect(result.error.message).toContain('Nothing is wrong with your copy');
+    // And explicitly NOT the parse message, which would blame the wrong thing.
+    expect(result.error.message).not.toContain('could not be read');
+  });
+
+  it('boundary: a genuinely unreadable manifest still gets the parse message', async () => {
+    // The two must stay distinguishable. Both concern JSON; only one of them
+    // means "there is nothing published". A serde failure DOES set
+    // `last_error`, so its own text is what reaches here.
+    plugin.check.mockRejectedValue(new Error('expected value at line 1 column 1'));
+
+    const result = await createTauriUpdatePort().check();
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.message).toContain('could not be read');
+    expect(result.error.message).not.toContain('no published releases');
   });
 });

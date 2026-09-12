@@ -80,18 +80,19 @@ export interface RegistryProblem {
  * everything is fine.
  *
  * ============================================================================
- * WHY THIS NUMBER, AND NOT A HIGHER ONE
+ * WHY THIS NUMBER, AND WHY IT SITS BELOW THE TRUE COUNT
  * ============================================================================
- * It is MEASURED, not guessed. At the time of writing this repository contains
- * exactly TEN issues carrying an `[L-NNN]` label, and ten issues in total —
- * `gh issue list --state all --limit 200` returns ten. The other twenty-eight
- * numbers below #38 are pull requests, which share the numbering and are not
- * claims.
+ * It is MEASURED, not guessed. At the time of writing this repository holds
+ * TWELVE issues, and all twelve carry an `[L-NNN]` label — `[L-20b]` among
+ * them, which is why the pattern accepts a letter suffix. Most numbers below
+ * #39 are pull requests, which share the numbering and never claim.
  *
- * A floor set above the true count is not a stricter guard, it is a RED BUILD
- * on every commit, and a check that is always red is a check somebody deletes
- * or bypasses within a week. So it sits at the measured count and is expected
- * to be raised as items accumulate.
+ * The floor is deliberately set BELOW that, at ten. A floor at or above the
+ * true count is not a stricter guard, it is a RED BUILD the first time an issue
+ * is deleted or the search returns one fewer — and a check that is always red
+ * is one somebody deletes or bypasses within a week. Two of slack still catches
+ * the failure this exists for, which is an empty or near-empty list, without
+ * being brittle about the exact population.
  *
  * This is the weak leg on its own, which is why it is not the only one: see
  * `LABELS_THAT_MUST_EXIST`.
@@ -106,6 +107,18 @@ export const MINIMUM_LABELS = 10;
  * DIFFERENT set rather than a smaller one — a changed search, a filter applied
  * by accident, the wrong repository — the count leg stays green and this one
  * does not.
+ *
+ * ============================================================================
+ * ALL FIVE ARE CLOSED ISSUES (#10 TO #14), AND THAT IS THE POINT
+ * ============================================================================
+ * The listing is fetched with `--state all` because a number claimed by a
+ * CLOSED issue is still claimed — reusing it would put two different pieces of
+ * work under one identifier in the history.
+ *
+ * Should anybody ever "tidy" that flag to `--state open`, all five of these
+ * vanish from the result and this leg fails five times over immediately,
+ * naming each one, instead of the registry quietly beginning to adjudicate a
+ * fraction of the claims it believes it is looking at.
  */
 export const LABELS_THAT_MUST_EXIST: readonly string[] = ['L-80', 'L-81', 'L-82', 'L-83', 'L-84'];
 
