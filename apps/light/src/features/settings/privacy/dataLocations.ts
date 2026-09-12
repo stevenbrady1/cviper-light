@@ -9,6 +9,7 @@
  * one — a location nothing erases would make "delete everything" a lie, and
  * `EraseEverything.test.tsx` checks the claim.
  */
+import { CONSENT_STORE_FILE } from '../../analysis/consent';
 import { BOARD_STORE_FILE } from '../../boards/port';
 import { DB_URL } from '../../../db/constants';
 
@@ -40,6 +41,11 @@ export const DATA_LOCATIONS: readonly DataLocation[] = [
   {
     what: 'Which job boards you enabled and how you ordered them',
     where: `${BOARD_STORE_FILE} in the same data folder`,
+    erasedBy: 'preferences',
+  },
+  {
+    what: 'Which AI providers you agreed to send your CV to',
+    where: `${CONSENT_STORE_FILE} in the same data folder`,
     erasedBy: 'preferences',
   },
   {
