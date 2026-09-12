@@ -87,9 +87,11 @@ the executable alone was the correct minimal package.
 Store "may apply all tests from this workflow", so WACK marking "Blocked
 executables" optional is not a guarantee that the Store's own gate ignores it
 too. That residual risk closes with a real submission and nothing else, which is
-also the cheapest next move: enrol — as a COMPANY account, not the free
-individual one this entry originally recommended (see L-99 below) — and submit
-one build to find out what the gate actually does with it.
+also the cheapest next move: enrol as an individual developer (free, via
+storedeveloper.microsoft.com) and submit one build to find out what the gate
+actually does with it. This clause briefly read "as a COMPANY account" instead;
+that was wrong and is corrected in L-99 below, which is worth reading before
+signup because the account type cannot be changed afterwards.
 
 ### A consent gate now guards every cloud AI call (L-97, 2026-09-12)
 
@@ -118,43 +120,79 @@ Consent is per provider, never global, and revocation is reachable from the
 analysis screen itself (`ConsentStatus`), not from Settings, because
 `Settings.tsx` was mid-flight in another change at the time this landed.
 
-### Store enrolment is a company account, not an individual one (L-99, 2026-09-12)
+### Store enrolment is a free individual account (L-99, corrected by L-100, 2026-09-12)
 
-**The decision: a company account — roughly $99 one-off, plus business
-verification.** The L-95 entry above recommended the free individual developer
-account. That recommendation is withdrawn, and the reasoning is recorded here
-rather than the wrong clause simply being deleted, because this is one of the
-few choices in this project that cannot be walked back: **individual→company
-conversion is not supported**, and the account's country cannot be changed
-afterwards either. Getting it wrong is unrecoverable, which is why it was
-settled before signup rather than discovered after.
+**This entry was corrected the same day it was written.** As first recorded it
+said the opposite — "_The decision: a company account — roughly $99 one-off,
+plus business verification_" — and that was wrong. The withdrawn version is
+described here rather than quietly deleted, because how it came to be written
+matters more than the wrong answer did.
 
-**Two Store policies decide it.** Policy 10.14 sets two tests an individual
-account would have had to pass: a publisher name a reasonable consumer would
-read as a business requires a company account, and individual accounts are only
-for developers whose distribution is "not in relation to their business, trade,
-or profession." CViper Light carries an upsell link to the owner's commercial
-hosted product — permitted, and deliberately so, under ADR 012 in the hosted
-repository — which makes passing that second test genuinely doubtful. Policy
-10.8.3 is the blunter one: it bars a free individual account from requiring API
-secret keys for primary functionality, which would have forced the listing to
-lead with the keyless features alone. Neither restriction binds a company
-account.
+**Why it wobbled.** The question was put to the owner twice, by two different
+sessions, within a short window, in two different framings. The first framing
+priced a company account at "roughly $99 plus business verification" and left
+out the fact that actually decides it: a Microsoft **company** account requires
+a real, pre-existing registered business entity — a legal name and a company
+number — so choosing it means going and incorporating one first (roughly £50 at
+Companies House in the UK). Asked that way, the owner said company. Asked again
+with the registered-business-entity requirement stated up front, the owner said
+individual. The answer did not change; the question did. The defect was the
+framing, not the answer given to it.
 
-**It also lifts the Azure Artifact Signing geographic lockout**, which changes
-what this product may do rather than merely what it files. Individual developers
-there are limited to the USA and Canada; organisations in the UK are eligible,
-at roughly $9.99/month. The company account therefore turns "MSIX or nothing"
-into "MSIX **and** a signed direct-download `.exe`" — the Microsoft Store stops
-being the only possible Windows distribution channel.
+**The decision, confirmed 2026-09-12: a free individual developer account**,
+registered at `storedeveloper.microsoft.com`. Registration fees are waived for
+individual accounts; verification is a government ID plus a selfie. No business
+entity, no company number, nothing to incorporate.
 
-**It does not buy a clean install outside the Store, and nothing does on day
-one.** EV certificates stopped granting instant SmartScreen reputation in 2024;
-reputation now accrues over several weeks and hundreds of clean installs, with
-no route to request an expedited review. **The Store remains the only way to a
-warning-free install from the very first download.** A signed direct `.exe` is a
-second channel that improves with age — not a replacement for the Store, and not
-a reason to treat the Store submission as optional.
+**Two Store policies are the price of that account. Neither is a solved problem
+— both bind from here on.**
+
+Policy 10.8.3 bars a free individual account from requiring an API secret key
+for primary app functionality. CViper Light clears it honestly rather than
+narrowly: the app genuinely works with no key at all — the deterministic ATS
+checks, keyword matching, the job tracker and the keyless board links are the
+product, not a degraded mode of it. But clearing it is a **standing constraint
+on the Store listing**, not a box already ticked: the listing must lead with the
+keyless features, with the AI lane presented as an optional enhancement and
+never the other way round. That binds the listing copy, the screenshots and the
+first paragraph of the description whenever that work happens.
+
+Policy 10.14 decides the publisher name: it must be the owner's own personal
+name and not "CViper", because a publisher name a reasonable consumer would read
+as a business name requires a company account. The same policy carries an
+**open, unresolved risk**: individual accounts are for distribution "not in
+relation to a business, trade, or profession," and CViper Light carries an
+optional link out to the owner's commercial hosted product — permitted, and
+deliberately so, under ADR 012 in the hosted repository. That tension is real
+and it is **not cleared**. It is being accepted deliberately for now, and is
+recorded here so that if the Store ever raises it, nobody has to reconstruct
+whether it was seen coming.
+
+**Azure Artifact Signing is out of reach either way, and the withdrawn version
+of this entry claimed otherwise.** It said a company account "lifts the Azure
+Artifact Signing geographic lockout" and turns "MSIX or nothing" into "MSIX
+**and** a signed direct-download `.exe`" at roughly $9.99/month. That does not
+apply here: Azure Artifact Signing admits individual developers only in the USA
+and Canada, so a UK individual is ineligible — and with no company account, the
+organisation route that claim leaned on does not exist either. A signed direct
+`.exe` would instead need a traditional OV code-signing certificate at roughly
+$150–300/yr. **So the Microsoft Store (MSIX) is the only zero-cost route to a
+warning-free Windows install, and it remains the only Windows distribution
+channel unless and until an OV certificate is bought.**
+
+**It is still a one-way door — now walked through deliberately, with the
+deciding fact in hand.** Account type and country cannot be changed after
+signup, and individual→company conversion is not supported by Microsoft. That
+has not softened because the decision went the other way; it is exactly why the
+question was worth asking a second time instead of acting on the first answer.
+
+**And nothing buys a clean install outside the Store on day one anyway —
+certificate or not.** EV certificates stopped granting instant SmartScreen
+reputation in 2024; reputation now accrues over several weeks and hundreds of
+clean installs, with no route to request an expedited review. **The Store
+remains the only channel that is warning-free from the very first download** —
+true independently of the account-type question, and the one part of this entry
+the correction did not touch.
 
 ---
 
@@ -645,10 +683,12 @@ text editor and starts with `"schemaVersion": 1`.
    inert until those exist, and with none of them set it skips itself with a
    warning while Windows still ships.
 8. Microsoft Store enrolment — **the recommended next step**, on the strength of
-   the WACK result recorded in Status. Enrol as a **company account** — roughly
-   $99 one-off plus business verification — and never as the free individual
-   one: the conversion between them does not exist, and neither does changing
-   the account's country later (see L-99 in Status for why). It remains the only
-   way to settle what the WACK result cannot: submit one real build and see what
-   the Store's own gate does with it.
+   the WACK result recorded in Status. Enrol as a **free individual account** at
+   `storedeveloper.microsoft.com` — fees waived, verified with a government ID
+   and a selfie, no business entity needed. Read L-99 in Status before signing
+   up: the account type and country cannot be changed afterwards, the publisher
+   name must be your own personal name rather than "CViper", and the listing has
+   to lead with the keyless features. It remains the only way to settle what the
+   WACK result cannot: submit one real build and see what the Store's own gate
+   does with it.
 9. First tagged release and macOS notarization.
