@@ -16,7 +16,7 @@
  * else in a template is a literal, including — deliberately — the word `jobs`
  * in Google's query.
  */
-import { z } from 'zod';
+import { z } from './zod';
 
 import { err, ok, type Result } from './result';
 

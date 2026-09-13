@@ -28,7 +28,7 @@
  * under `meta.cviper`, one namespace, so nothing here can collide with another
  * tool's keys and another tool's keys survive a round trip through here.
  */
-import { z } from 'zod';
+import { z } from '@cviper/core-types/zod';
 
 const text = z.string();
 const texts = z.array(z.string());

@@ -47,7 +47,7 @@
  * asserting the two agree on their required-key sets. Change one, change the
  * other, in the same commit.
  */
-import { z } from 'zod';
+import { z } from './zod';
 
 import { type IsoDate } from './entities';
 

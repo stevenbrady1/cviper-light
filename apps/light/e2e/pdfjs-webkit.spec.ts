@@ -283,38 +283,38 @@ function fingerprint(violations: readonly CspViolation[]): string[] {
 
 /**
  * ============================================================================
- * A KNOWN DEFECT, PINNED. THIS LIST IS NOT AN APPROVAL.
+ * EMPTY, AND IT MUST STAY EMPTY (L-112).
  * ============================================================================
- * `script-src|eval` is a refusal THE PACKAGED APP ALREADY RAISES AT STARTUP,
- * before a user touches anything, and it has nothing to do with pdf.js. This
- * check is what found it.
+ * This list once held `script-src|eval`: a refusal THE PACKAGED APP RAISED AT
+ * STARTUP, before a user touched anything, on every single launch. Zod 4 decided
+ * whether to JIT-compile its validators by running `new Function("")` inside a
+ * try/catch (`allowsEval` in zod/v4/core); under `script-src 'self'` that was
+ * refused, zod caught the `EvalError` and quietly used its interpreted validator
+ * instead. Nothing broke, and a real `securitypolicyviolation` was raised in the
+ * shipped product anyway. This check is what found it.
  *
- * Zod 4 decides whether to JIT-compile its validators by running
- * `new Function("")` inside a try/catch (`allowsEval` in zod/v4/core). Under
- * `script-src 'self'` that is refused, zod catches the `EvalError`, and quietly
- * uses its interpreted validator instead. Nothing breaks — and a real
- * `securitypolicyviolation` is raised in the shipped product every single
- * launch. It was verified against `apps/light/dist`, the bundle that goes
- * inside the installer, not only against this harness.
+ * It is fixed. Every schema in the app is now built from `z` re-exported by
+ * `packages/core-types/src/zod.ts`, which calls `z.config({ jitless: true })`
+ * before it hands `z` on — and `allowsEval` skips the probe entirely under
+ * `jitless`, so the `new Function` is never reached. Import order is what makes
+ * that hold, and it is PROVEN rather than asserted: `zod.test.ts` in both
+ * `core-types` and `resume-schema` reads zod's own memoisation state to show the
+ * probe never ran, and `no-direct-zod-imports.contract.test.ts` fails if any
+ * shipped file reaches for `zod` without going through that module.
  *
- * `smoke.yml` cannot see it: that observer is installed once WebDriver has a
- * session, and this fires during first paint, before there is one.
+ * `smoke.yml` could never have seen the original defect: its observer is
+ * installed once WebDriver has a session, and the refusal fired during first
+ * paint, before there was one.
  *
- * The fix belongs in its own change, because it is not local — zod is imported
- * by six files across `core-types` and `resume-schema`, and `globalConfig` has
- * to be set before the FIRST object schema is constructed, which means routing
- * every `import { z } from 'zod'` through one module that calls
- * `z.config({ jitless: true })` first. Doing that here, unreviewed, inside a
- * change about pdf.js, is how a two-line fix becomes a silent regression in the
- * résumé parser.
- *
- * WHY AN EXACT LIST RATHER THAN AN IGNORE-PATTERN. The assertion below is
- * equality, so this cannot rot in either direction: a NEW refusal fails, and so
- * does this one DISAPPEARING — the day zod is fixed, this check goes red and
- * tells whoever fixed it to delete this constant. An ignore-list would have
- * silently outlived the bug and silently swallowed the next one.
+ * WHY AN EMPTY LIST RATHER THAN A DELETED ASSERTION. The assertion below is
+ * equality against this constant, so an empty list is the strongest form of the
+ * claim — ANY refusal, from anywhere, fails the run. Deleting the constant and
+ * the assertion with it would have left the app's startup CSP behaviour
+ * unwatched by anything, which is how the refusal went unnoticed until L-111
+ * built this check. If a new entry is ever proposed here, it is a defect being
+ * pinned, not a policy being approved: say which, and open the work item.
  */
-const KNOWN_REFUSALS: readonly string[] = ['script-src|eval'];
+const KNOWN_REFUSALS: readonly string[] = [];
 
 /**
  * Installed through Playwright's `addInitScript`, so it is running before the
@@ -655,20 +655,23 @@ describe('pdf.js under WebKit, with the packaged app’s policy and wiring', () 
     assert.equal(result.error?.pageCount, SCANNED_PAGE_COUNT);
   });
 
-  it('refused nothing beyond the app’s one known, pre-existing refusal', async () => {
+  it('refused nothing at all — the app raises no policy violation of its own', async () => {
     const seen = await observed();
     console.log(`webkit: refusals = ${JSON.stringify(seen.violations)}`);
 
-    // EQUALITY, not "contains none of the bad ones". See KNOWN_REFUSALS: a new
-    // refusal fails here, and so does the known one going away.
+    // EQUALITY against an EMPTY list, not "contains none of the bad ones". See
+    // KNOWN_REFUSALS: any refusal, from anywhere, fails here.
     assert.deepEqual(
       fingerprint(seen.violations),
       KNOWN_REFUSALS,
       'The set of Content-Security-Policy refusals changed.\n' +
-        'If a refusal was ADDED, something the app now does is blocked in the packaged build — ' +
-        'find it before shipping.\n' +
-        'If `script-src|eval` DISAPPEARED, zod’s JIT probe has been fixed: delete it from ' +
-        'KNOWN_REFUSALS in this file, and delete the note above it.\n' +
+        'The app must load with NONE. A refusal here is something the app now does that the ' +
+        'packaged build blocks — find it before shipping, and do not pin it here without a ' +
+        'work item saying why.\n' +
+        'If it is `script-src|eval` again, L-112 has regressed: some schema is being built ' +
+        'from a `z` that did not come through packages/core-types/src/zod.ts. ' +
+        'no-direct-zod-imports.contract.test.ts should have caught that first — find out why ' +
+        'it did not.\n' +
         `  seen: ${JSON.stringify(seen.violations)}`,
     );
 

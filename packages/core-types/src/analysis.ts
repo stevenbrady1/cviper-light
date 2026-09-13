@@ -19,7 +19,7 @@
  * risk; the guard against it is a test asserting the two agree on their
  * required-key sets. Change one, change the other, in the same commit.
  */
-import { z } from 'zod';
+import { z } from './zod';
 
 export type Verdict = 'strong' | 'possible' | 'weak';
 

@@ -18,7 +18,7 @@
  * than one that may or may not exist. The single exception is `__extra`, which
  * is a forward-compatibility mechanism rather than data — see `ExtraFields`.
  */
-import { z } from 'zod';
+import { z } from './zod';
 
 import { CvAnalysisSchema, type CvAnalysis } from './analysis';
 
