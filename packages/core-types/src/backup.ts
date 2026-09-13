@@ -27,7 +27,7 @@
  *   "jobs": [...], "applications": [...], "cvs": [...], "analyses": [...]
  * }
  */
-import { z } from 'zod';
+import { z } from './zod';
 
 import {
   AnalysisSchema,
