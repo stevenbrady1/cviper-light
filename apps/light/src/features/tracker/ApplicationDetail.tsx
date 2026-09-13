@@ -5,6 +5,7 @@ import { type Application, type ApplicationStatus } from '@cviper/core-types';
 import { DESTRUCTIVE_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { daysSinceTimestamp } from '../../lib/dates';
 import { useDebouncedField } from '../../lib/useDebouncedField';
+import { isOpenableUrl, type BrowserPort } from '../../platform/browser';
 
 import { ConfirmDelete } from './ConfirmDelete';
 import { NEXT_ACTION_TONES, nextActionUrgency } from './nextAction';
@@ -41,6 +42,13 @@ interface ApplicationDetailProps {
   readonly entry: TrackerEntry;
   readonly today: string;
   readonly now: Date;
+  /**
+   * The way out to the advert. Required rather than optional-with-a-default,
+   * so this component can never quietly build a second port: the board already
+   * has one for the signpost, and two would be two things to keep honest about
+   * what "open this page" means.
+   */
+  readonly browser: BrowserPort;
   readonly onEdit: (
     changes: Partial<Pick<Application, 'notes' | 'next_action' | 'next_action_date'>>,
   ) => void;
@@ -58,12 +66,26 @@ export function ApplicationDetail({
   entry,
   today,
   now,
+  browser,
   onEdit,
   onStatusChange,
   onDelete,
 }: ApplicationDetailProps) {
   const { application, job } = entry;
   const [confirming, setConfirming] = useState(false);
+
+  /*
+   * Is there an advert to go back to?
+   *
+   * `isOpenableUrl` rather than `job.url !== null`, because those are not the
+   * same question. `createEntry` folds a blank Link box to `null`, but an
+   * imported backup is only held to `z.string().nullable()`, and the Link box
+   * itself accepts any text under 2000 characters — so `''`, `'   '` and
+   * `www.reed.co.uk/jobs/1` are all reachable stored values that
+   * `platform/browser.ts` would refuse. Asking the app's own predicate makes
+   * every control that renders a control that works.
+   */
+  const advertUrl = job.url !== null && isOpenableUrl(job.url) ? job.url : null;
 
   const notes = useDebouncedField(
     application.notes ?? '',
@@ -94,6 +116,57 @@ export function ApplicationDetail({
         />
         {stalenessDescription(days)}
       </p>
+
+      {/*
+        ============================================================================
+        THE WAY BACK TO THE ADVERT (L-109)
+        ============================================================================
+        The Link box has been saving `jobs.url` since the board shipped and
+        nothing ever read it, so putting an advert on the tracker LOST the route
+        to it — the one errand a tracker exists to save.
+
+        `SECONDARY_BUTTON`, not primary: blue means "the thing this screen is
+        for" once per view (`app/buttons.ts`), and the board is for tracking,
+        not for leaving. Not `QUIET_BUTTON` either — the search card keeps this
+        action quiet because "Save to tracker" is louder beside it, and here
+        there is nothing to be quieter than.
+
+        It says "advert", never "apply". CViper Light does not submit
+        applications; it hands the address to the browser the user is already
+        signed in to, and the label has to mean only that.
+
+        HIDDEN, not disabled, when there is nowhere to go. The search results
+        card disables its equivalent because every other card in the same list
+        has one and a control that comes and goes down a list cannot be learnt.
+        A single record has no such row to keep faith with, and a permanently
+        dead button on a pane the user opens for every edit is just a reminder
+        of a box they chose not to fill in.
+      */}
+      {advertUrl === null ? null : (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <button
+            type="button"
+            data-testid="detail-open-advert"
+            /*
+              Byte for byte, with nothing appended. The CViper web application
+              tags every outbound advert URL with `utm_source` and friends;
+              this app does not, and a new caller is exactly how that stops
+              being true. `advertLink.test.tsx` compares the opened address to
+              the stored one on a URL that already has a query string.
+
+              Fire-and-forget, like `Search.onOpen` and the welcome screen's
+              key link: the port already turns a refusal into a `Result`, and
+              inventing a third error surface here would be a banner the other
+              two callers do not have.
+            */
+            onClick={() => void browser.open(advertUrl)}
+            className={SECONDARY_BUTTON}
+          >
+            Open the advert →
+          </button>
+          <span className="text-xs text-ink-faint">Opens in your browser.</span>
+        </div>
+      )}
 
       <div>
         <label htmlFor="detail-status" className="block text-xs font-medium text-ink-muted">

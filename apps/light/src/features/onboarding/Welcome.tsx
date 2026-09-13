@@ -119,6 +119,32 @@ export function Welcome({ onDismiss, detect, browser }: WelcomeProps) {
           Your data stays on this computer. There is no account and nothing to sign up for. Two of
           these work better with a free key, and the page says which — you can start without one.
         </p>
+
+        {/*
+          The one request this reader has not been told about (L-108).
+
+          `App.tsx` runs the update check in a mount effect and `launchCheck.ts`
+          resolves an unconfigured machine to ON, so on a first run the app asks
+          github.com for a version number while this screen is still the only
+          thing anybody has read. The disclosure existed, in Settings → Privacy
+          — a screen a first-run user has not opened yet. A promise that is only
+          kept somewhere the reader has not been is not kept.
+
+          Stated, not apologised for: the launch check is how a security fix
+          reaches a direct-download build at all, and the default is deliberate
+          (`launchCheck.ts` sets out the whole argument). The wording is the
+          README's, so the front page of the repo and the first screen of the
+          app say the same thing in the same words.
+
+          `launchCheckDisclosure.contract.test.tsx` holds this to the
+          `github.com` row of `lib/outbound-hosts.ts` and to the live default,
+          so it cannot quietly go false — and stands down on its own if the app
+          ever stops checking on launch.
+        */}
+        <p data-testid="welcome-update-check" className="mt-2 max-w-2xl text-xs text-ink-faint">
+          When CViper Light starts it asks GitHub whether there is a newer version — a request for a
+          version number, carrying nothing about you. Settings → Updates switches it off.
+        </p>
       </header>
 
       <div className="mx-auto mt-6 grid w-full max-w-5xl gap-4 lg:grid-cols-3">

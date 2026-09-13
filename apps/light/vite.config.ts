@@ -29,8 +29,12 @@ import tailwindcss from '@tailwindcss/vite';
  * binaries that nobody can review in a diff, and copying keeps them in lockstep
  * with the installed pdfjs-dist instead of drifting from it at the next bump.
  * `public/pdfjs` is therefore gitignored.
+ *
+ * EXPORTED so `vite.webkit-harness.config.ts` can build the WebKit check's page
+ * with the SAME copier rather than a second one that drifts from it. Nothing
+ * else imports it.
  */
-function copyPdfJsAssets(): Plugin {
+export function copyPdfJsAssets(): Plugin {
   // Only the data pdf.js needs to extract TEXT. `wasm/` (image decoders) and
   // `iccs/` (colour profiles) are for rendering a page, which this app never
   // does — see the note in src/parsing/pdfjs-assets.ts.

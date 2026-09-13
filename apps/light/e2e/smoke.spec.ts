@@ -8,7 +8,7 @@
  * it is slow, it writes into `target/`, and a release bundle is a human/CI
  * artefact. The cost of that rule is that nothing in this repository had ever
  * been verified in the thing users actually run. Every test here is a Vitest
- * test against jsdom or a pure function; the Rust tests are `cargo test --lib`.
+ * test against jsdom or a pure function; the Rust tests are `cargo test`.
  * Between "the React tree renders" and "the app opens on a Windows desktop"
  * sit the WebView2 runtime, the Tauri IPC bridge, the capability file, the
  * bundled `frontendDist`, and the plugin registrations in `lib.rs` — none of

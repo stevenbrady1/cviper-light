@@ -98,6 +98,79 @@ jobs:
         run: pnpm format:check
 
   # ------------------------------------------------------------------
+  # DOES pdf.js WORK UNDER WebKit? (L-111)
+  # ------------------------------------------------------------------
+  # `packages/cv-parsing/src/pdfjs.ts` swaps the LEGACY pdfjs-dist build in for
+  # Node tests, because the modern one cannot be imported in Node at all. So
+  # every cv-parsing unit test exercises a different build from the one users
+  # run, and the only real-engine check — smoke.yml — is WebView2 on Windows.
+  # iOS is WKWebView, a different engine, under the same strict policy, and
+  # nothing had ever executed that path anywhere.
+  #
+  # This job drives the app's own parsing code — modern build, real module
+  # worker, the wiring from src/parsing/pdfjs-assets.ts, and the
+  # Content-Security-Policy read straight out of tauri.conf.json — under
+  # Playwright's WebKit. What it does and does not retire is written down at the
+  # top of apps/light/e2e/pdfjs-webkit.spec.ts; it is a proxy for WKWebView and
+  # not iOS, and that paragraph must be read before anyone quotes this job.
+  #
+  # ITS OWN JOB, NOT A STEP IN `verify`, AND NOT A VITEST TEST.
+  # It needs a ~60 MB browser download. `pnpm test` has to stay something a
+  # contributor can run offline in seconds, so this sits behind `pnpm webkit`
+  # exactly as the built-binary check sits behind `pnpm smoke`. Nothing about
+  # that separation is enforced by convention:
+  # apps/light/src/lib/webkit-check-runs-in-ci.contract.test.ts fails if this
+  # job stops existing, stops running `pnpm webkit`, or stops installing the
+  # browser — a check nobody runs is not a check.
+  #
+  # UBUNTU, NOT MACOS. Playwright's WebKit is the same engine source on every
+  # platform; only the port around it differs. A macOS runner would give the
+  # port closest to WKWebView and costs ten times as much, and it STILL would
+  # not be iOS — so it would buy a little fidelity and none of the risks the
+  # spec's honest-limit note says remain open. Ubuntu is the cheap half of that
+  # trade, taken deliberately.
+  webkit:
+    name: drive pdf.js under WebKit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Keyed on the lockfile, so a playwright-core bump misses the cache and
+      # downloads the browser build that matches it. A stale hit cannot go
+      # unnoticed: the install step below re-downloads anything absent, and the
+      # spec fails loudly rather than skipping if the binary is missing.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-webkit-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      # `playwright-core`, not `playwright`: the browser download is a lifecycle
+      # script pnpm does not run by default, and `playwright-core` has no such
+      # script at all — so a contributor's `pnpm install` never pulls 60 MB it
+      # may not want. The download is asked for here, explicitly.
+      # `--with-deps` installs the system libraries WebKit needs on a bare
+      # runner; without them the launch fails with a missing .so.
+      - name: Install the WebKit browser
+        run: pnpm --filter @cviper/light exec playwright-core install --with-deps webkit
+
+      # Builds the harness page, then drives it. A missing browser FAILS here;
+      # it never skips.
+      - name: Drive pdf.js under WebKit
+        run: pnpm webkit
+
+  # ------------------------------------------------------------------
   # No key of ours is ever compiled into this app (hosted ADR 012, R-COST).
   # Three surfaces: every reachable commit, the working tree, and the BUILT
   # web bundle — the last is what ships inside the installer's webview and is
