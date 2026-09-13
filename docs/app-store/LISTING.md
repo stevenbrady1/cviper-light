@@ -9,11 +9,13 @@ delete the other before pasting.
 > Do not paste this copy there: Microsoft's policy 10.8.3 constrains what a
 > free individual account's listing may lead with, and Apple's does not.
 
-> **One AI provider, not two.** Since L-102 the only AI key the app can SET UP
-> is OpenAI. An Anthropic key can still be read out of the OS credential store
-> if an older build ever wrote one, so `api.anthropic.com` remains in the
-> generated privacy policy — but no screen can save one and no picker can offer
-> one, so nothing below may tell a reviewer to paste one.
+> **Two AI providers, both bring-your-own-key.** Since L-149 Settings can set up
+> either an OpenAI or an Anthropic key (before that, L-102 restricted this to
+> OpenAI alone — an Anthropic key could only be read out of the OS credential
+> store if an older build had written one, and no screen could save a fresh
+> one). The analysis screen offers whichever key is saved, or a local model
+> through Ollama. Nothing supplies a key on your behalf, and nothing reaches
+> either provider until you choose it.
 
 ## App Information
 

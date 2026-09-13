@@ -5,30 +5,40 @@ import { createTauriBrowserPort, type BrowserPort } from '../../../platform/brow
 import { combineKeyState, type KeyState } from '../../../status/environment';
 
 import {
-  AI_KEY_PASS,
-  AI_KEY_REMOVED,
+  AI_KEY_PROVIDERS,
   AI_KEY_SAVED_MASK,
   AI_KEY_SAVE_REFUSED,
-  OPENAI_KEY_PROVIDER,
   normaliseAiKey,
   validateAiKey,
+  type AiKeyProvider,
+  type AiKeyProviderId,
 } from './aiKeyModel';
+import { AI_KEY_PROVIDER_IDS } from './aiKeyProviders';
 import { createTauriAiKeyPort, type AiKeyPort } from './aiKeyPort';
 import { KEY_STATE_LABEL, KEY_STATE_TONE } from './model';
 
 /**
- * Setting up the OpenAI key: one card, and no key saved until OpenAI has
- * accepted it.
+ * Setting up an AI key: one card per provider Settings can actually configure,
+ * and no key saved until the provider has accepted it.
+ *
+ * ============================================================================
+ * ONE CARD PER PROVIDER IN `AI_KEY_PROVIDER_IDS` (L-149)
+ * ============================================================================
+ * Until L-149 this rendered exactly one card, hardcoded to OpenAI. It now maps
+ * over the same list `analysis/providers.ts` reads to decide what the picker
+ * may offer, so a card added later (or removed) changes what is drawn here
+ * automatically rather than needing a second edit — the same discipline
+ * `KeySetup.tsx` already follows for the two job boards.
  *
  * ============================================================================
  * TEST FIRST. THE ORDER IS THE FEATURE, NOT A NICETY.
  * ============================================================================
- * Pressing the button sends the key in the box to OpenAI — a single cheap
- * metadata request — and only writes it to the credential store if OpenAI
- * answers. The failure that prevents is the expensive one: a mistyped key
- * sitting in the store looking configured, the analysis screen offering
- * "OpenAI" on the strength of it, and the user finding out after a thirty-second
- * wait that the answer is a 401.
+ * Pressing the button sends the key in the box to the provider — a single
+ * cheap metadata request — and only writes it to the credential store if the
+ * provider answers. The failure that prevents is the expensive one: a
+ * mistyped key sitting in the store looking configured, the analysis screen
+ * offering that provider on the strength of it, and the user finding out
+ * after a thirty-second wait that the answer is a 401.
  *
  * It also means a save can never clobber a working key with a broken one — the
  * old key is still in place for the whole time the new one is being checked.
@@ -45,12 +55,12 @@ import { KEY_STATE_LABEL, KEY_STATE_TONE } from './model';
  * ============================================================================
  * NO PRIMARY BUTTON HERE
  * ============================================================================
- * Blue means "this is the thing this screen is for", exactly once per view, and
- * Settings already spends it on Export. `Settings.test.tsx` counts the enabled
- * primaries and expects exactly one.
+ * Blue means "this is the thing this screen is for", exactly once per view,
+ * and Settings already spends it on Export. `Settings.test.tsx` counts the
+ * enabled primaries and expects exactly one.
  */
 
-/** What the card is doing, and what it has to say about the last thing it did. */
+/** What a card is doing, and what it has to say about the last thing it did. */
 interface CardOutcome {
   /** A confirmation. Rendered as a `status`, never an alert. */
   readonly passed: string | null;
@@ -60,24 +70,58 @@ interface CardOutcome {
 
 const NOTHING: CardOutcome = { passed: null, problem: null };
 
-/** The input's id, reused by the label and by `aria-describedby`. */
-const INPUT_ID = 'ai-key-input-openai';
-const ERROR_ID = `${INPUT_ID}-error`;
-
 export interface AiKeySetupProps {
-  /** Injected by tests. Defaults to the real keyring-and-transport port. */
-  readonly port?: AiKeyPort | undefined;
+  /**
+   * Injected by tests, one fake per provider id that needs one. A provider
+   * with no entry here falls back to the real keyring-and-transport port —
+   * exactly as the single `port` prop used to default before Anthropic
+   * existed.
+   */
+  readonly ports?: Partial<Record<AiKeyProviderId, AiKeyPort>> | undefined;
   /** Injected by tests: the real one opens the user's browser. */
   readonly browser?: BrowserPort | undefined;
 }
 
-export function AiKeySetup({ port, browser }: AiKeySetupProps = {}) {
-  // Built once. A new port object every render would restart the status effect
-  // on every keystroke.
-  const keyPort = useMemo(() => port ?? createTauriAiKeyPort(), [port]);
+export function AiKeySetup({ ports, browser }: AiKeySetupProps = {}) {
   const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
 
-  const provider = OPENAI_KEY_PROVIDER;
+  return (
+    <section data-testid="ai-key-setup">
+      <h2 className="font-medium text-ink">AI provider keys</h2>
+      <p className="mt-1 text-ink-muted">
+        Optional. The analysis screen already has a keyword match that needs no account, and the
+        tracker is entirely offline. A key adds one thing: a full reading of your CV against an
+        advert by a model that understands both.
+      </p>
+
+      <div className="mt-4 space-y-4">
+        {AI_KEY_PROVIDER_IDS.map((id) => (
+          <AiKeyCard
+            key={id}
+            provider={AI_KEY_PROVIDERS[id]}
+            port={ports?.[id]}
+            browser={browserPort}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+interface AiKeyCardProps {
+  readonly provider: AiKeyProvider;
+  /** Injected by tests. Defaults to the real keyring-and-transport port. */
+  readonly port?: AiKeyPort | undefined;
+  readonly browser: BrowserPort;
+}
+
+function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
+  // Built once per provider. A new port object every render would restart the
+  // status effect on every keystroke.
+  const keyPort = useMemo(
+    () => injectedPort ?? createTauriAiKeyPort(provider.secret, provider.id),
+    [injectedPort, provider.id, provider.secret],
+  );
 
   const [answer, setAnswer] = useState<boolean | null>(null);
   const [value, setValue] = useState('');
@@ -107,12 +151,15 @@ export function AiKeySetup({ port, browser }: AiKeySetupProps = {}) {
   // likely to be looking at it.
   const state: KeyState = combineKeyState([answer]);
 
+  const inputId = `ai-key-input-${provider.id}`;
+  const errorId = `${inputId}-error`;
+
   const onTest = useCallback(async () => {
     setOutcome(NOTHING);
 
-    // Checked here first, so a blank box never costs a round trip to OpenAI to
-    // find out it was blank.
-    const problem = validateAiKey(value);
+    // Checked here first, so a blank box never costs a round trip to the
+    // provider to find out it was blank.
+    const problem = validateAiKey(value, provider.label);
     setFieldError(problem);
     if (problem !== null) return;
 
@@ -148,9 +195,9 @@ export function AiKeySetup({ port, browser }: AiKeySetupProps = {}) {
     // to stay in the DOM afterwards, and one good reason for it not to.
     setValue('');
     setBusy(false);
-    setOutcome({ passed: AI_KEY_PASS, problem: null });
+    setOutcome({ passed: provider.passMessage, problem: null });
     await refresh();
-  }, [keyPort, refresh, value]);
+  }, [keyPort, provider.label, provider.passMessage, refresh, value]);
 
   const onRemove = useCallback(async () => {
     setOutcome(NOTHING);
@@ -167,152 +214,147 @@ export function AiKeySetup({ port, browser }: AiKeySetupProps = {}) {
       return;
     }
 
-    setOutcome({ passed: AI_KEY_REMOVED, problem: null });
+    setOutcome({ passed: provider.removedMessage, problem: null });
     await refresh();
-  }, [keyPort, refresh]);
+  }, [keyPort, provider.removedMessage, refresh]);
 
   return (
-    <section data-testid="ai-key-setup">
-      <h2 className="font-medium text-ink">OpenAI key</h2>
-      <p className="mt-1 text-ink-muted">
-        Optional. The analysis screen already has a keyword match that needs no account, and the
-        tracker is entirely offline. A key adds one thing: a full reading of your CV against an
-        advert by a model that understands both.
-      </p>
+    <article
+      data-testid={`ai-key-card-${provider.id}`}
+      className="rounded-card border border-line bg-card p-4 shadow-raised"
+    >
+      <header className="flex items-baseline justify-between gap-3">
+        <h3 className="font-medium text-ink">{provider.label}</h3>
+        <span
+          data-testid={`ai-key-state-${provider.id}`}
+          data-state={state}
+          className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-medium ${KEY_STATE_TONE[state]}`}
+        >
+          {KEY_STATE_LABEL[state]}
+        </span>
+      </header>
 
-      <article
-        data-testid="ai-key-card-openai"
-        className="mt-4 rounded-card border border-line bg-card p-4 shadow-raised"
-      >
-        <header className="flex items-baseline justify-between gap-3">
-          <h3 className="font-medium text-ink">{provider.label}</h3>
-          <span
-            data-testid="ai-key-state-openai"
-            data-state={state}
-            className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-medium ${KEY_STATE_TONE[state]}`}
-          >
-            {KEY_STATE_LABEL[state]}
-          </span>
-        </header>
+      <p className="mt-1 text-ink-muted">{provider.unlocks}</p>
+      <p className="mt-1 text-xs text-ink-faint">{provider.billing}</p>
 
-        <p className="mt-1 text-ink-muted">{provider.unlocks}</p>
-        <p className="mt-1 text-xs text-ink-faint">{provider.billing}</p>
+      <div className="mt-2">
+        <button
+          type="button"
+          data-testid={`ai-key-signup-${provider.id}`}
+          onClick={() => void browser.open(provider.signupUrl)}
+          className={`${QUIET_BUTTON} px-0 text-blue hover:bg-card hover:text-navy`}
+        >
+          {provider.signupLabel} →
+        </button>
+        <span className="ml-2 text-xs text-ink-faint">Opens in your browser.</span>
+      </div>
 
-        <div className="mt-2">
-          <button
-            type="button"
-            data-testid="ai-key-signup-openai"
-            onClick={() => void browserPort.open(provider.signupUrl)}
-            className={`${QUIET_BUTTON} px-0 text-blue hover:bg-card hover:text-navy`}
-          >
-            {provider.signupLabel} →
-          </button>
-          <span className="ml-2 text-xs text-ink-faint">Opens in your browser.</span>
-        </div>
+      {/*
+        A saved key, said without showing any of it. Fixed bullets from a
+        bool — nothing here has ever seen the value.
+      */}
+      {answer === true ? (
+        <p data-testid={`ai-key-saved-${provider.id}`} className="mt-2 text-xs text-ink-muted">
+          Saved <span className="font-mono">{AI_KEY_SAVED_MASK}</span>
+        </p>
+      ) : null}
 
-        {/*
-          A saved key, said without showing any of it. Fixed bullets from a
-          bool — nothing here has ever seen the value.
-        */}
-        {answer === true ? (
-          <p data-testid="ai-key-saved-openai" className="mt-2 text-xs text-ink-muted">
-            Saved <span className="font-mono">{AI_KEY_SAVED_MASK}</span>
-          </p>
-        ) : null}
+      <div className="mt-3">
+        <label htmlFor={inputId} className="block text-xs font-medium text-ink-muted">
+          {provider.fieldLabel}
+        </label>
+        <input
+          id={inputId}
+          data-testid={inputId}
+          /*
+            A password field, with no reveal toggle. The value is a credential,
+            this window is the sort of thing people screenshot when asking for
+            help, and the Test button answers the question a reveal toggle
+            would be for — "did that paste correctly?" — far better than
+            reading it back character by character.
+          */
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          value={value}
+          disabled={busy}
+          /*
+            Announced, not just coloured. A screen reader gets "invalid" and
+            is pointed at the sentence saying why — the same pairing
+            `NewApplicationForm` uses for every one of its fields.
+          */
+          aria-invalid={fieldError === null ? undefined : true}
+          aria-describedby={fieldError === null ? undefined : errorId}
+          onChange={(event) => {
+            setValue(event.currentTarget.value);
+            // The error belonged to the old value. Keeping it while the user
+            // fixes the thing it complained about is just noise.
+            setFieldError(null);
+          }}
+          className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
+            fieldError === null ? 'border-line' : 'border-danger'
+          }`}
+        />
+        <p className="mt-1 text-xs text-ink-faint">{provider.fieldHint}</p>
 
-        <div className="mt-3">
-          <label htmlFor={INPUT_ID} className="block text-xs font-medium text-ink-muted">
-            {provider.fieldLabel}
-          </label>
-          <input
-            id={INPUT_ID}
-            data-testid={INPUT_ID}
-            /*
-              A password field, with no reveal toggle. The value is a credential,
-              this window is the sort of thing people screenshot when asking for
-              help, and the Test button answers the question a reveal toggle
-              would be for — "did that paste correctly?" — far better than
-              reading it back character by character.
-            */
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={value}
-            disabled={busy}
-            /*
-              Announced, not just coloured. A screen reader gets "invalid" and
-              is pointed at the sentence saying why — the same pairing
-              `NewApplicationForm` uses for every one of its fields.
-            */
-            aria-invalid={fieldError === null ? undefined : true}
-            aria-describedby={fieldError === null ? undefined : ERROR_ID}
-            onChange={(event) => {
-              setValue(event.currentTarget.value);
-              // The error belonged to the old value. Keeping it while the user
-              // fixes the thing it complained about is just noise.
-              setFieldError(null);
-            }}
-            className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
-              fieldError === null ? 'border-line' : 'border-danger'
-            }`}
-          />
-          <p className="mt-1 text-xs text-ink-faint">{provider.fieldHint}</p>
-
-          {fieldError === null ? null : (
-            <p id={ERROR_ID} data-testid="ai-key-error-openai" className="mt-1 text-xs text-danger">
-              {fieldError}
-            </p>
-          )}
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            data-testid="ai-key-test-openai"
-            disabled={busy}
-            onClick={() => void onTest()}
-            className={SECONDARY_BUTTON}
-          >
-            {busy ? 'Checking…' : 'Test and save this key'}
-          </button>
-
-          <button
-            type="button"
-            data-testid="ai-key-remove-openai"
-            /*
-              Disabled, never hidden. A control that appears and disappears is a
-              control the user cannot learn.
-            */
-            disabled={busy || answer !== true}
-            onClick={() => void onRemove()}
-            className={QUIET_BUTTON}
-          >
-            Remove saved key
-          </button>
-        </div>
-
-        {outcome.passed === null ? null : (
+        {fieldError === null ? null : (
           <p
-            role="status"
-            data-testid="ai-key-result-openai"
-            className="mt-3 rounded-control bg-teal/10 px-3 py-2 text-teal"
+            id={errorId}
+            data-testid={`ai-key-error-${provider.id}`}
+            className="mt-1 text-xs text-danger"
           >
-            {outcome.passed}
+            {fieldError}
           </p>
         )}
+      </div>
 
-        {outcome.problem === null ? null : (
-          <p
-            role="alert"
-            data-testid="ai-key-problem-openai"
-            className="mt-3 rounded-control bg-danger/5 px-3 py-2 text-danger"
-          >
-            {outcome.problem}
-          </p>
-        )}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          data-testid={`ai-key-test-${provider.id}`}
+          disabled={busy}
+          onClick={() => void onTest()}
+          className={SECONDARY_BUTTON}
+        >
+          {busy ? 'Checking…' : 'Test and save this key'}
+        </button>
 
-        <p className="mt-3 text-xs text-ink-faint">{provider.privacyNote}</p>
-      </article>
-    </section>
+        <button
+          type="button"
+          data-testid={`ai-key-remove-${provider.id}`}
+          /*
+            Disabled, never hidden. A control that appears and disappears is a
+            control the user cannot learn.
+          */
+          disabled={busy || answer !== true}
+          onClick={() => void onRemove()}
+          className={QUIET_BUTTON}
+        >
+          Remove saved key
+        </button>
+      </div>
+
+      {outcome.passed === null ? null : (
+        <p
+          role="status"
+          data-testid={`ai-key-result-${provider.id}`}
+          className="mt-3 rounded-control bg-teal/10 px-3 py-2 text-teal"
+        >
+          {outcome.passed}
+        </p>
+      )}
+
+      {outcome.problem === null ? null : (
+        <p
+          role="alert"
+          data-testid={`ai-key-problem-${provider.id}`}
+          className="mt-3 rounded-control bg-danger/5 px-3 py-2 text-danger"
+        >
+          {outcome.problem}
+        </p>
+      )}
+
+      <p className="mt-3 text-xs text-ink-faint">{provider.privacyNote}</p>
+    </article>
   );
 }

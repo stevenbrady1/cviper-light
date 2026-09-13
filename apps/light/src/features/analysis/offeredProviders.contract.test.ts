@@ -2,12 +2,12 @@
  * The app must not OFFER an AI provider it cannot SET UP (L-102).
  *
  * ============================================================================
- * THE DEFECT THIS PINS
+ * THE DEFECT THIS PINS — HISTORICAL: FIXED FOR ANTHROPIC BY L-149
  * ============================================================================
- * `features/settings/keys/model.ts` carries key cards for Adzuna and Reed, and
- * `features/settings/keys/aiKeyModel.ts` carries exactly one AI card: OpenAI.
- * There has never been an Anthropic card. Every other link in the Anthropic
- * chain, however, is live:
+ * Until L-149, `features/settings/keys/model.ts` carried key cards for Adzuna
+ * and Reed, and `features/settings/keys/aiKeyModel.ts` carried exactly one AI
+ * card: OpenAI. There was no Anthropic card, yet every other link in the
+ * Anthropic chain was already live:
  *
  *   * `SecretKey::AnthropicApiKey` is a real variant, and `secret_set` is an
  *     exposed IPC command that accepts it;
@@ -103,8 +103,16 @@ const EVERY_AVAILABILITY: Availability[] = [false, true].flatMap((anthropicKey) 
   ),
 );
 
-describe('a saved key with no key card is not offered', () => {
-  it('does not offer Anthropic even when its key is in the credential store', async () => {
+describe('a saved key now offers Anthropic, because L-149 gave it a key card', () => {
+  // This block used to prove the opposite — that a saved Anthropic key was
+  // NOT offered, because no card in Settings could have created it. L-149
+  // added that card, so `AI_KEY_PROVIDER_IDS` now includes 'anthropic' and the
+  // exact mechanism this file exists to test — offered ⊆ configurable — makes
+  // the offer correct rather than a bug. The setup below (a credential store
+  // that genuinely holds the key) is unchanged; only the verdict flips, in the
+  // same way `unconfigurableKeyClaims.contract.test.tsx`'s "verdict follows
+  // the key-card list" tests already anticipated.
+  it('offers Anthropic once its key is in the credential store', async () => {
     tauri.invoke.mockReset();
     tauri.invoke.mockImplementation(async (command, args) => {
       if (command === 'ollama_probe') return null;
@@ -114,15 +122,12 @@ describe('a saved key with no key card is not offered', () => {
 
     const availability = await readAvailability();
 
-    // The report is UNCHANGED and still true: the key really is there. This is
-    // the half that proves the rule lives in the picker rather than in the
-    // probe — a gate inside `readAvailability` would fail this line.
     expect(availability.anthropicKey).toBe(true);
 
     const offered = providerOptions(availability).map((option) => option.kind);
 
-    expect(offered).not.toContain('anthropic');
-    expect(offered).toEqual(['keyword']);
+    expect(offered).toContain('anthropic');
+    expect(offered).toEqual(['keyword', 'anthropic']);
   });
 });
 

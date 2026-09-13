@@ -26,7 +26,7 @@ This is not a summary. It is the exact set of addresses the code is allowed to n
 These carry a key you pasted into Settings, under an account that is yours. The bill, if there is one, is between you and that provider.
 
 - `api.openai.com` — A CV analysis, or a pasted job advert, that you start, sent with your own OpenAI key under your own OpenAI account.
-- `api.anthropic.com` — A CV analysis, or a pasted job advert, that you start, but only if an Anthropic key is already in this computer’s credential store. This version has no screen for adding one, so for most people it is never contacted.
+- `api.anthropic.com` — A CV analysis, or a pasted job advert, that you start, sent with your own Anthropic key under your own Anthropic account.
 - `api.adzuna.com` — A job search you start, sent with the free Adzuna key you registered yourself. Adzuna’s API requires both parts of that key — the app ID and the app key — as parameters in the web address, so they appear in Adzuna’s own request logs. The request also carries your search words and location, which is what a search is, and Adzuna sees your IP address, exactly as it would if you searched on its own site yourself.
 - `www.reed.co.uk` — A job search you start, sent with the free Reed key you registered yourself, carrying your search words and location — Reed sees those and your IP address, exactly as it would if you searched on reed.co.uk yourself. Reed’s developer page is also opened in your browser from Settings, and so is a keyless search link for Reed from job-boards.json; the app never loads either page.
 
@@ -45,6 +45,7 @@ The app hands the address to your own browser and is not involved from then on. 
 
 - `developer.adzuna.com` — The page where you register your own Adzuna key. Opened in your browser from Settings; the app does not load it.
 - `platform.openai.com` — The page where you create your own OpenAI API key. The welcome screen and the OpenAI card in Settings hand the address to your browser when you tap it; the app never loads it, and nothing is added to the link.
+- `console.anthropic.com` — The page where you create your own Anthropic API key. The Anthropic card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.
 - `www.linkedin.com` — A keyless search link for LinkedIn, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `uk.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.totaljobs.com` — A keyless search link for Totaljobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
@@ -69,7 +70,7 @@ Part of the operating system, around the app rather than inside it. It is listed
 
 ## Services you may choose to use
 
-If you paste an API key for OpenAI, Adzuna or Reed, the app sends the request you start to that service under your own account, and that service handles what it receives under its own privacy policy, not this one. The key itself is stored in your device's credential store (the Keychain on Apple devices, Credential Manager on Windows), and the app has no way to read it back into the screen.
+If you paste an API key for OpenAI, Anthropic, Adzuna or Reed, the app sends the request you start to that service under your own account, and that service handles what it receives under its own privacy policy, not this one. The key itself is stored in your device's credential store (the Keychain on Apple devices, Credential Manager on Windows), and the app has no way to read it back into the screen.
 
 If you run Ollama, the analysis goes to that program on the same device and not to the internet.
 

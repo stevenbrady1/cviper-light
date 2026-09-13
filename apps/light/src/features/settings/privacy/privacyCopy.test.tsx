@@ -46,11 +46,14 @@ function renderSettings() {
 
 describe('the paragraph at the top of Settings → Privacy', () => {
   it('is the owner’s wording, exactly', () => {
+    // Re-pinned for L-149: Anthropic joined OpenAI as a provider Settings can
+    // actually set up, and `configurableAi.contract.test.ts` requires this
+    // paragraph to name every configurable provider.
     expect(PRIVACY_SUMMARY).toBe(
       'CViper Light runs on your computer. We have no server, no accounts, and no copy of your ' +
-        'data. Your CV and your OpenAI key only ever go to the AI you choose — today ' +
-        "that's OpenAI, or a model running on your own PC. Your job-board keys go only to Adzuna " +
-        'or Reed, and only when you search or test a key.',
+        'data. Your CV and your OpenAI or Anthropic key only ever go to the AI you choose — ' +
+        "today that's OpenAI or Anthropic, or a model running on your own PC. Your job-board " +
+        'keys go only to Adzuna or Reed, and only when you search or test a key.',
     );
   });
 
@@ -70,7 +73,7 @@ describe('the paragraph at the top of Settings → Privacy', () => {
     //
     // So each clause now names its own subject: the CV and the OpenAI key go
     // to the chosen AI; the job-board keys go to the job boards.
-    expect(PRIVACY_SUMMARY).toContain('Your CV and your OpenAI key');
+    expect(PRIVACY_SUMMARY).toContain('Your CV and your OpenAI or Anthropic key');
     expect(PRIVACY_SUMMARY).toContain('Your job-board keys go only to Adzuna or Reed');
   });
 

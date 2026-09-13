@@ -1,11 +1,21 @@
 /**
- * The four things the OpenAI key card does to the outside world, and nothing
- * else.
+ * The four things an AI key card does to the outside world, and nothing else.
+ *
+ * ============================================================================
+ * ONE PORT, ONE PROVIDER — BUILT PER CARD, NOT PER CALL
+ * ============================================================================
+ * `createTauriAiKeyPort(secret, providerId)` closes over which credential and
+ * which `ProviderId` this instance speaks for, the same way `AiKeyProvider`
+ * itself is one record per provider. `AiKeySetup` builds one port per card, so
+ * every method here stays a plain zero-argument (or key-only) call — exactly
+ * the shape `AiKeySetup.test.tsx`'s fake already had before Anthropic existed,
+ * so that file needed no change beyond the one line that wires its fake to the
+ * OpenAI card specifically.
  *
  * ============================================================================
  * TEST FIRST, SAVE SECOND. THE ORDER IS THE FEATURE.
  * ============================================================================
- * `test` sends the key the user just typed straight to OpenAI and saves
+ * `test` sends the key the user just typed straight to the provider and saves
  * NOTHING. `save` is a separate call the caller only makes once the test has
  * come back green. A test that wrote first and rolled back on failure would
  * have already overwritten the working key it was replacing — and a crash mid
@@ -29,13 +39,10 @@ import { invoke } from '@tauri-apps/api/core';
 
 import { err, ok, type Result } from '@cviper/core-types';
 
-import { OPENAI_SECRET_KEY } from './aiKeyModel';
+import { type AiKeyProviderId } from './aiKeyModel';
 
 /** The command names registered in `generate_handler!`. */
 const TEST_COMMAND = 'provider_test_key';
-
-/** The `ProviderId` variant Rust expects, spelled as serde serialises it. */
-const OPENAI_PROVIDER = 'openai';
 
 /** A credential store that would not do what was asked. */
 export interface AiKeyStoreError {
@@ -104,15 +111,24 @@ function describeStoreFailure(thrown: unknown): string {
   return 'This computer’s credential store did not answer. Try again in a moment.';
 }
 
-export function createTauriAiKeyPort(): AiKeyPort {
+/**
+ * @param secret Which credential this card reads and writes — spelled exactly
+ *   as `SecretKey` serialises it in Rust (`OPENAI_SECRET_KEY`,
+ *   `ANTHROPIC_SECRET_KEY`).
+ * @param providerId Which `ProviderId` variant `provider_test_key` should try.
+ *   `AiKeyProviderId`'s values are spelled identically to how Rust's
+ *   `ProviderId` enum serialises (`'openai'`, `'anthropic'`), so this is
+ *   passed straight through with nothing to translate.
+ */
+export function createTauriAiKeyPort(secret: string, providerId: AiKeyProviderId): AiKeyPort {
   return {
     async status() {
       try {
-        const answer = await invoke('secret_status', { key: OPENAI_SECRET_KEY });
+        const answer = await invoke('secret_status', { key: secret });
         // A non-boolean answer means Rust and this file disagree about the
         // command. Treating a truthy string as "yes" would claim a key exists
         // on the word of a bug, and the analysis screen would then offer an
-        // OpenAI option that cannot work.
+        // option that cannot work.
         return typeof answer === 'boolean' ? answer : null;
       } catch {
         return null;
@@ -121,7 +137,11 @@ export function createTauriAiKeyPort(): AiKeyPort {
 
     async test(key) {
       try {
-        await invoke(TEST_COMMAND, { provider: OPENAI_PROVIDER, key });
+        // The argument names must be the Rust parameter names exactly. A
+        // rename on either side would otherwise break silently at runtime —
+        // see `the_frontend_calls_the_key_test_by_this_name` in `providers.rs`,
+        // which greps for this exact literal shape.
+        await invoke(TEST_COMMAND, { provider: providerId, key });
         return ok(undefined);
       } catch (thrown) {
         return err({ message: describeRustFailure(thrown) });
@@ -130,7 +150,7 @@ export function createTauriAiKeyPort(): AiKeyPort {
 
     async save(key) {
       try {
-        await invoke('secret_set', { key: OPENAI_SECRET_KEY, value: key });
+        await invoke('secret_set', { key: secret, value: key });
         return ok(undefined);
       } catch (thrown) {
         // Never swallowed. A save that silently did nothing would leave the
@@ -141,7 +161,7 @@ export function createTauriAiKeyPort(): AiKeyPort {
 
     async remove() {
       try {
-        await invoke('secret_delete', { key: OPENAI_SECRET_KEY });
+        await invoke('secret_delete', { key: secret });
         return ok(undefined);
       } catch (thrown) {
         return err({ message: describeStoreFailure(thrown) });

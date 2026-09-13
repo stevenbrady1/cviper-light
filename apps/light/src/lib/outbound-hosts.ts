@@ -78,21 +78,15 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
   {
     host: 'api.anthropic.com',
     purpose: 'fetched-with-your-key',
-    // Scoped deliberately (L-105). `providers.rs` can reach Anthropic and
-    // `anthropic_api_key` is a real slot in the credential store — but since
-    // L-102 no screen in this build can put one there, so copy offering the
-    // reader "your own Anthropic key" described something no part of the app
-    // supports. The host STAYS: this list states reach, not choice, and
-    // dropping it would make the notice a summary. Only the sentence changed.
-    // `privacy/unconfigurableKeyClaims.contract.test.tsx` fails the build if a
-    // provider with no key card is ever described as one you hold a key for.
-    //
-    // L-134c added "or a pasted job advert" for the same reason as OpenAI's
-    // entry above; the "no screen for adding one" caveat is unchanged.
-    why:
-      'A CV analysis, or a pasted job advert, that you start, but only if an Anthropic key is ' +
-      'already in this computer’s credential store. This version has no screen for adding ' +
-      'one, so for most people it is never contacted.',
+    // L-105 scoped this to reach-not-choice while no Anthropic card existed:
+    // `providers.rs` could reach Anthropic and `anthropic_api_key` was a real
+    // slot in the credential store, but no screen could put one there, so
+    // "your own Anthropic key" would have described something no part of the
+    // app supported. L-149 added that screen, so the possession claim is now
+    // true — `privacy/unconfigurableKeyClaims.contract.test.tsx` is written
+    // exactly to flip its verdict the moment `AI_KEY_PROVIDER_IDS` includes
+    // 'anthropic', and this is that moment.
+    why: 'A CV analysis, or a pasted job advert, that you start, sent with your own Anthropic key under your own Anthropic account.',
   },
   {
     host: 'api.adzuna.com',
@@ -152,6 +146,13 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     host: 'platform.openai.com',
     purpose: 'opened-in-your-browser',
     why: 'The page where you create your own OpenAI API key. The welcome screen and the OpenAI card in Settings hand the address to your browser when you tap it; the app never loads it, and nothing is added to the link.',
+  },
+  {
+    host: 'console.anthropic.com',
+    purpose: 'opened-in-your-browser',
+    // L-149: the Anthropic card's own "Where do I get a key?" link, alongside
+    // OpenAI's platform.openai.com entry above.
+    why: 'The page where you create your own Anthropic API key. The Anthropic card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.',
   },
   {
     host: 'www.linkedin.com',

@@ -67,9 +67,13 @@ describe('extractionOptions — what this machine can offer', () => {
   it('offers a cloud provider only when its key is saved AND the app can set it up', () => {
     // Inherited from `providerOptions`, which is the point of reusing it: the
     // L-102 rule — offer only what Settings can set up — reaches the paste form
-    // without this file having to know about it. A saved Anthropic key has no
-    // key card behind it, so this machine can extract nothing.
-    expect(extractionOptions({ ...NOTHING, anthropicKey: true })).toEqual([]);
+    // without this file having to know about it. Before L-149 a saved
+    // Anthropic key had no key card behind it, so this machine could extract
+    // nothing from it; now that the card exists, the same key offers exactly
+    // as OpenAI's already did.
+    expect(extractionOptions({ ...NOTHING, anthropicKey: true }).map((o) => o.kind)).toEqual([
+      'anthropic',
+    ]);
 
     expect(extractionOptions({ ...NOTHING, openaiKey: true }).map((o) => o.kind)).toEqual([
       'openai',

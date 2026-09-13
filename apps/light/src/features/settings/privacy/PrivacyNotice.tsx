@@ -67,24 +67,19 @@ export const GROUPS: readonly Group[] = [
  * ============================================================================
  * THE ENUMERATION IS OF WHAT CAN BE CONFIGURED TODAY, NOT OF WHAT EXISTS
  * ============================================================================
- * "today that's OpenAI, or a model running on your own PC" is a statement about
- * what a user can SET UP from this build's Settings screen. It is deliberately
- * NOT a statement about what the code can reach: `src-tauri/src/providers.rs`
- * has a third variant, Anthropic, with a live base URL (`api.anthropic.com`),
- * a live `/v1/messages` path and a live `anthropic_api_key` slot in the
- * credential store. There is simply no key card that can create one — the card
- * list is `keys/model.ts` (Adzuna, Reed) plus the single OpenAI card in
- * `keys/aiKeyModel.ts`, whose `AiKeyProviderId` union has one member.
+ * "today that's OpenAI or Anthropic, or a model running on your own PC" is a
+ * statement about what a user can SET UP from this build's Settings screen —
+ * `keys/model.ts` (Adzuna, Reed) plus the two cards in `keys/aiKeyModel.ts`,
+ * whose `AiKeyProviderId` union now has both members (L-149).
  *
- * The honest disclosure of Anthropic is a few inches further down this SAME
- * screen: `api.anthropic.com` is a registered entry in `lib/outbound-hosts.ts`
- * and is rendered in the generated host list below this paragraph. This
- * sentence narrows the CHOICE; that list states the REACH. Both are true, and
- * neither is hiding the other.
+ * `api.anthropic.com` is also a registered entry in `lib/outbound-hosts.ts`
+ * and is rendered in the generated host list below this paragraph, exactly as
+ * `api.openai.com` is. This sentence narrows the CHOICE; that list states the
+ * REACH. Both are true, and neither is hiding the other.
  *
  * ============================================================================
- * WHOEVER ADDS AN ANTHROPIC KEY CARD MUST UPDATE THIS PARAGRAPH AND THE
- * GENERATED POLICY IN THE SAME CHANGE.
+ * WHOEVER ADDS A THIRD KEY CARD MUST UPDATE THIS PARAGRAPH AND THE GENERATED
+ * POLICY IN THE SAME CHANGE.
  * ============================================================================
  * `configurableAi.contract.test.ts` fails the build if an AI provider becomes
  * configurable and this paragraph does not name it. It watches the KEY-CARD
@@ -93,9 +88,10 @@ export const GROUPS: readonly Group[] = [
  *
  * The per-provider consent gate in `runAnalysis.ts` (L-97, PR #35) needs NO
  * update when that happens: its `ConsentProviderKind` is
- * `Exclude<ProviderId, 'ollama'>`, so it already covers Anthropic and names it
- * at the moment of the call. Only this paragraph and the policy document have
- * to change, so nobody later assumes the consent work is also owed.
+ * `Exclude<ProviderId, 'ollama'>`, so it already covers every cloud provider
+ * and names it at the moment of the call. Only this paragraph and the policy
+ * document have to change, so nobody later assumes the consent work is also
+ * owed.
  *
  * ============================================================================
  * "OR TEST A KEY" IS LOAD-BEARING. DO NOT TIDY IT AWAY.
@@ -110,9 +106,9 @@ export const GROUPS: readonly Group[] = [
  */
 export const PRIVACY_SUMMARY =
   'CViper Light runs on your computer. We have no server, no accounts, and no copy of your ' +
-  'data. Your CV and your OpenAI key only ever go to the AI you choose — today ' +
-  "that's OpenAI, or a model running on your own PC. Your job-board keys go only to Adzuna " +
-  'or Reed, and only when you search or test a key.';
+  'data. Your CV and your OpenAI or Anthropic key only ever go to the AI you choose — today ' +
+  "that's OpenAI or Anthropic, or a model running on your own PC. Your job-board keys go only " +
+  'to Adzuna or Reed, and only when you search or test a key.';
 
 export function PrivacyNotice() {
   return (

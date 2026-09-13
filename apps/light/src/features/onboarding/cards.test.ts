@@ -96,23 +96,26 @@ describe('localModelLine — the live detection shown on the analysis card', () 
 
   it('mentions a saved cloud key only when that key can actually be used', () => {
     // ========================================================================
-    // THE CARD MUST NOT PROMISE A ROW THE PICKER WILL NOT SHOW (L-102)
+    // THE CARD MUST NOT PROMISE A ROW THE PICKER WILL NOT SHOW (L-102 / L-149)
     // ========================================================================
-    // This used to assert that a saved Anthropic key put "Anthropic" in the
-    // line — "Your Anthropic key is saved, so the full analysis is available."
-    // The analysis screen has no Anthropic option and no way to set one up, so
-    // that sentence sent a new user to a picker that did not contain what they
-    // had just been told was there.
+    // Before L-149 this asserted the opposite for Anthropic: the analysis
+    // screen had no Anthropic option and no way to set one up, so a line
+    // naming it would have sent a new user to a picker that did not contain
+    // what they had just been told was there.
     //
-    // The line is now derived from `providerOptions`, so it cannot say this
-    // about a provider that is not offered — and it still says it for the one
-    // that is.
+    // The line is derived from `providerOptions`, so it can never say this
+    // about a provider that is not offered — and now that Anthropic has a key
+    // card, it is offered, so the line says so exactly as it does for OpenAI.
     expect(localModelLine({ ...NOTHING, openaiKey: true })).toContain('OpenAI');
+    expect(localModelLine({ ...NOTHING, anthropicKey: true })).toContain('Anthropic');
+  });
 
-    expect(localModelLine({ ...NOTHING, anthropicKey: true })).not.toContain('Anthropic');
-    // The machine reads exactly like one with nothing saved, which is the state
-    // it is actually in as far as running an analysis goes.
-    expect(localModelLine({ ...NOTHING, anthropicKey: true })).toBe(localModelLine(NOTHING));
+  it('names both, joined, when both keys are saved', () => {
+    // The `keys.join(' and ')` branch, only reachable with two cloud
+    // providers configured at once — untested until L-149 gave Anthropic a
+    // card, since OpenAI was the only one `providerOptions` could ever offer.
+    const line = localModelLine({ ...NOTHING, anthropicKey: true, openaiKey: true });
+    expect(line).toContain('Anthropic and OpenAI');
   });
 
   it('boundary: a machine with everything reports the local model, not the key', () => {
