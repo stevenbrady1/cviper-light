@@ -380,6 +380,12 @@ the reservation. That is Step 5 done wrong, not a build problem.
 
 ## Step 7 — Store listing
 
+<!-- generic-copy:start -->
+<!-- Everything to the matching :end below is the actual listing copy submitted to the Store,
+     scanned by no-provider-brand-in-store-listings.contract.test.ts for a hardcoded AI provider
+     brand name (W7, coordinator review of PR #96). Step 10's "Notes for certification" sit
+     OUTSIDE these markers on purpose: they name providers deliberately, for App Review. -->
+
 ### Name
 
 ```
@@ -467,6 +473,8 @@ Optional: bring your own AI provider's key, or run a model locally with Ollama
 No telemetry, no analytics, no crash reporting
 Open source under the MIT licence
 ```
+
+<!-- generic-copy:end -->
 
 ### Search terms (up to 7)
 

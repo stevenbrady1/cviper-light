@@ -66,7 +66,6 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { OUTBOUND_HOSTS, type OutboundHost } from '../../lib/outbound-hosts';
-import { createFakeBrowserPort } from '../../platform/test/fakeBrowserPort';
 import { type Availability } from '../analysis/providers';
 import { updateCheckOnLaunchEnabled } from '../settings/updates/launchCheck';
 
@@ -192,13 +191,7 @@ export function launchCheckDisclosureGaps(
 }
 
 function welcomeCopy(): string {
-  render(
-    <Welcome
-      onDismiss={() => undefined}
-      browser={createFakeBrowserPort()}
-      detect={() => Promise.resolve(NOTHING)}
-    />,
-  );
+  render(<Welcome onDismiss={() => undefined} detect={() => Promise.resolve(NOTHING)} />);
   return screen.getByTestId('welcome').textContent ?? '';
 }
 

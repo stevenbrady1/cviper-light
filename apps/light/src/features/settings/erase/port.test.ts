@@ -236,10 +236,19 @@ describe('forgetKeys deletes every credential this app can hold', () => {
     expect(tauriCore.invoke).toHaveBeenCalledTimes(SECRET_KEYS.length);
   });
 
-  it('boundary: a machine with nothing saved still reports success', async () => {
+  it('boundary: a machine with nothing saved still reports success, and still tries all five', async () => {
     // `secret_delete` is idempotent on the Rust side (see `port.ts`'s own
     // comment); deleting a credential that was never there is not a failure.
+    // I1 (coordinator review of PR #96): "reports success" on its own would
+    // pass just as well if `forgetKeys` gave up after the first key, or sent
+    // none at all — the boundary this test is named for is specifically that
+    // NOTHING being saved does not shrink the set of keys attempted.
     const result = await createTauriErasePort().forgetKeys();
+
     expect(result.ok).toBe(true);
+    const deletedKeys = tauriCore.invoke.mock.calls
+      .filter(([command]) => command === 'secret_delete')
+      .map(([, args]) => args?.['key']);
+    expect(deletedKeys).toEqual([...SECRET_KEYS]);
   });
 });

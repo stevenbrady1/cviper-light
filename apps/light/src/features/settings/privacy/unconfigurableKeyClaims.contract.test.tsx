@@ -1,10 +1,35 @@
-// @vitest-environment jsdom
 /**
  * A provider the app cannot SET UP is never described as one you have a key for
  * (L-105).
  *
  * ============================================================================
- * THE DEFECT THIS PINS
+ * W3 (coordinator review of PR #96): THREE LEGS RETIRED, VACUOUS SINCE L-149
+ * ============================================================================
+ * `describe('no user-facing surface offers a key for a provider that cannot
+ * be set up', …)` used to hold three legs against the real tree: the
+ * registry, the generated policy, and the rendered Settings → Privacy screen.
+ * Each worked by finding a host in `AI_PROVIDER_HOSTS` whose provider was NOT
+ * in `AI_KEY_PROVIDER_IDS`, and asserting the copy next to it made no
+ * possession claim. L-149 put both `openai` AND `anthropic` in
+ * `AI_KEY_PROVIDER_IDS`, so the `if (configurable.includes(provider.id))
+ * continue`/`return []` guard inside each leg now fires for every host in the
+ * map, every time — the loops still run, the assertions inside them never do,
+ * and all three report green having checked nothing.
+ *
+ * That is the same shape `configurableAi.contract.test.ts` was retired for in
+ * this PR, and the fix is the same: rather than leave three legs whose green
+ * is now a lie about what they cover, they are gone, with this note in their
+ * place. What still needs proving — that the DETECTOR catches a possession
+ * claim and lets an honest one through, and that the PURE RULE
+ * (`falseKeyClaims`) flips its verdict correctly on a planted registry —
+ * still runs below and needs no real tree to do it. If a third AI provider is
+ * ever added without a key card, `offeredProviders.contract.test.ts` (L-102)
+ * is what would catch it being offered anyway; this file's job was always the
+ * narrower one of catching the COPY over-claiming, and there is currently no
+ * real host left in the tree for that copy to be wrong about.
+ *
+ * ============================================================================
+ * THE DEFECT THIS PINS (HISTORICAL)
  * ============================================================================
  * `lib/outbound-hosts.ts` described `api.anthropic.com` as
  *
@@ -76,16 +101,9 @@
  * a provider a user CAN configure is named. Together: configurable must be
  * named, unconfigurable must not be offered.
  */
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { OUTBOUND_HOSTS, type OutboundHost } from '../../../lib/outbound-hosts';
-import { AI_KEY_PROVIDER_IDS } from '../keys/aiKeyProviders';
-
-import { currentPrivacyPolicy } from './policyDocument';
-import { PrivacyNotice } from './PrivacyNotice';
-
-afterEach(cleanup);
 
 /**
  * Which registered host is a cloud AI provider, and how it is spelled where a
@@ -206,53 +224,6 @@ describe('the detector', () => {
 
   it('does not fire on a provider that is merely named', () => {
     expect(claimsTheReaderHasAKey('The request goes to Anthropic.', 'Anthropic')).toBe(false);
-  });
-});
-
-describe('no user-facing surface offers a key for a provider that cannot be set up', () => {
-  it('the registry makes no such claim', () => {
-    expect(
-      falseKeyClaims(OUTBOUND_HOSTS, AI_KEY_PROVIDER_IDS),
-      'The "why" for each host above tells the reader they have a key for a provider that ' +
-        'Settings has no card for, so no screen in this build can create one. Either describe ' +
-        'the host as somewhere a key ALREADY on the machine could be used, or add the key card ' +
-        '(and its id to AI_KEY_PROVIDER_IDS) and make the claim true.',
-    ).toEqual([]);
-  });
-
-  it('the generated policy makes no such claim, and still discloses the host', () => {
-    const policy = currentPrivacyPolicy();
-
-    for (const [host, provider] of Object.entries(AI_PROVIDER_HOSTS)) {
-      if ((AI_KEY_PROVIDER_IDS as readonly string[]).includes(provider.id)) continue;
-
-      // Scanned whole rather than line by line: this asserts the ABSENCE of a
-      // claim, so widening the haystack can only make it stricter.
-      expect(policy, `${host} has stopped being disclosed in the policy`).toContain(host);
-      expect(
-        claimsTheReaderHasAKey(policy, provider.name),
-        `docs/app-store/privacy-policy.md offers the reader a key for ${provider.name}. Regenerate ` +
-          'it after fixing the registry: pnpm exec vitest run ' +
-          'apps/light/src/features/settings/privacy/policyDocument.test.ts -u',
-      ).toBe(false);
-    }
-  });
-
-  it('the Settings → Privacy screen makes no such claim, and still discloses the host', () => {
-    render(<PrivacyNotice />);
-    const notice = screen.getByTestId('privacy-notice').textContent ?? '';
-
-    for (const [host, provider] of Object.entries(AI_PROVIDER_HOSTS)) {
-      if ((AI_KEY_PROVIDER_IDS as readonly string[]).includes(provider.id)) continue;
-
-      // The RENDERED screen, not the module it is built from. A unit test on
-      // the registry cannot see a surface that stopped rendering the entry.
-      expect(notice, `${host} has stopped being shown on the Privacy screen`).toContain(host);
-      expect(
-        claimsTheReaderHasAKey(notice, provider.name),
-        `Settings → Privacy offers the reader a key for ${provider.name}.`,
-      ).toBe(false);
-    }
   });
 });
 

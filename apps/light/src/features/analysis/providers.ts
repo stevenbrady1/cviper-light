@@ -113,15 +113,16 @@ const KEYWORD_OPTION: ProviderOption = {
  * The cloud providers Settings can actually set a key up for.
  *
  * ============================================================================
- * THE APP OFFERS ONLY WHAT IT CAN SET UP (L-102)
+ * THE APP OFFERS ONLY WHAT IT CAN SET UP (L-102) — HISTORICAL: FIXED BY L-149
  * ============================================================================
  * A saved key is not on its own a reason to offer a provider. Anthropic was the
  * case that proved it: `SecretKey::AnthropicApiKey` exists, `secret_set` accepts
  * it, and a credential store SURVIVES AN UNINSTALL — so `readAvailability` could
- * report `anthropicKey: true` on a machine whose Settings screen has never had
- * an Anthropic card and never will until somebody writes one. The picker offered
- * it anyway, `runAnalysis` would have sent the user's CV to Anthropic, and the
- * Rust transport told anyone who got there to "Add one in Settings".
+ * report `anthropicKey: true` on a machine whose Settings screen had never had
+ * an Anthropic card. Until L-149 the picker offered it anyway, `runAnalysis`
+ * would have sent the user's CV to Anthropic, and the Rust transport told
+ * anyone who got there to "Add one in Settings" — a screen that did not exist.
+ * L-149 added that card, so both branches below now run under the same rule.
  *
  * So the offer is gated on the SET-UP surface rather than on the credential
  * store. Read from `AI_KEY_PROVIDER_IDS` rather than restated, so a card added
@@ -163,9 +164,10 @@ export function providerOptions(availability: Availability): ProviderOption[] {
     });
   }
 
-  // Saved AND settable-up. Today `canBeSetUp('anthropic')` is false, so this
-  // branch does not run — that is the fix, not dead code: the option returns the
-  // moment an Anthropic card is added to `AI_KEY_PROVIDER_IDS`.
+  // Saved AND settable-up. Both cloud providers have a card as of L-149, so
+  // both branches run under the identical rule: the option disappears again
+  // the day a card is ever removed from `AI_KEY_PROVIDER_IDS`, rather than
+  // being left behind pointing at a screen that is gone.
   if (availability.anthropicKey && canBeSetUp('anthropic')) {
     options.push({
       key: 'anthropic',
@@ -174,22 +176,23 @@ export function providerOptions(availability: Availability): ProviderOption[] {
       // Said plainly, every time. This is the only option that sends the user's
       // CV to someone else, and burying that would be the one dishonest line in
       // an app whose whole pitch is that it does not.
-      note: 'The strongest reading. Your CV and the advert are sent to Anthropic.',
+      note: 'A full reading. Your CV and the advert are sent to Anthropic.',
       model: ANTHROPIC_DEFAULT_MODEL,
       local: false,
       needsKey: true,
     });
   }
 
-  // The same rule, applied to the provider that DOES have a card. Written the
-  // same way on purpose: the day OpenAI's card is removed, its option goes with
-  // it rather than being left behind pointing at a screen that is gone.
+  // The same rule, applied to the other cloud provider (W1, coordinator
+  // review of PR #96: both notes now use the SAME shape — "A full reading…" —
+  // rather than one claiming to be "the strongest" and the other merely "a
+  // strong" reading, a comparison this file never actually measured).
   if (availability.openaiKey && canBeSetUp('openai')) {
     options.push({
       key: 'openai',
       kind: 'openai',
       label: `OpenAI · ${OPENAI_DEFAULT_MODEL}`,
-      note: 'A strong reading. Your CV and the advert are sent to OpenAI.',
+      note: 'A full reading. Your CV and the advert are sent to OpenAI.',
       model: OPENAI_DEFAULT_MODEL,
       local: false,
       needsKey: true,

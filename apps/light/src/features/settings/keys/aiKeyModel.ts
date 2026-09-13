@@ -40,6 +40,7 @@
 import { ANTHROPIC_DEFAULT_MODEL } from '@cviper/ai-providers';
 
 import { OPENAI_DEFAULT_MODEL } from '../../analysis/providers';
+import { ANTHROPIC_SECRET_KEY, OPENAI_SECRET_KEY } from '../../../status/secretKeyNames';
 
 import { MAX_KEY_BYTES } from './model';
 
@@ -61,11 +62,41 @@ import { MAX_KEY_BYTES } from './model';
  */
 export type AiKeyProviderId = 'openai' | 'anthropic';
 
-/** Spelled exactly as the `SecretKey` enum serialises it in Rust. */
-export const OPENAI_SECRET_KEY = 'openai_api_key';
+/**
+ * Re-exported from `status/secretKeyNames.ts`, the single source for these two
+ * strings (C2, coordinator review of PR #96) — see that file's docblock for
+ * why it exists as its own dependency-free module rather than being declared
+ * here as before.
+ */
+export { OPENAI_SECRET_KEY, ANTHROPIC_SECRET_KEY };
 
-/** Spelled exactly as the `SecretKey` enum serialises it in Rust. */
-export const ANTHROPIC_SECRET_KEY = 'anthropic_api_key';
+/**
+ * A credential name this app is actually allowed to test, save or delete
+ * against — the two strings above, and closed to exactly those.
+ *
+ * ============================================================================
+ * C2: WHY `AiKeyProvider.secret` MUST BE THIS TYPE, NOT A BARE `string`
+ * ============================================================================
+ * Coordinator review of PR #96 found `secret: string` on the interface below,
+ * with nothing checking that a card's `secret` actually matched its own `id`.
+ * `createTauriAiKeyPort(provider.secret, provider.id)` trusts both arguments
+ * independently, so a copy-paste mistake — the Anthropic card built with
+ * `secret: OPENAI_SECRET_KEY` — would type-check, test the key against
+ * Anthropic (`provider.id`), and on success WRITE it into `openai_api_key`
+ * (`provider.secret`) — silently overwriting the user's real OpenAI key with
+ * an Anthropic one the moment they pressed "Test and save this key" on the
+ * Anthropic card. `offeredProviders.contract.test.ts`'s
+ * `the key-card list is exactly the cards that actually exist` would not
+ * catch it: it checks `id`, never that `secret` agrees with it.
+ *
+ * `AiKeySecret` closes the type to the two real credential names, and
+ * `aiKeyModel.contract.test.ts`'s `every card's secret matches its own id`
+ * closes the remaining gap a type alone cannot: TWO valid strings can still be
+ * swapped between two cards and both stay well-typed. That test is proven by
+ * mutation — swap the Anthropic card's `secret` to `OPENAI_SECRET_KEY` and it
+ * fails by name.
+ */
+export type AiKeySecret = typeof OPENAI_SECRET_KEY | typeof ANTHROPIC_SECRET_KEY;
 
 /**
  * What a saved key looks like on screen: four bullets, and nothing else.
@@ -203,7 +234,7 @@ function keyRemovedMessage(label: string): string {
 export interface AiKeyProvider {
   readonly id: AiKeyProviderId;
   readonly label: string;
-  readonly secret: string;
+  readonly secret: AiKeySecret;
   /** What having this key lets the user do. One sentence, concrete. */
   readonly unlocks: string;
   /** Who pays, stated plainly. Never an estimate of how much. */
@@ -239,7 +270,7 @@ export interface AiKeyProvider {
 interface AiKeyProviderCopy {
   readonly id: AiKeyProviderId;
   readonly label: string;
-  readonly secret: string;
+  readonly secret: AiKeySecret;
   readonly defaultModel: string;
   readonly signupUrl: string;
   /** The billing sentence: who pays, and — where it is known — what it costs. */
@@ -258,7 +289,13 @@ function buildAiKeyProvider(copy: AiKeyProviderCopy): AiKeyProvider {
       `that sends your CV and the advert to ${label}.`,
     billing,
     signupUrl,
-    signupLabel: 'Where do I get a key?',
+    // Named per provider (W8, coordinator review of PR #96), mirroring
+    // `keys/model.ts`'s job-board cards ("Get a free Adzuna key"), which are
+    // also never merely "Get a free key". "an" assumes a vowel-sounding name
+    // — true of both providers today; a future consonant-led one (a
+    // hypothetical "Mistral" card) would need this reworded, the same way a
+    // third job-board card would.
+    signupLabel: `Where do I get an ${label} key?`,
     privacyNote:
       'The key is stored in this computer’s own credential store — Windows Credential Manager, ' +
       'macOS Keychain, or the Linux Secret Service. It is never written to a file, never put in ' +
@@ -282,6 +319,31 @@ export const OPENAI_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
     'published rates. CViper adds nothing to that, takes no cut, and never sees your bill.',
 });
 
+/**
+ * ============================================================================
+ * WHERE ANTHROPIC'S "A FEW PENCE" COMES FROM (W6, coordinator review of PR #96)
+ * ============================================================================
+ * `AI_COST_LINE` in `onboarding/cards.ts` deliberately stopped deriving its
+ * figure from one provider's rate card (L-148) — but the card BELOW that
+ * screen is exactly the place a per-provider number belongs, and the OpenAI
+ * card had a derivation for its own (now-removed) figure that this one
+ * lacked.
+ *
+ * `ANTHROPIC_DEFAULT_MODEL` is `claude-opus-5`. Using the same shape of
+ * estimate as OpenAI's — a CV plus an advert, asking for a structured reading
+ * back, roughly 6,000 input tokens and 1,500 output tokens — at Anthropic's
+ * published rates of $5.00 per million input tokens and $25.00 per million
+ * output tokens:
+ *
+ *     input    6,000 / 1,000,000 x $5.00  = $0.030
+ *     output   1,500 / 1,000,000 x $25.00 = $0.0375
+ *     total                               = $0.0675  (~5p at $1.27/£)
+ *
+ * So "a few pence" is honest for Anthropic too — a touch more than OpenAI's
+ * own ~2.4p at the rates `AI_COST_LINE`'s history recorded, both comfortably
+ * inside the phrase, neither claiming false precision now that the welcome
+ * screen states the figure generically rather than per-provider.
+ */
 export const ANTHROPIC_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   id: 'anthropic',
   label: 'Anthropic',

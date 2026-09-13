@@ -41,6 +41,12 @@ Pick one:
 - `Private CV checker & tracker` (28) — plain
 - `Your CV, checked on your phone` (30) — warm
 
+<!-- generic-copy:start -->
+<!-- Everything to the matching :end below is the actual listing copy submitted to the Store,
+     scanned by no-provider-brand-in-store-listings.contract.test.ts for a hardcoded AI provider
+     brand name (W7, coordinator review of PR #96). "App Review Information" sits OUTSIDE these
+     markers on purpose: its "Notes for the reviewer" name providers deliberately, for App Review. -->
+
 ### Promotional text (170 characters, editable without a new build)
 
 > Read your CV, match it to the advert, track every application — on your
@@ -90,6 +96,8 @@ Pick one:
 > on another device.
 >
 > CViper Light is free, open source under the MIT licence, and made in the UK.
+
+<!-- generic-copy:end -->
 
 ## Keywords (100 characters max, comma-separated, no spaces after commas)
 

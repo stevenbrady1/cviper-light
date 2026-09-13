@@ -39,7 +39,13 @@ import { invoke } from '@tauri-apps/api/core';
 
 import { err, ok, type Result } from '@cviper/core-types';
 
-import { type AiKeyProviderId } from './aiKeyModel';
+// LOAD-BEARING, top-level `import type` (I3, coordinator review of PR #96) —
+// per `aiKeyProviders.ts`'s own rule: `verbatimModuleSyntax` erases this
+// entirely, while the inline spelling `import { type AiKeySecret }` still
+// emits a runtime `import {} from './aiKeyModel'`. Only these two are pure
+// types with no runtime member, so the whole import can be type-only; `err`,
+// `ok` and `Result` above carry runtime values and stay as they are.
+import type { AiKeyProviderId, AiKeySecret } from './aiKeyModel';
 
 /** The command names registered in `generate_handler!`. */
 const TEST_COMMAND = 'provider_test_key';
@@ -120,7 +126,7 @@ function describeStoreFailure(thrown: unknown): string {
  *   `ProviderId` enum serialises (`'openai'`, `'anthropic'`), so this is
  *   passed straight through with nothing to translate.
  */
-export function createTauriAiKeyPort(secret: string, providerId: AiKeyProviderId): AiKeyPort {
+export function createTauriAiKeyPort(secret: AiKeySecret, providerId: AiKeyProviderId): AiKeyPort {
   return {
     async status() {
       try {

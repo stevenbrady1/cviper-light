@@ -110,12 +110,18 @@ describe('localModelLine — the live detection shown on the analysis card', () 
     expect(localModelLine({ ...NOTHING, anthropicKey: true })).toContain('Anthropic');
   });
 
-  it('names both, joined, when both keys are saved', () => {
+  it('names both, joined, and pluralises correctly, when both keys are saved', () => {
     // The `keys.join(' and ')` branch, only reachable with two cloud
     // providers configured at once — untested until L-149 gave Anthropic a
     // card, since OpenAI was the only one `providerOptions` could ever offer.
+    // W4 (coordinator review of PR #96): "Your Anthropic and OpenAI key is
+    // saved" was ungrammatical for exactly this state — asserted here as the
+    // whole sentence, not a substring, so a regression back to the singular
+    // cannot pass by only checking that both names appear somewhere in it.
     const line = localModelLine({ ...NOTHING, anthropicKey: true, openaiKey: true });
-    expect(line).toContain('Anthropic and OpenAI');
+    expect(line).toBe(
+      'Your Anthropic and OpenAI keys are saved, so the full analysis is available.',
+    );
   });
 
   it('boundary: a machine with everything reports the local model, not the key', () => {

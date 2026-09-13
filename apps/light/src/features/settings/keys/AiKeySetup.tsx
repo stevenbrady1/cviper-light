@@ -218,13 +218,18 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
     await refresh();
   }, [keyPort, provider.removedMessage, refresh]);
 
+  const headingId = `ai-key-heading-${provider.id}`;
+
   return (
     <article
       data-testid={`ai-key-card-${provider.id}`}
+      aria-labelledby={headingId}
       className="rounded-card border border-line bg-card p-4 shadow-raised"
     >
       <header className="flex items-baseline justify-between gap-3">
-        <h3 className="font-medium text-ink">{provider.label}</h3>
+        <h3 id={headingId} className="font-medium text-ink">
+          {provider.label}
+        </h3>
         <span
           data-testid={`ai-key-state-${provider.id}`}
           data-state={state}

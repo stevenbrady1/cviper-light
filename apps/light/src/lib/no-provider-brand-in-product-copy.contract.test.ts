@@ -25,7 +25,7 @@
  * below, so only a name reappearing can turn it red.
  *
  * ============================================================================
- * SCANNED, AND WHY EXACTLY THESE FOUR FILES
+ * SCANNED, AND WHY EXACTLY THESE FIVE FILES
  * ============================================================================
  * Every file here is one where the entire shipped, non-comment text is meant
  * to describe the product generically, so a whole-file scan (comments
@@ -35,7 +35,17 @@
  *   - `PrivacyNotice.tsx`   — the Settings → Privacy summary paragraph
  *   - `policyDocument.ts`   — the generated policy's own prose
  *   - `onboarding/cards.ts` — the welcome screen's cost line
+ *   - `onboarding/Welcome.tsx` — the welcome screen's own JSX and copy
  *   - `README.md`           — the repo's own front page
+ *
+ * `Welcome.tsx` joined this list under coordinator review (C1, PR #96): its
+ * "where do I get a key?" button used to call `browserPort.open(
+ * OPENAI_KEY_PROVIDER.signupUrl)` directly, sending the reader to one named
+ * provider's signup page while the cost line two lines above it said "the
+ * provider you choose" — a real violation this guard's original file list
+ * would never have found, because it was not looking. The button now routes
+ * to Settings instead, and `Welcome.tsx` no longer accepts a `BrowserPort` at
+ * all, so it earns its place on the scanned list rather than the allow-list.
  *
  * ============================================================================
  * WHY NOT MORE FILES — WHERE A BRAND NAME STAYS ALLOWED, AND STAYS RIGHT
@@ -53,19 +63,23 @@
  *     `configurableAi.contract.test.ts`'s surviving test for that split);
  *   - `analysis/ConsentGate.tsx`, the per-provider consent dialog — Apple
  *     5.1.2(i) requires the dialog to name the provider, not say "a provider";
- *   - `onboarding/Welcome.tsx`'s "where do I get a key" link, which still
- *     opens one specific provider's signup page and says so on screen —
- *     offering a choice of provider from that link is L-150's job (a generic
- *     OpenAI-compatible card), not this one's;
- *   - `docs/STORE-SUBMISSION.md`, `docs/app-store/LISTING.md` and
- *     `PRIVACY-LABEL.md` — Apple's and Microsoft's own review process is told
- *     which providers exist TODAY so a reviewer can actually test the claim,
- *     in wording the owner supplies verbatim to the store ("paste this as
- *     written"). Each mixes that guidance with product marketing copy in the
- *     SAME file, so a section-level split here would be a fragile markdown
- *     parser guarding a document nobody but a human reads before submission;
- *     the marketing copy surrounding those notes was corrected by hand in the
- *     same change that added this guard.
+ *   - the per-provider key cards' own "where do I get a key?" links in
+ *     Settings, which correctly still open one specific provider's signup
+ *     page and say so — that is the "how to get a key" guidance the owner's
+ *     decision explicitly carves out, now that `Welcome.tsx` no longer does
+ *     the same thing at the product level;
+ *   - `docs/STORE-SUBMISSION.md` and `docs/app-store/LISTING.md`'s reviewer /
+ *     certification notes, and `PRIVACY-LABEL.md` — Apple's and Microsoft's
+ *     own review process is told which providers exist TODAY so a reviewer
+ *     can actually test the claim, in wording the owner supplies verbatim to
+ *     the store ("paste this as written"). The first two mix that guidance
+ *     with product marketing copy in the SAME file; W7 (PR #96 review) fences
+ *     the marketing blocks with `<!-- generic-copy:start/end -->` markers so
+ *     THIS guard can scan exactly those blocks — see
+ *     `no-provider-brand-in-store-listings.contract.test.ts` — while the
+ *     reviewer notes outside the fences keep naming providers.
+ *     `PRIVACY-LABEL.md` is smaller and entirely App-Review guidance with no
+ *     separable marketing block, so it stays manually reviewed.
  *
  * ============================================================================
  * `CLAUDE.md` IS A FILENAME, NOT THE MODEL
@@ -111,6 +125,10 @@ const SURFACES: readonly Surface[] = [
     file: join(REPO_ROOT, 'apps/light/src/features/onboarding/cards.ts'),
   },
   {
+    path: 'apps/light/src/features/onboarding/Welcome.tsx',
+    file: join(REPO_ROOT, 'apps/light/src/features/onboarding/Welcome.tsx'),
+  },
+  {
     path: 'README.md',
     file: join(REPO_ROOT, 'README.md'),
   },
@@ -142,13 +160,18 @@ export function findBrandMentions(
 }
 
 describe('the scan itself', () => {
-  it('reads at least four real, non-empty surfaces', () => {
-    // Anti-inert: fewer than this, or an empty file, and the sweep below could
-    // pass by finding nothing to read — the failure mode this repo's own
-    // guards keep naming as the reason a forbid-list gets deleted quietly.
-    expect(SURFACES.length).toBeGreaterThanOrEqual(4);
+  it('reads at least five real, non-empty surfaces', () => {
+    // Anti-inert: fewer than this, or a surface with nothing left after
+    // stripping, and the sweep below could pass by finding nothing to read —
+    // the failure mode this repo's own guards keep naming as the reason a
+    // forbid-list gets deleted quietly. Measured on the STRIPPED text, not the
+    // raw file (I2, PR #96 review): a file that was ALL comment — a real
+    // possibility for a docblock-heavy module like this repo's — would pass a
+    // raw-length floor while handing the scan below an empty string.
+    expect(SURFACES.length).toBeGreaterThanOrEqual(5);
     for (const surface of SURFACES) {
-      expect(readFileSync(surface.file, 'utf8').length, surface.path).toBeGreaterThan(50);
+      const stripped = stripClaudeDotMd(stripComments(readFileSync(surface.file, 'utf8')));
+      expect(stripped.length, surface.path).toBeGreaterThan(50);
     }
   });
 

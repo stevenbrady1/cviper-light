@@ -25,8 +25,12 @@ import { About } from './about/About';
 import { EraseEverything } from './erase/EraseEverything';
 import { type ErasePort } from './erase/port';
 import { AiKeySetup } from './keys/AiKeySetup';
-import { type AiKeyProviderId } from './keys/aiKeyModel';
-import { type AiKeyPort } from './keys/aiKeyPort';
+// LOAD-BEARING, top-level `import type` (I3, coordinator review of PR #96) —
+// per `aiKeyProviders.ts`'s own rule: `verbatimModuleSyntax` erases this
+// entirely, while the inline spelling `import { type AiKeyProviderId }`
+// still emits a runtime `import {} from './keys/aiKeyModel'`.
+import type { AiKeyProviderId } from './keys/aiKeyModel';
+import type { AiKeyPort } from './keys/aiKeyPort';
 import { KeySetup } from './keys/KeySetup';
 import { Signpost } from '../signposts/Signpost';
 

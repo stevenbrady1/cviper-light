@@ -114,7 +114,7 @@ export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
  */
 export const AI_COST_LINE =
   'A typical CV check costs a few pence, paid to the AI provider you choose on your own ' +
-  'account. A model running on your own PC is free.';
+  'account. A model running on your own PC is free. CViper takes no cut, and prices can change.';
 
 /**
  * What this machine can do for a CV check, in one line, read live.
@@ -153,7 +153,12 @@ export function localModelLine(availability: Availability): string {
     .map((option) => providerLabel(option.kind));
 
   if (keys.length > 0) {
-    return `Your ${keys.join(' and ')} key is saved, so the full analysis is available.`;
+    // W4 (coordinator review of PR #96): "Your Anthropic and OpenAI key is
+    // saved" was ungrammatical the moment two cloud keys could be saved at
+    // once (L-149 made that a real, reachable state) — singular "key ... is"
+    // was only ever true for one.
+    const noun = keys.length > 1 ? 'keys are' : 'key is';
+    return `Your ${keys.join(' and ')} ${noun} saved, so the full analysis is available.`;
   }
 
   // The default machine, and the line that has to leave the reader with
