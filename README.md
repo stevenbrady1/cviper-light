@@ -116,12 +116,12 @@ own machine, or your own OpenAI key. Without one you add jobs by
 typing them in, and everything else carries on as normal — the tracker and the
 browser job-search links never needed a key and still do not.
 
-**Point at the full CViper, three times, in one line each.** After a CV check,
-under the tracker and in Settings → Privacy there is a single sentence saying
-what the full CViper at cviper.ai adds, and Settings → About says who made
-Light. Each opens your own browser only when you tap it. There is no badge, no
-count, no timer and no nag: the same sentence every time, and a test fails the
-build if one of those lines ever reads or writes any state.
+**Two lines about us, and only two.** Settings → Privacy carries one sentence
+that opens this app's own privacy policy at `cviper.ai/privacy`, and Settings →
+About says who made Light and links to its page and its source. Each opens your
+own browser only when you tap it. There is no badge, no count, no timer and no
+nag: the same sentence every time, and a test fails the build if one of those
+lines ever reads or writes any state.
 
 ## What needs a key, and what does not
 
@@ -267,7 +267,7 @@ exports the whole thing as a single readable `.json` file wherever you choose to
 put it, and imports it back. A CV that arrived as a JSON Resume can also go
 back out on its own — Analysis → Save as JSON Resume writes the file it came in
 as, unchanged except for a `meta.cviper` note of when it left — so it can go
-into any tool that reads the format, the full CViper included. The format is documented in
+into any tool that reads the format. The format is documented in
 [docs/FEATURE-MATRIX.md](docs/FEATURE-MATRIX.md) and is additive-only: a file
 exported today still imports in five years.
 

@@ -83,9 +83,8 @@ Pick one:
 >
 > TAKE IT WITH YOU
 >
-> Export everything to one file whenever you like. Import it on another
-> device, or into the full CViper at cviper.ai when you want the same tools
-> across every job you save, kept up to date for you.
+> Export everything to one file whenever you like. Import it back, or import it
+> on another device.
 >
 > CViper Light is free, open source under the MIT licence, and made by the
 > people behind cviper.ai.
@@ -151,12 +150,15 @@ version to be greater than the last; check the live value before changing it.
 
 ## EU Digital Services Act — trader status
 
-App Store Connect → Agreements → the DSA trader question. Because the listing
-links to a paid product (cviper.ai), the safe declaration is **trader**, which
-publishes a contact address and phone or email on the EU storefront. Declaring
+App Store Connect → Agreements → the DSA trader question. The reason recorded
+here until September 2026 — that the listing links to a paid product at
+cviper.ai — no longer holds: that product was mothballed on 10 September 2026
+and cviper.ai now serves this free app's own site (L-114). **Trader** publishes
+a contact address and phone or email on the EU storefront; declaring
 **non-trader** and later being judged a trader gets the app removed from the EU
 storefront until fixed. This is a legal choice for the account holder, not a
-technical one.
+technical one, and it now has to be made on the current facts rather than on
+that premise.
 
 ## TestFlight
 

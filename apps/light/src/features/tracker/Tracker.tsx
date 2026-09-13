@@ -12,7 +12,6 @@ import { todayIsoDate } from '../../lib/dates';
 import { viewById } from '../../app/views';
 
 import { type Availability } from '../analysis/providers';
-import { Signpost } from '../signposts/Signpost';
 
 import { ApplicationDetail } from './ApplicationDetail';
 import { NewApplicationForm } from './NewApplicationForm';
@@ -96,7 +95,7 @@ export interface TrackerProps {
   readonly createPageTransport?: (() => PageFetchTransport) | undefined;
   /** Injected by tests so the machine's real credentials are never consulted. */
   readonly readAvailability?: (() => Promise<Availability>) | undefined;
-  /** Injected by tests: the real one opens the user's browser (the L-87 signpost). */
+  /** Injected by tests: the real one opens the user's browser at the advert. */
   readonly browser?: BrowserPort | undefined;
 }
 
@@ -433,11 +432,6 @@ export function Tracker({
             />
           </DetailPane>
         )}
-      </div>
-
-      {/* One line under the board, the same every time (L-87). */}
-      <div className="border-t border-line px-4 py-1 md:px-6">
-        <Signpost id="tracker" browser={browserPort} />
       </div>
     </section>
   );

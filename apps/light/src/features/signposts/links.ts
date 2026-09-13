@@ -5,13 +5,18 @@
  * and holds them to `lib/outbound-hosts.ts`, so a link to a host the privacy
  * notice does not list cannot ship. Nothing is appended to any of them — no
  * `utm_`, no version, no install id (`platform/browser.ts`).
+ *
+ * `CVIPER_URL` — the root of the site, where the analysis and tracker
+ * signposts used to point — was removed with those signposts (L-114). It
+ * described a hosted product that no longer exists.
  */
 
-/** The full CViper. Where the analysis and tracker signposts point. */
-export const CVIPER_URL = 'https://cviper.ai/';
-
-/** What the full CViper keeps. Where the Settings → Privacy signpost points. */
-export const CVIPER_PRIVACY_URL = 'https://cviper.ai/?tab=privacy';
+/**
+ * This app's own privacy policy, published from `docs/app-store/privacy-policy.md`.
+ * Where the Settings → Privacy signpost points. The trailing slash is the
+ * canonical form the site serves.
+ */
+export const CVIPER_PRIVACY_URL = 'https://cviper.ai/privacy/';
 
 /** The page about this app: downloads, the generated policy, the source. */
 export const LIGHT_PAGE_URL = 'https://cviper.ai/light';

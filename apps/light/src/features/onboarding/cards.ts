@@ -82,10 +82,12 @@ export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
  * A FIGURE, NOT A SHRUG.
  * ============================================================================
  * "Bring your own key" is only an honest offer if the user can find out what
- * the key will cost them BEFORE they go and get one. cviper.ai promises that
- * this screen "shows what a typical CV costs", and a card that said only "you
- * pay OpenAI" would send somebody off to a pricing page written for developers
- * to work out an answer we already know.
+ * the key will cost them BEFORE they go and get one. This app's OWN landing
+ * page at cviper.ai — not the hosted CViper, which was mothballed in September
+ * 2026 and whose site cviper.ai replaced — promises that this screen "shows
+ * what a typical CV costs", and a card that said only "you pay OpenAI" would
+ * send somebody off to a pricing page written for developers to work out an
+ * answer we already know.
  *
  * ============================================================================
  * WHERE "ABOUT 2–3P" COMES FROM
@@ -107,7 +109,8 @@ export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
  * advert both vary in length, and the figure a user carries away from this
  * screen should not be the best case they could have had.
  *
- * It also agrees with the landing page, which says a check costs "a few pence".
+ * It also agrees with that same landing page, which says a check costs "a few
+ * pence, about 2–3p for a CV check".
  * A band sits comfortably inside that phrase; a single round number argues with
  * it the first time somebody's CV runs long.
  *

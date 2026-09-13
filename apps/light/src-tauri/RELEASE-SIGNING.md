@@ -107,6 +107,15 @@ decides everything after that.
    what you expect. This is what the draft gate exists to make possible.
    `releaseDraft: true` is deliberate and is not a setting to flip: publishing
    is the moment every existing install starts downloading.
+   **Before publishing, open every address this build hands to a browser and
+   confirm each one still resolves** — the links in
+   `apps/light/src/features/signposts/links.ts`, the `signupUrl` of every
+   provider in `apps/light/src/features/settings/keys/`, and every entry in
+   `apps/light/src/config/job-boards.json`. No test can do this: a guard can
+   prove the app only names registered hosts, and cannot prove those hosts
+   still serve the page the copy promises. The hosted CViper the analysis and
+   tracker signposts described was deleted while the app still advertised it
+   (L-114), and nothing in CI went red.
 3. **Publish the draft as a PRE-RELEASE.** Pre-release rather than latest,
    because the direct-download installers are unsigned, SmartScreen warns about
    them, and they are not a headline download.

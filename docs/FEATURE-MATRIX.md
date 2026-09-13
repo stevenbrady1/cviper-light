@@ -38,6 +38,9 @@ enrolment and submission are the owner's, by hand. See
 [`STORE-SUBMISSION.md`](STORE-SUBMISSION.md).
 
 `apps/cloud` is an empty stub directory. There is no cloud code of any kind.
+The hosted CViper the Cloud column describes was mothballed on 10 September
+2026 and its infrastructure deleted, so that column records an intent and not a
+product that exists (L-114).
 
 | Feature                         | Light                                                 | Cloud (future)                     | State                     |
 | ------------------------------- | ----------------------------------------------------- | ---------------------------------- | ------------------------- |
@@ -53,7 +56,7 @@ enrolment and submission are the owner's, by hand. See
 | A link pasted in the advert box | Yes — spotted, never sent to a model                  | No — not built there               | Built                     |
 | CV parsing                      | Yes — fully local                                     | Yes — server-side                  | Extraction built          |
 | JSON Resume import              | Yes — any JSON Resume 1.0 file, read here             | Yes — server-side                  | Built                     |
-| JSON Resume export              | Yes — the file it came in as, `meta.cviper` only      | Planned — cviper.ai/import         | Built                     |
+| JSON Resume export              | Yes — the file it came in as, `meta.cviper` only      | No hosted product at present       | Built                     |
 | CV analysis (BYO key)           | Yes — user's own provider key                         | Not applicable                     | Built                     |
 | CV analysis (local Ollama)      | Yes — offline, no key, no network                     | No                                 | Built                     |
 | Keyword-only analysis           | Yes — no AI, no key, always available                 | Yes                                | Built                     |
@@ -368,8 +371,9 @@ the source did not say — show the figures unqualified rather than guessing.
 | `next_action_date` | `YYYY-MM-DD`                                                | yes   |                   |
 | `updated_at`       | ISO-8601 UTC                                                | no    |                   |
 
-**The five statuses map 1:1 onto the CViper web app's five board columns**, so an
-export from Light folds into the cloud app with no translation table:
+**The five statuses map 1:1 onto the five board columns the hosted CViper web
+app used**, so an export from Light would fold into a cloud app with no
+translation table:
 
 | Light          | Cloud board column |
 | -------------- | ------------------ |
