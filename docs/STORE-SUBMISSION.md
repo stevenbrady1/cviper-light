@@ -71,7 +71,11 @@ what counts as financial information includes **API secret keys**.
 
 CViper Light clears this honestly rather than narrowly — the tracker, the
 keyword match, the deterministic checks and the keyless board links genuinely
-need no key at all. But clearing it is a **standing constraint on the listing**,
+need no key at all. Since L-110 the strongest part of that case is that
+**finding a job inside the app needs no key either**: two free feeds are read
+with no key and no account. Job discovery is about as close to "primary
+functionality" as this app has, so say it in the listing rather than leaving a
+reviewer to infer it from a bullet about browser links. But clearing it is a **standing constraint on the listing**,
 not a box already ticked: the description, the screenshots and the first
 paragraph must lead with what works with no key, and present the AI lane as an
 optional extra the user pays OpenAI for directly. The copy in Step 7 is written
@@ -215,15 +219,19 @@ application you have sent, what each advert actually asked for, and how your CV
 reads against it. There is no account to create and no server behind the app.
 Your CVs and your applications stay on your own machine.
 
-WORKS THE MOMENT YOU OPEN IT — NO KEY, NO SIGN-UP, NO INTERNET
+WORKS THE MOMENT YOU OPEN IT — NO KEY, NO SIGN-UP
 
 • Track every application. A board of everything you are chasing, where each
   one has got to, and how long it has sat still — because age is what tells you
-  who to chase next.
+  who to chase next. Works with no internet connection at all.
 • Check your CV against the advert. Paste the job description beside your CV
   and see which of its words you already use and which you are missing. It runs
-  on your computer, instantly.
+  on your computer, instantly, offline.
 • Read a PDF, a Word file or a JSON Resume, and save one back out again.
+• Browse recent job adverts inside the app. Two free feeds are read straight
+  from the web with no key and no account, and narrowed down on your own
+  computer. It is a browse of what has just been posted rather than a search of
+  the whole market, and each feed tells you on screen if it stops working.
 • Search nine UK job boards in your browser with one click. Turn any of them
   off, put them in the order you use them, or add your own.
 • Export everything to a single file whenever you like, and import it back.
@@ -235,8 +243,9 @@ IF YOU WANT AN AI SECOND OPINION — OPTIONAL, AND YOURS
   key, we do not stand in the middle, and we receive nothing.
 • Or run a free model on your own machine with Ollama, in which case your CV
   does not go anywhere at all.
-• Add your own free Adzuna or Reed key to search job boards from inside the
-  app instead of in your browser.
+• Add your own free Adzuna or Reed key and the same screen searches those two
+  boards properly as well — a full search rather than the recent-postings
+  browse, which needs no key and is there either way.
 
 None of the features above this section need any of that.
 
@@ -259,6 +268,7 @@ save.
 ```
 Track every application in one place, with no account
 Check your CV against a job advert on your own computer
+Browse recent job adverts in the app with no key and no account
 Nine UK job boards, one click, no key needed
 Reads PDF, Word and JSON Resume files
 Export and import everything as one file
