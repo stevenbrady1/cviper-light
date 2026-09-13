@@ -84,11 +84,17 @@ match is a word comparison that runs instantly on your machine with nothing
 installed. A model reads it properly and explains itself — either a free local
 one, or your own API key.
 
-**Search jobs.** _Needs free Adzuna/Reed keys — or use the browser links, which
-need no key._ Search two UK job boards from inside the app and save what is
-worth chasing straight onto the board. The browser links cover nine UK boards
-and open in your own browser; Settings lets you turn any of them off, put them
-in the order you use them, and add your own.
+**Browse and search jobs.** _Needs nothing to start._ Two free feeds are read
+straight from the web with no key and no account — Arbeitnow, which is mostly
+Germany and the rest of Europe with a growing London list, and Guardian Jobs,
+which is the twenty most recent UK posts. CViper reads what they have just
+published and narrows it down on your computer, so it is a browse of recent
+jobs rather than a look at the whole market, and each feed says so on screen if
+it stops working. Add your own free Adzuna and Reed keys and the same screen
+searches those two boards properly as well. Either way, what you find saves
+straight onto the tracker board. The browser links cover nine UK boards and open
+in your own browser; Settings lets you turn any of them off, put them in the
+order you use them, and add your own.
 
 **Paste a job.** _Needs an AI provider._ Copy the text of a job advert, paste it
 in, and a model fills in the form for you — title, company, location, salary,
@@ -127,7 +133,8 @@ build if one of those lines ever reads or writes any state.
 | Basic keyword CV match              | **No.** Runs locally, instantly.                                       |
 | CV analysis with a local model      | **No key** — needs [Ollama](https://ollama.com) installed and running. |
 | CV analysis with OpenAI             | Yes — your own key, billed to you.                                     |
-| Job search inside the app           | Yes — free Adzuna and/or Reed keys.                                    |
+| Browse recent jobs inside the app   | **No.** Two free feeds, read with no key and no account.               |
+| Full job search inside the app      | Yes — free Adzuna and/or Reed keys.                                    |
 | Job search in your browser          | **No.** One click, no key at all.                                      |
 | Paste a job advert into the tracker | Yes — a local Ollama model, or your own key.                           |
 | Export and import your data         | **No.**                                                                |
@@ -243,7 +250,7 @@ place the build is allowed to happen — see the hard rules in
 | `apps/cloud`               | Stub. Nothing built.                        |
 | `packages/core-types`      | Shared domain types, export/import format   |
 | `packages/ai-providers`    | BYO-key and local Ollama adapters           |
-| `packages/job-apis`        | Adzuna / Reed clients, keyless search links |
+| `packages/job-apis`        | Adzuna / Reed clients, keyless feeds, links |
 | `packages/cv-parsing`      | CV ingestion and extraction                 |
 | `packages/keyword-scoring` | The no-AI CV match                          |
 | `packages/resume-schema`   | JSON Resume: read, flatten, write back      |

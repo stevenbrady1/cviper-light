@@ -101,6 +101,52 @@ export {
   shingles,
 } from './fingerprint';
 
+// ── Browsing the keyless feeds: no key, no account, no query either ──────
+
+export {
+  KEYLESS_PAGES,
+  KEYLESS_SOURCE_IDS,
+  KEYLESS_SOURCE_LABEL,
+  type KeylessFetchTransport,
+  type KeylessSourceId,
+} from './keyless/types';
+
+export {
+  keylessEmptyFeed,
+  keylessError,
+  keylessHttpStatusError,
+  keylessUnreachable,
+  keylessUnreadable,
+  type KeylessError,
+  type KeylessErrorKind,
+} from './keyless/errors';
+
+export {
+  ARBEITNOW_ATTRIBUTION,
+  ARBEITNOW_TERMS,
+  normaliseArbeitnowFeed,
+} from './keyless/arbeitnow';
+
+export { normaliseGuardianFeed } from './keyless/guardian';
+
+export {
+  filterKeylessJobs,
+  matchesKeywords,
+  matchesLocation,
+  type KeylessFilter,
+} from './keyless/filter';
+
+export {
+  browseKeylessJobs,
+  type KeylessBrowseOutcome,
+  type KeylessBrowseRequest,
+  type KeylessSourceOutcome,
+} from './keyless/browse';
+
+// ── What each source is called on screen ─────────────────────────────────
+
+export { SOURCE_LABEL } from './sources';
+
 // ── Keyless browser links: no key, no scraper, no account ────────────────────
 
 export { boardTemplateProblem, buildBoardUrl, type BrowserSearchInput } from './links';

@@ -1,8 +1,12 @@
 import { ok, type Job, type Result } from '@cviper/core-types';
 import {
+  browseKeylessJobs,
   findCrossPostClusters,
   type JobSearchOutcome,
   type JobSearchRequest,
+  type KeylessBrowseOutcome,
+  type KeylessBrowseRequest,
+  type KeylessFetchTransport,
   type ProviderOutcome,
   type SearchResultJob,
 } from '@cviper/job-apis';
@@ -30,13 +34,15 @@ import { type SaveOutcome, type SearchPort } from '../port';
 export interface FakeSearchPort extends SearchPort {
   /** Every search request the screen actually sent. */
   readonly requests: () => readonly JobSearchRequest[];
+  /** Every keyless browse the screen actually asked for. */
+  readonly browses: () => readonly KeylessBrowseRequest[];
   /** What the next search resolves with. */
   readonly nextOutcome: (outcome: JobSearchOutcome) => void;
   /** Everything currently "on the tracker board". */
   readonly savedJobs: () => readonly Job[];
   /** Make the next call to the named method fail. */
   readonly failNext: (method: 'loadTracked' | 'saveToTracker') => void;
-  readonly calls: Record<'search' | 'loadTracked' | 'saveToTracker', number>;
+  readonly calls: Record<'search' | 'browseKeyless' | 'loadTracked' | 'saveToTracker', number>;
 }
 
 const FAILURE: DbError = {
@@ -84,11 +90,33 @@ export function outcomeOf(
   };
 }
 
-export function createFakeSearchPort(initial: readonly Job[] = []): FakeSearchPort {
+/**
+ * An in-memory `SearchPort`.
+ *
+ * ============================================================================
+ * THE KEYLESS HALF RUNS THE REAL CODE WHEN IT IS GIVEN A TRANSPORT
+ * ============================================================================
+ * Pass `keylessTransport` and `browseKeyless` runs the SHIPPED
+ * `browseKeylessJobs` against the recorded bodies it hands back — real
+ * parsing, real filtering, and above all the real decision about whether a
+ * feed failed or simply matched nothing. A fake that returned a hand-built
+ * outcome would let a test assert "the error is shown" while the code that
+ * decides there IS an error went untested, which is precisely the shape of
+ * guard this repository keeps finding it has.
+ *
+ * With no transport it answers "nothing came back and nothing failed", which
+ * is what the keyed-path tests want: they are about the other half of the
+ * screen, and two error lines appearing in all of them would be noise.
+ */
+export function createFakeSearchPort(
+  initial: readonly Job[] = [],
+  keylessTransport?: KeylessFetchTransport,
+): FakeSearchPort {
   let stored: Job[] = [...initial];
   const sent: JobSearchRequest[] = [];
+  const browsed: KeylessBrowseRequest[] = [];
   const failing = new Set<'loadTracked' | 'saveToTracker'>();
-  const calls = { search: 0, loadTracked: 0, saveToTracker: 0 };
+  const calls = { search: 0, browseKeyless: 0, loadTracked: 0, saveToTracker: 0 };
 
   let outcome: JobSearchOutcome | null = null;
 
@@ -101,6 +129,7 @@ export function createFakeSearchPort(initial: readonly Job[] = []): FakeSearchPo
   return {
     calls,
     requests: () => sent,
+    browses: () => browsed,
     savedJobs: () => stored,
     nextOutcome: (next) => {
       outcome = next;
@@ -111,6 +140,13 @@ export function createFakeSearchPort(initial: readonly Job[] = []): FakeSearchPo
       calls.search += 1;
       sent.push(request);
       return outcome ?? emptyOutcome(request.quota);
+    },
+
+    async browseKeyless(request): Promise<KeylessBrowseOutcome> {
+      calls.browseKeyless += 1;
+      browsed.push(request);
+      if (keylessTransport === undefined) return { outcomes: [], jobs: [] };
+      return await browseKeylessJobs(keylessTransport, request);
     },
 
     async loadTracked(): Promise<Result<ReadonlySet<string>, DbError>> {

@@ -24,6 +24,16 @@ import { type SearchForm } from './model';
  * always searches for whatever is in the boxes.
  *
  * ============================================================================
+ * IT IS NO LONGER THE ONLY KEYLESS THING ON THE SCREEN, SO IT SAYS WHAT IT IS
+ * ============================================================================
+ * Since L-110 the free feeds above also need no key, so the old eyebrow "No key
+ * needed" described two different sections and distinguished neither. This one
+ * hands the address to the user's own browser and gets them a real search of a
+ * whole site; the feeds above are read inside the app and can only show what
+ * was recently published. Both are worth having and they are not the same
+ * thing, so each says which it is.
+ *
+ * ============================================================================
  * NOT ONE BOARD IS NAMED IN THIS FILE
  * ============================================================================
  * Every button comes from `boards`, which comes from `job-boards.json` with the
@@ -59,11 +69,12 @@ export function KeylessBar({ form, browser, boards }: KeylessBarProps) {
       className="rounded-card border border-line bg-sunken px-4 py-3"
     >
       <p className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase">
-        No key needed
+        Open in your browser
       </p>
       <p className="mt-1 text-ink">
-        Send this same search to a job board in your own browser, where you are already signed in.
-        Nothing to set up and nothing to spend.
+        Send these same words to a job board in your own browser, where you are already signed in. A
+        real search of that whole site — more than the free feeds above can show — with nothing to
+        set up and nothing to spend.
       </p>
 
       {shown.length === 0 ? (

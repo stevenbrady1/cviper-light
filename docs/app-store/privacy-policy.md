@@ -33,6 +33,8 @@ These carry a key you pasted into Settings, under an account that is yours. The 
 
 A plain request with nothing about you in it beyond the request itself.
 
+- `www.arbeitnow.com` — The list of recent jobs this free job board publishes, read when you press Browse. It takes no key and no account, and nothing about you is sent — the site sees your IP address, exactly as it would if you opened its job board in your browser. It cannot search: CViper reads the recent list and narrows it down on your computer.
+- `jobs.theguardian.com` — Guardian Jobs’ public list of its twenty most recent UK jobs, read when you press Browse. It takes no key and no account, and nothing about you is sent — the site sees your IP address, exactly as it would if you opened the page yourself. Its own search page is also opened in your browser by the keyless buttons on the search screen, and the app does not load that one.
 - `github.com` — The update check reads a small signed file from this app’s public GitHub releases. It happens when you press “Check for updates”, and once when the app starts unless you switch that off in Settings. It carries no data about you beyond the request itself. The source code is also opened in your browser from Settings → About.
 - **any job-advert page you ask it to open — only when you press Fetch** — You paste a link and press Fetch, and the app reads that one page so it can fill in the form. The address is whichever one you pasted, so it cannot be listed here in advance. It carries no cookies, no sign-in and no key, it cannot reach your saved keys, it follows no links, and addresses on your own computer or home network are refused. The site sees your IP address, exactly as it would if you had clicked the link yourself.
 
@@ -48,7 +50,6 @@ The app hands the address to your own browser and is not involved from then on. 
 - `www.cv-library.co.uk` — A keyless search link for CV-Library, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.adzuna.co.uk` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.google.com` — A keyless search link for Google Jobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
-- `jobs.theguardian.com` — A keyless search link for Guardian Jobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.jobserve.com` — A keyless search link for Jobserve, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page, and it never scrapes Jobserve.
 - `cviper.ai` — The full CViper, and the page about this app. Three one-line signposts and the About entry in Settings hand the address to your browser when you tap them; the app never loads it, and nothing is added to the link.
 

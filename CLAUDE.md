@@ -93,7 +93,7 @@ apps/light           Tauri v2 desktop app (React + Vite + Tailwind 4)
 apps/cloud           Stub. Nothing here. Do not build anything in it.
 packages/core-types  Shared domain types
 packages/ai-providers  BYO-key and local Ollama adapters
-packages/job-apis    Adzuna / Reed clients, keyless search links
+packages/job-apis    Adzuna / Reed clients, keyless feeds and links
 packages/cv-parsing  CV ingestion and extraction
 packages/ui          Shared presentational components
 docs/                Plan and feature matrix

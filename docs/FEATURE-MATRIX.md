@@ -8,8 +8,9 @@ the shared data model and export/import format, the local SQLite data-access
 layer, CV text extraction, the provider adapters and their Rust transport, the
 keyword-only scorer, JSON Resume import, the app shell, the application tracker, the CV analysis
 view, the job-board clients (Adzuna and Reed request building, response
-normalisation, cross-post detection, the nine configurable keyless browser
-links and the daily request budget), the job search view, the API-key setup
+normalisation, cross-post detection, the two keyless feeds and the local filter
+over them, the nine configurable keyless browser links and the daily request
+budget), the job search view, the API-key setup
 wizard, pasted-advert extraction and the review form it fills, fetching one
 advert from a link and the guards around it, the update check and the switch
 that decides whether it runs at launch, the first-run introduction and the app
@@ -41,6 +42,7 @@ enrolment and submission are the owner's, by hand. See
 | Feature                         | Light                                                 | Cloud (future)                     | State                     |
 | ------------------------------- | ----------------------------------------------------- | ---------------------------------- | ------------------------- |
 | Job search (Adzuna/Reed)        | Yes — user's own API keys, direct calls               | Yes — server-side, shared keys     | Built                     |
+| Browse recent jobs, no key      | Yes — Arbeitnow + Guardian feeds, filtered locally    | Not applicable                     | Built                     |
 | Cross-post detection            | Yes — flags duplicates, never merges                  | Yes — merges, with a server undo   | Built                     |
 | Keyless browser search links    | Yes — nine UK boards, opens in browser                | Not applicable                     | Built                     |
 | Job-board list, user-edited     | Yes — enable, reorder, add your own                   | Not applicable                     | Built                     |
@@ -330,22 +332,22 @@ Strict JSON — no comments, no trailing commas. `app` is metadata only.
 
 ### `jobs[]`
 
-| Field             | Type                                                 | Null? | Notes                                        |
-| ----------------- | ---------------------------------------------------- | ----- | -------------------------------------------- |
-| `id`              | string                                               | no    | Sort key for deterministic export.           |
-| `source`          | `adzuna` / `reed` / `manual` / `linkedin` / `indeed` | no    | Closed set.                                  |
-| `external_id`     | string                                               | yes   | The provider's own id. `null` when `manual`. |
-| `title`           | string                                               | no    |                                              |
-| `company`         | string                                               | no    |                                              |
-| `location`        | string                                               | yes   |                                              |
-| `salary_min`      | number                                               | yes   |                                              |
-| `salary_max`      | number                                               | yes   |                                              |
-| `salary_currency` | string                                               | yes   | ISO-4217, e.g. `GBP`.                        |
-| `salary_period`   | `year` / `day` / `hour`                              | yes   | See below — this field is load-bearing.      |
-| `description`     | string                                               | yes   |                                              |
-| `url`             | string                                               | yes   |                                              |
-| `posted_date`     | `YYYY-MM-DD`                                         | yes   |                                              |
-| `created_at`      | ISO-8601 UTC                                         | no    |                                              |
+| Field             | Type                                                                            | Null? | Notes                                        |
+| ----------------- | ------------------------------------------------------------------------------- | ----- | -------------------------------------------- |
+| `id`              | string                                                                          | no    | Sort key for deterministic export.           |
+| `source`          | `adzuna` / `reed` / `arbeitnow` / `guardian` / `manual` / `linkedin` / `indeed` | no    | Closed set.                                  |
+| `external_id`     | string                                                                          | yes   | The provider's own id. `null` when `manual`. |
+| `title`           | string                                                                          | no    |                                              |
+| `company`         | string                                                                          | no    |                                              |
+| `location`        | string                                                                          | yes   |                                              |
+| `salary_min`      | number                                                                          | yes   |                                              |
+| `salary_max`      | number                                                                          | yes   |                                              |
+| `salary_currency` | string                                                                          | yes   | ISO-4217, e.g. `GBP`.                        |
+| `salary_period`   | `year` / `day` / `hour`                                                         | yes   | See below — this field is load-bearing.      |
+| `description`     | string                                                                          | yes   |                                              |
+| `url`             | string                                                                          | yes   |                                              |
+| `posted_date`     | `YYYY-MM-DD`                                                                    | yes   |                                              |
+| `created_at`      | ISO-8601 UTC                                                                    | no    |                                              |
 
 **Why `salary_period` exists.** Reed returns salary figures with no period unit,
 so a contract advertised at £457–£550 is a **day rate** that is byte-for-byte

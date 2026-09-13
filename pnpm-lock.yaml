@@ -187,6 +187,10 @@ importers:
       '@cviper/core-types':
         specifier: workspace:*
         version: link:../core-types
+    devDependencies:
+      jsdom:
+        specifier: ^30.0.1
+        version: 30.0.1
 
   packages/keyword-scoring:
     dependencies:

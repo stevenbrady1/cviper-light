@@ -57,14 +57,22 @@ export const UNKNOWN_COMPANY = 'Unknown';
 /** Both providers are queried against the UK market - see `jobs.rs`. */
 const CURRENCY = 'GBP';
 
-function asRecord(value: unknown): Record<string, unknown> | null {
+/*
+  The four readers below are `export`ed for the keyless feeds (`keyless/`),
+  which face exactly the same problem this file does — an untrusted third-party
+  payload that changes without notice — and must answer it identically. A second
+  copy of "what counts as a usable string" is a second place for the answer to
+  drift, and the drift would show up as adverts quietly missing from one source
+  and not the other.
+*/
+export function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
 }
 
 /** A non-empty trimmed string, or `null`. Numbers are NOT coerced. */
-function asText(value: unknown): string | null {
+export function asText(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed === '' ? null : trimmed;
@@ -77,14 +85,14 @@ function asText(value: unknown): string | null {
  * `UNIQUE(source, external_id)`, so they have to agree on a type or the same
  * advert saves twice.
  */
-function asExternalId(value: unknown): string | null {
+export function asExternalId(value: unknown): string | null {
   if (typeof value === 'string') return asText(value);
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   return null;
 }
 
 /** An `http`/`https` link, or `null`. Nothing else is a link worth offering. */
-function asHttpUrl(value: unknown): string | null {
+export function asHttpUrl(value: unknown): string | null {
   const text = asText(value);
   if (text === null) return null;
   return /^https?:\/\//i.test(text) ? text : null;

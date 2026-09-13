@@ -30,10 +30,14 @@
  * far worse lie than a database error.
  */
 import {
+  browseKeylessJobs,
   searchJobs,
   type JobSearchOutcome,
   type JobSearchRequest,
   type JobSearchTransport,
+  type KeylessBrowseOutcome,
+  type KeylessBrowseRequest,
+  type KeylessFetchTransport,
 } from '@cviper/job-apis';
 import { ok, type Application, type IsoTimestamp, type Job, type Result } from '@cviper/core-types';
 
@@ -46,6 +50,7 @@ import {
   type DbError,
 } from '../../db';
 import { createTauriJobTransport } from '../../jobs/transport';
+import { createTauriKeylessTransport } from '../../jobs/keylessTransport';
 
 import { externalKey } from './model';
 
@@ -55,6 +60,19 @@ export type SaveOutcome = 'saved' | 'already-saved';
 export interface SearchPort {
   /** Run one search. Never rejects: each board succeeds or fails on its own. */
   search(request: JobSearchRequest): Promise<JobSearchOutcome>;
+  /**
+   * Read the keyless feeds and narrow them on this machine (L-110).
+   *
+   * A SEPARATE METHOD, not a flag on `search`. The two spend different things:
+   * a search spends one of Reed's hundred daily requests and needs a key that
+   * may not exist, while a browse spends nothing and needs nothing. Folding
+   * them together would mean one call site deciding, per provider, which of
+   * those two it was doing.
+   *
+   * Never rejects: each feed succeeds or fails on its own, and a feed that
+   * failed comes back as a message rather than as an absence.
+   */
+  browseKeyless(request: KeylessBrowseRequest): Promise<KeylessBrowseOutcome>;
   /** `source:external_id` for every advert already on the tracker board. */
   loadTracked(): Promise<Result<ReadonlySet<string>, DbError>>;
   /** Add an advert and the application chasing it. */
@@ -86,14 +104,24 @@ function newApplication(jobId: string, applicationId: string, now: IsoTimestamp)
   };
 }
 
-export function createDbSearchPort(transport?: JobSearchTransport): SearchPort {
+export function createDbSearchPort(
+  transport?: JobSearchTransport,
+  keylessTransport?: KeylessFetchTransport,
+): SearchPort {
   // Built once per port. `createTauriJobTransport` is cheap, but a new one per
   // search would be a new object identity in every dependency array above.
   const jobTransport = transport ?? createTauriJobTransport();
+  // The keyless one is built here too, and is a DIFFERENT object reaching a
+  // DIFFERENT Rust command — the one that cannot reach the credential store.
+  const feedTransport = keylessTransport ?? createTauriKeylessTransport();
 
   return {
     search(request) {
       return searchJobs(jobTransport, request);
+    },
+
+    browseKeyless(request) {
+      return browseKeylessJobs(feedTransport, request);
     },
 
     async loadTracked() {

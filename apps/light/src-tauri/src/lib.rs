@@ -2,6 +2,7 @@ mod db;
 mod fetch_page;
 mod files;
 mod jobs;
+mod keyless;
 mod providers;
 mod secrets;
 
@@ -126,6 +127,17 @@ pub fn run() {
             // written anywhere. See the command's own comment for why a key is
             // proved before it is stored rather than after.
             jobs::job_test_credentials,
+            // Reading a whole public job feed, with NO credential of any kind
+            // (L-110). Two fixed addresses, a page number that is clamped
+            // rather than trusted, and nothing the user typed — these feeds
+            // accept no query, which is why the app filters what comes back on
+            // this machine and never calls it a search.
+            //
+            // `keyless.rs` carries a test proving the file cannot so much as
+            // NAME the credential store, the same structural guard
+            // fetch_page.rs has. The bytes come back raw and the page parses
+            // them, so no XML crate joins the side of the app that holds keys.
+            keyless::keyless_fetch,
             // Reading a CV the user picked, and reading or writing a backup.
             // Each one opens the dialog ITSELF and touches only what came back
             // out of it: there is no command here that takes a path, so there
