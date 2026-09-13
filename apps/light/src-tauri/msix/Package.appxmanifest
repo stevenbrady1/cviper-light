@@ -9,30 +9,39 @@
   `.msix` the owner uploads to Partner Center.
 
   ============================================================================
-  THREE FIELDS ARE PLACEHOLDERS AND THE OWNER PASTES ALL THREE. NONE OF THEM
-  CAN BE GUESSED.
+  THE THREE IDENTITY FIELDS ARE REAL. THEY ARE NOT GUESSES AND NOT EXAMPLES.
   ============================================================================
-  Partner Center assigns them when the app's name is reserved, and they are
-  shown under Product -> Product identity. Copy them EXACTLY:
+  Partner Center assigned them when the app's name was reserved, and they are
+  shown under Product -> Product identity. All three were pasted from there
+  (L-93 follow-up), replacing the values this file shipped with:
 
     Package/Identity/@Name              <- "Package/Identity/Name"
     Package/Identity/@Publisher         <- "Package/Identity/Publisher" (CN=...)
     Package/Properties/PublisherDisplayName
                                         <- "Publisher display name"
 
-  Every one of them is marked `PLACEHOLDER-` below. `docs/STORE-SUBMISSION.md`
-  has the step-by-step.
+  `Identity/@Publisher` is CASE SENSITIVE and must match the reservation
+  character for character. The `Name` prefix is `StBr`, the publisher id
+  Partner Center issued; it is NOT an abbreviation somebody chose and must not
+  be "tidied" into `StevenBrady`. Change any of the three and the package no
+  longer matches the reservation, which Partner Center rejects at upload with a
+  message naming the field that disagrees.
+
+  `docs/STORE-SUBMISSION.md` has the step-by-step.
 
   Two things people expect to find here and will not, because they are NOT
-  manifest fields: the Package Family Name and the Store ID. Partner Center
-  derives both from the identity above; nothing is pasted back in.
+  manifest fields: the Package Family Name (`StBr.CViperLight_wjvg8g4k0t6gr`)
+  and the Store ID (`9PKWNV9CGPWV`). Partner Center derives both from the
+  identity above; nothing is pasted back in.
 
   ALL THREE, OR NONE. A half-filled identity is the dangerous state — it looks
   finished and is rejected at upload — so
   `src/lib/msix-store-build.contract.test.ts` fails the build if some of the
-  three are placeholders and others are not. It never asks that they BE
-  placeholders: a real submission replacing all three is exactly what this file
-  is for.
+  three are placeholders and others are not. It never asked that they BE
+  placeholders, and this is the all-real end of the same rule: a real
+  submission replacing all three is exactly what this file is for. That file
+  also pins the SHAPE of each value, so a field blanked, retyped as an example
+  or reverted to a placeholder fails there rather than at upload.
 
   ============================================================================
   THE VERSION'S FOURTH NUMBER MUST BE 0.
@@ -66,8 +75,8 @@
   IgnorableNamespaces="uap rescap uap10">
 
   <Identity
-    Name="PLACEHOLDER-Partner-Center-Identity-Name"
-    Publisher="CN=PLACEHOLDER-Partner-Center-Publisher-Id"
+    Name="StBr.CViperLight"
+    Publisher="CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399"
     Version="0.1.0.0" />
 
   <Properties>
@@ -77,7 +86,7 @@
       own personal name. "CViper" would read to a reasonable consumer as a
       business entity, which requires a company account.
     -->
-    <PublisherDisplayName>PLACEHOLDER-Owners-Own-Name</PublisherDisplayName>
+    <PublisherDisplayName>Steven Brady</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
     <uap10:PackageIntegrity>
       <uap10:Content Enforcement="on" />
