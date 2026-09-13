@@ -252,7 +252,15 @@ function emitCv(cv: Cv): Record<string, unknown> {
     {
       id: cv.id,
       name: cv.name,
-      file_path: cv.file_path,
+      // L-133: `file_path` is a path on the machine that exported it —
+      // typically `C:\Users\<name>\...` on Windows — so it leaks the
+      // Windows username and folder layout to anyone the export is shared
+      // with. The field cannot be REMOVED (additive-only, see the header
+      // above), so it stays, always null. The internal database keeps the
+      // real value for opening the file locally; only the export nulls it.
+      // An older export written before this fix may still carry a real
+      // path, and importBackup still accepts that unchanged.
+      file_path: null,
       extracted_text: cv.extracted_text,
       created_at: cv.created_at,
       json_resume: cv.json_resume,

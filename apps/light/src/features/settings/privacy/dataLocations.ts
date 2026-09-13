@@ -33,6 +33,15 @@ export const DATA_LOCATIONS: readonly DataLocation[] = [
     erasedBy: 'database',
   },
   {
+    // L-133: the path lives in the same row as the CV, so it is stated as
+    // its own location — a reader would otherwise have no way to know it
+    // existed, or that `packages/core-types/src/backup.ts` deliberately
+    // leaves it out of every export.
+    what: 'Where each CV file came from on this computer',
+    where: `the file’s full path, kept in the same database file on this computer only — an export always leaves it out`,
+    erasedBy: 'database',
+  },
+  {
     what: 'Your API keys',
     where:
       'this device’s credential store (the Keychain on an iPhone, iPad or Mac; Credential Manager on Windows; the Secret Service on Linux), one entry per key',

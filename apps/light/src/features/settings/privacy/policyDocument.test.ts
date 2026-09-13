@@ -54,6 +54,20 @@ describe('the privacy policy document', () => {
     expect(PRIVACY_CONTACT_URL).toMatch(/^https:\/\/github\.com\/.+\/issues$/);
   });
 
+  it('L-134b: the short version carves out the automatic local Ollama check honestly', () => {
+    // The short version used to say the app contacts another service "only
+    // when you press a button that says it will" — stricter than the code:
+    // App.tsx/environment.ts probe Ollama on mount and on every view change,
+    // with no button behind it. The carve-out must name Ollama, say the check
+    // happens on its own, and say it stays on this computer — without
+    // deleting the "only when you press a button" promise for everything
+    // else that actually leaves the machine.
+    const text = currentPrivacyPolicy();
+    expect(text).toContain('only when you press a button');
+    expect(text).toMatch(/Ollama[^.]*on its own/);
+    expect(text).toContain('never leaves');
+  });
+
   it('negative: a host added to the registry appears in the render without any other change', () => {
     const text = renderPrivacyPolicy({
       version: '9.9.9',
