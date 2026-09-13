@@ -115,6 +115,11 @@ decides everything after that.
    existing installs begin to see the new version.** Nothing before this step
    changes what the updater serves.
 
+Those are the only two ways in. Running the workflow by hand with `promote_tag`
+empty is neither, and it now **fails with a message saying so** — it used to
+build a draft tagged after the run number, whose `latest.json` said something
+else entirely (L-118).
+
 ### Why step 4 is a workflow rather than "copy the file across"
 
 A manual copy has none of the properties that matter here:

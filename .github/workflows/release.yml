@@ -3,8 +3,19 @@ name: Release
 # ============================================================================
 # THE ONLY PLACE A SIGNED, SHIPPABLE BUILD IS PRODUCED.
 # ============================================================================
-# Triggered by a `light-v*` tag, or by hand. Nothing about it is automatic: it
-# produces a DRAFT release, always, and a person presses publish.
+# There are exactly TWO ways in, and no third:
+#
+#   PUSH a `light-v*` tag          -> `bundle` builds the installers into a
+#                                     DRAFT release named after that tag.
+#   DISPATCH with `promote_tag`    -> `promote-manifest` publishes an
+#                                     already-reviewed release's `latest.json`.
+#
+# A dispatch with `promote_tag` left empty is neither, and it FAILS (L-118). It
+# used to fall through to `bundle`, which had no tag and invented one from the
+# run number — a draft tagged `light-v2` whose `latest.json` said `0.1.0`.
+#
+# Nothing about any of it is automatic: it produces a DRAFT release, always, and
+# a person presses publish.
 #
 # smoke.yml also runs `tauri build` (L-88), and deliberately produces something
 # that CANNOT be shipped: unsigned, with `createUpdaterArtifacts` overridden to
@@ -19,8 +30,10 @@ on:
       promote_tag:
         description: >-
           Publish the updater manifest from an ALREADY-PUBLISHED release, e.g.
-          light-v0.1.0. Leave this empty to bundle a new draft instead. See
-          "Promoting the manifest" in apps/light/src-tauri/RELEASE-SIGNING.md.
+          light-v0.1.0. Leaving this empty FAILS the run: bundling a new draft
+          is started by pushing a light-v* tag, never by running this workflow
+          by hand. See "Releasing: the human steps, in order" in
+          apps/light/src-tauri/RELEASE-SIGNING.md.
         required: false
         default: ''
 
@@ -30,11 +43,58 @@ permissions:
   contents: write
 
 jobs:
+  # ==========================================================================
+  # A BARE DISPATCH IS A MISTAKE, AND THIS SAYS SO OUT LOUD (L-118).
+  # ==========================================================================
+  # Running this workflow by hand with nothing filled in used to BUILD A
+  # RELEASE. `bundle` ran on any dispatch that was not a promotion, had no
+  # pushed tag to name the release after, and filled one in from the run
+  # number — so a draft appeared tagged `light-v2` carrying a `latest.json`
+  # that said `0.1.0`. The tag and the version disagreed and nothing objected.
+  #
+  # The fallback is gone, which leaves a bare dispatch with nothing to do. It
+  # must not do that nothing QUIETLY: a run in which every job skips is a green
+  # tick, and a green tick on a workflow called Release is read as "the release
+  # went out". So it fails here, in a sentence, naming what it could have meant.
+  refuse-a-bare-dispatch:
+    if: github.event_name == 'workflow_dispatch' && inputs.promote_tag == ''
+
+    runs-on: ubuntu-latest
+
+    # Reads nothing, writes nothing, checks nothing out. This job only prints
+    # and exits.
+    permissions:
+      contents: read
+
+    steps:
+      - name: A release starts with a tag push, not with this button
+        shell: bash
+        run: |
+          set -eu
+          echo 'This workflow was run by hand with promote_tag empty, and that is not a way to'
+          echo 'start a release. Nothing was built and nothing was published.'
+          echo ''
+          echo 'There are two ways in:'
+          echo ''
+          echo '  1. To build a new release: push a light-v* tag. The bundle job builds the'
+          echo '     installers into a DRAFT release named after that tag. Review it, then'
+          echo '     publish it as a pre-release.'
+          echo '  2. To point existing installs at a release you have already published: run'
+          echo '     this workflow with promote_tag set to that tag.'
+          echo ''
+          echo 'See "Releasing: the human steps, in order" in apps/light/src-tauri/RELEASE-SIGNING.md.'
+          echo "::error title=Nothing to do, so nothing was done::promote_tag was empty. Push a light-v* tag to build a release, or dispatch this workflow with promote_tag set to an already-published tag to promote its updater manifest. See section 3 of apps/light/src-tauri/RELEASE-SIGNING.md."
+          exit 1
+
   bundle:
-    # A "promote the manifest" dispatch must not also bundle a fresh draft.
-    # Those are two different acts: one produces artefacts for a person to
-    # review, the other publishes a manifest for artefacts already reviewed.
-    if: github.event_name != 'workflow_dispatch' || inputs.promote_tag == ''
+    # A PUSHED TAG AND NOTHING ELSE.
+    #
+    # Both halves matter. `ref_type == 'tag'` alone would still let a dispatch
+    # aimed at a tag ref from the Actions UI reach the bundler, and a dispatch
+    # means "promote a manifest" — never "build me a release". `event_name ==
+    # 'push'` alone would let a branch push in, with no tag to name the release
+    # after, which is the state the invented tag came out of.
+    if: github.event_name == 'push' && github.ref_type == 'tag'
 
     strategy:
       # One platform failing must not cancel the other. A Windows build that
@@ -231,7 +291,10 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: apps/light
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('light-v{0}', github.run_number) }}
+          # The tag that was pushed, and no fallback. The job cannot be reached
+          # without one (see the `if:` above), so there is no state left for a
+          # fallback to cover — only a state for it to invent a name in.
+          tagName: ${{ github.ref_name }}
           releaseName: 'CViper Light ${{ github.ref_name }}'
           releaseBody: 'See the assets below to download and install this version.'
           # ==================================================================
