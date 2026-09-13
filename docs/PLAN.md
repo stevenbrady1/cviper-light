@@ -777,8 +777,28 @@ text editor and starts with `"schemaVersion": 1`.
    [`STORE-SUBMISSION.md`](STORE-SUBMISSION.md) — it has the enrolment steps,
    the listing copy in the order policy 10.8.3 requires, the three identity
    fields to paste, the age rating and generative-AI answers, and the four
-   screenshots to take. Two things are owed before submitting: the
-   `cviper.ai/privacy` page has to be live, and the name has to be reserved
-   before the identity fields exist to paste.
+   screenshots to take. **One** thing is owed before submitting: the name has to
+   be reserved, because the identity fields do not exist until it is.
+
+   The privacy page is **no longer owed** — `cviper.ai/light/privacy` is live
+   (checked 2026-09-13; a bogus path under the same prefix 404s, so it is a real
+   page and not a catch-all). The Azure mothballing on 2026-09-10 did not take it
+   with it: it is served from the `cviper-landing` GitHub Pages repository, which
+   is not part of the deleted infrastructure.
 
 9. First tagged release and macOS notarization.
+
+   **The 21 August draft has been deleted and `light-v0.1.0` re-tagged at
+   `dcd57f4` (2026-09-13).** The old draft was 96 commits stale and would have
+   shipped without the privacy lock-down, the AI consent gate, the Store
+   packaging or the L-106…L-109 fixes. Anyone reading an older copy of this file
+   should not go looking for it.
+
+   The current draft is built, and its `latest.json` signatures have been
+   verified against the real downloaded installers with
+   `pnpm verify:updater-manifest --bundle-dir` (key `7029FCBC6B4F158F`). What is
+   left is exactly steps 2–4 of
+   [`RELEASE-SIGNING.md`](../apps/light/src-tauri/RELEASE-SIGNING.md): install it
+   and look at it, publish as a **pre-release**, then run the promote workflow.
+   The installer is **not** Authenticode-signed — confirmed, not assumed — so
+   SmartScreen will warn until the Store route in task 8 lands.
