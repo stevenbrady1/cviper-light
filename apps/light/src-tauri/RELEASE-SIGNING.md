@@ -131,6 +131,18 @@ decides everything after that.
    existing installs begin to see the new version.** Nothing before this step
    changes what the updater serves.
 
+Only two of those four steps start the workflow at all: **step 1 (pushing a
+`light-v*` tag)** and **step 4 (dispatching it with `promote_tag` set)**. Steps
+2 and 3 happen in the GitHub releases UI and trigger nothing. There is no third
+way in — running the workflow by hand with `promote_tag` empty is neither of the
+two, and it now **fails with a message saying so**. It used to build a draft
+tagged after the run number, whose `latest.json` said something else entirely
+(L-118).
+
+Step 1 also refuses a tag that disagrees with the app: before anything is built,
+`bundle` compares `light-v<x>` against `version` in `tauri.conf.json` and stops
+if they differ. Bump the version in the same commit you tag.
+
 ### Why step 4 is a workflow rather than "copy the file across"
 
 A manual copy has none of the properties that matter here:
