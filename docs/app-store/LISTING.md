@@ -86,8 +86,7 @@ Pick one:
 > Export everything to one file whenever you like. Import it back, or import it
 > on another device.
 >
-> CViper Light is free, open source under the MIT licence, and made by the
-> people behind cviper.ai.
+> CViper Light is free, open source under the MIT licence, and made in the UK.
 
 ## Keywords (100 characters max, comma-separated, no spaces after commas)
 

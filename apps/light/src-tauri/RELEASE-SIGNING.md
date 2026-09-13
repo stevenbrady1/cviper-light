@@ -108,14 +108,21 @@ decides everything after that.
    `releaseDraft: true` is deliberate and is not a setting to flip: publishing
    is the moment every existing install starts downloading.
    **Before publishing, open every address this build hands to a browser and
-   confirm each one still resolves** — the links in
+   confirm each one shows what the app claims about it — not merely that it
+   loads.** The addresses are the links in
    `apps/light/src/features/signposts/links.ts`, the `signupUrl` of every
    provider in `apps/light/src/features/settings/keys/`, and every entry in
-   `apps/light/src/config/job-boards.json`. No test can do this: a guard can
-   prove the app only names registered hosts, and cannot prove those hosts
-   still serve the page the copy promises. The hosted CViper the analysis and
-   tracker signposts described was deleted while the app still advertised it
-   (L-114), and nothing in CI went red.
+   `apps/light/src/config/job-boards.json`. In particular,
+   `https://cviper.ai/privacy/` must contain every sentence in
+   `apps/light/src/lib/outbound-hosts.ts`: that page is generated from this
+   repository's registry but published from another one, so it drifts every
+   time this file changes and a 200 says nothing about whether it has caught
+   up. No test can do any of this. A guard can prove the app only names
+   registered hosts; it cannot prove those hosts still serve the page the copy
+   promises. The hosted CViper the analysis and tracker signposts described was
+   deleted while the app still advertised it (L-114), and nothing in CI went
+   red. Turning this into a script that fails loudly is tracked as a
+   follow-up.
 3. **Publish the draft as a PRE-RELEASE.** Pre-release rather than latest,
    because the direct-download installers are unsigned, SmartScreen warns about
    them, and they are not a headline download.

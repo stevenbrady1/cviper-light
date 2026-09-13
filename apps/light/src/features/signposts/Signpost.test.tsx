@@ -26,7 +26,7 @@ const IDS: readonly SignpostId[] = ['privacy'];
  * made here on purpose.
  */
 const EXPECTED: Readonly<Record<SignpostId, string>> = {
-  privacy: 'Here is exactly what this app keeps and contacts, as a page you can link to.',
+  privacy: 'Here is exactly what this app keeps, and what it contacts.',
 };
 
 afterEach(() => {

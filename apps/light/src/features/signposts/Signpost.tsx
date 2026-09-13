@@ -40,7 +40,7 @@ export interface SignpostCopy {
 
 export const SIGNPOSTS: Readonly<Record<SignpostId, SignpostCopy>> = {
   privacy: {
-    text: 'Here is exactly what this app keeps and contacts, as a page you can link to.',
+    text: 'Here is exactly what this app keeps, and what it contacts.',
     url: CVIPER_PRIVACY_URL,
   },
 };

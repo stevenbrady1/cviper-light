@@ -116,10 +116,10 @@ own machine, or your own OpenAI key. Without one you add jobs by
 typing them in, and everything else carries on as normal — the tracker and the
 browser job-search links never needed a key and still do not.
 
-**Two lines about us, and only two.** Settings → Privacy carries one sentence
-that opens this app's own privacy policy at `cviper.ai/privacy`, and Settings →
-About says who made Light and links to its page and its source. Each opens your
-own browser only when you tap it. There is no badge, no count, no timer and no
+**About us, briefly.** Settings → Privacy carries one sentence that opens this
+app's own privacy policy at `cviper.ai/privacy`, and Settings → About says
+where Light was made and links to its page and its source. Each opens your own
+browser only when you tap it. There is no badge, no count, no timer and no
 nag: the same sentence every time, and a test fails the build if one of those
 lines ever reads or writes any state.
 

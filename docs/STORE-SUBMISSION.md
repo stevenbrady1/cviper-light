@@ -454,10 +454,10 @@ to buy, subscribe to or sign into. The address now serves this app's own site:
 its download page and its privacy policy.
 
 What remains true today is smaller than what the paragraphs above weighed. The
-app hands out one link, not three — a single line in Settings → Privacy that
+app hands out only its own addresses — a single line in Settings → Privacy that
 opens `https://cviper.ai/privacy/`, this app's own generated policy — plus the
-About entry naming who made it and linking to its page and its MIT-licensed
-source. All of them are this free app's own pages. Nothing is sold anywhere,
+About entry naming where it was made and linking to its page and its
+MIT-licensed source. All of them are this free app's own pages. Nothing is sold anywhere,
 by anyone, at any point.
 
 The 10.14 question is therefore narrower than it was when it was written: it is
