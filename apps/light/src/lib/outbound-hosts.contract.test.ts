@@ -48,7 +48,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { OUTBOUND_HOSTS, OUTBOUND_HOST_NAMES } from './outbound-hosts.ts';
+import { OUTBOUND_HOSTS, OUTBOUND_HOST_NAMES, type OutboundHost } from './outbound-hosts.ts';
 import { REPO_ROOT, displayPath, shippedText, walk } from './repo-scan.ts';
 
 const SCANNED_EXTENSIONS = ['.ts', '.tsx', '.rs', '.sql', '.html', '.css', '.json'] as const;
@@ -113,6 +113,71 @@ describe('the outbound-hosts registry', () => {
         'local-only',
       ]).toContain(purpose);
     }
+  });
+});
+
+/** One entry's `why`, or a test failure that names the missing host. */
+function findHost(host: string): OutboundHost {
+  const entry = OUTBOUND_HOSTS.find((candidate) => candidate.host === host);
+  if (entry === undefined) throw new Error(`no OUTBOUND_HOSTS entry for ${host}`);
+  return entry;
+}
+
+describe('L-128 / L-134: copy that used to say less than the code does', () => {
+  it('L-134a: Adzuna — says its two credentials travel as URL parameters, into Adzuna’s own logs', () => {
+    // jobs.rs:496-499 puts app_id and app_key on the query string because
+    // Adzuna's API requires it that way (Reed, next door, uses HTTP Basic
+    // auth instead — a real difference between the two, not a stray detail).
+    const why = findHost('api.adzuna.com').why;
+    expect(why).toContain('parameters in the web address');
+    expect(why).toContain('Adzuna’s own request logs');
+  });
+
+  it('L-134c: OpenAI and Anthropic — a pasted job advert reaches the same host as a CV analysis', () => {
+    // runExtraction.ts sends whatever the user pasted into the tracker's
+    // "paste a job" box to the same provider adapters analysis uses, and a
+    // pasted advert can be a recruiter's email forwarded verbatim.
+    expect(findHost('api.openai.com').why).toContain('pasted job advert');
+
+    const anthropic = findHost('api.anthropic.com').why;
+    expect(anthropic).toContain('pasted job advert');
+    // L-105's caveat must survive the reword: no screen in this build can add
+    // an Anthropic key, so `unconfigurableKeyClaims.contract.test.tsx` must
+    // still find no possession claim here.
+    expect(anthropic).toContain('no screen for adding one');
+  });
+
+  it('L-128: Reed — discloses the keyless browser link, not only the keyed API', () => {
+    // config/job-boards.json has a keyless www.reed.co.uk search link opened
+    // in the browser, at the SAME host as the keyed API a few lines above —
+    // so it cannot be a second OUTBOUND_HOSTS entry (that would list the host
+    // twice) and must live in this one entry's `why`.
+    const why = findHost('www.reed.co.uk').why;
+    expect(why).toContain('keyless search link for Reed');
+    expect(why).toContain('job-boards.json');
+  });
+
+  it('W3: Adzuna and Reed carry the same IP-address caveat as their keyless siblings', () => {
+    // Coordinator review, PR #89: "nothing else about you is sent" (Adzuna's
+    // original wording here) was stronger than the truth, and stronger than
+    // every keyless entry below it, which all say the site sees the
+    // requester's IP address. A search also carries the search words and
+    // location — that is what a search is.
+    for (const host of ['api.adzuna.com', 'www.reed.co.uk']) {
+      const why = findHost(host).why;
+      expect(why, host).toContain('IP address');
+      expect(why, host).toMatch(/search words|search terms/);
+    }
+  });
+
+  it('L-134b: the local Ollama check runs on its own, not only when asked', () => {
+    // App.tsx:238-248 re-reads environment status on mount and on every view
+    // change; environment.ts:145-154 fans that out into probeOllama(), which
+    // hits 127.0.0.1:11434/api/tags with no button press behind it.
+    const why = findHost('127.0.0.1').why;
+    expect(why).toMatch(/on its own/i);
+    expect(why).toContain('opens');
+    expect(why).toContain('change screens');
   });
 });
 

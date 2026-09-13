@@ -77,9 +77,10 @@ Pick one:
 > • It never asks you to sign up.
 > • It never sends anything to us. There is no "us" to send it to: no server,
 > no analytics, no crash reporting.
-> • It never contacts a service you did not press a button for. Settings →
-> Privacy lists every address the app is allowed to name — and a test in the
-> public source code fails the build if another is added.
+> • The only requests it ever makes are ones you start, or switched on
+> yourself — like the update check on startup, which you can switch off any
+> time. Settings → Privacy lists every address the app is allowed to name —
+> and a test in the public source code fails the build if another is added.
 >
 > TAKE IT WITH YOU
 >

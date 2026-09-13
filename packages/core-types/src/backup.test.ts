@@ -228,7 +228,14 @@ describe('backup round-trip', () => {
 
     const imported = unwrap(importBackup(exportBackup(original)));
 
-    expect(imported).toEqual(original);
+    expect(imported).toEqual({
+      ...original,
+      // L-133: `file_path` is a path on the machine that exported it — often
+      // `C:\Users\<name>\...` — so it is the one field this "no loss" round
+      // trip does NOT carry through: exportBackup always writes it as null.
+      // See backup.privacy.test.ts for the guard.
+      cvs: original.cvs.map((cv) => ({ ...cv, file_path: null })),
+    });
 
     // Called out explicitly so a failure names the thing that broke instead of
     // dumping a whole-object diff.
@@ -237,7 +244,8 @@ describe('backup round-trip', () => {
     expect(cv.extracted_text).toContain('\u00a3');
     expect(cv.extracted_text).toContain('\n');
     expect(cv.extracted_text).toContain('\u65e5\u672c\u8a9e');
-    expect(cv.file_path).toBe('C:\\Users\\steve\\Documents\\Risk CV.pdf');
+    // L-133: never the real path, even though the source Cv carried one.
+    expect(cv.file_path).toBeNull();
 
     const adzunaJob = at(imported.jobs, 0);
     expect(adzunaJob.salary_period).toBe('day');

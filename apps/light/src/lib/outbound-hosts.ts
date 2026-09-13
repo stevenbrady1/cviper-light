@@ -69,7 +69,11 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
   {
     host: 'api.openai.com',
     purpose: 'fetched-with-your-key',
-    why: 'A CV analysis you start, sent with your own OpenAI key under your own OpenAI account.',
+    // L-134c: the tracker's "paste a job" box (runExtraction.ts) sends
+    // whatever was pasted — which can be a recruiter's email forwarded
+    // verbatim — through the same provider adapter a CV analysis uses. The
+    // sentence used to name only the CV analysis.
+    why: 'A CV analysis, or a pasted job advert, that you start, sent with your own OpenAI key under your own OpenAI account.',
   },
   {
     host: 'api.anthropic.com',
@@ -82,20 +86,53 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     // dropping it would make the notice a summary. Only the sentence changed.
     // `privacy/unconfigurableKeyClaims.contract.test.tsx` fails the build if a
     // provider with no key card is ever described as one you hold a key for.
+    //
+    // L-134c added "or a pasted job advert" for the same reason as OpenAI's
+    // entry above; the "no screen for adding one" caveat is unchanged.
     why:
-      'A CV analysis you start, but only if an Anthropic key is already in this computer’s ' +
-      'credential store. This version has no screen for adding one, so for most people it is ' +
-      'never contacted.',
+      'A CV analysis, or a pasted job advert, that you start, but only if an Anthropic key is ' +
+      'already in this computer’s credential store. This version has no screen for adding ' +
+      'one, so for most people it is never contacted.',
   },
   {
     host: 'api.adzuna.com',
     purpose: 'fetched-with-your-key',
-    why: 'A job search you start, sent with the free Adzuna key you registered yourself.',
+    // L-134a: `jobs.rs:496-499` puts both credentials on the query string —
+    // Adzuna's API requires them there, unlike Reed's HTTP Basic auth a few
+    // lines below — so they appear in Adzuna's own request logs and in any
+    // proxy between here and Adzuna. `describe_request_failure` exists so a
+    // `reqwest` error can never print that address back to the user.
+    //
+    // W3 (coordinator review): "nothing else about you is sent" was
+    // stronger than the truth, and stronger than every keyless sibling
+    // below, which all add the IP-address caveat. A search carries the
+    // search words and location — that is what a search is — and Adzuna
+    // sees the requester's IP address the same way any site would.
+    why:
+      'A job search you start, sent with the free Adzuna key you registered yourself. ' +
+      'Adzuna’s API requires both parts of that key — the app ID and the app key — as ' +
+      'parameters in the web address, so they appear in Adzuna’s own request logs. The ' +
+      'request also carries your search words and location, which is what a search is, and ' +
+      'Adzuna sees your IP address, exactly as it would if you searched on its own site ' +
+      'yourself.',
   },
   {
     host: 'www.reed.co.uk',
     purpose: 'fetched-with-your-key',
-    why: 'A job search you start, sent with the free Reed key you registered yourself. Reed’s developer page is also opened in your browser from Settings.',
+    // L-128: `config/job-boards.json` also has a keyless www.reed.co.uk
+    // search link opened in the browser — the same host as the keyed API
+    // above, so it cannot be a second entry (that would list this host
+    // twice) and has to be disclosed here instead.
+    //
+    // W3: same IP-address caveat as Adzuna's entry above, for the same
+    // reason — the keyed search is still a real request Reed receives and
+    // answers, carrying the search words and location.
+    why:
+      'A job search you start, sent with the free Reed key you registered yourself, carrying ' +
+      'your search words and location — Reed sees those and your IP address, exactly as it ' +
+      'would if you searched on reed.co.uk yourself. Reed’s developer page is also opened in ' +
+      'your browser from Settings, and so is a keyless search link for Reed from ' +
+      'job-boards.json; the app never loads either page.',
   },
   {
     host: 'www.arbeitnow.com',
@@ -179,7 +216,16 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
   {
     host: '127.0.0.1',
     purpose: 'local-only',
-    why: 'Ollama, if you installed it. The request goes to a program on this computer, not to the internet.',
+    // L-134b: this one is NOT started by a button. App.tsx:238-248 re-reads
+    // the environment strip on mount and on every view change; that fans out
+    // (status/environment.ts:145-154) into probeOllama() asking
+    // 127.0.0.1:11434/api/tags whether Ollama is running, with no press
+    // behind it. The sentence used to read as though every Ollama contact
+    // was a request the user made.
+    why:
+      'Ollama, if you installed it. The app checks on its own — when it opens, and again each ' +
+      'time you change screens — whether Ollama is running, by asking this same computer. ' +
+      'Nothing about this ever leaves this computer, whether or not Ollama answers.',
   },
   {
     host: 'localhost',

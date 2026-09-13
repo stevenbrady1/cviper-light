@@ -252,7 +252,26 @@ function emitCv(cv: Cv): Record<string, unknown> {
     {
       id: cv.id,
       name: cv.name,
-      file_path: cv.file_path,
+      // L-133: `file_path` is a path on the machine that exported it —
+      // typically `C:\Users\<name>\...` on Windows — so it leaks the
+      // Windows username and folder layout to anyone the export is shared
+      // with. The field cannot be REMOVED (additive-only, see the header
+      // above), so it stays, always null.
+      //
+      // This is NOT "the export nulls it, the database keeps the real one
+      // for later use" — nothing in this app reads file_path back out to do
+      // anything with it (no UI, no reader; apps/light/src/db/rows.ts only
+      // ever WRITES it). And re-importing this export is not inert for a
+      // row that already exists: apps/light/src/db/statements.ts's
+      // upsertInto sets every column — file_path included — from
+      // `excluded.file_path` on a matching id, so importing your own export
+      // back into the same database nulls the LIVE column too, not just a
+      // freshly created one. (Not changed in this PR: the column itself
+      // stays, and so does writing it on create — that is a follow-up.)
+      //
+      // An older export written before this fix may still carry a real
+      // path, and importBackup still accepts that unchanged.
+      file_path: null,
       extracted_text: cv.extracted_text,
       created_at: cv.created_at,
       json_resume: cv.json_resume,

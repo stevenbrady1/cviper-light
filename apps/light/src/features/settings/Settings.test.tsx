@@ -399,7 +399,10 @@ describe('the round trip', () => {
 
     expect(destination.snapshot().jobs).toEqual([JOB]);
     expect(destination.snapshot().applications).toEqual([APPLICATION]);
-    expect(destination.snapshot().cvs).toEqual([CV]);
+    // L-133: file_path is a local path (usually the Windows username) and is
+    // deliberately never written into an export, so this is the one field
+    // the round trip does NOT carry through. See backup.privacy.test.ts.
+    expect(destination.snapshot().cvs).toEqual([{ ...CV, file_path: null }]);
   });
 
   it('does not delete what is already there', async () => {

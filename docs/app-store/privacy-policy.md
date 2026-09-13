@@ -4,13 +4,14 @@ _For CViper Light 0.1.0. This page is generated from the app's own list of the a
 
 ## The short version
 
-CViper Light has no account to create, no server of ours behind it and no analytics in it. Your CV text, your saved jobs and your applications are stored on your own device, in a database that belongs to the app. The app contacts another service only when you press a button that says it will, and only the services listed on this page.
+CViper Light has no account to create, no server of ours behind it and no analytics in it. Your CV text, your saved jobs and your applications are stored on your own device, in a database that belongs to the app. The app contacts another service only when you press a button that says it will, or switched it on — and only the services listed on this page. Two things happen on their own: when the app starts it reads this app’s GitHub releases to see whether there is a newer version, unless you switch that off in Settings; and it asks this same computer whether Ollama is running, a request that never leaves it.
 
 We — the people who make CViper Light — receive nothing from it. Not your CV, not your searches, not your keys, not whether you use it at all. The one address on this page that is ours, cviper.ai, is only ever opened in your own browser when you tap a line that names it; the app never contacts it, and what that site sees is what your browser shows it.
 
 ## What the app keeps, and where
 
 - **Your jobs, applications, CV text and every analysis** — one database file, cviper.db, in this app’s data folder for your user account.
+- **Where each CV file came from on this computer** — the file’s full path, kept in the same database file on this computer only — an export always leaves it out.
 - **Your API keys** — this device’s credential store (the Keychain on an iPhone, iPad or Mac; Credential Manager on Windows; the Secret Service on Linux), one entry per key.
 - **Which job boards you enabled and how you ordered them** — job-boards.json in the same data folder.
 - **Which AI providers you agreed to send your CV to** — ai-provider-consent.json in the same data folder.
@@ -24,10 +25,10 @@ This is not a summary. It is the exact set of addresses the code is allowed to n
 
 These carry a key you pasted into Settings, under an account that is yours. The bill, if there is one, is between you and that provider.
 
-- `api.openai.com` — A CV analysis you start, sent with your own OpenAI key under your own OpenAI account.
-- `api.anthropic.com` — A CV analysis you start, but only if an Anthropic key is already in this computer’s credential store. This version has no screen for adding one, so for most people it is never contacted.
-- `api.adzuna.com` — A job search you start, sent with the free Adzuna key you registered yourself.
-- `www.reed.co.uk` — A job search you start, sent with the free Reed key you registered yourself. Reed’s developer page is also opened in your browser from Settings.
+- `api.openai.com` — A CV analysis, or a pasted job advert, that you start, sent with your own OpenAI key under your own OpenAI account.
+- `api.anthropic.com` — A CV analysis, or a pasted job advert, that you start, but only if an Anthropic key is already in this computer’s credential store. This version has no screen for adding one, so for most people it is never contacted.
+- `api.adzuna.com` — A job search you start, sent with the free Adzuna key you registered yourself. Adzuna’s API requires both parts of that key — the app ID and the app key — as parameters in the web address, so they appear in Adzuna’s own request logs. The request also carries your search words and location, which is what a search is, and Adzuna sees your IP address, exactly as it would if you searched on its own site yourself.
+- `www.reed.co.uk` — A job search you start, sent with the free Reed key you registered yourself, carrying your search words and location — Reed sees those and your IP address, exactly as it would if you searched on reed.co.uk yourself. Reed’s developer page is also opened in your browser from Settings, and so is a keyless search link for Reed from job-boards.json; the app never loads either page.
 
 ### Only when you press a button, with no key
 
@@ -57,7 +58,7 @@ The app hands the address to your own browser and is not involved from then on. 
 
 A program running on this same machine. The request never reaches the internet.
 
-- `127.0.0.1` — Ollama, if you installed it. The request goes to a program on this computer, not to the internet.
+- `127.0.0.1` — Ollama, if you installed it. The app checks on its own — when it opens, and again each time you change screens — whether Ollama is running, by asking this same computer. Nothing about this ever leaves this computer, whether or not Ollama answers.
 - `localhost` — Named only so the fetch-from-link guard can refuse it. Never contacted.
 
 ### Done by Windows, not by this app

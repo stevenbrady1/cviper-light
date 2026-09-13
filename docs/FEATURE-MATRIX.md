@@ -388,13 +388,13 @@ a decision on the cloud side first.
 
 ### `cvs[]`
 
-| Field            | Type         | Null? | Notes                                      |
-| ---------------- | ------------ | ----- | ------------------------------------------ |
-| `id`             | string       | no    | Sort key.                                  |
-| `name`           | string       | no    |                                            |
-| `file_path`      | string       | yes   | Local path. `null` if the text was pasted. |
-| `extracted_text` | string       | yes   | `null` until parsing has run.              |
-| `created_at`     | ISO-8601 UTC | no    |                                            |
+| Field            | Type         | Null? | Notes                                                                                                                                               |
+| ---------------- | ------------ | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | string       | no    | Sort key.                                                                                                                                           |
+| `name`           | string       | no    |                                                                                                                                                     |
+| `file_path`      | string       | yes   | Local path when known. `null` for a pasted CV, and — since L-133 — for every CV in a fresh export too; an older backup may still carry a real path. |
+| `extracted_text` | string       | yes   | `null` until parsing has run.                                                                                                                       |
+| `created_at`     | ISO-8601 UTC | no    |                                                                                                                                                     |
 
 ### `analyses[]`
 
