@@ -57,6 +57,10 @@ jobs:
   # tick, and a green tick on a workflow called Release is read as "the release
   # went out". So it fails here, in a sentence, naming what it could have meant.
   refuse-a-bare-dispatch:
+    # THE ORDER OF THESE CONJUNCTS IS LOAD-BEARING. On a tag push `inputs` is
+    # empty, and GitHub coerces both sides of `null == ''` to 0 — so the second
+    # half is TRUE on every push. It is the `event_name` half that holds this
+    # job off, and it must stay.
     if: github.event_name == 'workflow_dispatch' && inputs.promote_tag == ''
 
     runs-on: ubuntu-latest
@@ -81,6 +85,11 @@ jobs:
           echo '     publish it as a pre-release.'
           echo '  2. To point existing installs at a release you have already published: run'
           echo '     this workflow with promote_tag set to that tag.'
+          echo ''
+          echo 'If the tag already exists and one leg of its run failed, DO NOT push the tag'
+          echo 'again and do not run this workflow: a tag only triggers a run the first time it'
+          echo 'is pushed, so a second push is a no-op and looks like nothing happened. Open the'
+          echo 'original run in the Actions tab and press "Re-run failed jobs".'
           echo ''
           echo 'See "Releasing: the human steps, in order" in apps/light/src-tauri/RELEASE-SIGNING.md.'
           echo "::error title=Nothing to do, so nothing was done::promote_tag was empty. Push a light-v* tag to build a release, or dispatch this workflow with promote_tag set to an already-published tag to promote its updater manifest. See section 3 of apps/light/src-tauri/RELEASE-SIGNING.md."
@@ -237,6 +246,40 @@ jobs:
 
       - uses: actions/checkout@v5
 
+      # ======================================================================
+      # THE TAG AND THE VERSION HAVE TO BE THE SAME NUMBER.
+      # ======================================================================
+      # As early as it can be: the first thing after the checkout, because it
+      # needs tauri.conf.json and nothing else, and a wrong tag should cost
+      # seconds rather than a full build on two platforms.
+      #
+      # Removing the invented `light-v<run_number>` fallback stops the tag and
+      # the version disagreeing BY ACCIDENT. It does nothing at all about
+      # pushing `light-v0.2.0` at a tree whose tauri.conf.json still says
+      # `0.1.0` — which produces the SAME artefact this work item is about: a
+      # release whose name and whose `latest.json` are two different versions.
+      #
+      # That one is worse, because it is discovered by a user. The updater
+      # compares the version in `latest.json`, so a mismatch either offers an
+      # update that is already installed or hides one that is not.
+      #
+      # `jq` is on every GitHub-hosted runner. If it ever is not, `set -e` and
+      # the command substitution below make this step die loudly rather than
+      # compare against an empty string and pass.
+      - name: The tag and tauri.conf.json must be the same version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#light-v}"
+          config_version="$(jq -r .version apps/light/src-tauri/tauri.conf.json)"
+          echo "tag:             $GITHUB_REF_NAME  ->  $tag_version"
+          echo "tauri.conf.json: $config_version"
+          if [ "$tag_version" != "$config_version" ]; then
+            echo "::error title=The tag and the version disagree::The tag $GITHUB_REF_NAME says version $tag_version, and apps/light/src-tauri/tauri.conf.json says $config_version. The release would be NAMED one version and would SHIP another, and the updater reads the one inside. Fix whichever is wrong: bump the version in tauri.conf.json and push a matching tag, or delete this tag and push the right one."
+            exit 1
+          fi
+          echo "They agree. Bundling $GITHUB_REF_NAME."
+
       - name: Enable pnpm through corepack
         run: corepack enable pnpm
 
@@ -358,6 +401,31 @@ jobs:
       TAG: ${{ inputs.promote_tag }}
 
     steps:
+      # ====================================================================
+      # WHAT WAS TYPED HAS TO LOOK LIKE A TAG, BEFORE `gh` IS ASKED ANYTHING.
+      # ====================================================================
+      # FIRST, before the checkout, because it needs nothing and a typo should
+      # cost seconds. `promote_tag` is free text typed into a box, and the job
+      # only guarantees it is not the empty string — a single SPACE passes
+      # that, because two strings are compared as strings.
+      #
+      # Handed a blank or a bare `0.1.0`, the next step runs
+      # `gh release view " "` and gets "release not found", which reads as "the
+      # release is missing" rather than "you typed a space". Say which it is.
+      - name: The promote_tag has to look like a release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$TAG" in
+            light-v?*)
+              echo "promote_tag is $TAG."
+              ;;
+            *)
+              echo "::error title=That is not a release tag::promote_tag was '$TAG'. It has to be the tag of a release this workflow built, which always begins light-v - for example light-v0.1.0. A blank, a space, or a bare version number is not one, and asking GitHub for it would return a not-found error that reads as though the release were missing. Check the tag on the release you published and paste it exactly."
+              exit 1
+              ;;
+          esac
+
       - uses: actions/checkout@v5
 
       - name: Enable pnpm through corepack
