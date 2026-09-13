@@ -28,6 +28,7 @@ import { readAvailability } from './availability';
 import { ConsentGate, ConsentStatus } from './ConsentGate';
 import {
   createTauriConsentPort,
+  isCloudKind,
   NO_CONSENT,
   type ConsentPort,
   type ConsentProviderKind,
@@ -129,9 +130,15 @@ export interface AnalysisProps {
   readonly consentPort?: ConsentPort | undefined;
 }
 
-/** Which of the two cloud kinds this option is, or `null` for keyword/Ollama. */
+/**
+ * Which cloud kind this option is, or `null` for a local one.
+ *
+ * Delegates to `isCloudKind` rather than repeating the predicate: a second copy
+ * of "which providers need consent" is a second place to forget a new provider,
+ * and this screen decides whether the dialog opens at all.
+ */
 function consentKindFor(kind: ProviderOption['kind']): ConsentProviderKind | null {
-  return kind === 'anthropic' || kind === 'openai' ? kind : null;
+  return isCloudKind(kind) ? kind : null;
 }
 
 export function Analysis({

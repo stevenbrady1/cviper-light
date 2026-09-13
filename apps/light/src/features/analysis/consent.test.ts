@@ -12,6 +12,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type ProviderKind } from './providers';
+
 const plugin = vi.hoisted(() => {
   /** What is "on disk", keyed by store file. Survives a `load`, like a file. */
   const disk = new Map<string, Map<string, unknown>>();
@@ -62,7 +64,9 @@ const {
   CONSENT_STORE_KEY,
   NO_CONSENT,
   createTauriConsentPort,
+  isCloudKind,
   parseConsentState,
+  readStoredConsent,
 } = await import('./consent');
 
 beforeEach(() => {
@@ -189,5 +193,84 @@ describe('consent survives a restart', () => {
     const read = await createTauriConsentPort().read();
 
     expect(read.ok && read.value).toEqual({ anthropic: false, openai: true });
+  });
+});
+
+/**
+ * `isCloudKind` decides, at BOTH call sites, whether anything is asked at all —
+ * so the question it must answer correctly is not "are these two cloud?" but
+ * "what happens to a kind nobody here has heard of?".
+ */
+describe('isCloudKind — an exclusion, so an unknown provider is gated by default', () => {
+  it('says yes to the two cloud providers that exist today', () => {
+    expect(isCloudKind('anthropic')).toBe(true);
+    expect(isCloudKind('openai')).toBe(true);
+  });
+
+  it('negative: the two local kinds are never asked about', () => {
+    // 127.0.0.1 and a pure function on this machine. Neither is a third party,
+    // and prompting for either would be asking permission to use the user's own
+    // computer.
+    expect(isCloudKind('ollama')).toBe(false);
+    expect(isCloudKind('keyword')).toBe(false);
+  });
+
+  it('boundary: a provider added tomorrow is treated as cloud, not skipped', () => {
+    // Cast through `unknown` because the union does not have this member YET —
+    // which is the whole point. An allow-list (`=== 'anthropic' || ===
+    // 'openai'`) would answer `false` here, and a new provider would slip past
+    // the gate at both call sites with every guard in the repo still green.
+    const future = 'mistral' as unknown as ProviderKind;
+
+    expect(isCloudKind(future)).toBe(true);
+  });
+});
+
+/**
+ * The default `hasConsent` both call sites use when nothing is injected.
+ *
+ * Tested directly, against the real store, because it is the ONLY version of
+ * the check a user's machine ever runs: everywhere else it is replaced by a
+ * fake, so a body that returned a constant would leave every other test green.
+ */
+describe('readStoredConsent — the check the app actually runs', () => {
+  /** Put a consent record on the simulated disk, as a previous grant would. */
+  function onDisk(state: Record<string, unknown>): void {
+    plugin.disk.set(CONSENT_STORE_FILE, new Map<string, unknown>([[CONSENT_STORE_KEY, state]]));
+  }
+
+  it('reads a granted provider back as true', async () => {
+    onDisk({ openai: true });
+
+    await expect(readStoredConsent('openai')).resolves.toBe(true);
+  });
+
+  it('negative: a recorded false is false, not "something was written, so yes"', async () => {
+    onDisk({ openai: false });
+
+    await expect(readStoredConsent('openai')).resolves.toBe(false);
+  });
+
+  it('boundary: consent for one provider is not consent for the other', async () => {
+    onDisk({ openai: true });
+
+    await expect(readStoredConsent('anthropic')).resolves.toBe(false);
+  });
+
+  it('negative: an unreadable store fails CLOSED', async () => {
+    plugin.failLoad('the app data directory is read-only');
+
+    await expect(readStoredConsent('openai')).resolves.toBe(false);
+  });
+
+  it('reads fresh on every call, so a withdrawal takes effect immediately', async () => {
+    const port = createTauriConsentPort();
+    await port.grant('openai');
+    await expect(readStoredConsent('openai')).resolves.toBe(true);
+
+    await port.revoke('openai');
+
+    // No snapshot anywhere: the second call opens the store again.
+    await expect(readStoredConsent('openai')).resolves.toBe(false);
   });
 });
