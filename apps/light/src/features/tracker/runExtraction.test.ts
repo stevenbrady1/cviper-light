@@ -85,9 +85,14 @@ describe('runExtraction', () => {
       },
     };
 
+    // Consent is granted explicitly because this test is about ADAPTER PARITY,
+    // not about the gate: since L-115 a cloud extraction without it never
+    // builds a transport at all. The gate itself is proved in
+    // `runExtraction.consent.test.ts`.
     const outcome = await runExtraction(
       { option: option({ kind: 'anthropic', model: 'claude-opus-5' }), text: ADVERT },
       () => transport,
+      () => Promise.resolve(true),
     );
 
     expect(outcome.available).toBe(true);

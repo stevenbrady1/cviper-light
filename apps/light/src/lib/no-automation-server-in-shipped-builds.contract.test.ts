@@ -63,6 +63,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { KEY_MATERIAL_PATTERNS } from './key-material.ts';
 import { REPO_ROOT } from './repo-scan.ts';
 
 /** The crate that opens the port. */
@@ -214,17 +215,15 @@ export function bundlingInstrumentedBuilds(workflowText: string): string[] {
  *
  * Signing material is the worst case because it is silent — a `.pfx` in an
  * artefact looks exactly like a build output in the run summary.
+ *
+ * THE LIST IS SHARED, and it did not used to be. This file knew about `.asc`
+ * and `id_rsa`; the MSIX artefact rules knew about `.snk`; the sweep inside
+ * `msix.yml` was a third copy. Each read as complete and each had a gap the
+ * others covered, which is the worst shape a security rule can take — the
+ * reviewer of any one of them sees a finished list. One constant, in
+ * `key-material.ts`, means widening it widens every guard.
  */
-const FORBIDDEN_UPLOAD_PATTERNS: readonly RegExp[] = [
-  /\.pfx\b/i,
-  /\.p12\b/i,
-  /\.pem\b/i,
-  /\.key\b/i,
-  /\.jks\b/i,
-  /\.keystore\b/i,
-  /\.asc\b/i,
-  /\bid_rsa\b/i,
-];
+const FORBIDDEN_UPLOAD_PATTERNS: readonly RegExp[] = KEY_MATERIAL_PATTERNS;
 
 /** How many `upload-artifact` steps a workflow declares. Feeds the floor. */
 export function countUploadSteps(workflowText: string): number {

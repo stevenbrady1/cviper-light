@@ -2,6 +2,11 @@
  * The macOS release-signing contract (L-95): no step in `release.yml` may reach
  * Apple's signing tools carrying secrets nobody has checked.
  *
+ * A second contract lives at the bottom of this file, over the same workflow:
+ * the ENTRY-POINT contract (L-118), which forbids a release that nobody asked
+ * for and a tag nobody pushed. Both are here because they adjudicate one file
+ * and share its lexical reader; each has its own premise, detector and proofs.
+ *
  * ============================================================================
  * WHY THIS EXISTS
  * ============================================================================
@@ -506,5 +511,954 @@ describe('a correctly gated workflow walks through', () => {
       '          targets: aarch64-apple-darwin,x86_64-apple-darwin',
     ].join('\n');
     expect(signingGateOffences(workflow)).toEqual([]);
+  });
+});
+// ════════════════════════════════════════════════════════════════════════════
+// THE ENTRY-POINT CONTRACT (L-118)
+// ════════════════════════════════════════════════════════════════════════════
+/**
+ * A release has exactly TWO entry points, neither of them invents a tag, and the
+ * tag it is given has to agree with the version it ships.
+ *
+ * ============================================================================
+ * WHY THIS EXISTS
+ * ============================================================================
+ * `tagName` used to read
+ *
+ *   ${{ github.ref_type == 'tag' && github.ref_name
+ *       || format('light-v{0}', github.run_number) }}
+ *
+ * and the `bundle` job ran on any dispatch that was not a promotion. So running
+ * the workflow by hand out of curiosity — no tag pushed, `promote_tag` left
+ * empty — built installers and created a draft release tagged `light-v2`,
+ * because two was the run number. The `latest.json` inside it said `0.1.0`. The
+ * tag and the version disagreed, and nothing in the run objected: a green tick
+ * over a release named after a counter.
+ *
+ * A run number is not a version. Neither is a run id, a run attempt or a commit
+ * sha. They go up when a workflow is re-run, they are shared by every trigger of
+ * the file, and they have no relationship whatsoever to what is in
+ * `tauri.conf.json`. Any expression that can produce a tag out of one is a tag
+ * nobody chose.
+ *
+ * ============================================================================
+ * THE SECOND HALF: SKIPPING QUIETLY IS ALSO THE DEFECT
+ * ============================================================================
+ * Deleting the fallback leaves a bare dispatch with nothing to do, and "nothing
+ * to do" must not become "every job skipped, run succeeded". A run where all
+ * jobs skip is a GREEN TICK, and a green tick on a workflow called Release is
+ * read by a person at eleven at night as "the release went out".
+ *
+ * That is the benign-alarm shape this repository has been bitten by before: a
+ * check whose failure looks exactly like its success. So a dispatch with an
+ * empty `promote_tag` has to reach a job that FAILS, in a sentence, naming the
+ * two things it could have meant instead — and that job must fail for real.
+ * `continue-on-error: true` on it, or an `exit 1` parked under a step condition
+ * that is never true, restores the original defect while leaving this file
+ * green.
+ *
+ * ============================================================================
+ * A FORBID-LIST, NOT AN ALLOW-LIST (LESSON-033)
+ * ============================================================================
+ * Six shapes are forbidden, and none of them is "the workflow must contain the
+ * blessed line":
+ *
+ *   1. Any expression that manufactures a `light-v` tag — `format(...)`, an
+ *      interpolated `light-v${{ … }}`, or a `tagName:`/`TAG:` built out of a
+ *      run number, run id, run attempt or commit sha.
+ *   2. A BUNDLING JOB — any job that invokes `tauri-apps/tauri-action`, found by
+ *      its `uses:` and never by its name — reachable by anything but a PUSHED
+ *      TAG. The condition is read as a CONJUNCTION: it is split on `&&` and both
+ *      halves must be present as whole conjuncts, so `'push' || 'tag'` and
+ *      `!(push && tag)` are offences rather than substring matches.
+ *   3. A bundling job that never compares the tag it was handed against the
+ *      version in `tauri.conf.json`. Removing the invented tag stops the two
+ *      disagreeing BY ACCIDENT; only this step stops them disagreeing because
+ *      somebody pushed the wrong tag.
+ *   4. A `workflow_dispatch` trigger whose bare form (no `promote_tag`) reaches
+ *      no failing job.
+ *   5. A refusal job that cannot actually fail: `continue-on-error` anywhere in
+ *      it, or no `exit 1` that is reachable unconditionally.
+ *   6. A job condition written as a folded or literal block scalar, which this
+ *      reader cannot follow. That is reported AS ITSELF — "write it on one
+ *      line" — and never as "the job is ungated", so the guard does not accuse
+ *      a correct workflow of a defect it does not have.
+ *
+ * ============================================================================
+ * WHAT COUNTS AS TEXT, AND THE LIMITATION THAT BUYS
+ * ============================================================================
+ * `#` comments are stripped first, for the reason the top of this file gives:
+ * a guard that fires on the prose explaining the fix is a guard somebody
+ * deletes. The cost is that a commented-out job is invisible — which is why the
+ * premise below asserts that a `bundle` job, a `promote-manifest` job and at
+ * least one job carrying `tauri-action` were actually PARSED before any of this
+ * adjudicates anything. Without that, a rename or a reindent would empty the
+ * job list and every rule here would pass by having nothing to look at.
+ */
+
+/** Both spellings GitHub accepts for a dispatch input, as a regex fragment. */
+const PROMOTE_TAG_SOURCE = String.raw`(?:inputs|github\.event\.inputs)\.promote_tag`;
+
+/** The contexts the gate rules read, as regex fragments. */
+const EVENT_NAME_SOURCE = String.raw`github\.event_name`;
+const REF_TYPE_SOURCE = String.raw`github\.ref_type`;
+
+/** The action that turns source into an installer. A bundling job is one that uses it. */
+const BUNDLES = /uses:\s*tauri-apps\/tauri-action/;
+
+/** Ways a `light-v` tag gets manufactured rather than pushed. */
+const MANUFACTURED_TAG: ReadonlyArray<{ readonly pattern: RegExp; readonly why: string }> = [
+  {
+    pattern: /format\(\s*'light-v[^\n]*/g,
+    why:
+      'this expression builds a `light-v` tag out of something that is not the tag somebody ' +
+      'pushed. A release is named by a human pushing a tag; a fallback that fills one in ' +
+      'produces a draft whose tag and whose `latest.json` version disagree, and nothing ' +
+      'downstream compares the two.',
+  },
+  {
+    pattern: /light-v\$\{\{[^\n}]*\}\}/g,
+    why:
+      'a `light-v` tag pasted together from an expression. `format(...)` is not the only way ' +
+      'to spell that mistake — this is the same defect written with string interpolation, and ' +
+      'a forbid-list that only knew the first spelling would have missed it.',
+  },
+];
+
+/** A counter, an id or a hash. None of them is a version. */
+const NOT_A_VERSION = /github\.(?:run_number|run_id|run_attempt|sha)/;
+
+/** Every place a tag is named: the bundler's input, or an env var the shell uses. */
+const TAG_ASSIGNMENTS = /^[^\n]*\b(?:tagName|TAG):[^\n]*$/gm;
+
+/** The dispatch trigger this file has to protect. Absent it, rule 4 is moot. */
+const HAS_DISPATCH_TRIGGER = /^\s*workflow_dispatch:/m;
+
+/** A job that fails on purpose rather than skipping into a green tick. */
+const FAILS_ON_PURPOSE = /\bexit\s+1\b/;
+
+/** A job or step that is allowed to fail is a job or step that cannot gate anything. */
+const SWALLOWS_FAILURE = /continue-on-error/;
+
+/** The two halves of the comparison rule 3 demands, as it must be written to work. */
+const READS_THE_PUSHED_TAG = /GITHUB_REF_NAME|github\.ref_name/;
+const READS_THE_SHIPPED_VERSION = /tauri\.conf\.json/;
+
+/** A block scalar this lexical reader cannot follow. */
+const BLOCK_SCALAR = /^[>|][-+]?\d*$/;
+
+interface Job {
+  readonly name: string;
+  readonly text: string;
+}
+
+/** A job's own `if:`, and whether it was written in a form that can be read. */
+export interface JobCondition {
+  /** The condition on one line. `''` when absent, or when it is a block scalar. */
+  readonly text: string;
+  /** It was written as `>`/`|`, so its real value lives on the lines below. */
+  readonly folded: boolean;
+}
+
+/**
+ * The jobs of a workflow, as blocks of text.
+ *
+ * Deliberately lexical — no YAML parser, matching `stepsOf` above and the house
+ * style of the other repository guards. A private copy rather than an import:
+ * importing one TEST module from another re-registers its whole suite under the
+ * wrong name (see the docblock in `repo-scan.ts`).
+ */
+export function jobsOf(workflow: string): Job[] {
+  const jobs: Array<{ name: string; text: string[] }> = [];
+
+  let seenJobs = false;
+  let indent = -1;
+  let current: { name: string; text: string[] } | null = null;
+
+  const flush = (): void => {
+    if (current !== null) jobs.push(current);
+    current = null;
+  };
+
+  for (const line of workflow.split('\n')) {
+    if (!seenJobs) {
+      if (/^jobs:\s*$/.test(line)) seenJobs = true;
+      continue;
+    }
+    if (line.trim() === '') {
+      current?.text.push(line);
+      continue;
+    }
+
+    const depth = line.length - line.trimStart().length;
+    const header = /^(\s+)([A-Za-z0-9_-]+):\s*$/.exec(line);
+
+    if (header && (indent === -1 || depth === indent)) {
+      indent = (header[1] ?? '').length;
+      flush();
+      current = { name: header[2] ?? '', text: [line] };
+      continue;
+    }
+
+    if (indent !== -1 && depth <= indent && !header) {
+      flush();
+      break;
+    }
+
+    current?.text.push(line);
+  }
+
+  flush();
+  return jobs.map((job) => ({ name: job.name, text: job.text.join('\n') }));
+}
+
+/**
+ * A job's OWN `if:`, not its steps'.
+ *
+ * The job's keys all sit at one indentation, taken from its first line; an
+ * `if:` at any deeper level belongs to a step and says nothing about whether
+ * the job runs. An absent condition yields `''`, which no rule can satisfy —
+ * the safe direction.
+ */
+export function jobConditionOf(jobText: string): JobCondition {
+  const [, ...body] = jobText.split('\n');
+  const firstKey = body.find((line) => line.trim() !== '');
+  if (firstKey === undefined) return { text: '', folded: false };
+
+  const keyIndent = firstKey.length - firstKey.trimStart().length;
+  const jobLevelIf = new RegExp(String.raw`^\s{${keyIndent}}if:\s*(.*)$`);
+
+  const written = body
+    .map((line) => jobLevelIf.exec(line)?.[1]?.trim() ?? '')
+    .filter((condition) => condition !== '');
+
+  if (written.some((condition) => BLOCK_SCALAR.test(condition))) {
+    return { text: '', folded: true };
+  }
+  return { text: written.join(' '), folded: false };
+}
+
+/** Whitespace collapsed, so indentation cannot make two identical conditions differ. */
+function flatten(text: string): string {
+  return text.trim().replace(/\s+/g, ' ');
+}
+
+/** The `&&`-separated halves of a condition. A conjunction, read as one. */
+export function conjunctsOf(condition: string): string[] {
+  return condition
+    .split('&&')
+    .map(flatten)
+    .filter((part) => part !== '');
+}
+
+/**
+ * Is `<context> == '<literal>'` one of these conjuncts, written either way round?
+ *
+ * ANCHORED on purpose. A substring test would accept the conjunct
+ * `!(github.event_name == 'push'`, and accepting that is how a wholesale
+ * negation of the whole gate would have scored clean.
+ */
+function hasConjunct(
+  conjuncts: readonly string[],
+  contextSource: string,
+  literal: string,
+): boolean {
+  const value = escapeForRegExp(literal);
+  const forwards = new RegExp(String.raw`^${contextSource}\s*==\s*'${value}'$`);
+  const backwards = new RegExp(String.raw`^'${value}'\s*==\s*${contextSource}$`);
+  return conjuncts.some((part) => forwards.test(part) || backwards.test(part));
+}
+
+/** The condition that says "a dispatch with the box left empty", however spelled. */
+function refusesTheBareDispatch(condition: JobCondition): boolean {
+  const conjuncts = conjunctsOf(condition.text);
+  return (
+    hasConjunct(conjuncts, EVENT_NAME_SOURCE, 'workflow_dispatch') &&
+    hasConjunct(conjuncts, PROMOTE_TAG_SOURCE, '')
+  );
+}
+
+/** The steps of one job, with their own `if:` — including one written on the dash line. */
+function stepConditionsOf(step: string): string {
+  return step
+    .split('\n')
+    .filter((line) => /^\s*-?\s*if:/.test(line))
+    .join(' ');
+}
+
+/** Every way this workflow could release something nobody asked for. */
+export function releaseEntryPointOffences(workflow: string): Offence[] {
+  const text = readableYaml(workflow);
+  const offences: Offence[] = [];
+  const jobs = jobsOf(text);
+
+  // ── 1. No code path may manufacture a tag. ────────────────────────────────
+  for (const spelling of MANUFACTURED_TAG) {
+    for (const match of text.matchAll(spelling.pattern)) {
+      offences.push({
+        where: 'a manufactured tag',
+        found: (match[0] ?? '').trim(),
+        why: spelling.why,
+      });
+    }
+  }
+
+  for (const line of text.match(TAG_ASSIGNMENTS) ?? []) {
+    if (!NOT_A_VERSION.test(line)) continue;
+    offences.push({
+      where: 'a tag named after a counter',
+      found: flatten(line),
+      why:
+        'a run number, run id, run attempt and commit sha are all things that change without ' +
+        'anybody deciding to release. They go up on a re-run, they are shared by every trigger ' +
+        'of this workflow, and none of them has any relationship to the version in ' +
+        'tauri.conf.json. A release named after one is a release named by an accident.',
+    });
+  }
+
+  // ── 2, 3 and 6. Every job that BUNDLES, found by its action, not its name. ─
+  const bundlers = jobs.filter((job) => BUNDLES.test(job.text));
+
+  for (const job of bundlers) {
+    const condition = jobConditionOf(job.text);
+
+    if (condition.folded) {
+      offences.push({
+        where: `the "${job.name}" job`,
+        found: 'its `if:` is a folded or literal block scalar',
+        why:
+          'write the job condition on one line so the guard can read it. This is NOT a claim ' +
+          'that the job is ungated — it may well be correct — it is that a lexical reader ' +
+          'cannot follow a condition whose value lives on the lines below the key, and a guard ' +
+          'that guesses in either direction is worse than one that says it cannot tell.',
+      });
+    } else {
+      const conjuncts = conjunctsOf(condition.text);
+      const shown = condition.text === '' ? 'it has no job-level `if:` at all' : condition.text;
+
+      if (condition.text.includes('||')) {
+        offences.push({
+          where: `the "${job.name}" job`,
+          found: shown,
+          why:
+            'an `||` in the gate means EITHER half is enough to get in, so the job runs in ' +
+            'cases neither half was meant to admit. The gate has to be a conjunction: a pushed ' +
+            'ref, AND that ref being a tag.',
+        });
+      }
+
+      if (/(^|\s|\()!/.test(condition.text)) {
+        offences.push({
+          where: `the "${job.name}" job`,
+          found: shown,
+          why:
+            'a negation in the gate. `!(a && b)` contains both halves as text while meaning ' +
+            'the opposite of them, which is exactly the shape a substring check would wave ' +
+            'through. State the condition affirmatively.',
+        });
+      }
+
+      if (!hasConjunct(conjuncts, EVENT_NAME_SOURCE, 'push')) {
+        offences.push({
+          where: `the "${job.name}" job`,
+          found: shown,
+          why:
+            "it does not require `github.event_name == 'push'` as a conjunct. A " +
+            'workflow_dispatch can be aimed at a tag ref from the Actions UI, so a run-by-hand ' +
+            'still reaches the bundler. Dispatching this workflow means "promote a manifest" ' +
+            'and never "build me a release".',
+        });
+      }
+
+      if (!hasConjunct(conjuncts, REF_TYPE_SOURCE, 'tag')) {
+        offences.push({
+          where: `the "${job.name}" job`,
+          found: shown,
+          why:
+            "it does not require `github.ref_type == 'tag'` as a conjunct, so the job can run " +
+            'with no tag to name the release after — which is the state that produced the ' +
+            'invented `light-v<run_number>` draft in the first place.',
+        });
+      }
+    }
+
+    const compares = stepsOf(job.text).some(
+      (step) =>
+        READS_THE_PUSHED_TAG.test(step.text) &&
+        READS_THE_SHIPPED_VERSION.test(step.text) &&
+        FAILS_ON_PURPOSE.test(step.text),
+    );
+
+    if (!compares) {
+      offences.push({
+        where: `the "${job.name}" job`,
+        found: 'nothing in it compares the tag against tauri.conf.json',
+        why:
+          'removing the invented tag stops the tag and the version disagreeing BY ACCIDENT. It ' +
+          'does nothing about somebody pushing light-v0.2.0 at a tree whose tauri.conf.json ' +
+          'still says 0.1.0 — which produces exactly the artefact this work item is about, and ' +
+          'is discovered by a user whose updater offers a version that does not exist. Add a ' +
+          'step that reads both and exits 1 when they differ.',
+      });
+    }
+  }
+
+  // ── 4 and 5. A bare dispatch has to reach a job that really fails. ────────
+  if (HAS_DISPATCH_TRIGGER.test(text)) {
+    const unreadable = jobs.some((job) => jobConditionOf(job.text).folded);
+    const refusal = jobs.find((job) => refusesTheBareDispatch(jobConditionOf(job.text)));
+
+    if (refusal === undefined) {
+      if (!unreadable) {
+        offences.push({
+          where: 'the workflow_dispatch trigger',
+          found: 'no job runs when promote_tag is empty',
+          why:
+            'a dispatch with an empty `promote_tag` has nothing to do, and a run in which ' +
+            'every job skips REPORTS SUCCESS. A green tick on a workflow called Release reads ' +
+            'as "the release went out". Add a job gated on ' +
+            "`github.event_name == 'workflow_dispatch' && inputs.promote_tag == ''` that fails " +
+            'and says what the two real entry points are.',
+        });
+      }
+    } else {
+      if (SWALLOWS_FAILURE.test(refusal.text)) {
+        offences.push({
+          where: `the "${refusal.name}" job`,
+          found: 'continue-on-error is set inside the job that is meant to refuse',
+          why:
+            '`continue-on-error` turns a failure into a green tick. On the one job whose entire ' +
+            'purpose is to go red, it restores the defect exactly: the run succeeds, nothing ' +
+            'was built, and the two states look identical from the Actions list.',
+        });
+      }
+
+      const reachableFailure = stepsOf(refusal.text).some(
+        (step) => FAILS_ON_PURPOSE.test(step.text) && stepConditionsOf(step.text) === '',
+      );
+
+      if (!reachableFailure) {
+        offences.push({
+          where: `the "${refusal.name}" job`,
+          found: 'no step fails unconditionally',
+          why:
+            'this is the job that refuses a bare dispatch, and every `exit 1` in it sits behind ' +
+            'a step condition — or there is none at all. A refusal that can be skipped is a ' +
+            'refusal that passes, which is indistinguishable from a release that worked: the ' +
+            'same shape as a health check that swallows its own error and prints "OK".',
+        });
+      }
+    }
+  }
+
+  return offences;
+}
+
+// ── The premise ─────────────────────────────────────────────────────────────
+
+describe('the premise: the entry-point rules have a workflow to read', () => {
+  // Asserted FIRST, and this is the anti-inert half of the contract. Every rule
+  // below either scans text or selects jobs, so a reader that quietly returned
+  // nothing would make the whole section pass by having nothing to adjudicate.
+  const live = readableYaml(WORKFLOW);
+  const parsed = jobsOf(live);
+  const names = parsed.map((job) => job.name);
+
+  it('parses a bundle job and a promote-manifest job', () => {
+    expect(
+      names,
+      'No `bundle` job was PARSED out of release.yml. An empty job list makes every rule below ' +
+        'pass silently. If the job was renamed, rename it here in the same commit.',
+    ).toContain('bundle');
+    expect(
+      names,
+      'No `promote-manifest` job was parsed out of release.yml. Promotion is the second of the ' +
+        'two entry points this contract exists to keep separate.',
+    ).toContain('promote-manifest');
+  });
+
+  it('finds at least one job that actually bundles', () => {
+    // The gate and comparison rules are applied to jobs SELECTED by this test's
+    // criterion. If the selector matches nothing — the action was renamed, the
+    // `uses:` reindented — those rules adjudicate an empty list and this whole
+    // section reports clean over a workflow nobody checked.
+    const bundlers = parsed.filter((job) => BUNDLES.test(job.text));
+    expect(
+      bundlers.map((job) => job.name),
+      'No job in release.yml invokes `tauri-apps/tauri-action`, so the gate rules and the ' +
+        'tag-versus-version rule have nothing to adjudicate. If the bundler changed, change ' +
+        'the selector here in the same commit.',
+    ).not.toEqual([]);
+  });
+
+  it('reads a real job-level condition, not an empty string', () => {
+    const bundle = parsed.find((job) => job.name === 'bundle');
+    expect(jobConditionOf(bundle?.text ?? '').text).not.toBe('');
+  });
+
+  it('still offers the workflow_dispatch that rules 4 and 5 protect', () => {
+    expect(
+      live,
+      'release.yml no longer accepts a dispatch. If the promote path moved, the refusal rules ' +
+        'below have nothing to protect and should move with it.',
+    ).toMatch(HAS_DISPATCH_TRIGGER);
+  });
+});
+
+// ── The contract ────────────────────────────────────────────────────────────
+
+describe('a release has two entry points and neither invents a tag', () => {
+  it('release.yml is clean', () => {
+    const offences = releaseEntryPointOffences(WORKFLOW);
+    expect(offences, `\n${explain(offences)}\n`).toEqual([]);
+  });
+});
+
+// ── Proof the detector can actually fail ────────────────────────────────────
+
+/** A bundling job's tag-versus-version step, so fixtures about other rules are clean. */
+const COMPARISON_STEP = [
+  '      - name: The tag and the version must agree',
+  '        run: |',
+  '          test "${GITHUB_REF_NAME#light-v}" = "$(jq -r .version apps/light/src-tauri/tauri.conf.json)" || exit 1',
+];
+
+/** A refusal job that really refuses, so fixtures about other rules are clean. */
+const REFUSAL_JOB = [
+  '  refuse-a-bare-dispatch:',
+  "    if: github.event_name == 'workflow_dispatch' && inputs.promote_tag == ''",
+  '    steps:',
+  '      - run: exit 1',
+];
+
+describe('the entry-point detector can actually fail', () => {
+  const caught: ReadonlyArray<readonly [string, string]> = [
+    [
+      'the L-118 trap, transcribed: a tag invented from the run number',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name != 'workflow_dispatch' || inputs.promote_tag == ''",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '        with:',
+        "          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('light-v{0}', github.run_number) }}",
+        ...REFUSAL_JOB,
+      ].join('\n'),
+    ],
+    [
+      'the same defect spelled with interpolation instead of format()',
+      [
+        'on:',
+        '  push:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    env:',
+        '      TAG: light-v${{ github.run_number }}',
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+      ].join('\n'),
+    ],
+    [
+      'a tag named after the commit sha',
+      [
+        'on:',
+        '  push:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '        with:',
+        '          tagName: ${{ github.sha }}',
+      ].join('\n'),
+    ],
+    [
+      'a gate whose halves are alternatives rather than a conjunction',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' || github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        ...REFUSAL_JOB,
+      ].join('\n'),
+    ],
+    [
+      'a gate negated wholesale, which contains both halves as text',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  bundle:',
+        "    if: ${{ !(github.event_name == 'push' && github.ref_type == 'tag') }}",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        ...REFUSAL_JOB,
+      ].join('\n'),
+    ],
+    [
+      'a bundle job a dispatch can still reach',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        ...REFUSAL_JOB,
+      ].join('\n'),
+    ],
+    [
+      'a bundle job gated on the event but not on there being a tag',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        ...REFUSAL_JOB,
+      ].join('\n'),
+    ],
+    [
+      'a bundle job with no condition at all',
+      [
+        'on:',
+        '  push:',
+        'jobs:',
+        '  bundle:',
+        '    runs-on: windows-latest',
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+      ].join('\n'),
+    ],
+    [
+      'a SECOND bundling job, ungated, that the old rule never looked at',
+      [
+        'on:',
+        '  push:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '  bundle-linux:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+      ].join('\n'),
+    ],
+    [
+      'a bundling job that never checks the tag against the version it ships',
+      [
+        'on:',
+        '  push:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    steps:',
+        '      - uses: tauri-apps/tauri-action@v0',
+        '        with:',
+        '          tagName: ${{ github.ref_name }}',
+      ].join('\n'),
+    ],
+    [
+      'the silent-skip trap: a bare dispatch that reaches no job at all',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '  promote-manifest:',
+        "    if: github.event_name == 'workflow_dispatch' && inputs.promote_tag != ''",
+        '    steps:',
+        '      - run: gh release upload updater promote/latest.json --clobber',
+      ].join('\n'),
+    ],
+    [
+      'the benign-alarm trap: a refusal job that only prints and succeeds',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '  refuse-a-bare-dispatch:',
+        "    if: github.event_name == 'workflow_dispatch' && inputs.promote_tag == ''",
+        '    steps:',
+        '      - run: echo "There was nothing to do here."',
+      ].join('\n'),
+    ],
+    [
+      'a refusal job allowed to fail, which is a refusal that passes',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '  refuse-a-bare-dispatch:',
+        "    if: github.event_name == 'workflow_dispatch' && inputs.promote_tag == ''",
+        '    continue-on-error: true',
+        '    steps:',
+        '      - run: exit 1',
+      ].join('\n'),
+    ],
+    [
+      'a refusal whose only exit 1 sits behind a step condition that never fires',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '  refuse-a-bare-dispatch:',
+        "    if: github.event_name == 'workflow_dispatch' && inputs.promote_tag == ''",
+        '    steps:',
+        '      - if: false',
+        '        run: exit 1',
+      ].join('\n'),
+    ],
+  ];
+
+  it.each(caught)('catches %s', (_name, workflow) => {
+    expect(releaseEntryPointOffences(workflow)).not.toEqual([]);
+  });
+
+  it('names the run number and the reason', () => {
+    const offences = releaseEntryPointOffences(
+      [
+        'on:',
+        '  push:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '        with:',
+        "          tagName: ${{ format('light-v{0}', github.run_number) }}",
+      ].join('\n'),
+    );
+    expect(offences.map((offence) => offence.where)).toEqual([
+      'a manufactured tag',
+      'a tag named after a counter',
+    ]);
+    expect(offences[1]?.found).toContain('run_number');
+    expect(offences[1]?.why).toContain('accident');
+  });
+
+  it('reports an unreadable condition as unreadable, not as ungated', () => {
+    // W2. A folded scalar may well be a CORRECT gate — this reader simply
+    // cannot follow it. Accusing it of being ungated is a false red, and a
+    // false red is how a guard gets deleted rather than fixed.
+    const offences = releaseEntryPointOffences(
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  bundle:',
+        '    if: >-',
+        "      github.event_name == 'push'",
+        "      && github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        ...REFUSAL_JOB,
+      ].join('\n'),
+    );
+    expect(offences.length).toBe(1);
+    expect(offences[0]?.found).toContain('block scalar');
+    expect(offences[0]?.why).toContain('one line');
+    expect(explain(offences)).not.toContain('no job-level');
+  });
+});
+
+// ── Proof it does not fire on the correct shape ──────────────────────────────
+
+describe('the honest release flow walks through', () => {
+  const honest: ReadonlyArray<readonly [string, string]> = [
+    [
+      'the two entry points, as release.yml now has them',
+      [
+        'on:',
+        '  push:',
+        '    tags:',
+        "      - 'light-v*'",
+        '  workflow_dispatch:',
+        'jobs:',
+        '  refuse-a-bare-dispatch:',
+        "    if: github.event_name == 'workflow_dispatch' && inputs.promote_tag == ''",
+        '    steps:',
+        '      - run: |',
+        '          echo "Push a light-v* tag, or dispatch with promote_tag set."',
+        '          exit 1',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '        with:',
+        '          tagName: ${{ github.ref_name }}',
+        '  promote-manifest:',
+        "    if: github.event_name == 'workflow_dispatch' && inputs.promote_tag != ''",
+        '    steps:',
+        '      - run: gh release upload updater promote/latest.json --clobber',
+      ].join('\n'),
+    ],
+    [
+      'the other spelling of a dispatch input, and the operands the other way round',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  bundle:',
+        "    if: 'push' == github.event_name && 'tag' == github.ref_type",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '  refuse-a-bare-dispatch:',
+        "    if: github.event.inputs.promote_tag == '' && 'workflow_dispatch' == github.event_name",
+        '    steps:',
+        '      - run: exit 1',
+      ].join('\n'),
+    ],
+    [
+      'a tag-push-only workflow, which has no dispatch to refuse',
+      [
+        'on:',
+        '  push:',
+        '    tags:',
+        "      - 'light-v*'",
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '        with:',
+        '          tagName: ${{ github.ref_name }}',
+      ].join('\n'),
+    ],
+    [
+      'a comment describing the fallback that was removed',
+      [
+        'on:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        "    # was: format('light-v{0}', github.run_number), which invented a tag",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        ...REFUSAL_JOB,
+      ].join('\n'),
+    ],
+    [
+      'the run number used for something that is not a tag',
+      [
+        'on:',
+        '  push:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '      - uses: actions/upload-artifact@v4',
+        '        with:',
+        '          name: logs-${{ github.run_number }}',
+      ].join('\n'),
+    ],
+    [
+      'a non-bundling job with no condition, which ships nothing',
+      [
+        'on:',
+        '  push:',
+        'jobs:',
+        '  bundle:',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+        '    steps:',
+        ...COMPARISON_STEP,
+        '      - uses: tauri-apps/tauri-action@v0',
+        '  announce:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        '      - run: echo "a release happened"',
+      ].join('\n'),
+    ],
+  ];
+
+  it.each(honest)('does not fire on %s', (_name, workflow) => {
+    const offences = releaseEntryPointOffences(workflow);
+    expect(offences, explain(offences)).toEqual([]);
+  });
+
+  it('boundary: an empty workflow has nothing to say', () => {
+    expect(releaseEntryPointOffences('')).toEqual([]);
+    expect(jobsOf('')).toEqual([]);
+    expect(jobConditionOf('')).toEqual({ text: '', folded: false });
+    expect(conjunctsOf('')).toEqual([]);
+  });
+
+  it("boundary: a step's own `if:` is not mistaken for the job's", () => {
+    // The bundle job's real gate is the one at the job's indentation. A step
+    // condition that happens to mention a tag must not excuse a job that has no
+    // condition of its own.
+    const stepLevelOnly = [
+      'jobs:',
+      '  bundle:',
+      '    runs-on: windows-latest',
+      '    steps:',
+      "      - if: github.event_name == 'push' && github.ref_type == 'tag'",
+      '        uses: tauri-apps/tauri-action@v0',
+    ].join('\n');
+
+    const [job] = jobsOf(stepLevelOnly);
+    expect(jobConditionOf(job?.text ?? '').text).toBe('');
+    expect(releaseEntryPointOffences(stepLevelOnly)).not.toEqual([]);
+  });
+
+  it('boundary: a conjunction is read as conjuncts, not as a substring', () => {
+    // The C1 defect in miniature. `||` and `&&` produce the same substrings.
+    expect(conjunctsOf("github.event_name == 'push' && github.ref_type == 'tag'")).toEqual([
+      "github.event_name == 'push'",
+      "github.ref_type == 'tag'",
+    ]);
+    expect(conjunctsOf("github.event_name == 'push' || github.ref_type == 'tag'")).toEqual([
+      "github.event_name == 'push' || github.ref_type == 'tag'",
+    ]);
   });
 });

@@ -124,9 +124,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
 
           # THREE directories, and keeping them apart is a security decision,
-          # not tidiness. Only OUT_DIR is uploaded. The development certificate
-          # lives in PACK_DIR precisely so that no glob, no reordered step and
-          # no future edit can publish a private key from a public repository.
+          # not tidiness. Only OUT_DIR is uploaded. The development
+          # certificate's PRIVATE half lives in PACK_DIR precisely so that no
+          # glob, no reordered step and no future edit can publish a private
+          # key from a public repository.
           "LAYOUT_DIR=${{ runner.temp }}/layout" >> $env:GITHUB_ENV
           "PACK_DIR=${{ runner.temp }}/pack"     >> $env:GITHUB_ENV
           "OUT_DIR=${{ runner.temp }}/out"       >> $env:GITHUB_ENV
@@ -382,10 +383,23 @@ jobs:
       # never gets to run. `--install` puts it in the machine store.
       #
       # The password is the tool's own documented default. This is a self-signed
-      # certificate for a placeholder publisher, generated on a throwaway runner
-      # and destroyed with it. It is written into PACK_DIR, which is never
-      # uploaded — the L-95 spike published one by accident, and "close to
-      # harmless" is not a reason to publish a private key.
+      # certificate generated on a throwaway runner and destroyed with it. It is
+      # written into PACK_DIR, which is never uploaded — the L-95 spike
+      # published one by accident, and "close to harmless" is not a reason to
+      # publish a private key.
+      #
+      # ITS SUBJECT IS NOT A PLACEHOLDER ANY MORE. Since #76 the manifest
+      # carries the REAL Partner Center identity, and `--manifest` copies it —
+      # so this throwaway certificate's subject is
+      # `CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399`, character for character the
+      # same CN as the genuine Store publisher. It is a different key and a
+      # different certificate; only the name matches.
+      #
+      # WHICH IS WHY CLEANUP AFTER THE INSTALL TEST GOES BY THUMBPRINT. The
+      # export step prints this certificate's thumbprint to the job summary.
+      # Removing trust by SUBJECT would match anything else carrying that CN,
+      # and the subject is now the real identity rather than a string invented
+      # for this workflow. Match the thumbprint; never the subject.
       - name: Generate and trust a self-signed development certificate
         shell: pwsh
         working-directory: ${{ env.PACK_DIR }}
@@ -417,6 +431,80 @@ jobs:
           $msix = Get-Item $output
           Write-Host ('MSIX: {0} ({1:N0} bytes)' -f $msix.Name, $msix.Length)
           "MSIX_PATH=$($msix.FullName)" >> $env:GITHUB_ENV
+
+      # ----------------------------------------------------------------------
+      # THE PUBLIC HALF OF THE SIGNER, SO THE PACKAGE CAN BE INSTALLED (L-119).
+      # ----------------------------------------------------------------------
+      # The certification kit is STATIC analysis — its own report says "Running
+      # tests without application deployment". A package can pass every check
+      # in it and still fail to open, and nothing had ever installed this one.
+      # The only thing that answers that question is installing it on a real PC.
+      #
+      # Double-clicking will not do it. The package is signed by the
+      # self-signed developer certificate generated above, which no machine
+      # trusts. `Add-AppxPackage -AllowUnsigned` is NOT the way round that:
+      # that switch is documented for genuinely UNSIGNED packages, whose
+      # Publisher carries the unsigned-package OID — this package is signed and
+      # carries the real Store publisher. The supported route is to trust the
+      # SIGNER for the length of the test: import the .cer into
+      # `Cert:\LocalMachine\TrustedPeople`, `Add-AppxPackage -Path <msix>`,
+      # open the app, then remove the package and the certificate again.
+      #
+      # WHAT LEAVES THE RUNNER, EXACTLY: the public half, and nothing else.
+      # `X509ContentType::Cert` is a DER certificate — a public key and a
+      # signature, carrying no private key by CONSTRUCTION rather than by
+      # convention, and the export is read back below so the claim is tested
+      # rather than asserted. The .pfx holds the private half and stays in
+      # PACK_DIR, which is never uploaded.
+      #
+      # It pairs with THIS RUN'S package and nothing else: the certificate is
+      # regenerated every run, so this .cer cannot validate another run's
+      # .msix. The thumbprint goes to the job summary so the owner can untrust
+      # exactly what they trusted, by thumbprint, rather than guessing at the
+      # certificate store afterwards.
+      - name: Export the public half of the development certificate
+        shell: pwsh
+        working-directory: ${{ env.PACK_DIR }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # EphemeralKeySet: a `::Cert` export needs the public half only, so
+          # the private key is never persisted to this machine's key store on
+          # the way past. Nothing here calls Sign.
+          $pfx = (Resolve-Path 'devcert.pfx').Path
+          $signer = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
+            $pfx, 'password',
+            [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+
+          $publicHalf = Join-Path $env:OUT_DIR 'devcert-public.cer'
+          $der = $signer.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert)
+          [System.IO.File]::WriteAllBytes($publicHalf, $der)
+
+          # The ARTEFACT is the assertion, as everywhere else in this job — and
+          # the assertion is about the CONTENT, not the file name. Reading it
+          # back the way the owner's machine will is the only thing that can
+          # tell a public certificate from a private key wearing a .cer suffix,
+          # and it proves the file exists on the way past: a missing or
+          # malformed file throws here rather than reaching the artefact.
+          $exported = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($publicHalf)
+          if ($exported.HasPrivateKey) {
+            Write-Host '::error title=Private key in the artefact::The exported certificate carries a private key and must not be uploaded.'
+            exit 1
+          }
+
+          $thumbprint = $signer.Thumbprint
+          Write-Host "Development certificate thumbprint: $thumbprint"
+
+          $sb = [System.Text.StringBuilder]::new()
+          [void]$sb.AppendLine('## Installing this package for the one-time open test')
+          [void]$sb.AppendLine('')
+          [void]$sb.AppendLine("Signer thumbprint: **$thumbprint**")
+          [void]$sb.AppendLine('')
+          [void]$sb.AppendLine('The artefact carries `devcert-public.cer`, the PUBLIC half of the certificate this run signed the package with. Windows will not install the package until that signer is trusted, and `-AllowUnsigned` does not apply to a signed package. Import it into `Cert:\LocalMachine\TrustedPeople`, install the `.msix`, open the app, then remove the package and delete the certificate by the thumbprint above.')
+          [void]$sb.AppendLine('')
+          [void]$sb.AppendLine('It pairs with THIS run only: the certificate is regenerated every run, so this certificate cannot validate any other run''s package.')
+          $note = $sb.ToString()
+          $note >> $env:GITHUB_STEP_SUMMARY
 
       # ----------------------------------------------------------------------
       # THE CERTIFICATION KIT. Rule 71: a failed check must never take the same
@@ -594,14 +682,91 @@ jobs:
             exit 1
           }
 
+      # ----------------------------------------------------------------------
+      # THE GATE ON THE UPLOAD, NOT A NOTE IN AN EARLIER STEP (L-119).
+      # ----------------------------------------------------------------------
+      # This sweep started life inside the export step and was worthless there,
+      # for two reasons a review had to find:
+      #
+      #   1. The upload below is `if: always()`. A sweep that calls `exit 1`
+      #      ten steps earlier turns the JOB red and the upload runs anyway —
+      #      so the key would have been published by the very run that
+      #      announced it had found one. A forbid-list that cannot stop the
+      #      thing it forbids is decoration.
+      #   2. A step with no `if:` is `success()`-gated. If WACK failed, or the
+      #      pack failed, the sweep was SKIPPED and the `always()` upload
+      #      published an UNSWEPT directory — exactly the runs where something
+      #      went wrong and a stray file is most likely.
+      #
+      # So the sweep is its own step, it is `always()` like the upload it
+      # guards, it sits immediately before that upload, and the upload consumes
+      # its OUTCOME. `steps.<id>.outcome` is the step's own result before
+      # `continue-on-error`, so a failing sweep skips the upload while leaving
+      # the job red — the two things that must both happen.
+      #
+      # Rule 71: a failed check must never take the same branch as a passed
+      # one. There is no `|| true`, no `-ErrorAction SilentlyContinue` and no
+      # empty-directory shrug here. A sweep that cannot see the directory
+      # cannot prove it is clean, and says so, and refuses the upload.
+      - name: Refuse to upload signing material
+        id: refuse-signing-material
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if (-not $env:OUT_DIR) {
+            Write-Host '::error title=Nowhere to sweep::The output directory is not set, so this step cannot prove the artefact is clean. Refusing the upload.'
+            exit 1
+          }
+          if (-not (Test-Path -LiteralPath $env:OUT_DIR)) {
+            Write-Host '::error title=Nowhere to sweep::The output directory does not exist, so this step cannot prove the artefact is clean. Refusing the upload.'
+            exit 1
+          }
+
+          # The extensions are named on a line of their own on purpose: the
+          # contract test flags any WRITE into the output directory that
+          # mentions key material, and joining these two lines would fire it on
+          # the guard itself. The list is held equal to KEY_MATERIAL_EXTENSIONS
+          # in `apps/light/src/lib/key-material.ts` by that same test, so the
+          # three forbid-lists in this repository cannot drift apart again.
+          $forbiddenExtensions = @('.pfx', '.p12', '.pem', '.key', '.snk', '.jks', '.keystore', '.asc')
+          $forbiddenNames = @('id_rsa')
+
+          $files = @(Get-ChildItem -LiteralPath $env:OUT_DIR -Recurse -File)
+          $leaked = @($files | Where-Object {
+            $forbiddenExtensions -contains $_.Extension -or $forbiddenNames -contains $_.BaseName
+          })
+
+          if ($leaked.Count -gt 0) {
+            $names = ($leaked | ForEach-Object { $_.Name }) -join ', '
+            Write-Host "::error title=Signing material in the artefact::$names. A CI artefact is a download link for anyone signed in, and this repository is public. The private half must never leave the runner, and this upload is refused."
+            exit 1
+          }
+
+          Write-Host ('Swept {0} file(s); no signing material.' -f $files.Count)
+
       # `always()` so the inventory and any partial report survive a failure —
       # a run that died is exactly when you most want to look at the files.
       #
-      # Only OUT_DIR. The development certificate is in PACK_DIR and is never
-      # uploaded: a build artefact is a download link for anyone signed in, and
-      # this repository is public.
+      # AND `outcome == 'success'` on the sweep directly above, which is the
+      # half that has teeth. `always()` on its own means a red job still
+      # publishes, so the only thing that can stop a leak reaching the artefact
+      # is a condition on THIS step: the sweep runs on every path, and if it
+      # found key material — or could not look — this upload does not happen.
+      # The job stays red either way; what changes is whether the download
+      # exists.
+      #
+      # Only OUT_DIR. The development certificate's PRIVATE half is in PACK_DIR
+      # and is never uploaded: a build artefact is a download link for anyone
+      # signed in, and this repository is public.
+      #
+      # Its PUBLIC half is in here, deliberately (L-119): a package signed by a
+      # certificate no machine trusts cannot be installed, so without it the
+      # artefact is a package nobody can open. The step that exports it reads
+      # the file back to prove it carries no private key.
       - name: Upload the package, the manifest and the certification report
-        if: always()
+        if: always() && steps.refuse-signing-material.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: cviper-light-msix
