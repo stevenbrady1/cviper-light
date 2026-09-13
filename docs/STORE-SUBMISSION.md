@@ -136,25 +136,175 @@ and why it is stated rather than ignored.
 
 ---
 
-## Step 5 — Paste the identity fields into the manifest
+## Step 4a — Install the package once, on a real PC
+
+The certification kit in Step 4 never opens the app. Its own report says
+_"Running tests without application deployment"_: it reads the package, it does
+not run it. So a package can pass every check in Step 4, be reported overall
+**PASS**, and still fail to draw a window — and until somebody installs it,
+nobody knows which.
+
+This is the test that finds out. The owner does it once, on a real Windows PC,
+and it takes about ten minutes.
+
+### What it proves, and what it does not
+
+**It proves the package installs and the app opens and can be used.** That is
+the one question CI cannot answer, and the one the certification kit explicitly
+did not ask.
+
+**It does not prove the Store will accept the submission.** The certification
+kit is a local approximation of the Store's gate rather than the gate itself,
+and this test is not even that — it is one PC installing one package. Only a
+real submission settles certification.
+
+### Three things to know before you start
+
+**The `.cer` and the `.msix` have to come from the SAME run.** The certificate
+is generated fresh on every run of the workflow, so one run's certificate cannot
+vouch for another run's package. Mix them and the install fails with a signature
+error that reads exactly like a broken package. It is not a broken package; it
+is a mismatched pair. Take both files from one run, and do not keep an old
+`.cer` to reuse.
+
+**A run from before the certificate change has no `.cer` at all, and cannot be
+installed.** The public half of the signing certificate is only in the artefact
+for runs made after
+[#84](https://github.com/stevenbrady1/cviper-light/pull/84) merges. If the
+artefact you downloaded holds only the `.msix`, the manifest and the
+certification report, stop: nothing on your PC trusts that package's signer and
+no amount of retrying will change that. Re-run the workflow and use the new
+artefact.
+
+**`Add-AppxPackage -AllowUnsigned` is a dead end — do not spend an hour on it.**
+That switch is for genuinely _unsigned_ packages, which say so by carrying a
+special OID marker in `Identity/Publisher`. This package is signed, and its
+`Identity/Publisher` is the real Store publisher `CN=F08F8DD5-…` from Step 5.
+Building an OID-marked variant to get round the problem would install a
+different identity from the one being submitted, which answers a different
+question from the one being asked.
+
+### Do it
+
+Everything below runs in **PowerShell opened as administrator** — right-click
+the Start button → **Terminal (Admin)**, or right-click PowerShell → **Run as
+administrator**. Trusting a certificate for the machine and installing a package
+both need it, and both fail with a bare "access denied" without it.
+
+**1. Get the artefact.** Actions → **MSIX (Microsoft Store)** → the run you want
+→ download `cviper-light-msix` and unzip it somewhere short, such as
+`C:\msix-test`. Open the administrator PowerShell in that folder. Two files
+matter: `CViperLight-store.msix` and `devcert-public.cer`.
+
+**2. Trust this run's signer.** This tells Windows you accept the certificate
+that signed this package. The file holds the public half only — there is no
+private key in it, and the workflow reads it back to prove that before
+uploading.
+
+```powershell
+Import-Certificate -FilePath devcert-public.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+```
+
+A good result: one line naming the certificate, with a thumbprint. **Copy that
+thumbprint somewhere now** — you need it to undo this at the end. It is also
+printed in the workflow run's job summary, under "Installing this package for
+the one-time open test".
+
+**3. Install the package.**
+
+```powershell
+Add-AppxPackage -Path CViperLight-store.msix
+```
+
+A good result: nothing at all. PowerShell just returns to the prompt. An error
+mentioning a signature or a certificate nearly always means the two files came
+from different runs — go back to the top of this section.
+
+**4. Open it and use it.** Start menu → **CViper Light**. A good result: the
+window opens, the introduction appears, you can dismiss it, go to Analysis, pick
+a PDF, paste some advert text and press Check. Spend a minute clicking around.
+This is the entire point of the exercise — a package that installs and then
+fails to draw a window is exactly what Step 4 could not have told you.
+
+### Clean up — this part is not optional
+
+Two things are now on your machine that should not stay there: the app, and a
+self-signed certificate that your PC has been told to trust. The certificate is
+the one that matters. While it sits in `LocalMachine\TrustedPeople`, this PC
+will accept anything signed with it, and the private half of it lived on a build
+runner belonging to a public repository. Leaving it behind is a worse end state
+than never having run the test at all.
+
+**Remove the app.**
+
+```powershell
+Get-AppxPackage StBr.CViperLight | Remove-AppxPackage
+```
+
+A good result: no output, and the Start menu entry is gone.
+
+**Remove the certificate by its THUMBPRINT.** Put the thumbprint from step 2 in
+place of `<thumbprint>`.
+
+```powershell
+Remove-Item -Path Cert:\LocalMachine\TrustedPeople\<thumbprint>
+```
+
+A good result: no output.
+
+> **Never remove it by subject name.** The workflow generates the development
+> certificate with `winapp cert generate --manifest`, which takes the subject
+> straight from the manifest — so this throwaway certificate carries the **same
+> `CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399` as the real Store publisher**. A
+> tidy-up that matched on that `CN=` would look perfectly reasonable and could
+> later delete something legitimate that shares it. A thumbprint is the hash of
+> one specific certificate and nothing else. It is the only safe handle.
+
+**Check it is really gone.**
+
+```powershell
+Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Thumbprint -eq '<thumbprint>'
+```
+
+A good result: nothing is printed. If a line comes back, the certificate is
+still trusted and the clean-up is not finished.
+
+---
+
+## Step 5 — The identity fields in the manifest
 
 This is the only code change a submission needs, and it can only happen **after**
 Step 2, because Partner Center invents the values.
 
-Partner Center → your product → **Product identity**. Copy three values into
-[`apps/light/src-tauri/msix/Package.appxmanifest`](../apps/light/src-tauri/msix/Package.appxmanifest):
+**It is already done.** The name has been reserved, and the three values Partner
+Center issued are in
+[`apps/light/src-tauri/msix/Package.appxmanifest`](../apps/light/src-tauri/msix/Package.appxmanifest)
+on `main`. There is nothing to type here. Read the table, satisfy yourself that
+Partner Center → your product → **Product identity** still shows the same three
+strings, and go on to Step 6.
 
-| Partner Center shows           | Paste into                                       | Looks like                 |
-| ------------------------------ | ------------------------------------------------ | -------------------------- |
-| **Package/Identity/Name**      | `<Identity Name="…">`                            | `12345Name.CViperLight`    |
-| **Package/Identity/Publisher** | `<Identity Publisher="…">`                       | `CN=A1B2C3D4-5E6F-…`       |
-| **Publisher display name**     | `<PublisherDisplayName>…</PublisherDisplayName>` | your own name, from Step 3 |
+| Partner Center shows           | Lives in the manifest as                         | And now reads                             |
+| ------------------------------ | ------------------------------------------------ | ----------------------------------------- |
+| **Package/Identity/Name**      | `<Identity Name="…">`                            | `StBr.CViperLight`                        |
+| **Package/Identity/Publisher** | `<Identity Publisher="…">`                       | `CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399` |
+| **Publisher display name**     | `<PublisherDisplayName>…</PublisherDisplayName>` | `Steven Brady`                            |
 
-Every one of the three currently reads `PLACEHOLDER-…`. Replace **all three or
-none** — a half-filled identity looks finished, passes every other check, and is
-rejected at upload. A test in this repository
-(`apps/light/src/lib/msix-store-build.contract.test.ts`) fails the build if some
-are replaced and others are not.
+`Identity/@Publisher` is case sensitive and has to match the reservation
+character for character. `StBr` is the publisher id Partner Center issued, not
+an abbreviation somebody chose — it must not be tidied into `StevenBrady`.
+
+### If the name is ever re-reserved
+
+A fresh reservation, a new product entry or a second account issues new values,
+and then this becomes a live step again. Replace **all three or none** — a
+half-filled identity looks finished, passes every other check, and is rejected
+at upload.
+
+A test in this repository (`apps/light/src/lib/msix-store-build.contract.test.ts`)
+holds that line. It fails the build if the three fall out of step with each
+other, and it also pins the shape of each value, so a field left blank, retyped
+as an example or reverted to a placeholder goes red here rather than at Partner
+Center.
 
 ### Two fields people look for here and will not find
 
@@ -169,8 +319,12 @@ anything else is rejected at upload. The app's own version stays the three-part
 `0.1.0` in `tauri.conf.json` — the trailing `.0` belongs in the manifest and
 nowhere else.
 
-Commit that change, then **re-run Step 4** and download the new package. The
-package built before the identity was pasted cannot be uploaded.
+**A package built before the identity landed cannot be uploaded.** The three
+values were merged on 13 September 2026
+([#76](https://github.com/stevenbrady1/cviper-light/pull/76)), so submit a
+package from a Step 4 run made after that date, and throw away any older `.msix`
+still sitting on your disk. The same applies if the identity is ever changed
+again: commit it, re-run Step 4, and upload the package that run produced.
 
 ---
 
@@ -419,6 +573,8 @@ compliance position is that keys are optional.
 - [ ] Identity: all three fields pasted from Product identity; version ends `.0`
 - [ ] MSIX rebuilt **after** the identity was pasted, and downloaded from CI
 - [ ] Certification kit reported overall **PASS** in the run summary
+- [ ] Step 4a done: the package installed on a real PC, the window opened, **and
+      the app and the certificate were both removed again**
 - [ ] Description pasted **in the order given** — keyless features first
 - [ ] Four screenshots uploaded, PNG, ≥ 1366 × 768, no real CV in any of them
 - [ ] Age rating questionnaire completed, all answers none/no
@@ -493,6 +649,7 @@ an optional failure is a submission risk to be aware of, not a non-event.
    settles it.
 2. **Whether the packaged app RUNS.** The kit analyses the package statically
    — its own report says _"Running tests without application deployment"_.
-   Nothing has installed the MSIX and opened the window.
+   Nothing in CI has installed the MSIX and opened the window. **Step 4a** is
+   the one-off human test that does, and it is the only thing that answers this.
 3. **arm64.** Only x64 is built and tested.
 4. **The account-type question above.**
