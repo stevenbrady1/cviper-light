@@ -206,7 +206,12 @@ jobs:
       # supply-chain step nobody reviewed.
       - name: Install gitleaks 8.24.3
         run: |
-          curl -sSL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz
+          # --fail makes an HTTP error an EXIT CODE instead of a file: without it curl
+          # writes a 502 page into gitleaks.tgz and exits 0, and the checksum below then
+          # reports a network blip as "hash mismatch" — a tampered-release alarm on the
+          # secret scanner (L-140). The integrity check must never be what names a
+          # network failure.
+          curl --fail --retry 3 --retry-all-errors -sSL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz
           echo "9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c  gitleaks.tgz" | sha256sum -c -
           tar -xzf gitleaks.tgz gitleaks
 
