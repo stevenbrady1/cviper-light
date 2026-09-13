@@ -83,13 +83,30 @@ function positiveWhole(raw: string): number | null {
  * lets through a search the package would then refuse with a different
  * sentence.
  */
-export function validateForm(formValues: SearchForm): FormErrors {
+export interface ValidateOptions {
+  /**
+   * Must at least one of the two text boxes be filled in?
+   *
+   * TRUE for a keyed search: Adzuna and Reed are query endpoints, and asking
+   * either for "everything" is a request they will refuse or answer with
+   * nonsense — so an empty form is a mistake to point at rather than a request.
+   *
+   * FALSE when only the keyless feeds are being read (L-110). They take no
+   * query at all: "show me what was published recently" is the most natural
+   * first thing a person does, and refusing it would be the app declining to do
+   * the one thing it can definitely do with no key. The boxes then narrow what
+   * came back, on this machine, and an empty box means "do not narrow".
+   */
+  readonly requireQuery?: boolean;
+}
+
+export function validateForm(formValues: SearchForm, options: ValidateOptions = {}): FormErrors {
   const errors: FormErrors = {};
 
   const keywords = formValues.keywords.trim();
   const location = formValues.location.trim();
 
-  if (keywords === '' && location === '') {
+  if ((options.requireQuery ?? true) && keywords === '' && location === '') {
     errors.keywords = 'Enter a job title, some keywords, or a location before searching.';
   }
 
@@ -175,23 +192,31 @@ export function providerAvailability(
 }
 
 /**
- * Why the Search button cannot be pressed, or `null`.
+ * Why the primary button cannot be pressed, or `null`.
  *
  * The button is ALWAYS on screen and always carries its reason — the same rule
  * the analysis view follows, and for the same reason: there is no support inbox
  * for a free offline app, so a grey button that says nothing is where a user's
  * session ends.
  *
- * The one reason that exists is worth reading carefully. It does not apologise,
- * because the two browser buttons underneath it are a real, working job search
- * that needs no key at all — and it points at them before it points at Settings.
+ * ============================================================================
+ * THE COUNT IS "THINGS TO LOOK AT", NOT "KEYS YOU HAVE" (L-110)
+ * ============================================================================
+ * It used to be the number of KEYED boards that were usable, so a machine with
+ * no keys had a permanently disabled button. Since the keyless feeds a ticked
+ * free feed is also something to look at, and the only way to reach zero is to
+ * untick everything — which is a thing the user just did and can undo, rather
+ * than a wall they were born behind.
+ *
+ * The message still points at what works before it points at Settings.
  */
-export function searchDisabledReason(usableChosen: number): string | null {
-  if (usableChosen > 0) return null;
+export function searchDisabledReason(usableSources: number): string | null {
+  if (usableSources > 0) return null;
 
   return (
-    'No job board is ticked that CViper can search from inside the app yet. The two buttons ' +
-    'below run this same search in your browser and need no key at all.'
+    'Nothing is ticked for CViper to look at. Tick one of the free feeds or a job board above ' +
+    '— the feeds need no key at all — or send this straight to a job site with the buttons ' +
+    'below.'
   );
 }
 

@@ -84,12 +84,13 @@ describe('browseKeylessJobs — both feeds working', () => {
     const { transport } = fakeTransport(workingReply);
     const outcome = await browseKeylessJobs(transport, REQUEST);
 
-    // 19 recorded Arbeitnow adverts across two pages (the fake answers the
-    // same page twice, which is what a feed that has not moved on looks like)
-    // and the Guardian's 20.
-    expect(outcomeFor(outcome, 'arbeitnow').fetched).toBe(38);
+    // 19 recorded Arbeitnow adverts, asked for twice: the fake answers the
+    // same page for page 1 and page 2, which is exactly what a feed that has
+    // not moved on looks like — so 19 distinct adverts, not 38. Plus the
+    // Guardian's 20.
+    expect(outcomeFor(outcome, 'arbeitnow').fetched).toBe(19);
     expect(outcomeFor(outcome, 'guardian').fetched).toBe(20);
-    expect(outcome.jobs).toHaveLength(58);
+    expect(outcome.jobs).toHaveLength(39);
     expect(outcome.outcomes.every((entry) => entry.error === null)).toBe(true);
   });
 
@@ -111,6 +112,19 @@ describe('browseKeylessJobs — both feeds working', () => {
     await browseKeylessJobs(transport, REQUEST);
 
     expect(asked().indexOf('arbeitnow:1')).toBeLessThan(asked().indexOf('arbeitnow:2'));
+  });
+
+  it('does not list the same advert twice when it appears on both pages', async () => {
+    // Arbeitnow updates hourly and orders newest first, so an advert arriving
+    // between the two fetches shifts the page boundary and the last advert of
+    // page 1 comes back as the first of page 2. Listed twice it would look like
+    // two jobs, and the cross-post check would then flag it as "2 similar
+    // postings" — a confident wrong statement about one advert.
+    const { transport } = fakeTransport(workingReply);
+    const outcome = await browseKeylessJobs(transport, REQUEST);
+
+    const ids = outcomeFor(outcome, 'arbeitnow').jobs.map((entry) => entry.job.external_id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('contacts nothing the caller did not ask for', async () => {
@@ -285,7 +299,7 @@ describe('browseKeylessJobs — nothing matched is a DIFFERENT answer', () => {
     });
 
     const arbeitnow = outcomeFor(outcome, 'arbeitnow');
-    expect(arbeitnow.fetched).toBe(38);
+    expect(arbeitnow.fetched).toBe(19);
     expect(arbeitnow.jobs.length).toBeGreaterThan(0);
     expect(arbeitnow.jobs.length).toBeLessThan(arbeitnow.fetched);
     expect(arbeitnow.error).toBeNull();

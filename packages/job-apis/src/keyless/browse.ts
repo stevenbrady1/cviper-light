@@ -119,6 +119,21 @@ async function collect(
   request: KeylessBrowseRequest,
 ): Promise<Collected> {
   const jobs: SearchResultJob[] = [];
+  /*
+    ============================================================================
+    THE SAME ADVERT CAN LEGITIMATELY ARRIVE ON BOTH PAGES
+    ============================================================================
+    Arbeitnow updates hourly and orders newest first, so one advert posted
+    between our two fetches shifts the page boundary by one and the last advert
+    of page 1 comes back as the first of page 2. Listed twice it reads as two
+    jobs; worse, the cross-post check then flags the pair as "2 similar
+    postings", which is a confident wrong statement about one advert.
+
+    Keyed by the feed's own id, so two genuinely different adverts are never
+    folded together. An advert with no id is kept — dropping unidentifiable rows
+    would lose real jobs to protect against a duplicate we cannot prove.
+  */
+  const seen = new Set<string>();
   const pages = KEYLESS_PAGES[source];
 
   for (let page = 1; page <= pages; page += 1) {
@@ -145,7 +160,14 @@ async function collect(
     });
     if (!parsed.ok) return { jobs, error: parsed.error };
 
-    jobs.push(...parsed.value);
+    for (const entry of parsed.value) {
+      const id = entry.job.external_id;
+      if (id !== null) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+      }
+      jobs.push(entry);
+    }
   }
 
   return { jobs, error: null };

@@ -1,4 +1,4 @@
-import { PROVIDER_LABEL, type SearchResultJob } from '@cviper/job-apis';
+import { SOURCE_LABEL, type SearchResultJob } from '@cviper/job-apis';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 
@@ -31,8 +31,15 @@ import { describeSalary, formatSalary } from './salary';
  * THE SOURCE IS ALWAYS NAMED
  * ============================================================================
  * Partly so the user can tell which board to blame for a bad advert, and partly
- * because attributing Adzuna's data is a condition of their API terms. It is a
- * chip on every card rather than a footnote for that reason.
+ * because attributing Adzuna's data is a condition of their API terms, as is
+ * crediting Arbeitnow. It is a chip on every card rather than a footnote for
+ * that reason.
+ *
+ * The label comes from `SOURCE_LABEL`, which is exhaustive over `JobSource`.
+ * It used to be `source === 'adzuna' ? 'adzuna' : 'reed'`, which was correct
+ * while there were two boards and silently labelled every advert from the
+ * keyless feeds "Reed" the moment there were four — a wrong attribution on the
+ * one line of the card whose job is to say where the advert came from.
  */
 
 interface ResultCardProps {
@@ -86,7 +93,7 @@ export function ResultCard({
           data-testid={`result-source-${job.id}`}
           className="shrink-0 rounded-pill bg-sunken px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] text-ink-muted uppercase"
         >
-          {PROVIDER_LABEL[job.source === 'adzuna' ? 'adzuna' : 'reed']}
+          {SOURCE_LABEL[job.source]}
         </span>
       </div>
 

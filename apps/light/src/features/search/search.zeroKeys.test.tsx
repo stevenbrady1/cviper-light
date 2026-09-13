@@ -41,6 +41,9 @@ const tauri = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 
+import ARBEITNOW_PAGE from '../../../../../packages/job-apis/src/fixtures/arbeitnow-page1.json';
+import GUARDIAN_FEED from '../../../../../packages/job-apis/src/fixtures/guardian-jobsrss.xml?raw';
+
 const { default: App } = await import('../../app/App');
 const { markWelcomeSeen } = await import('../onboarding/store');
 const { createFakeTrackerPort } = await import('../tracker/test/fakePort');
@@ -62,6 +65,18 @@ const PROVIDER_COMMANDS = [
 
 const NOW = new Date('2026-08-19T09:00:00.000Z');
 
+/**
+ * What the two keyless feeds answer with, for the tests that press the button.
+ *
+ * The recorded live responses, so the SHIPPED readers run: a 19-advert slice of
+ * an Arbeitnow page and the Guardian's complete feed. Reassigned per test to
+ * break a feed on purpose.
+ */
+let keylessReply: (source: string) => { status: number; body: string } = (source) => ({
+  status: 200,
+  body: source === 'arbeitnow' ? JSON.stringify(ARBEITNOW_PAGE) : GUARDIAN_FEED,
+});
+
 function invokedProviderCommands(): string[] {
   return tauri.invoke.mock.calls
     .map(([command]) => command)
@@ -75,10 +90,23 @@ beforeEach(() => {
   // Without this the app opens on the welcome screen and the shell is not drawn.
   markWelcomeSeen();
   tauri.invoke.mockReset();
-  tauri.invoke.mockImplementation(async (command) => {
+  keylessReply = (source) => ({
+    status: 200,
+    body: source === 'arbeitnow' ? JSON.stringify(ARBEITNOW_PAGE) : GUARDIAN_FEED,
+  });
+  tauri.invoke.mockImplementation(async (command, args) => {
     // A machine with nothing set up: no daemon, and not one saved credential.
     if (command === 'ollama_probe') return null;
     if (command === 'secret_status') return false;
+
+    // The keyless feeds. NOT in PROVIDER_COMMANDS above and deliberately so:
+    // this command carries no credential, cannot reach one (keyless.rs has the
+    // structural test), and is the reason a key-less machine now gets adverts
+    // rather than a disabled button.
+    if (command === 'keyless_fetch') {
+      const source = String((args as { source?: unknown } | undefined)?.source ?? '');
+      return JSON.stringify(keylessReply(source));
+    }
 
     // An empty but working local database, so the screen's "which of these are
     // already in my tracker" read succeeds and this test stays about keys.
@@ -161,7 +189,19 @@ describe('the search view on a machine with no keys', () => {
     expect(invokedProviderCommands()).toEqual([]);
   });
 
-  it('disables Search, says why, and points at the buttons that do work', async () => {
+  it('lets the button be pressed, and browses two free feeds with no key at all', async () => {
+    // ======================================================================
+    // THIS TEST REPLACED ONE THAT ASSERTED THE OPPOSITE (L-110).
+    // ======================================================================
+    // It used to read "disables Search, says why, and points at the buttons
+    // that do work", and it was right while the only way to get an advert into
+    // this app was an API key. The product decision that key is no longer
+    // required is the whole of L-110, and Microsoft Store policy 10.8.3 says
+    // an individual-account app may not require an API key for its primary
+    // functionality.
+    //
+    // What is kept from the old test: the button is never hidden, and no keyed
+    // provider command is contacted. What changed: the button WORKS.
     const user = userEvent.setup();
 
     render(
@@ -172,16 +212,47 @@ describe('the search view on a machine with no keys', () => {
     await user.click(screen.getByTestId('nav-search'));
 
     const submit = (await screen.findByTestId('search-submit')) as HTMLButtonElement;
-    await vi.waitFor(() => expect(submit.disabled).toBe(true));
+    await vi.waitFor(() => expect(submit.disabled).toBe(false));
+    // It does not call itself a search. The feeds ignore every query.
+    expect(submit.textContent).toBe('Browse recent jobs');
+    expect(screen.queryByTestId('search-reason')).toBeNull();
 
-    // Disabled, never hidden, and the reason is beside it — pointing at the
-    // browser buttons before it points at Settings.
-    const reason = screen.getByTestId('search-reason').textContent ?? '';
-    expect(reason).toContain('below');
-    expect(reason).toContain('no key');
-
-    // Pressing it anyway changes nothing and contacts nobody.
     await user.click(submit);
+
+    // Real adverts, from the real reader, on a machine with nothing saved.
+    const cards = await screen.findAllByTestId(/^result-/);
+    expect(cards.length).toBeGreaterThan(0);
+
+    // The promise this file exists for is untouched: not one keyed provider
+    // command was invoked, and the feed command carries no credential — see
+    // the structural test in keyless.rs.
+    expect(invokedProviderCommands()).toEqual([]);
+    expect(tauri.invoke.mock.calls.filter(([command]) => command === 'keyless_fetch')).toHaveLength(
+      3,
+    );
+  });
+
+  it('a dead feed is a message on screen, never an empty list', async () => {
+    // The other half of the same promise. A user with no keys has nothing else
+    // on this screen, so a feed that has quietly died must not look like a
+    // market with no jobs in it.
+    keylessReply = () => ({ status: 503, body: '' });
+
+    const user = userEvent.setup();
+
+    render(
+      <App trackerPort={createFakeTrackerPort()} browser={createFakeBrowserPort()} now={NOW} />,
+    );
+
+    await screen.findByTestId('status-strip');
+    await user.click(screen.getByTestId('nav-search'));
+    await user.click(await screen.findByTestId('search-submit'));
+
+    expect((await screen.findByTestId('keyless-error-arbeitnow')).textContent).toContain(
+      'Arbeitnow',
+    );
+    expect(screen.getByTestId('keyless-error-guardian').textContent).toContain('Guardian Jobs');
+    expect(screen.queryByTestId('search-no-results')).toBeNull();
     expect(invokedProviderCommands()).toEqual([]);
   });
 

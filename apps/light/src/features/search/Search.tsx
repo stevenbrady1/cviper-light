@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import {
+  ARBEITNOW_ATTRIBUTION,
   JOB_PROVIDER_IDS,
+  KEYLESS_SOURCE_IDS,
   PROVIDER_LABEL,
   REED_DAILY_LIMIT,
   quotaVerdict,
   utcDateOf,
   type JobProviderId,
   type JobSearchOutcome,
+  type KeylessBrowseOutcome,
+  type KeylessSourceId,
   type QuotaState,
 } from '@cviper/job-apis';
 
@@ -23,9 +27,11 @@ import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser
 import { readJobKeyStates, type KeyState } from '../../status/environment';
 
 import { KeylessBar } from './KeylessBar';
+import { KeylessFeedToggles } from './KeylessFeedToggles';
 import { ProviderToggles } from './ProviderToggles';
 import { ResultCard } from './ResultCard';
 import { readSearchMemory, rememberSearch, writeDraft } from './memory';
+import { combineResults, nothingMatchedNote, submitLabel } from './keylessModel';
 import {
   CONTRACT_CHOICES,
   EMPTY_FORM,
@@ -126,8 +132,18 @@ export function Search({
     reed: 'unreadable',
   });
   const [chosen, setChosen] = useState<ReadonlySet<JobProviderId>>(new Set(JOB_PROVIDER_IDS));
+  /*
+    Both free feeds ticked from the start (L-110). They need no key, no account
+    and no setup, so a machine with an empty credential store returns real
+    adverts the first time the button is pressed — which is the whole point of
+    the feature, and would be undone by making the user find and tick them.
+  */
+  const [keylessChosen, setKeylessChosen] = useState<ReadonlySet<KeylessSourceId>>(
+    new Set(KEYLESS_SOURCE_IDS),
+  );
   const [running, setRunning] = useState(false);
   const [outcome, setOutcome] = useState<JobSearchOutcome | null>(null);
+  const [keylessOutcome, setKeylessOutcome] = useState<KeylessBrowseOutcome | null>(null);
   const [tracked, setTracked] = useState<ReadonlySet<string>>(new Set());
   const [trackedProblem, setTrackedProblem] = useState<string | null>(null);
   const [notes, setNotes] = useState<CardNotes>({});
@@ -228,9 +244,23 @@ export function Search({
     (provider) =>
       chosen.has(provider) && providerAvailability(provider, keyStates[provider]).usable,
   );
-  const disabledReason = searchDisabledReason(usableChosen.length);
+  const keylessWanted = KEYLESS_SOURCE_IDS.filter((source) => keylessChosen.has(source));
+  /*
+    The button is disabled only when there is NOTHING to look at. A free feed
+    counts, so a machine with no keys at all can press it — the state this
+    feature exists to fix.
+  */
+  const disabledReason = searchDisabledReason(usableChosen.length + keylessWanted.length);
 
   const reedVerdict = quotaVerdict(quota, 'reed', utcDateOf(clock) ?? quota.date);
+
+  /*
+    One list of adverts out of the two halves, with cross-posts looked for
+    ACROSS them — the same role on Adzuna and on a free feed is exactly the
+    pair worth flagging, and neither half can see it alone. Nothing is merged
+    and nothing is removed; see `keylessModel.ts`.
+  */
+  const results = combineResults(outcome, keylessOutcome);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -238,42 +268,79 @@ export function Search({
     async (event: FormEvent) => {
       event.preventDefault();
 
-      const found = validateForm(form);
+      /*
+        The "type something first" rule belongs to the KEYED half only. Adzuna
+        and Reed are query endpoints and an empty form is a mistake to point at;
+        the free feeds take no query at all, so browsing what they have just
+        published with both boxes empty is the most natural thing a new user
+        does. See `ValidateOptions` in model.ts.
+      */
+      const found = validateForm(form, { requireQuery: usableChosen.length > 0 });
       setErrors(found);
       if (!formIsValid(found)) return;
-      if (usableChosen.length === 0) return;
+      if (usableChosen.length === 0 && keylessWanted.length === 0) return;
 
       setRunning(true);
       setNotes({});
       setProblems({});
 
       const utcToday = utcDateOf(clock) ?? quota.date;
-      const result = await searchPort.search({
-        // Only the boards the user actually ticked. Unticking one really does
-        // skip its call — see `searchJobs`, which contacts nothing it is not
-        // given.
-        providers: usableChosen,
-        input: toSearchInput(form),
-        quota: readQuota(clock),
-        today: utcToday,
-        createdAt: clock.toISOString(),
-        newId: newId ?? (() => crypto.randomUUID()),
-      });
+      const createdAt = clock.toISOString();
+      const nextId = newId ?? (() => crypto.randomUUID());
 
-      // Written back straight away. The count is the only warning that can
-      // exist — Reed's API reports no remaining balance at all.
-      writeQuota(result.quota);
-      setQuota(result.quota);
+      /*
+        The two halves run TOGETHER and are independent. A keyed board being
+        down is not a reason to hold back the free feeds' adverts, and a dead
+        feed is not a reason to lose a paid-for search — each half already
+        reports per-source failures of its own, and neither can throw.
+
+        The keyless half takes no quota and gets none: these feeds have no
+        account and no daily allowance, so counting a browse against Reed's
+        hundred would take real searches away from the user for nothing.
+      */
+      const [keyed, keyless] = await Promise.all([
+        usableChosen.length === 0
+          ? Promise.resolve(null)
+          : searchPort.search({
+              // Only the boards the user actually ticked. Unticking one really
+              // does skip its call — see `searchJobs`, which contacts nothing
+              // it is not given.
+              providers: usableChosen,
+              input: toSearchInput(form),
+              quota: readQuota(clock),
+              today: utcToday,
+              createdAt,
+              newId: nextId,
+            }),
+        keylessWanted.length === 0
+          ? Promise.resolve(null)
+          : searchPort.browseKeyless({
+              sources: keylessWanted,
+              // The feeds cannot filter, so this narrows what comes back, HERE,
+              // on this machine. Nothing typed below ever leaves the process.
+              filter: { keywords: form.keywords.trim(), location: form.location.trim() },
+              createdAt,
+              newId: nextId,
+            }),
+      ]);
+
+      if (keyed !== null) {
+        // Written back straight away. The count is the only warning that can
+        // exist — Reed's API reports no remaining balance at all.
+        writeQuota(keyed.quota);
+        setQuota(keyed.quota);
+      }
       setRecent(rememberSearch(form).recent);
-      setOutcome(result);
+      setOutcome(keyed);
+      setKeylessOutcome(keyless);
       setRunning(false);
     },
-    [clock, form, newId, quota.date, searchPort, usableChosen],
+    [clock, form, keylessWanted, newId, quota.date, searchPort, usableChosen],
   );
 
   const onSave = useCallback(
     async (jobId: string) => {
-      const entry = outcome?.jobs.find((candidate) => candidate.job.id === jobId);
+      const entry = results.jobs.find((candidate) => candidate.job.id === jobId);
       if (entry === undefined) return;
 
       setSavingId(jobId);
@@ -308,7 +375,7 @@ export function Search({
             : 'Saved to your tracker, under “Saved”.',
       }));
     },
-    [clock, newId, outcome, searchPort],
+    [clock, newId, results, searchPort],
   );
 
   const onOpen = useCallback(
@@ -333,11 +400,42 @@ export function Search({
     });
   }, []);
 
+  const onToggleKeyless = useCallback((source: KeylessSourceId, next: boolean) => {
+    setKeylessChosen((current) => {
+      const updated = new Set(current);
+      if (next) updated.add(source);
+      else updated.delete(source);
+      return updated;
+    });
+  }, []);
+
   // ── Rendering ────────────────────────────────────────────────────────────
 
   const view = viewById('search');
   const failures = (outcome?.outcomes ?? []).filter((entry) => entry.error !== null);
-  const showsAdzuna = (outcome?.jobs ?? []).some((entry) => entry.job.source === 'adzuna');
+  /*
+    ============================================================================
+    A FEED THAT FAILED GETS A LINE OF ITS OWN. THIS IS THE POINT OF L-110.
+    ============================================================================
+    Free feeds rot: they move, they change shape, they get switched off. Every
+    one of those failures reaches this screen as an empty list unless it is
+    rendered, and an empty list reads as "there are no jobs like that" — a
+    sentence the user cannot question and cannot act on.
+
+    So `keylessFailures` is drawn above the results, exactly like the keyed
+    boards' failures, and `nothingMatched` is a SEPARATE and differently worded
+    line for the case where the feed worked and the filter matched none of what
+    it published. Blurring the two is the bug this feature exists to prevent.
+  */
+  const keylessFailures = (keylessOutcome?.outcomes ?? []).filter((entry) => entry.error !== null);
+  const nothingMatched = (keylessOutcome?.outcomes ?? [])
+    .map((entry) => ({ source: entry.source, note: nothingMatchedNote(entry) }))
+    .filter((entry): entry is { source: KeylessSourceId; note: string } => entry.note !== null);
+
+  const showsAdzuna = results.jobs.some((entry) => entry.job.source === 'adzuna');
+  // Arbeitnow's own terms ask for a link back to the site, so their credit is
+  // shown wherever their adverts are — the same treatment Adzuna's terms get.
+  const showsArbeitnow = results.jobs.some((entry) => entry.job.source === 'arbeitnow');
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-search">
@@ -425,6 +523,21 @@ export function Search({
               />
             </div>
 
+            {/*
+              Under the keyed boards, not instead of them. The two are different
+              things and the screen says which is which: a search of a job board
+              with the user's own free key, and a browse of what two public
+              feeds have just published. Neither is presented as a fallback for
+              the other.
+            */}
+            <div className="mt-3">
+              <KeylessFeedToggles
+                chosen={keylessChosen}
+                onToggle={onToggleKeyless}
+                disabled={running}
+              />
+            </div>
+
             <div className="mt-3 flex flex-wrap items-center gap-3">
               {/*
                 The view's ONE blue button. Disabled, never hidden, and the
@@ -438,7 +551,7 @@ export function Search({
                 disabled={running || disabledReason !== null}
                 className={PRIMARY_BUTTON}
               >
-                {running ? 'Searching…' : 'Search'}
+                {running ? 'Working…' : submitLabel(usableChosen.length, keylessWanted.length)}
               </button>
 
               {disabledReason === null ? null : (
@@ -526,15 +639,49 @@ export function Search({
             </p>
           ))}
 
-          {outcome === null ? (
+          {/*
+            One line per FEED that failed, in exactly the same place and shape.
+            A 404, a feed that changed its payload, and a feed that answered
+            with no jobs at all are three different sentences and all three are
+            failures — none of them may reach the user as an empty list.
+          */}
+          {keylessFailures.map((entry) => (
+            <p
+              key={entry.source}
+              role="alert"
+              data-testid={`keyless-error-${entry.source}`}
+              data-kind={entry.error?.kind}
+              className="rounded-control bg-danger/5 px-3 py-2 text-danger"
+            >
+              {entry.error?.message}
+            </p>
+          ))}
+
+          {/*
+            NOT an alert, and deliberately worded so it cannot be mistaken for
+            one: the feed answered, it published N jobs, and none of them
+            matched. The only thing to change is what the user typed, and this
+            is the one line on the screen that says so.
+          */}
+          {nothingMatched.map((entry) => (
+            <p
+              key={entry.source}
+              data-testid={`keyless-nothing-matched-${entry.source}`}
+              className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
+            >
+              {entry.note}
+            </p>
+          ))}
+
+          {!results.ran ? (
             <div
               data-testid="search-empty"
               className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
             >
-              <p className="font-medium text-ink">Nothing searched yet.</p>
+              <p className="font-medium text-ink">Nothing looked at yet.</p>
               <p className="mt-1 text-ink-muted">
-                Type a job title and press Search, or send the same search straight to your browser
-                with the buttons above — those need no key at all.
+                Type a job title and press the button — the two free feeds need no key at all. Or
+                send the same words straight to a job site in your browser with the buttons above.
               </p>
             </div>
           ) : (
@@ -548,16 +695,28 @@ export function Search({
                 </p>
               ) : null}
 
-              {outcome.jobs.length === 0 && failures.length === 0 ? (
+              {showsArbeitnow ? (
+                // The same, for Arbeitnow, whose own `meta.terms` say "I would
+                // appreciate linking back to the site". Every card also keeps
+                // its link to their page for that advert.
+                <p data-testid="arbeitnow-attribution" className="text-xs text-ink-faint">
+                  {ARBEITNOW_ATTRIBUTION}
+                </p>
+              ) : null}
+
+              {results.jobs.length === 0 &&
+              failures.length === 0 &&
+              keylessFailures.length === 0 &&
+              nothingMatched.length === 0 ? (
                 <p data-testid="search-no-results" className="text-ink-muted">
-                  No adverts matched that search. Try broader keywords, a wider radius, or send the
-                  same search to your browser with the buttons above.
+                  No adverts matched that. Try broader keywords, a wider radius, or send the same
+                  words to your browser with the buttons above.
                 </p>
               ) : null}
 
               <div className="space-y-3">
-                {outcome.jobs.map((entry) => {
-                  const siblings = clusterSiblings(entry.job.id, outcome.clusters);
+                {results.jobs.map((entry) => {
+                  const siblings = clusterSiblings(entry.job.id, results.clusters);
                   const key = externalKey(entry.job.source, entry.job.external_id);
 
                   return (
