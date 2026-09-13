@@ -87,24 +87,51 @@ that way. Do not reorder it.
 
 Partner Center → **Apps and games** → **New product** → **MSIX or PWA app**.
 
-Reserve **`CViper Light`**. If it is taken, reserve a variant and use the same
-string everywhere below — the reserved name is what appears in the Store.
+**This was done, and the name reserved is `CViper Light`.** That is what appears
+in the Store, and it is what the app is called everywhere below.
+
+The reservation is also what produced the identity in Step 5. Partner Center
+invents those values at the moment a name is reserved, which is why Step 5 could
+not have happened before this one — and it is why the two are tied together: the
+same reservation issued the Store ID `9PKWNV9CGPWV`.
+
+### If the name is ever re-reserved
+
+If `CViper Light` ever has to be given up — a dispute, a rename, a second
+account — reserve the replacement first, then use that same string everywhere
+below, because the reserved name is what the Store shows. A new reservation
+issues a new identity too, so Step 5 becomes a live step again on the same day.
 
 ---
 
-## Step 3 — Set the publisher display name to YOUR OWN NAME
+## Step 3 — The publisher display name is the owner's own name
 
 Partner Center → **Account settings** → **Publisher display name**.
 
-**Use the owner's own personal name. Not "CViper".**
-
-**Policy 10.14** requires a company account where _"a reasonable consumer would
-interpret your application or publisher name to be that of a business entity"_.
-"CViper" reads as a business. A personal name does not, and it is the name an
-individual account is for.
+**This was done. It is `Steven Brady`** — the owner's own personal name, not
+"CViper". The same string was pasted into the manifest's
+`<PublisherDisplayName>`, which is why it appears again in Step 5.
 
 This is the name shown on the Store listing under the app title. It is separate
 from the app's own name, which stays `CViper Light`.
+
+### Why it is a personal name, and why it has to stay one
+
+**Policy 10.14** requires a **company** account wherever _"a reasonable consumer
+would interpret your application or publisher name to be that of a business
+entity"_. "CViper" reads as a business. A personal name does not, and it is the
+name an individual account is for.
+
+So this is not a cosmetic field, and the temptation to make it look more
+professional is the thing to resist. Putting a business-sounding name here would
+put a free individual account on the wrong side of 10.14, and an individual
+account cannot be converted to a company one (Step 1) — the way back would be
+incorporating, a second account and a fresh submission.
+
+If it is ever changed for a legitimate reason, change it in Partner Center and
+in the manifest in the same breath. It is one of the three identity values, and
+a package that disagrees with the reservation on any of them is rejected at
+upload.
 
 ---
 
@@ -310,6 +337,16 @@ Center.
 
 **Package Family Name** and **Store ID** are **not manifest fields**. Partner
 Center derives both from the identity above. Nothing is pasted back in.
+
+They are written down, though, so stop hunting. Both sit in the header comment
+at the top of
+[`Package.appxmanifest`](../apps/light/src-tauri/msix/Package.appxmanifest),
+next to the explanation of why they are not fields:
+
+| Derived value           | Value                            |
+| ----------------------- | -------------------------------- |
+| **Package Family Name** | `StBr.CViperLight_wjvg8g4k0t6gr` |
+| **Store ID**            | `9PKWNV9CGPWV`                   |
 
 ### The version's fourth number must be 0
 
@@ -567,10 +604,18 @@ compliance position is that keys are optional.
 
 - [ ] Enrolled as an **individual** developer at `storedeveloper.microsoft.com`
 - [ ] Country is correct (it cannot be changed later)
-- [ ] Publisher display name is **the owner's own name**, not "CViper"
-- [ ] Name `CViper Light` reserved
+- [x] Publisher display name is **the owner's own name**, not "CViper" —
+      `Steven Brady`, pasted from Partner Center into the manifest in
+      [#76](https://github.com/stevenbrady1/cviper-light/pull/76)
+- [x] Name `CViper Light` reserved — the reservation is what issued the identity
+      below and the Store ID `9PKWNV9CGPWV`
 - [ ] `https://cviper.ai/privacy/` is **live** and shows the policy
-- [ ] Identity: all three fields pasted from Product identity; version ends `.0`
+- [x] Identity: all three fields pasted from Product identity —
+      `StBr.CViperLight`, `CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399` and
+      `Steven Brady`, merged in
+      [#76](https://github.com/stevenbrady1/cviper-light/pull/76)
+- [x] Version ends `.0` — the manifest reads `Version="0.1.0.0"`, and has since
+      the file was created
 - [ ] MSIX rebuilt **after** the identity was pasted, and downloaded from CI
 - [ ] Certification kit reported overall **PASS** in the run summary
 - [ ] Step 4a done: the package installed on a real PC, the window opened, **and
