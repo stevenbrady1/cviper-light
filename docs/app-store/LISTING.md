@@ -69,9 +69,9 @@ Pick one:
 >
 > IF YOU WANT MORE
 >
-> • Bring your own OpenAI key for a deeper analysis. The key is stored in your
-> phone's Keychain and never shown to the app's screen. The request goes from
-> you to them, under your account — we are not in the middle.
+> • Bring your own AI provider's key for a deeper analysis. The key is stored
+> in your phone's Keychain and never shown to the app's screen. The request
+> goes from you to them, under your account — we are not in the middle.
 > • Bring your own free Adzuna or Reed key to search inside the app.
 >
 > WHAT IT NEVER DOES
@@ -122,11 +122,12 @@ them.)
 > any PDF from Files, paste some text into the advert box and tap "Check".
 > The basic match runs on the device with no key.
 >
-> The app can optionally use an AI provider. That requires the user's OWN
-> OpenAI API key, which the user pastes into Settings; the key is stored in the
-> Keychain and the request is made from the device to OpenAI under the user's
-> own account. We do not supply a key, we do not proxy the request and we
-> receive nothing. No key is needed to review any screen.
+> The app can optionally use an AI provider. That requires the user's OWN key
+> for an AI provider of their choice (today OpenAI or Anthropic); the key is
+> stored in the Keychain and the request is made from the device to that
+> provider under the user's own account. We do not supply a key, we do not
+> proxy the request and we receive nothing. No key is needed to review any
+> screen.
 >
 > This iPhone build makes no network request on launch, and none the user did
 > not start by pressing a button. The updater is not compiled into an iOS build

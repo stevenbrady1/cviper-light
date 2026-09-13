@@ -78,8 +78,8 @@ functionality" as this app has, so say it in the listing rather than leaving a
 reviewer to infer it from a bullet about browser links. But clearing it is a **standing constraint on the listing**,
 not a box already ticked: the description, the screenshots and the first
 paragraph must lead with what works with no key, and present the AI lane as an
-optional extra the user pays OpenAI for directly. The copy in Step 7 is written
-that way. Do not reorder it.
+optional extra the user pays their own AI provider for directly. The copy in
+Step 7 is written that way. Do not reorder it.
 
 ---
 
@@ -400,7 +400,7 @@ works the moment you open it.
 > **Paste this as written.** The order is a policy requirement, not a style
 > choice — see Step 1 on policy 10.8.3. Everything that needs no key comes
 > first; the AI lane is an optional extra, after it, clearly marked as the
-> user's own account with OpenAI.
+> user's own account with the AI provider they choose.
 
 ```
 Make every application count.
@@ -429,9 +429,9 @@ WORKS THE MOMENT YOU OPEN IT — NO KEY, NO SIGN-UP
 
 IF YOU WANT AN AI SECOND OPINION — OPTIONAL, AND YOURS
 
-• Add your own OpenAI key and a model will read your CV properly and explain
-  itself. You pay OpenAI directly, under your own account. We do not supply a
-  key, we do not stand in the middle, and we receive nothing.
+• Add your own AI provider's key and a model will read your CV properly and
+  explain itself. You pay your provider directly, under your own account. We
+  do not supply a key, we do not stand in the middle, and we receive nothing.
 • Or run a free model on your own machine with Ollama, in which case your CV
   does not go anywhere at all.
 • Add your own free Adzuna or Reed key and the same screen searches those two
@@ -463,7 +463,7 @@ Browse recent job adverts in the app with no key and no account
 Nine UK job boards, one click, no key needed
 Reads PDF, Word and JSON Resume files
 Export and import everything as one file
-Optional: bring your own OpenAI key, or run a model locally with Ollama
+Optional: bring your own AI provider's key, or run a model locally with Ollama
 No telemetry, no analytics, no crash reporting
 Open source under the MIT licence
 ```
@@ -569,11 +569,11 @@ app, dismiss the introduction, go to Analysis, select a CV (any PDF), paste some
 text into the advert box and press Check. The basic match runs on the device
 with no key and no network.
 
-The app can optionally use an AI provider. That requires the user's OWN OpenAI
-API key, which the user pastes into Settings; it is stored in Windows Credential
-Manager and the request goes from the device to OpenAI under the user's own
-account. We do not supply a key, we do not proxy the request and we receive
-nothing. No key is needed to review any screen.
+The app can optionally use an AI provider. That requires the user's OWN key for
+an AI provider of their choice (today OpenAI or Anthropic), stored in
+Credential Manager; the request goes from the device to that provider under
+the user's own account. We do not supply a key, we do not proxy the request
+and we receive nothing. No key is needed to review any screen.
 
 This is a packaged desktop (Win32) app. It declares runFullTrust and nothing
 else. It contains no analytics or crash-reporting SDK and no automatic update

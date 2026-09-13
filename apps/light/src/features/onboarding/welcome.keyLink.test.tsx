@@ -108,20 +108,33 @@ describe('where do I get a key', () => {
 
 describe('what a typical CV costs', () => {
   it('names a figure and says who is paid', async () => {
+    // Re-pinned for L-148: the figure and the payee are now stated generically
+    // ("a few pence", "the AI provider you choose") rather than naming OpenAI
+    // and its specific rate — see `AI_COST_LINE`'s docblock in `cards.ts` for
+    // why a precise band tied to one provider's rate card was the thing that
+    // read as tied to one AI provider.
     renderWelcome();
 
     const line = (await screen.findByTestId('welcome-cost')).textContent ?? '';
-    expect(line).toContain('2–3p');
+    expect(line).toContain('a few pence');
     // Who takes the money. CViper never sees it, and the screen must not imply
-    // otherwise — the app has no payment path of any kind.
-    expect(line).toContain('OpenAI');
+    // otherwise — the app has no payment path of any kind. Stated generically:
+    // the provider is the user's choice, not this screen's.
+    expect(line).toContain('the AI provider you choose');
   });
 
-  it('says the figure can move, because it is someone else’s price list', async () => {
+  it('says a model on your own PC costs nothing', async () => {
+    // The "prices can change" caveat this test used to check for is gone: it
+    // hedged a precise band derived from one provider's published per-token
+    // rate, and the owner's L-148 wording deliberately replaced that band with
+    // the looser, provider-agnostic "a few pence" — a figure far less likely
+    // to go stale, and one this screen no longer needs to hedge the same way.
+    // What the new sentence adds instead is the free option, which the old
+    // one-provider wording never stated on this card at all.
     renderWelcome();
 
     const line = ((await screen.findByTestId('welcome-cost')).textContent ?? '').toLowerCase();
-    expect(line).toContain('change');
+    expect(line).toContain('free');
   });
 
   it('sits on the analysis card, not on the two that cost nothing', async () => {

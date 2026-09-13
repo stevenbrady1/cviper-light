@@ -79,56 +79,42 @@ export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
  * What one AI-read analysis costs, and who is paid for it.
  *
  * ============================================================================
- * A FIGURE, NOT A SHRUG.
+ * A FIGURE, NOT A SHRUG — AND, SINCE L-148, NOT TIED TO ONE PROVIDER'S RATES
  * ============================================================================
  * "Bring your own key" is only an honest offer if the user can find out what
  * the key will cost them BEFORE they go and get one. This app's OWN landing
  * page at cviper.ai — not the hosted CViper, which was mothballed in September
  * 2026 and whose site cviper.ai replaced — promises that this screen "shows
- * what a typical CV costs", and a card that said only "you pay OpenAI" would
- * send somebody off to a pricing page written for developers to work out an
- * answer we already know.
+ * what a typical CV costs", and a card that said only "you pay your provider"
+ * with no figure at all would send somebody off to read a pricing page to work
+ * out an answer we already know roughly.
  *
  * ============================================================================
- * WHERE "ABOUT 2–3P" COMES FROM
+ * WHY THIS NO LONGER NAMES A PROVIDER OR A BAND (L-148)
  * ============================================================================
- * The model is `OPENAI_DEFAULT_MODEL` in `analysis/providers.ts`, which is
- * `gpt-4o`. One analysis sends a CV plus an advert and asks for a structured
- * reading back — roughly 6,000 input tokens and 1,500 output tokens.
+ * The line used to be derived from one specific model's published per-token
+ * rate (`OPENAI_DEFAULT_MODEL`, at the time `gpt-4o`) and said "about 2–3p,
+ * paid straight to OpenAI". That was an honest number for the one provider a
+ * user could actually choose — but the owner's decision on L-148 is that the
+ * product must not read as tied to one AI provider, and a precise band derived
+ * from one provider's rate card is exactly that: correct for OpenAI, silent
+ * about Anthropic (whose card shipped in L-149, at different published rates),
+ * and one repricing away from being quietly wrong for the provider it names.
  *
- * At gpt-4o's published rates of $2.50 per million input tokens and $10.00 per
- * million output tokens:
+ * "A few pence" is the looser, provider-agnostic shape of the same fact — both
+ * shipped providers land in that range for one CV-and-advert exchange — and it
+ * still agrees with the landing page's own "a few pence, about 2–3p for a CV
+ * check" without repeating the precise band that only ever described one of
+ * them. The per-provider cost REMAINS on each key card (`aiKeyModel.ts`'s
+ * `billing` field), where naming a provider and its rate is exactly what that
+ * card is for.
  *
- *     input    6,000 / 1,000,000 x $2.50  = $0.015
- *     output   1,500 / 1,000,000 x $10.00 = $0.015
- *     total                               = $0.030   (~2.4p at $1.27/£)
- *
- * So the copy says "about 2–3p", and the band is the honest shape of it.
- * $0.030 is 2.4p — the MIDDLE of that band, not the bottom — so rounding down
- * to "about 2p" would quote the optimistic end of a real spread. A CV and an
- * advert both vary in length, and the figure a user carries away from this
- * screen should not be the best case they could have had.
- *
- * It also agrees with that same landing page, which says a check costs "a few
- * pence, about 2–3p for a CV check".
- * A band sits comfortably inside that phrase; a single round number argues with
- * it the first time somebody's CV runs long.
- *
- * ============================================================================
- * AND WHY IT SAYS PRICES CAN CHANGE
- * ============================================================================
- * This is a number from somebody else's price list, shipped inside a desktop
- * binary a user may not update for a year. The sentence has to survive OpenAI
- * repricing `gpt-4o` without becoming a lie, and "prices can change" is what
- * makes it an estimate rather than a quote.
- *
- * A LIVE per-run cost, measured from the tokens an analysis actually used, is a
- * different feature and is not this one. This constant is a static estimate and
- * must not be mistaken for a meter.
+ * "Prices can change" survives for the same reason it always existed: this is
+ * still an estimate of someone else's price list, not a live meter.
  */
-export const OPENAI_COST_LINE =
-  'A typical CV check costs about 2–3p, paid straight to OpenAI on your own account. ' +
-  'CViper takes no cut, and prices can change.';
+export const AI_COST_LINE =
+  'A typical CV check costs a few pence, paid to the AI provider you choose on your own ' +
+  'account. A model running on your own PC is free.';
 
 /**
  * What this machine can do for a CV check, in one line, read live.

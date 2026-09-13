@@ -7,7 +7,7 @@ import { readAvailability } from '../analysis/availability';
 import { type Availability } from '../analysis/providers';
 import { OPENAI_KEY_PROVIDER } from '../settings/keys/aiKeyModel';
 
-import { ONBOARDING_CARDS, OPENAI_COST_LINE, localModelLine } from './cards';
+import { AI_COST_LINE, ONBOARDING_CARDS, localModelLine } from './cards';
 
 /**
  * The first screen, and the only one that ever explains the whole product.
@@ -200,7 +200,7 @@ export function Welcome({ onDismiss, detect, browser }: WelcomeProps) {
             {card.id === 'analysis' ? (
               <div data-testid="welcome-key-help" className="mt-2">
                 <p data-testid="welcome-cost" className="text-xs text-ink-muted">
-                  {OPENAI_COST_LINE}
+                  {AI_COST_LINE}
                 </p>
 
                 <div className="mt-1 flex flex-wrap items-center gap-x-3">

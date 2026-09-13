@@ -65,50 +65,53 @@ export const GROUPS: readonly Group[] = [
  * The paragraph at the top of Settings → Privacy. The owner's own words.
  *
  * ============================================================================
- * THE ENUMERATION IS OF WHAT CAN BE CONFIGURED TODAY, NOT OF WHAT EXISTS
+ * NAMES NO AI PROVIDER, ON PURPOSE, AND PERMANENTLY (L-148)
  * ============================================================================
- * "today that's OpenAI or Anthropic, or a model running on your own PC" is a
- * statement about what a user can SET UP from this build's Settings screen —
- * `keys/model.ts` (Adzuna, Reed) plus the two cards in `keys/aiKeyModel.ts`,
- * whose `AiKeyProviderId` union now has both members (L-149).
+ * Every earlier version of this paragraph enumerated what could be configured
+ * TODAY — "today that's OpenAI", then "today that's OpenAI or Anthropic" once
+ * L-149 shipped a second card — and `configurableAi.contract.test.ts` used to
+ * fail the build if a newly-configurable provider went unnamed here. The owner
+ * reversed that on 13 September 2026: "the product must not read as tied to
+ * one AI provider… provider names belong only in the 'how to get a key'
+ * guidance, never in the product's description of itself."
  *
- * `api.anthropic.com` is also a registered entry in `lib/outbound-hosts.ts`
- * and is rendered in the generated host list below this paragraph, exactly as
- * `api.openai.com` is. This sentence narrows the CHOICE; that list states the
- * REACH. Both are true, and neither is hiding the other.
+ * So this paragraph now says "the provider you choose" and stops there. That
+ * is not a downgrade in honesty — a user can read exactly which providers
+ * those are one screen down, where the generated host list names
+ * `api.openai.com` and `api.anthropic.com` with the same "why" it always had —
+ * it is a decision about where a brand name is allowed to live. The per-host
+ * registry, the key cards themselves, and the analysis screen's option labels
+ * still name providers, because that is where a specific provider is actually
+ * being set up or chosen. This paragraph is the product describing itself, and
+ * the product is not one provider's front end.
+ *
+ * A THIRD KEY CARD ARRIVING OWES THIS PARAGRAPH NOTHING. That is the whole
+ * point of the reversal: naming was the thing that went stale, so removing it
+ * is what stops the next provider from being one more paragraph to remember.
+ * `lib/no-provider-brand-in-product-copy.contract.test.ts` fails the build the
+ * other way now — if a brand name ever appears here again.
+ *
+ * The per-provider consent gate in `runAnalysis.ts` (L-97, PR #35) still needs
+ * no update from any of this: its `ConsentProviderKind` is
+ * `Exclude<ProviderId, 'ollama'>`, and the per-provider consent DIALOG is one
+ * of the places a name is allowed, and expected, to appear.
  *
  * ============================================================================
- * WHOEVER ADDS A THIRD KEY CARD MUST UPDATE THIS PARAGRAPH AND THE GENERATED
- * POLICY IN THE SAME CHANGE.
+ * "OR TEST A KEY" IS STILL LOAD-BEARING. DO NOT TIDY IT AWAY.
  * ============================================================================
- * `configurableAi.contract.test.ts` fails the build if an AI provider becomes
- * configurable and this paragraph does not name it. It watches the KEY-CARD
- * list, not the Rust enum — see its docblock for why that distinction is the
- * whole point.
- *
- * The per-provider consent gate in `runAnalysis.ts` (L-97, PR #35) needs NO
- * update when that happens: its `ConsentProviderKind` is
- * `Exclude<ProviderId, 'ollama'>`, so it already covers every cloud provider
- * and names it at the moment of the call. Only this paragraph and the policy
- * document have to change, so nobody later assumes the consent work is also
- * owed.
- *
- * ============================================================================
- * "OR TEST A KEY" IS LOAD-BEARING. DO NOT TIDY IT AWAY.
- * ============================================================================
- * The draft before this one said the job-board keys leave "only when you
- * search". That is not quite true: `job_test_credentials` (`src-tauri/src/jobs.rs`)
- * runs a real one-result search through `send_search` when the user presses
- * "Test and save this key" in Settings, so the key leaves the machine at SAVE
- * time too. It is literally a search, which is why the shorter sentence reads
- * as defensible — but nobody pressing Save would describe themselves as
- * searching, and that gap is exactly the kind this paragraph exists to close.
+ * A draft once said the job-board keys leave "only when you search". That is
+ * not quite true: `job_test_credentials` (`src-tauri/src/jobs.rs`) runs a real
+ * one-result search through `send_search` when the user presses "Test and save
+ * this key" in Settings, so the key leaves the machine at SAVE time too. It is
+ * literally a search, which is why the shorter sentence reads as defensible —
+ * but nobody pressing Save would describe themselves as searching, and that
+ * gap is exactly the kind this paragraph exists to close.
  */
 export const PRIVACY_SUMMARY =
   'CViper Light runs on your computer. We have no server, no accounts, and no copy of your ' +
-  'data. Your CV and your OpenAI or Anthropic key only ever go to the AI you choose — today ' +
-  "that's OpenAI or Anthropic, or a model running on your own PC. Your job-board keys go only " +
-  'to Adzuna or Reed, and only when you search or test a key.';
+  'data. Your CV, a pasted advert and your own AI key only ever go to the provider you ' +
+  'choose, or to a model running on your own PC. Your job-board keys go only to Adzuna and ' +
+  'Reed, and only when you search or test a key.';
 
 export function PrivacyNotice() {
   return (
