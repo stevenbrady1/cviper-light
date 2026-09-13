@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { EMPTY_JOB_EXTRACTION, type JobExtraction } from '@cviper/core-types';
 import { type JobExtractionOutcome } from '@cviper/ai-providers';
 
-import { type Availability } from '../analysis/providers';
+import { type Availability, type ProviderOption } from '../analysis/providers';
 
 import {
   NO_PROVIDER_NOTE,
@@ -67,9 +67,13 @@ describe('extractionOptions — what this machine can offer', () => {
   it('offers a cloud provider only when its key is saved AND the app can set it up', () => {
     // Inherited from `providerOptions`, which is the point of reusing it: the
     // L-102 rule — offer only what Settings can set up — reaches the paste form
-    // without this file having to know about it. A saved Anthropic key has no
-    // key card behind it, so this machine can extract nothing.
-    expect(extractionOptions({ ...NOTHING, anthropicKey: true })).toEqual([]);
+    // without this file having to know about it. Before L-149 a saved
+    // Anthropic key had no key card behind it, so this machine could extract
+    // nothing from it; now that the card exists, the same key offers exactly
+    // as OpenAI's already did.
+    expect(extractionOptions({ ...NOTHING, anthropicKey: true }).map((o) => o.kind)).toEqual([
+      'anthropic',
+    ]);
 
     expect(extractionOptions({ ...NOTHING, openaiKey: true }).map((o) => o.kind)).toEqual([
       'openai',
@@ -117,6 +121,29 @@ describe('extractionProgressNote — silence reads as a crash', () => {
   it('says where the advert is going on a cloud path', () => {
     const note = extractionProgressNote({ ...local, kind: 'anthropic', local: false });
     expect(note).toContain('Anthropic');
+  });
+
+  it('says OpenAI, not Anthropic, on the OTHER cloud path', () => {
+    const note = extractionProgressNote({ ...local, kind: 'openai', local: false });
+    expect(note).toContain('OpenAI');
+    expect(note).not.toContain('Anthropic');
+  });
+
+  it('negative: a kind this file has never heard of names ITSELF, not a fallback brand (W9)', () => {
+    // `providerLabel` (analysis/model.ts), not a two-way ternary: the old
+    // `option.kind === 'anthropic' ? 'Anthropic' : 'OpenAI'` defaulted every
+    // other kind to "OpenAI", which would have quietly misnamed a third cloud
+    // provider's own advert-reading progress note. `ProviderKind` is closed
+    // to two cloud kinds today, so a hypothetical third is asserted past the
+    // type checker here — `providerLabel` itself is typed for exactly this,
+    // falling back to the raw string for a kind it has never heard of either.
+    const note = extractionProgressNote({
+      ...local,
+      kind: 'mistral',
+      local: false,
+    } as unknown as ProviderOption);
+    expect(note).toContain('mistral');
+    expect(note).not.toContain('OpenAI');
   });
 });
 

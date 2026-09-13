@@ -9,6 +9,7 @@
 import { ANTHROPIC_DEFAULT_MODEL, type JobExtractionOutcome } from '@cviper/ai-providers';
 import { EMPTY_JOB_EXTRACTION, type JobExtraction } from '@cviper/core-types';
 
+import { providerLabel } from '../analysis/model';
 import { providerOptions, type Availability, type ProviderOption } from '../analysis/providers';
 
 import { EMPTY_DRAFT, type ApplicationDraft } from './model';
@@ -57,8 +58,12 @@ export function extractionProgressNote(option: ProviderOption): string {
     ? `Reading the advert with ${option.model} on this machine. The first run after starting ` +
         'your PC loads the model into memory, which takes 5 to 30 seconds. Nothing is being ' +
         'sent anywhere.'
-    : `Sending the advert to ${option.kind === 'anthropic' ? 'Anthropic' : 'OpenAI'}. ` +
-        'This usually takes a few seconds.';
+    : // `providerLabel`, not a hardcoded ternary (W9, coordinator review of
+      // PR #96): a ternary naming exactly two providers is itself a small
+      // instance of "the product is tied to one (or two) AI providers" —
+      // it silently reads "OpenAI" for any THIRD cloud kind this file has
+      // never heard of, rather than that kind's own name.
+      `Sending the advert to ${providerLabel(option.kind)}. This usually takes a few seconds.`;
 }
 
 /** A number as the review form shows it. `null` is an EMPTY BOX, never a zero. */

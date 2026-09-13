@@ -73,7 +73,10 @@ interface Harness {
 function renderCard(port = createFakeAiKeyPort()): Harness {
   const user = userEvent.setup();
   const browser = createFakeBrowserPort();
-  render(<AiKeySetup port={port} browser={browser} />);
+  // Settings now renders one card per provider (L-149); this file only ever
+  // drives OpenAI's, so its fake is wired to that id and the second card falls
+  // back to its own (real) port, which no assertion here touches.
+  render(<AiKeySetup ports={{ openai: port }} browser={browser} />);
   return { user, port, browser };
 }
 

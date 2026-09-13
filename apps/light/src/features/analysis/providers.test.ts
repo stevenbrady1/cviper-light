@@ -95,21 +95,21 @@ describe('providerOptions', () => {
 
   it('offers a cloud provider only when its key is saved AND the app can set it up', () => {
     // ========================================================================
-    // A SAVED KEY IS NOT ENOUGH ON ITS OWN (L-102)
+    // A SAVED KEY IS NOT ENOUGH ON ITS OWN (L-102) — BOTH SIDES NOW TRUE (L-149)
     // ========================================================================
-    // This test used to pin `['keyword', 'anthropic']` — a saved Anthropic key
-    // produced an Anthropic option. That was the defect. There is no Anthropic
-    // key card anywhere in Settings, so the only way to reach that state is a
-    // key left behind in the OS credential store, which survives an uninstall;
-    // the user was then offered a provider they could not set up, could not
-    // re-enter a key for, and was told in Rust to "Add one in Settings".
-    //
-    // The rule now is the one the product can keep: offer what can be set up.
+    // This test used to pin `['keyword']` for a saved Anthropic key: there was
+    // no Anthropic key card anywhere in Settings, so the only way to reach that
+    // state was a key left behind in the OS credential store, which survives an
+    // uninstall — offering it would have shown a provider the user could not
+    // set up, could not re-enter a key for, and was told in Rust to "Add one in
+    // Settings". L-149 added that card, so the same saved key is now a state a
+    // user CAN reach honestly, and the rule — offer what can be set up — makes
+    // the option appear rather than hiding it.
     expect(
       providerOptions({ ...NOTHING, anthropicKey: true }).map((option) => option.kind),
-    ).toEqual(['keyword']);
+    ).toEqual(['keyword', 'anthropic']);
 
-    // OpenAI has a card, so nothing about it changes.
+    // OpenAI has a card too, and nothing about it changes.
     expect(providerOptions({ ...NOTHING, openaiKey: true }).map((option) => option.kind)).toEqual([
       'keyword',
       'openai',
@@ -124,9 +124,14 @@ describe('providerOptions', () => {
       openaiKey: true,
     });
 
-    // Anthropic is absent DESPITE its key being saved — see the test above.
-    // The ordering rule itself is unchanged: basic, then local, then cloud.
-    expect(options.map((option) => option.kind)).toEqual(['keyword', 'ollama', 'openai']);
+    // Both cloud options are present now that both have key cards (L-149);
+    // the ordering rule itself is unchanged: basic, then local, then cloud.
+    expect(options.map((option) => option.kind)).toEqual([
+      'keyword',
+      'ollama',
+      'anthropic',
+      'openai',
+    ]);
   });
 
   it('marks the cloud options as leaving the machine and the others as not', () => {
@@ -137,9 +142,9 @@ describe('providerOptions', () => {
       openaiKey: true,
     });
 
-    // Three options now, not four: the Anthropic row is gone (L-102). The
-    // property is the same one — the only `false` is the cloud option.
-    expect(options.map((option) => option.local)).toEqual([true, true, false]);
+    // Four options now that both cloud providers have key cards (L-149). The
+    // property is the same one — only the two cloud options are `false`.
+    expect(options.map((option) => option.local)).toEqual([true, true, false, false]);
   });
 
   it('gives every option a distinct key', () => {
@@ -186,12 +191,13 @@ describe('defaultOptionKey', () => {
     expect(defaultOptionKey(options)).toBe('openai');
   });
 
-  it('falls back to the basic match when the only saved key has no key card', () => {
-    // L-102: an Anthropic key is never offered, so there is nothing for the
-    // picker to default TO. It must land on the option that always works rather
-    // than select a row that is not in the list.
+  it('is Anthropic when that is the only thing set up (L-149)', () => {
+    // This used to be the "falls back to the basic match" example: an
+    // Anthropic-only key had no key card behind it, so there was nothing for
+    // the picker to default TO. Now that Anthropic has a card, a saved
+    // Anthropic key is exactly as good a default as a saved OpenAI key.
     const options = providerOptions({ ...NOTHING, anthropicKey: true });
-    expect(defaultOptionKey(options)).toBe(KEYWORD_KEY);
+    expect(defaultOptionKey(options)).toBe('anthropic');
   });
 
   it('boundary: falls back to the basic match given an empty list', () => {

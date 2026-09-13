@@ -36,6 +36,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { probeOllama } from '../ai/transport';
 
 import { requestsToday } from './requestLog';
+import { ANTHROPIC_SECRET_KEY, OPENAI_SECRET_KEY } from './secretKeyNames';
 
 /**
  * The five credentials the app can hold, spelled exactly as the `SecretKey`
@@ -43,14 +44,18 @@ import { requestsToday } from './requestLog';
  *
  * A string that is not one of these is refused by serde before our Rust runs,
  * so a typo here is a runtime failure rather than a silent `false` — which is
- * why `environment.test.ts` asserts the app asks about exactly this set.
+ * why `environment.test.ts` asserts the app asks about exactly this set. The
+ * two AI credentials are the shared constants from `./secretKeyNames` (C2,
+ * coordinator review of PR #96) rather than a third copy of the same two
+ * literals — `keys/aiKeyModel.ts` and `analysis/availability.ts` are the
+ * other two.
  */
 export const SECRET_KEYS = [
   'adzuna_app_id',
   'adzuna_app_key',
   'reed_api_key',
-  'anthropic_api_key',
-  'openai_api_key',
+  ANTHROPIC_SECRET_KEY,
+  OPENAI_SECRET_KEY,
 ] as const;
 
 export type SecretKeyName = (typeof SECRET_KEYS)[number];

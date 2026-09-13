@@ -30,12 +30,9 @@ import { err, ok } from '@cviper/core-types';
 import { invoke } from '@tauri-apps/api/core';
 
 import { probeOllama } from '../../ai/transport';
+import { ANTHROPIC_SECRET_KEY, OPENAI_SECRET_KEY } from '../../status/secretKeyNames';
 
 import { type Availability } from './providers';
-
-/** The two credentials this view cares about, spelled as `SecretKey` serialises. */
-const ANTHROPIC_KEY = 'anthropic_api_key';
-const OPENAI_KEY = 'openai_api_key';
 
 /**
  * A transport that answers `listModels` from text already fetched and refuses
@@ -95,8 +92,8 @@ async function hasKey(key: string): Promise<boolean> {
 export async function readAvailability(): Promise<Availability> {
   const [ollama, anthropicKey, openaiKey] = await Promise.all([
     ollamaState(),
-    hasKey(ANTHROPIC_KEY),
-    hasKey(OPENAI_KEY),
+    hasKey(ANTHROPIC_SECRET_KEY),
+    hasKey(OPENAI_SECRET_KEY),
   ]);
 
   return {

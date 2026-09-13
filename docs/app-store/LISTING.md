@@ -9,11 +9,13 @@ delete the other before pasting.
 > Do not paste this copy there: Microsoft's policy 10.8.3 constrains what a
 > free individual account's listing may lead with, and Apple's does not.
 
-> **One AI provider, not two.** Since L-102 the only AI key the app can SET UP
-> is OpenAI. An Anthropic key can still be read out of the OS credential store
-> if an older build ever wrote one, so `api.anthropic.com` remains in the
-> generated privacy policy — but no screen can save one and no picker can offer
-> one, so nothing below may tell a reviewer to paste one.
+> **Two AI providers, both bring-your-own-key.** Since L-149 Settings can set up
+> either an OpenAI or an Anthropic key (before that, L-102 restricted this to
+> OpenAI alone — an Anthropic key could only be read out of the OS credential
+> store if an older build had written one, and no screen could save a fresh
+> one). The analysis screen offers whichever key is saved, or a local model
+> through Ollama. Nothing supplies a key on your behalf, and nothing reaches
+> either provider until you choose it.
 
 ## App Information
 
@@ -38,6 +40,12 @@ Pick one:
 - `Check your CV. Nothing sent.` (28) — quiet
 - `Private CV checker & tracker` (28) — plain
 - `Your CV, checked on your phone` (30) — warm
+
+<!-- generic-copy:start -->
+<!-- Everything to the matching :end below is the actual listing copy submitted to the Store,
+     scanned by no-provider-brand-in-store-listings.contract.test.ts for a hardcoded AI provider
+     brand name (W7, coordinator review of PR #96). "App Review Information" sits OUTSIDE these
+     markers on purpose: its "Notes for the reviewer" name providers deliberately, for App Review. -->
 
 ### Promotional text (170 characters, editable without a new build)
 
@@ -67,9 +75,9 @@ Pick one:
 >
 > IF YOU WANT MORE
 >
-> • Bring your own OpenAI key for a deeper analysis. The key is stored in your
-> phone's Keychain and never shown to the app's screen. The request goes from
-> you to them, under your account — we are not in the middle.
+> • Bring your own AI provider's key for a deeper analysis. The key is stored
+> in your phone's Keychain and never shown to the app's screen. The request
+> goes from you to them, under your account — we are not in the middle.
 > • Bring your own free Adzuna or Reed key to search inside the app.
 >
 > WHAT IT NEVER DOES
@@ -88,6 +96,8 @@ Pick one:
 > on another device.
 >
 > CViper Light is free, open source under the MIT licence, and made in the UK.
+
+<!-- generic-copy:end -->
 
 ## Keywords (100 characters max, comma-separated, no spaces after commas)
 
@@ -120,11 +130,12 @@ them.)
 > any PDF from Files, paste some text into the advert box and tap "Check".
 > The basic match runs on the device with no key.
 >
-> The app can optionally use an AI provider. That requires the user's OWN
-> OpenAI API key, which the user pastes into Settings; the key is stored in the
-> Keychain and the request is made from the device to OpenAI under the user's
-> own account. We do not supply a key, we do not proxy the request and we
-> receive nothing. No key is needed to review any screen.
+> The app can optionally use an AI provider. That requires the user's OWN key
+> for an AI provider of their choice (today OpenAI or Anthropic); the key is
+> stored in the Keychain and the request is made from the device to that
+> provider under the user's own account. We do not supply a key, we do not
+> proxy the request and we receive nothing. No key is needed to review any
+> screen.
 >
 > This iPhone build makes no network request on launch, and none the user did
 > not start by pressing a button. The updater is not compiled into an iOS build

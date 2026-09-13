@@ -99,14 +99,16 @@ impl ProviderId {
     /// What to tell the user when the key they need is not saved.
     fn missing_key_message(self) -> &'static str {
         match self {
-            // L-102: there is no Anthropic key card in Settings, so "Add one in
-            // Settings" sent the user looking for a screen that does not exist.
+            // L-149: Settings now has an Anthropic key card
+            // (`AI_KEY_PROVIDER_IDS` includes 'anthropic'), so "Add one in
+            // Settings" is honest again — it used to send the user looking for
+            // a screen that did not exist (L-102).
             // `only_a_provider_with_a_key_card_is_told_to_add_one_in_settings`
-            // reads the card registry and ties this arm to it, so adding an
-            // Anthropic card makes THIS sentence the thing that fails the build.
+            // reads the card registry and ties this arm to it, so removing the
+            // card again would make THIS sentence the thing that fails the
+            // build.
             ProviderId::Anthropic => {
-                "No Anthropic API key is saved, and this version of CViper has no screen for \
-                 adding one."
+                "No Anthropic API key is saved. Add one in Settings before using this provider."
             }
             ProviderId::Openai => {
                 "No OpenAI API key is saved. Add one in Settings before using this provider."
@@ -1319,13 +1321,21 @@ mod tests {
 
         assert!(
             PORT_TS.contains("'provider_test_key'"),
-            "the OpenAI key card does not invoke provider_test_key"
+            "the AI key port does not invoke provider_test_key"
         );
         // The argument names must be the Rust parameter names exactly. A rename
         // on either side would otherwise break silently at runtime.
+        //
+        // L-149: `createTauriAiKeyPort` is now built per card (one per
+        // provider, see its own doc comment), so the value sent as `provider`
+        // is the `providerId` parameter rather than a single OpenAI-only
+        // constant. `AiKeyProviderId`'s values are spelled exactly as Rust's
+        // `ProviderId` enum serialises them, so this is still the same literal
+        // guarantee — a card can never send `provider` under a different field
+        // name — just no longer hardcoded to one provider.
         assert!(
-            PORT_TS.contains("{ provider: OPENAI_PROVIDER, key }"),
-            "the OpenAI key card no longer passes `provider` and `key`"
+            PORT_TS.contains("{ provider: providerId, key }"),
+            "the AI key port no longer passes `provider` and `key`"
         );
     }
 

@@ -141,10 +141,11 @@ describe('L-128 / L-134: copy that used to say less than the code does', () => {
 
     const anthropic = findHost('api.anthropic.com').why;
     expect(anthropic).toContain('pasted job advert');
-    // L-105's caveat must survive the reword: no screen in this build can add
-    // an Anthropic key, so `unconfigurableKeyClaims.contract.test.tsx` must
-    // still find no possession claim here.
-    expect(anthropic).toContain('no screen for adding one');
+    // L-149 gave Anthropic a key card, so the caveat that used to sit here —
+    // "no screen for adding one" — stopped being true and is gone. The two
+    // entries now read the same shape, and `unconfigurableKeyClaims.contract
+    // .test.tsx` expects exactly that once a provider is configurable.
+    expect(anthropic).toContain('your own Anthropic key');
   });
 
   it('L-128: Reed — discloses the keyless browser link, not only the keyed API', () => {

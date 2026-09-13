@@ -64,8 +64,16 @@ const plugin = vi.hoisted(() => {
 
 vi.mock('@tauri-apps/plugin-store', () => ({ load: plugin.load }));
 
+/** `secret_delete` calls, for `forgetKeys` — a separate concern from the store mock above. */
+const tauriCore = vi.hoisted(() => ({
+  invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
+}));
+
+vi.mock('@tauri-apps/api/core', () => ({ invoke: tauriCore.invoke }));
+
 const { BOARD_STORE_FILE, BOARD_STORE_KEY } = await import('../../boards/port');
 const { CONSENT_STORE_FILE, CONSENT_STORE_KEY } = await import('../../analysis/consent');
+const { SECRET_KEYS } = await import('../../../status/environment');
 const { createTauriErasePort } = await import('./port');
 
 /** Both files, with something in them, exactly as a used machine would have. */
@@ -91,6 +99,8 @@ beforeEach(() => {
   plugin.loadThrows.clear();
   plugin.clearThrows.clear();
   plugin.load.mockClear();
+  tauriCore.invoke.mockReset();
+  tauriCore.invoke.mockResolvedValue(undefined);
 });
 
 describe('forgetPreferences empties every preferences file', () => {
@@ -182,5 +192,63 @@ describe('one file refusing does not cancel the others', () => {
 
     expect(result.ok).toBe(false);
     expect(result.ok ? '' : result.error.message).toContain('No reason was given.');
+  });
+});
+
+describe('forgetKeys deletes every credential this app can hold', () => {
+  /**
+   * ============================================================================
+   * WHY THIS EXISTS: L-149
+   * ============================================================================
+   * `forgetKeys` (`port.ts`) already iterates `SECRET_KEYS` — the same list
+   * `status/environment.ts` reads for the rail — so adding the Anthropic card
+   * needed no change here: `anthropic_api_key` was already in that list before
+   * this card could save one. Nothing tested `forgetKeys` against the REAL
+   * `secret_delete` call at all until now, which is exactly the gap L-106 found
+   * in `forgetPreferences` above — a fake port proves a fake port works.
+   */
+  it('deletes all five secrets, including the Anthropic key', async () => {
+    const result = await createTauriErasePort().forgetKeys();
+
+    expect(result.ok).toBe(true);
+    const deletedKeys = tauriCore.invoke.mock.calls
+      .filter(([command]) => command === 'secret_delete')
+      .map(([, args]) => args?.['key']);
+
+    expect(deletedKeys).toEqual([...SECRET_KEYS]);
+    expect(deletedKeys).toContain('anthropic_api_key');
+  });
+
+  it('negative: the first refusal is named, and every key is still attempted', async () => {
+    tauriCore.invoke.mockImplementation(async (command, args) => {
+      if (command === 'secret_delete' && args?.['key'] === 'adzuna_app_id') {
+        throw new Error('The keychain is locked.');
+      }
+      return undefined;
+    });
+
+    const result = await createTauriErasePort().forgetKeys();
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? '' : result.error.message).toContain('adzuna_app_id');
+    // Stopping at the first failure would leave later keys — including
+    // Anthropic's — in place with nothing said about them.
+    expect(tauriCore.invoke).toHaveBeenCalledTimes(SECRET_KEYS.length);
+  });
+
+  it('boundary: a machine with nothing saved still reports success, and still tries all five', async () => {
+    // `secret_delete` is idempotent on the Rust side (see `port.ts`'s own
+    // comment); deleting a credential that was never there is not a failure.
+    // I1 (coordinator review of PR #96): "reports success" on its own would
+    // pass just as well if `forgetKeys` gave up after the first key, or sent
+    // none at all — the boundary this test is named for is specifically that
+    // NOTHING being saved does not shrink the set of keys attempted.
+    const result = await createTauriErasePort().forgetKeys();
+
+    expect(result.ok).toBe(true);
+    const deletedKeys = tauriCore.invoke.mock.calls
+      .filter(([command]) => command === 'secret_delete')
+      .map(([, args]) => args?.['key']);
+    expect(deletedKeys).toEqual([...SECRET_KEYS]);
   });
 });

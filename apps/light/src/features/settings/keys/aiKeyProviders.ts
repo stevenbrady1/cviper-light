@@ -49,4 +49,7 @@ import type { AiKeyProviderId } from './aiKeyModel';
  * so an id that is not an `AiKeyProviderId` is a compile error right here —
  * this list can never name a provider the card model has never heard of.
  */
-export const AI_KEY_PROVIDER_IDS = ['openai'] as const satisfies readonly AiKeyProviderId[];
+export const AI_KEY_PROVIDER_IDS = [
+  'openai',
+  'anthropic',
+] as const satisfies readonly AiKeyProviderId[];

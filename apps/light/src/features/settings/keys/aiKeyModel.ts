@@ -1,5 +1,5 @@
 /**
- * What the OpenAI key card says, and what is wrong with what was typed.
+ * What an AI key card says, and what is wrong with what was typed.
  *
  * ============================================================================
  * NO REACT, NO KEYRING, NO NETWORK.
@@ -15,13 +15,13 @@
  * the way down, and its test step invokes `job_test_credentials`. That command
  * cannot test an AI key and is not merely unsuited to it — `jobs.rs` has a test
  * called `an_ai_credential_can_never_be_used_as_a_job_board_credential` which
- * asserts it REFUSES one. Bolting OpenAI into that list would mean widening a
- * closed union, weakening a deliberate guard, and sending an OpenAI key to
- * Adzuna to find out whether it works.
+ * asserts it REFUSES one. Bolting an AI provider into that list would mean
+ * widening a closed union, weakening a deliberate guard, and sending an AI key
+ * to Adzuna to find out whether it works.
  *
- * So this is its own small section with its own command. The two cards look
- * identical on screen because they do the same job; underneath they share
- * nothing but the credential store and the design tokens.
+ * So this is its own small section with its own command. Every card looks the
+ * same on screen because they do the same job; underneath they share nothing
+ * but the credential store and the design tokens.
  *
  * ============================================================================
  * THE KEY GOES IN AND NOT ONE CHARACTER COMES BACK
@@ -37,16 +37,17 @@
  * app stores — both AI keys and all three job-board ones — to answer a question
  * only this card was asking. Telling two keys apart is not worth that.
  */
+import { ANTHROPIC_DEFAULT_MODEL } from '@cviper/ai-providers';
+
 import { OPENAI_DEFAULT_MODEL } from '../../analysis/providers';
+import { ANTHROPIC_SECRET_KEY, OPENAI_SECRET_KEY } from '../../../status/secretKeyNames';
 
 import { MAX_KEY_BYTES } from './model';
 
 /**
- * Which AI key. A closed set with one member today.
- *
- * Written as a union rather than a bare string so adding Anthropic later is a
- * compile error at every site that has to change, rather than a card that
- * silently reads the wrong credential.
+ * Which AI key. A closed set, so a provider added later is a compile error at
+ * every site that has to change, rather than a card that silently reads the
+ * wrong credential.
  *
  * ============================================================================
  * TWO GUARDS READ THIS DECLARATION. LEAVE IT HERE, SPELLED LIKE THIS.
@@ -59,10 +60,43 @@ import { MAX_KEY_BYTES } from './model';
  *     `analysis/providers.ts` has to decide what the picker may offer while the
  *     app is running, and a type cannot answer that (L-102).
  */
-export type AiKeyProviderId = 'openai';
+export type AiKeyProviderId = 'openai' | 'anthropic';
 
-/** Spelled exactly as the `SecretKey` enum serialises it in Rust. */
-export const OPENAI_SECRET_KEY = 'openai_api_key';
+/**
+ * Re-exported from `status/secretKeyNames.ts`, the single source for these two
+ * strings (C2, coordinator review of PR #96) — see that file's docblock for
+ * why it exists as its own dependency-free module rather than being declared
+ * here as before.
+ */
+export { OPENAI_SECRET_KEY, ANTHROPIC_SECRET_KEY };
+
+/**
+ * A credential name this app is actually allowed to test, save or delete
+ * against — the two strings above, and closed to exactly those.
+ *
+ * ============================================================================
+ * C2: WHY `AiKeyProvider.secret` MUST BE THIS TYPE, NOT A BARE `string`
+ * ============================================================================
+ * Coordinator review of PR #96 found `secret: string` on the interface below,
+ * with nothing checking that a card's `secret` actually matched its own `id`.
+ * `createTauriAiKeyPort(provider.secret, provider.id)` trusts both arguments
+ * independently, so a copy-paste mistake — the Anthropic card built with
+ * `secret: OPENAI_SECRET_KEY` — would type-check, test the key against
+ * Anthropic (`provider.id`), and on success WRITE it into `openai_api_key`
+ * (`provider.secret`) — silently overwriting the user's real OpenAI key with
+ * an Anthropic one the moment they pressed "Test and save this key" on the
+ * Anthropic card. `offeredProviders.contract.test.ts`'s
+ * `the key-card list is exactly the cards that actually exist` would not
+ * catch it: it checks `id`, never that `secret` agrees with it.
+ *
+ * `AiKeySecret` closes the type to the two real credential names, and
+ * `aiKeyModel.contract.test.ts`'s `every card's secret matches its own id`
+ * closes the remaining gap a type alone cannot: TWO valid strings can still be
+ * swapped between two cards and both stay well-typed. That test is proven by
+ * mutation — swap the Anthropic card's `secret` to `OPENAI_SECRET_KEY` and it
+ * fails by name.
+ */
+export type AiKeySecret = typeof OPENAI_SECRET_KEY | typeof ANTHROPIC_SECRET_KEY;
 
 /**
  * What a saved key looks like on screen: four bullets, and nothing else.
@@ -105,14 +139,17 @@ export function normaliseAiKey(value: string): string {
 /**
  * What is wrong with what was typed, or `null`.
  *
- * Checked here first so a blank box never costs a round trip to OpenAI to find
- * out it was blank. Rust checks both of these again — neither side trusts the
- * other — and neither message ever repeats the value back.
+ * Checked here first so a blank box never costs a round trip to the provider
+ * to find out it was blank. Rust checks both of these again — neither side
+ * trusts the other — and neither message ever repeats the value back.
+ *
+ * `label` names the card asking, so the sentence a user reads always names the
+ * provider they are actually pasting a key for.
  */
-export function validateAiKey(value: string): string | null {
+export function validateAiKey(value: string, label: string): string | null {
   const key = normaliseAiKey(value);
 
-  if (key === '') return 'Paste your OpenAI API key before testing it.';
+  if (key === '') return `Paste your ${label} API key before testing it.`;
 
   if (byteLength(key) > MAX_KEY_BYTES) {
     return (
@@ -130,17 +167,23 @@ export function validateAiKey(value: string): string | null {
  * ============================================================================
  * These are declared in Rust, in `provider_test_key` (`providers.rs`), because
  * that is the only place that knows what actually happened. They are repeated
- * here so this side can be tested without a socket, and
- * `the_card_repeats_these_sentences_word_for_word` in `providers.rs` reads this
- * file and asserts the two agree — a reworded Rust sentence fails the build
- * rather than quietly making these constants a lie.
+ * here — for OpenAI specifically — so this side can be tested without a
+ * socket, and `the_card_repeats_these_sentences_word_for_word` in `providers.rs`
+ * reads this file and asserts the two agree — a reworded Rust sentence fails
+ * the build rather than quietly making these constants a lie.
+ *
+ * Only OpenAI's wording is pinned this way. `key_test_message` builds every
+ * provider's sentence from the exact same template with only the name
+ * substituted, so there is nothing provider-specific left for a second set of
+ * constants to prove — the card renders whatever Rust sends it, for either
+ * provider, and `AiKeySetup.anthropic.test.tsx` drives that path directly.
  *
  * Each one names a DIFFERENT fix. A refused key is re-pasted, a network fault
  * is retried, and a rate limit is waited out. Collapsing them into "something
  * went wrong" would send a user with a working key off to re-read it.
  *
- * None of them contains a status code, a digit, or a single byte of OpenAI's
- * response — the test never reads the body at all.
+ * None of them contains a status code, a digit, or a single byte of the
+ * provider's response — the test never reads the body at all.
  */
 export const AI_KEY_REFUSED =
   'OpenAI did not accept that key. Check it was pasted whole — a brand new key can take a few minutes to become active.';
@@ -157,7 +200,7 @@ export const AI_KEY_PROVIDER_FAULT =
 export const AI_KEY_REQUEST_REFUSED =
   'OpenAI would not accept the test request. Nothing was changed.';
 
-/** Every sentence Rust can produce for a failed key test. */
+/** Every sentence Rust can produce for a failed key test, for OpenAI. */
 export const AI_KEY_TEST_SENTENCES: readonly string[] = [
   AI_KEY_REFUSED,
   AI_KEY_UNREACHABLE,
@@ -166,77 +209,157 @@ export const AI_KEY_TEST_SENTENCES: readonly string[] = [
   AI_KEY_REQUEST_REFUSED,
 ];
 
+/** The key worked but the credential store would not keep it. Names no provider. */
+export const AI_KEY_SAVE_REFUSED =
+  'The key worked, but this computer’s credential store would not keep it.';
+
 /**
- * What a passed test means.
+ * What a passed test means, for a named provider.
  *
  * Says the key was accepted AND that it is now saved, because those are two
  * separate facts and the user just pressed one button for both.
  */
-export const AI_KEY_PASS =
-  'OpenAI accepted the key, and it is saved in this computer’s credential store. ' +
-  'It never leaves this computer except to OpenAI.';
+function keyPassMessage(label: string): string {
+  return (
+    `${label} accepted the key, and it is saved in this computer’s credential store. ` +
+    `It never leaves this computer except to ${label}.`
+  );
+}
 
-/**
- * The key worked but the credential store would not keep it.
- *
- * A distinct outcome with a distinct fix — unlock the store — and reporting it
- * as "your key was refused" would send the user to re-read a key that is fine.
- */
-export const AI_KEY_SAVE_REFUSED =
-  'The key worked, but this computer’s credential store would not keep it.';
-
-export const AI_KEY_REMOVED =
-  'Your OpenAI key has been removed from this computer’s credential store.';
+/** What removing a saved key means, for a named provider. */
+function keyRemovedMessage(label: string): string {
+  return `Your ${label} key has been removed from this computer’s credential store.`;
+}
 
 export interface AiKeyProvider {
   readonly id: AiKeyProviderId;
   readonly label: string;
-  readonly secret: string;
+  readonly secret: AiKeySecret;
   /** What having this key lets the user do. One sentence, concrete. */
   readonly unlocks: string;
   /** Who pays, stated plainly. Never an estimate of how much. */
   readonly billing: string;
-  /** OpenAI's own key page. Opened in the user's real browser. */
+  /** The provider's own key page. Opened in the user's real browser. */
   readonly signupUrl: string;
   readonly signupLabel: string;
   /** Where the key goes, and that it can never be shown back. */
   readonly privacyNote: string;
   readonly fieldLabel: string;
   readonly fieldHint: string;
+  /** Shown once the key has been tested and saved. */
+  readonly passMessage: string;
+  /** Shown once the key has been removed. */
+  readonly removedMessage: string;
 }
 
 /**
  * ============================================================================
  * THE SIGNUP LINK IS A REGISTERED HOST, NOT A CONVENIENCE
  * ============================================================================
- * `platform.openai.com` is an entry in `lib/outbound-hosts.ts` with a stated
+ * Every `signupUrl` below is an entry in `lib/outbound-hosts.ts` with a stated
  * reason, exactly as `developer.adzuna.com` and `www.reed.co.uk` are for the
  * two job boards. `outbound-hosts.contract.test.ts` fails the build on any host
  * that is not in that registry, and the privacy notice is GENERATED from it —
  * so adding the link and telling the user about it are the same act.
  *
  * The app never loads the page. It hands the address to the user's own browser
- * through `platform/browser.ts`, which is why the registry files it under
- * `opened-in-your-browser` rather than anything that carries a credential.
+ * through `platform/browser.ts`, which is why the registry files each one
+ * under `opened-in-your-browser` rather than anything that carries a
+ * credential.
  */
-export const OPENAI_KEY_PROVIDER: AiKeyProvider = {
+interface AiKeyProviderCopy {
+  readonly id: AiKeyProviderId;
+  readonly label: string;
+  readonly secret: AiKeySecret;
+  readonly defaultModel: string;
+  readonly signupUrl: string;
+  /** The billing sentence: who pays, and — where it is known — what it costs. */
+  readonly billing: string;
+}
+
+function buildAiKeyProvider(copy: AiKeyProviderCopy): AiKeyProvider {
+  const { id, label, secret, defaultModel, signupUrl, billing } = copy;
+  return {
+    id,
+    label,
+    secret,
+    unlocks:
+      `Adds “${label} · ${defaultModel}” to the analysis screen as a way of reading your CV. ` +
+      'It is a full reading available without installing anything, and it is the one option ' +
+      `that sends your CV and the advert to ${label}.`,
+    billing,
+    signupUrl,
+    // Named per provider (W8, coordinator review of PR #96), mirroring
+    // `keys/model.ts`'s job-board cards ("Get a free Adzuna key"), which are
+    // also never merely "Get a free key". "an" assumes a vowel-sounding name
+    // — true of both providers today; a future consonant-led one (a
+    // hypothetical "Mistral" card) would need this reworded, the same way a
+    // third job-board card would.
+    signupLabel: `Where do I get an ${label} key?`,
+    privacyNote:
+      'The key is stored in this computer’s own credential store — Windows Credential Manager, ' +
+      'macOS Keychain, or the Linux Secret Service. It is never written to a file, never put in ' +
+      `your backup, and never sent anywhere except to ${label}. CViper cannot show it back to you ` +
+      'afterwards — not even the last few characters — so if you lose it, paste it again.',
+    fieldLabel: 'API key',
+    fieldHint: 'Paste the whole value, including the prefix.',
+    passMessage: keyPassMessage(label),
+    removedMessage: keyRemovedMessage(label),
+  };
+}
+
+export const OPENAI_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   id: 'openai',
   label: 'OpenAI',
   secret: OPENAI_SECRET_KEY,
-  unlocks:
-    `Adds “OpenAI · ${OPENAI_DEFAULT_MODEL}” to the analysis screen as a way of reading your CV. ` +
-    'It is the strongest reading available without installing anything, and it is the one ' +
-    'option that sends your CV and the advert to OpenAI.',
+  defaultModel: OPENAI_DEFAULT_MODEL,
+  signupUrl: 'https://platform.openai.com/api-keys',
   billing:
     'An OpenAI key is not free. OpenAI bills your own account for what you use, at their ' +
     'published rates. CViper adds nothing to that, takes no cut, and never sees your bill.',
-  signupUrl: 'https://platform.openai.com/api-keys',
-  signupLabel: 'Where do I get a key?',
-  privacyNote:
-    'The key is stored in this computer’s own credential store — Windows Credential Manager, ' +
-    'macOS Keychain, or the Linux Secret Service. It is never written to a file, never put in ' +
-    'your backup, and never sent anywhere except to OpenAI. CViper cannot show it back to you ' +
-    'afterwards — not even the last few characters — so if you lose it, paste it again.',
-  fieldLabel: 'API key',
-  fieldHint: 'Paste the whole value, including the prefix.',
+});
+
+/**
+ * ============================================================================
+ * WHERE ANTHROPIC'S "A FEW PENCE" COMES FROM (W6, coordinator review of PR #96)
+ * ============================================================================
+ * `AI_COST_LINE` in `onboarding/cards.ts` deliberately stopped deriving its
+ * figure from one provider's rate card (L-148) — but the card BELOW that
+ * screen is exactly the place a per-provider number belongs, and the OpenAI
+ * card had a derivation for its own (now-removed) figure that this one
+ * lacked.
+ *
+ * `ANTHROPIC_DEFAULT_MODEL` is `claude-opus-5`. Using the same shape of
+ * estimate as OpenAI's — a CV plus an advert, asking for a structured reading
+ * back, roughly 6,000 input tokens and 1,500 output tokens — at Anthropic's
+ * published rates of $5.00 per million input tokens and $25.00 per million
+ * output tokens:
+ *
+ *     input    6,000 / 1,000,000 x $5.00  = $0.030
+ *     output   1,500 / 1,000,000 x $25.00 = $0.0375
+ *     total                               = $0.0675  (~5p at $1.27/£)
+ *
+ * So "a few pence" is honest for Anthropic too — a touch more than OpenAI's
+ * own ~2.4p at the rates `AI_COST_LINE`'s history recorded, both comfortably
+ * inside the phrase, neither claiming false precision now that the welcome
+ * screen states the figure generically rather than per-provider.
+ */
+export const ANTHROPIC_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
+  id: 'anthropic',
+  label: 'Anthropic',
+  secret: ANTHROPIC_SECRET_KEY,
+  defaultModel: ANTHROPIC_DEFAULT_MODEL,
+  signupUrl: 'https://console.anthropic.com/settings/keys',
+  billing:
+    'Anthropic bills your own account; a typical CV check costs a few pence. CViper adds ' +
+    'nothing to that, takes no cut, and never sees your bill.',
+});
+
+/**
+ * Every card, keyed by id — what `AiKeySetup` iterates over to render one
+ * article per provider in `AI_KEY_PROVIDER_IDS`.
+ */
+export const AI_KEY_PROVIDERS: Readonly<Record<AiKeyProviderId, AiKeyProvider>> = {
+  openai: OPENAI_KEY_PROVIDER,
+  anthropic: ANTHROPIC_KEY_PROVIDER,
 };

@@ -25,7 +25,12 @@ import { About } from './about/About';
 import { EraseEverything } from './erase/EraseEverything';
 import { type ErasePort } from './erase/port';
 import { AiKeySetup } from './keys/AiKeySetup';
-import { type AiKeyPort } from './keys/aiKeyPort';
+// LOAD-BEARING, top-level `import type` (I3, coordinator review of PR #96) —
+// per `aiKeyProviders.ts`'s own rule: `verbatimModuleSyntax` erases this
+// entirely, while the inline spelling `import { type AiKeyProviderId }`
+// still emits a runtime `import {} from './keys/aiKeyModel'`.
+import type { AiKeyProviderId } from './keys/aiKeyModel';
+import type { AiKeyPort } from './keys/aiKeyPort';
 import { KeySetup } from './keys/KeySetup';
 import { Signpost } from '../signposts/Signpost';
 
@@ -87,8 +92,12 @@ export interface SettingsProps {
   readonly filePort?: FilePort | undefined;
   /** Injected by tests. Defaults to the real keyring-and-transport port. */
   readonly keyPort?: KeyPort | undefined;
-  /** Injected by tests. The OpenAI key card's own port — see `aiKeyPort.ts`. */
-  readonly aiKeyPort?: AiKeyPort | undefined;
+  /**
+   * Injected by tests. One AI key port per provider id — see `aiKeyPort.ts`.
+   * A provider with no entry falls back to the real keyring-and-transport
+   * port, exactly as the single-provider `aiKeyPort` prop used to default.
+   */
+  readonly aiKeyPorts?: Partial<Record<AiKeyProviderId, AiKeyPort>> | undefined;
   /** Injected by tests: the real one opens the user's browser. */
   readonly browser?: BrowserPort | undefined;
   /** Injected by tests: the real one reads and writes the board-choices file. */
@@ -162,7 +171,7 @@ export function Settings({
   port,
   filePort,
   keyPort,
-  aiKeyPort,
+  aiKeyPorts,
   browser,
   boardsPort,
   updatePort,
@@ -409,7 +418,7 @@ export function Settings({
             and tests its keys with `job_test_credentials`, a command that
             REFUSES an AI credential by design — see the note in `aiKeyModel.ts`.
           */}
-          <AiKeySetup port={aiKeyPort} browser={browserPort} />
+          <AiKeySetup ports={aiKeyPorts} browser={browserPort} />
 
           <BoardSettings port={boardsPort} />
 

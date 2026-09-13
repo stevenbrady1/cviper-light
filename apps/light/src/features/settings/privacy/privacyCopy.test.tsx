@@ -46,11 +46,15 @@ function renderSettings() {
 
 describe('the paragraph at the top of Settings → Privacy', () => {
   it('is the owner’s wording, exactly', () => {
+    // Re-pinned for L-148 (13 September 2026): the product must not read as
+    // tied to one AI provider, so this paragraph stopped naming any — "the
+    // provider you choose" replaces "OpenAI or Anthropic" / "today that's…".
+    // See the docblock on `PRIVACY_SUMMARY` in `PrivacyNotice.tsx`.
     expect(PRIVACY_SUMMARY).toBe(
       'CViper Light runs on your computer. We have no server, no accounts, and no copy of your ' +
-        'data. Your CV and your OpenAI key only ever go to the AI you choose — today ' +
-        "that's OpenAI, or a model running on your own PC. Your job-board keys go only to Adzuna " +
-        'or Reed, and only when you search or test a key.',
+        'data. Your CV, a pasted advert and your own AI key only ever go to the provider you ' +
+        'choose, or to a model running on your own PC. Your job-board keys go only to Adzuna ' +
+        'and Reed, and only when you search or test a key.',
     );
   });
 
@@ -58,28 +62,37 @@ describe('the paragraph at the top of Settings → Privacy', () => {
     // `job_test_credentials` (jobs.rs) runs a real one-result search through
     // `send_search` when the user presses "Test and save this key" in Settings.
     // An earlier draft said "only when you search", which is defensible — it IS
-    // a search — but nobody pressing Save would call it searching.
+    // a search — but nobody pressing Save would call it searching. Unaffected
+    // by L-148: this clause was never about which AI provider, and stayed.
     expect(PRIVACY_SUMMARY).toContain('only when you search or test a key');
   });
 
   it('scopes each promise to the thing it is actually true of', () => {
-    // Two drafts were rejected here, both for over-reaching. The first named
-    // OpenAI as the only destination a key or CV could reach. The second said
-    // "your key", which reads as ALL keys — but the Adzuna and Reed keys do
-    // leave the machine and neither is an AI provider.
-    //
-    // So each clause now names its own subject: the CV and the OpenAI key go
-    // to the chosen AI; the job-board keys go to the job boards.
-    expect(PRIVACY_SUMMARY).toContain('Your CV and your OpenAI key');
-    expect(PRIVACY_SUMMARY).toContain('Your job-board keys go only to Adzuna or Reed');
+    // Earlier drafts were rejected for over-reaching in both directions: one
+    // named OpenAI as the only destination a key or CV could reach, another
+    // said "your key" (reading as ALL keys, when the Adzuna and Reed keys
+    // leave the machine too and neither is an AI provider). L-148 added a
+    // third failure mode to guard against — naming a provider at all — so each
+    // clause now names its own subject without naming a brand: the CV, the
+    // pasted advert and the AI key go to the chosen provider; the job-board
+    // keys go to the job boards.
+    expect(PRIVACY_SUMMARY).toContain(
+      'Your CV, a pasted advert and your own AI key only ever go to the provider you choose',
+    );
+    expect(PRIVACY_SUMMARY).toContain('Your job-board keys go only to Adzuna and Reed');
   });
 
-  it('says "today", so the list reads as this build rather than for ever', () => {
-    // The word doing the work. `providers.rs` can reach Anthropic; no key card
-    // can configure it. "today that's…" is a claim about what is choosable in
-    // this build, and `configurableAi.contract.test.ts` is what keeps it true.
-    expect(PRIVACY_SUMMARY).toContain("today that's OpenAI");
+  it('never names an AI provider, only the choice and the local option', () => {
+    // The word that used to do this work was "today" — "today that's OpenAI…",
+    // a claim about what is choosable in THIS build, kept honest by
+    // `configurableAi.contract.test.ts`. L-148 removed the claim instead of
+    // maintaining it: there is no provider name left here to go stale, in this
+    // build or the next one.
+    expect(PRIVACY_SUMMARY).toContain('the provider you choose');
     expect(PRIVACY_SUMMARY).toContain('a model running on your own PC');
+    expect(PRIVACY_SUMMARY).not.toContain('OpenAI');
+    expect(PRIVACY_SUMMARY).not.toContain('Anthropic');
+    expect(PRIVACY_SUMMARY).not.toContain('today');
   });
 
   it('is on the Privacy screen, above the telemetry switch', () => {
