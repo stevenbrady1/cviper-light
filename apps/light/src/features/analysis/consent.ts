@@ -111,9 +111,24 @@ function describeThrown(cause: unknown): string {
  * could not see. The narrowing is the point — everything downstream of a `true`
  * from here is typed as a provider this file actually has a flag for, so
  * 'ollama' has nowhere to go.
+ *
+ * ============================================================================
+ * WRITTEN AS AN EXCLUSION, NEVER AS A LIST OF CLOUD PROVIDERS
+ * ============================================================================
+ * `kind === 'anthropic' || kind === 'openai'` reads the same today and fails
+ * the wrong way tomorrow: a provider added to `ProviderKind` — Mistral, Groq,
+ * whoever — would be absent from that list and would therefore skip the gate at
+ * BOTH call sites, silently, while every guard stayed green. The exclusion is
+ * the safe default: something new is treated as cloud until somebody
+ * deliberately writes it down here as local, and the only two things that are
+ * local are the two named below. 'keyword' never leaves the process at all and
+ * 'ollama' is 127.0.0.1, which is exactly what 5.1.2(i) does not reach.
+ *
+ * The cost of getting the exclusion wrong is a consent prompt nobody needed.
+ * The cost of getting a list wrong is somebody's CV leaving the machine.
  */
 export function isCloudKind(kind: ProviderKind): kind is ConsentProviderKind {
-  return kind === 'anthropic' || kind === 'openai';
+  return kind !== 'keyword' && kind !== 'ollama';
 }
 
 export function createTauriConsentPort(): ConsentPort {

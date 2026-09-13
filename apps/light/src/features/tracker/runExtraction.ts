@@ -109,10 +109,16 @@ export async function runExtraction(
     const consented = await hasConsent(request.option.kind);
     if (!consented) {
       const label = providerLabel(request.option.kind);
+      // Says the PRECONDITION, not just the destination. The consent dialog
+      // only opens when "Check this CV" runs, and that button is disabled with
+      // "Choose a CV first." — so "grant it on the Analysis screen" on its own
+      // sends somebody with no CV yet to a screen that will not ask. A paste-flow
+      // affordance of its own is L-141 (#81); until then this sentence is the
+      // route, and it has to be a route that works.
       return unavailable(
-        `${label} needs your permission before the advert can be sent to it. Grant it on ` +
-          `the Analysis screen, where the first run with ${label} asks — or fill the form ` +
-          'in by hand.',
+        `${label} needs your permission before the advert can be sent to it. Grant it on the ` +
+          `Analysis screen: choose a CV there and run a check with ${label}, and it will ask ` +
+          '— or fill the form in by hand.',
       );
     }
   }

@@ -37,10 +37,12 @@
  * ============================================================================
  * PROVED, NOT ASSUMED
  * ============================================================================
- * Three mutations, all restored: deleting the check from `runAnalysis.ts`,
- * deleting the one added to `runExtraction.ts`, and adding a fourth importer
- * with no check and no exemption. Each turns this red, naming the file. The
- * output is in the L-115 pull request.
+ * Four mutations, all restored: deleting the check from `runAnalysis.ts`,
+ * deleting the one added to `runExtraction.ts`, adding a fourth importer with
+ * no check and no exemption, and adding one that reaches the factory through a
+ * NAMESPACE import — the shape that used to be invisible here rather than red.
+ * Each turns this file red, naming the offending module. The output is in the
+ * L-115 pull request.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -54,41 +56,54 @@ const APP_SRC = join(REPO_ROOT, 'apps/light/src');
 /**
  * Import forms that put the real transport factory in a module's hands.
  *
- * The static form is what every shipped module uses; the dynamic form is here
- * because `await import('./transport')` is the obvious way around a guard that
- * only knows the first one, and a guard that can be stepped around by a
- * refactor is not a guard.
+ * The static named import is what every shipped module uses. The others are
+ * here because a guard that knows ONE spelling is a guard a refactor steps
+ * around without anyone meaning to: `await import('./transport')` is the
+ * obvious dynamic form, and a NAMESPACE import
+ * (`import * as transportModule from '../../ai/transport'`) never writes the
+ * token `createTauriTransport` on the import line at all, so a detector that
+ * looks for it there drops the file out of the population entirely — invisible,
+ * not red. That is the exact failure this whole file exists to stop, so the
+ * namespace form matches on the MODULE PATH, not on what is taken from it, and
+ * the member-call shape is matched wherever it appears in the file.
  */
 const IMPORT_FORMS: readonly RegExp[] = [
   /import[^;]*?\bcreateTauriTransport\b[^;]*?from\s*['"][^'"]*transport['"]/,
   /\bcreateTauriTransport\b[^;]*?=\s*await\s+import\(\s*['"][^'"]*transport['"]\s*\)/,
   /import\(\s*['"][^'"]*transport['"]\s*\)[^;]*?\bcreateTauriTransport\b/,
+  /import\s+\*\s+as\s+\w+\s+from\s*['"][^'"]*transport['"]/,
+  /\.\s*createTauriTransport\s*(?:\?\.)?\s*\(/,
 ];
 
 /** `hasConsent(kind)` — the shared check, however the module obtained it. */
 const CONSENT_CHECK = /\bhasConsent\s*\(/;
 
 /**
- * A transport being BUILT: `createTransport()` or `createTauriTransport()`.
+ * A transport being BUILT: the factory CALLED, under any of its spellings.
+ *
+ * `createTransport()`, `createTauriTransport()`, the namespace member form
+ * `transportModule.createTauriTransport()`, and the optional-call form
+ * `createTransport?.()` — which an injected, optional factory is written as,
+ * and which a naive `\(` after the name does not match.
  *
  * The call, never the name. `createTransport: () => ChatTransport =
  * createTauriTransport` is a default parameter, not a construction, and a guard
  * that counted the import line as the first use would be unsatisfiable — the
  * import is always at the top.
  */
-const TRANSPORT_BUILD = /\bcreate(?:Tauri)?Transport\s*\(\s*\)/;
+const TRANSPORT_BUILD = /\b(?:\w+\.)?create(?:Tauri)?Transport\s*(?:\?\.)?\s*\(\s*\)/;
 
-export function importsTauriTransport(text: string): boolean {
+function importsTauriTransport(text: string): boolean {
   return IMPORT_FORMS.some((pattern) => pattern.test(text));
 }
 
-export interface GateReport {
+interface GateReport {
   readonly consentAt: number;
   readonly transportAt: number;
 }
 
 /** Where the consent check and the first transport construction are, or -1. */
-export function gateReport(text: string): GateReport {
+function gateReport(text: string): GateReport {
   return {
     consentAt: text.search(CONSENT_CHECK),
     transportAt: text.search(TRANSPORT_BUILD),
@@ -108,7 +123,7 @@ interface Exemption {
  * still be an importer (a stale exemption is dead weight that hides the next
  * one), and it must not build a transport of its own.
  */
-export const CONSENT_EXEMPT: readonly Exemption[] = [
+const CONSENT_EXEMPT: readonly Exemption[] = [
   {
     file: 'apps/light/src/features/analysis/Analysis.tsx',
     reason:
@@ -141,6 +156,19 @@ describe('the call-site detector', () => {
     ).toBe(true);
   });
 
+  it('sees a namespace import, which never writes the factory name on the import line', () => {
+    // The evasion that is invisible rather than red: nothing on this line says
+    // `createTauriTransport`, so a detector keyed to that token drops the file
+    // out of the population and reports the tree as clean.
+    expect(importsTauriTransport("import * as transportModule from '../../ai/transport';")).toBe(
+      true,
+    );
+
+    // And the member call on its own, wherever the namespace came from.
+    expect(importsTauriTransport('const t = transportModule.createTauriTransport();')).toBe(true);
+    expect(importsTauriTransport('const t = transportModule.createTauriTransport?.();')).toBe(true);
+  });
+
   it('lets the honest shapes through', () => {
     // A module that takes a transport as a parameter, and one that imports
     // something else from the same file, are not call sites of this factory.
@@ -163,6 +191,20 @@ describe('the call-site detector', () => {
     expect(
       gateReport('createTransport: () => ChatTransport = createTauriTransport,').transportAt,
     ).toBe(-1);
+  });
+
+  it('counts every spelling of the call as a build', () => {
+    // Each of these reaches the network exactly as `createTransport()` does, so
+    // a build the guard cannot see is a gate it cannot order.
+    for (const built of [
+      'const t = createTransport();',
+      'const t = createTauriTransport();',
+      'const t = transportModule.createTauriTransport();',
+      'const t = createTransport?.();',
+      'const t = deps.createTransport?.();',
+    ]) {
+      expect(gateReport(built).transportAt, built).toBeGreaterThan(-1);
+    }
   });
 
   it('a comment cannot stand in for the check', () => {
