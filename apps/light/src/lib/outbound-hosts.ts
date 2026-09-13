@@ -102,11 +102,19 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     // lines below — so they appear in Adzuna's own request logs and in any
     // proxy between here and Adzuna. `describe_request_failure` exists so a
     // `reqwest` error can never print that address back to the user.
+    //
+    // W3 (coordinator review): "nothing else about you is sent" was
+    // stronger than the truth, and stronger than every keyless sibling
+    // below, which all add the IP-address caveat. A search carries the
+    // search words and location — that is what a search is — and Adzuna
+    // sees the requester's IP address the same way any site would.
     why:
       'A job search you start, sent with the free Adzuna key you registered yourself. ' +
       'Adzuna’s API requires both parts of that key — the app ID and the app key — as ' +
-      'parameters in the web address, so they appear in Adzuna’s own request logs; nothing ' +
-      'else about you is sent.',
+      'parameters in the web address, so they appear in Adzuna’s own request logs. The ' +
+      'request also carries your search words and location, which is what a search is, and ' +
+      'Adzuna sees your IP address, exactly as it would if you searched on its own site ' +
+      'yourself.',
   },
   {
     host: 'www.reed.co.uk',
@@ -115,10 +123,16 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     // search link opened in the browser — the same host as the keyed API
     // above, so it cannot be a second entry (that would list this host
     // twice) and has to be disclosed here instead.
+    //
+    // W3: same IP-address caveat as Adzuna's entry above, for the same
+    // reason — the keyed search is still a real request Reed receives and
+    // answers, carrying the search words and location.
     why:
-      'A job search you start, sent with the free Reed key you registered yourself. Reed’s ' +
-      'developer page is also opened in your browser from Settings, and so is a keyless ' +
-      'search link for Reed from job-boards.json; the app never loads either page.',
+      'A job search you start, sent with the free Reed key you registered yourself, carrying ' +
+      'your search words and location — Reed sees those and your IP address, exactly as it ' +
+      'would if you searched on reed.co.uk yourself. Reed’s developer page is also opened in ' +
+      'your browser from Settings, and so is a keyless search link for Reed from ' +
+      'job-boards.json; the app never loads either page.',
   },
   {
     host: 'www.arbeitnow.com',

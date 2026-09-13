@@ -51,8 +51,17 @@ describe('exporting cvs.file_path (L-133)', () => {
       ],
     });
 
-    expect(exported).not.toContain('C:\\Users\\steve');
-    expect(exported).not.toContain('\\steve\\');
+    // W1 (coordinator review): `JSON.stringify` doubles every backslash in a
+    // Windows path, so a literal `.not.toContain('C:\\Users\\steve')` here —
+    // a JS string with ONE backslash per separator — could never appear in
+    // output that always has TWO, and would pass whether or not the leak
+    // exists. Strip the quotes off the same `JSON.stringify` the export path
+    // actually calls, so this matches character-for-character what a leak
+    // would look like in the file.
+    expect(exported).not.toContain(JSON.stringify(CV_WITH_PATH.file_path).slice(1, -1));
+    // The plain username needs no escaping at all — the most literal form
+    // the leak could take, and immune to the same mistake.
+    expect(exported).not.toContain('steve');
 
     const reimported = importBackup(exported);
     expect(reimported.ok).toBe(true);

@@ -157,6 +157,19 @@ describe('L-128 / L-134: copy that used to say less than the code does', () => {
     expect(why).toContain('job-boards.json');
   });
 
+  it('W3: Adzuna and Reed carry the same IP-address caveat as their keyless siblings', () => {
+    // Coordinator review, PR #89: "nothing else about you is sent" (Adzuna's
+    // original wording here) was stronger than the truth, and stronger than
+    // every keyless entry below it, which all say the site sees the
+    // requester's IP address. A search also carries the search words and
+    // location — that is what a search is.
+    for (const host of ['api.adzuna.com', 'www.reed.co.uk']) {
+      const why = findHost(host).why;
+      expect(why, host).toContain('IP address');
+      expect(why, host).toMatch(/search words|search terms/);
+    }
+  });
+
   it('L-134b: the local Ollama check runs on its own, not only when asked', () => {
     // App.tsx:238-248 re-reads environment status on mount and on every view
     // change; environment.ts:145-154 fans that out into probeOllama(), which

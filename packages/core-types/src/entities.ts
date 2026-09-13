@@ -126,7 +126,13 @@ export interface Application {
 export interface Cv {
   id: string;
   name: string;
-  /** Absolute path on this machine. `null` if the text was pasted in. */
+  /**
+   * Absolute path on this machine, when known. `null` for a pasted CV — but
+   * also, since L-133, for every CV in a fresh export: `exportBackup` now
+   * always writes `null` here on purpose, so `null` no longer means
+   * specifically "the text was pasted in". A v1 file exported before L-133
+   * may still carry a real path, and importing it is unaffected.
+   */
   file_path: string | null;
   /** `null` until parsing has run. */
   extracted_text: string | null;

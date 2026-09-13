@@ -54,18 +54,34 @@ describe('the privacy policy document', () => {
     expect(PRIVACY_CONTACT_URL).toMatch(/^https:\/\/github\.com\/.+\/issues$/);
   });
 
-  it('L-134b: the short version carves out the automatic local Ollama check honestly', () => {
+  it('C1: the short version does not make the bare "only when you press a button" claim', () => {
     // The short version used to say the app contacts another service "only
-    // when you press a button that says it will" — stricter than the code:
-    // App.tsx/environment.ts probe Ollama on mount and on every view change,
-    // with no button behind it. The carve-out must name Ollama, say the check
-    // happens on its own, and say it stays on this computer — without
-    // deleting the "only when you press a button" promise for everything
-    // else that actually leaves the machine.
+    // when you press a button that says it will, and only the services
+    // listed on this page" — a bare absolute that was already false twice
+    // over: the launch update check to github.com defaults ON (L-92,
+    // launchCheck.ts) and fires from App.tsx's mount effect with no button
+    // pressed, and the Ollama probe (L-134b) does the same. FORBID the bare
+    // shape rather than merely requiring the qualifying phrase to be present
+    // somewhere — the bare text would satisfy a naive "contains" check too.
     const text = currentPrivacyPolicy();
-    expect(text).toContain('only when you press a button');
-    expect(text).toMatch(/Ollama[^.]*on its own/);
-    expect(text).toContain('never leaves');
+    expect(text).not.toContain(
+      'only when you press a button that says it will, and only the services',
+    );
+  });
+
+  it('C1: the short version names both things that happen on their own, and how to stop the one that can be', () => {
+    // The repo already fixed this exact class of claim once, in the
+    // Settings screen's telemetry note (privacyCopy.test.tsx: "ones you
+    // start or switched on"). This is the same shape for the policy
+    // document: qualify the promise, then name both automatic requests —
+    // the GitHub update check, which leaves the machine but is switchable,
+    // and the Ollama probe, which never leaves it at all.
+    const text = currentPrivacyPolicy();
+    expect(text).toContain('only when you press a button that says it will, or switched it on');
+    expect(text).toMatch(/GitHub releases to see whether there is a newer version/);
+    expect(text).toContain('unless you switch that off in Settings');
+    expect(text).toContain('asks this same computer whether Ollama is running');
+    expect(text).toContain('never leaves it');
   });
 
   it('negative: a host added to the registry appears in the render without any other change', () => {
