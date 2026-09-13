@@ -1,0 +1,24 @@
+<!doctype html>
+<!--
+  The page Playwright's WebKit loads for `apps/light/e2e/pdfjs-webkit.spec.ts`.
+
+  It carries NOTHING test-only. Its single module is the app's own parsing
+  wiring, so what WebKit executes is the code the packaged app executes and not
+  a re-implementation of it. Everything the spec needs to watch — the console,
+  CSP refusals, Worker construction — is installed from OUTSIDE the page, by
+  Playwright, before this document runs a line.
+
+  There is no React, no Tailwind and no `#root`: mounting the app would drag in
+  the Tauri IPC bridge, which does not exist in a browser, and the question here
+  is about pdf.js under WebKit, not about the UI.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>pdf.js under WebKit — CViper Light harness</title>
+  </head>
+  <body>
+    <p>Headless harness. See apps/light/e2e/pdfjs-webkit.spec.ts.</p>
+    <script type="module" src="./harness.ts"></script>
+  </body>
+</html>

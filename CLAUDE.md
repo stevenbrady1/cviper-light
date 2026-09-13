@@ -66,6 +66,26 @@ comes back.
 Never commit red. Never skip a check. Never weaken a config to make a check
 pass — if a guard fails, fix the thing it is protecting.
 
+## The two checks that are NOT in the loop
+
+Both need something a contributor may not have, so `pnpm verify` stays runnable
+offline in minutes. Both run in CI, and both have a contract test that fails if
+their CI job disappears — a check nobody runs is not a check.
+
+```
+pnpm smoke    # drives the BUILT Windows binary (WebView2). Needs `tauri build`
+              # first, which CLAUDE.md forbids an agent from running.
+              # CI: smoke.yml.
+pnpm webkit   # drives the app's own pdf.js under Playwright's WebKit, with the
+              # production CSP read out of tauri.conf.json. Needs a ~60 MB
+              # browser: `pnpm --filter @cviper/light exec playwright-core
+              # install webkit`. CI: ci.yml's `webkit` job.
+```
+
+`pnpm webkit` is the only thing that has ever run pdf.js on a WebKit engine. It
+is a proxy for WKWebView and NOT iOS — read the honest-limit note at the top of
+`apps/light/e2e/pdfjs-webkit.spec.ts` before quoting it as iOS verification.
+
 ## Layout
 
 ```
