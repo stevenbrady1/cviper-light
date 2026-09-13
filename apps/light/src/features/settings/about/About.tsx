@@ -4,7 +4,7 @@ import { LIGHT_PAGE_URL, LIGHT_SOURCE_URL } from '../../signposts/links';
 import { APP_VERSION } from '../backup';
 
 /**
- * About — who made Light, what it costs, and which build this is (L-87).
+ * About — where Light was made, what it costs, and which build this is (L-87).
  *
  * Stateless, like the signposts: the version is a compile-time constant and
  * the two links hand a fixed address to the user's browser. Nothing here is
@@ -21,8 +21,7 @@ export function About({ browser }: AboutProps) {
     <section data-testid="settings-about">
       <h2 className="font-medium text-ink">About</h2>
       <p className="mt-1 text-ink-muted">
-        Made by the people behind cviper.ai. Light is free, MIT-licensed, and never sends us
-        anything.
+        Light is free, MIT-licensed, made in the UK, and never sends us anything.
       </p>
       <p data-testid="about-version" className="mt-1 text-xs text-ink-faint">
         CViper Light {APP_VERSION} · MIT licence

@@ -169,7 +169,7 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
   {
     host: 'cviper.ai',
     purpose: 'opened-in-your-browser',
-    why: 'The full CViper, and the page about this app. Three one-line signposts and the About entry in Settings hand the address to your browser when you tap them; the app never loads it, and nothing is added to the link.',
+    why: 'This app’s own website: its download page and the privacy policy, opened in your browser when you tap a line that names it. The app never contacts it, and nothing is added to the link.',
   },
   {
     host: 'github.com',

@@ -258,9 +258,7 @@ WHAT IT NEVER DOES
   Privacy lists every address the app is allowed to name, and a test in the
   public source code fails the build if another one is added.
 
-CViper Light is free, open source under the MIT licence, and there is a larger
-hosted CViper at cviper.ai if you ever want the same tools across every job you
-save.
+CViper Light is free and open source under the MIT licence.
 ```
 
 ### Product features (up to 20, short lines)
@@ -305,7 +303,7 @@ applications
 ## Step 8 — Privacy policy URL
 
 ```
-https://cviper.ai/privacy
+https://cviper.ai/privacy/
 ```
 
 **That page must be live before you submit.** It is added by a pull request in
@@ -417,7 +415,7 @@ compliance position is that keys are optional.
 - [ ] Country is correct (it cannot be changed later)
 - [ ] Publisher display name is **the owner's own name**, not "CViper"
 - [ ] Name `CViper Light` reserved
-- [ ] `https://cviper.ai/privacy` is **live** and shows the policy
+- [ ] `https://cviper.ai/privacy/` is **live** and shows the policy
 - [ ] Identity: all three fields pasted from Product identity; version ends `.0`
 - [ ] MSIX rebuilt **after** the identity was pasted, and downloaded from CI
 - [ ] Certification kit reported overall **PASS** in the run summary
@@ -447,6 +445,26 @@ it nobody has to reconstruct whether it was seen coming. The realistic
 consequence, if raised, is being asked to move to a company account — which
 would mean incorporating first, and a fresh account, because individual accounts
 cannot be converted.
+
+**UPDATE, 13 September 2026 (L-114).** The two paragraphs above are kept as
+written, because they record what was believed at the time. What they describe
+no longer exists. The hosted service they call a paid product was mothballed on
+10 September 2026 and its infrastructure deleted; there is nothing at cviper.ai
+to buy, subscribe to or sign into. The address now serves this app's own site:
+its download page and its privacy policy.
+
+What remains true today is smaller than what the paragraphs above weighed. The
+app hands out only its own addresses — a single line in Settings → Privacy that
+opens `https://cviper.ai/privacy/`, this app's own generated policy — plus the
+About entry naming where it was made and linking to its page and its
+MIT-licensed source. All of them are this free app's own pages. Nothing is sold anywhere,
+by anyone, at any point.
+
+The 10.14 question is therefore narrower than it was when it was written: it is
+no longer "does a link to a paid product make this a trade", but "does a free
+app linking to its own website make this a trade". That is still not settled
+here, and it is still recorded rather than cleared — but the exposure is
+smaller, not larger, than the assessment above assumed.
 
 ---
 

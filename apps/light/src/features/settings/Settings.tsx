@@ -497,7 +497,7 @@ export function Settings({
 
             <PrivacyNotice />
 
-            {/* The third signpost: what the full CViper keeps, on its own page (L-87). */}
+            {/* The signpost: this app's own policy, on its own page (L-87, L-114). */}
             <div className="mt-3">
               <Signpost id="privacy" browser={browserPort} />
             </div>

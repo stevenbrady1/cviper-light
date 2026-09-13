@@ -45,8 +45,8 @@ interface ApplicationDetailProps {
   /**
    * The way out to the advert. Required rather than optional-with-a-default,
    * so this component can never quietly build a second port: the board already
-   * has one for the signpost, and two would be two things to keep honest about
-   * what "open this page" means.
+   * has one, and two would be two things to keep honest about what
+   * "open this page" means.
    */
   readonly browser: BrowserPort;
   readonly onEdit: (

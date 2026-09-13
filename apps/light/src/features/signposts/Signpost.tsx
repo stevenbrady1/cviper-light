@@ -1,6 +1,6 @@
 import { type BrowserPort } from '../../platform/browser';
 
-import { CVIPER_PRIVACY_URL, CVIPER_URL } from './links';
+import { CVIPER_PRIVACY_URL } from './links';
 
 /**
  * A signpost: one line of plain text that opens the browser when tapped.
@@ -8,19 +8,28 @@ import { CVIPER_PRIVACY_URL, CVIPER_URL } from './links';
  * ============================================================================
  * THE GATEWAY IS DATA, NOT LOCKS (L-87)
  * ============================================================================
- * Light is the free front door for the full CViper. There are exactly three
- * places it says so, each in one sentence, each opening the browser only when
- * tapped. No badge, no modal, no count, no timer, no state: the same text
- * every time, so a signpost can never turn into a nag. Two tests hold that —
- * `Signpost.test.tsx` for the behaviour and
- * `signposts.stateless.contract.test.ts` for the source.
+ * There is one place this app hands the user an address of ours, in one
+ * sentence, opening the browser only when tapped. No badge, no modal, no
+ * count, no timer, no state: the same text every time, so a signpost can never
+ * turn into a nag. Two tests hold that — `Signpost.test.tsx` for the behaviour
+ * and `signposts.stateless.contract.test.ts` for the source.
+ *
+ * ============================================================================
+ * WHY THERE USED TO BE THREE (L-114)
+ * ============================================================================
+ * Two more sat under the analysis result and the tracker board, saying a
+ * hosted CViper kept the rule set live and synced the board to a phone. That
+ * service was mothballed on 10 September 2026 and its infrastructure deleted,
+ * so both sentences became untrue the day it went. They were removed rather
+ * than reworded, because nothing was left for them to point at. The one that
+ * remains describes this app's OWN published privacy policy, which exists.
  *
  * The result of `browser.open` is deliberately not shown. Showing it would
  * need state, and the worst case — a machine with no default browser — is a
  * tap that does nothing, on a line that was never in the user's way.
  */
 
-export type SignpostId = 'analysis' | 'tracker' | 'privacy';
+export type SignpostId = 'privacy';
 
 export interface SignpostCopy {
   /** The one sentence. Never changes at runtime. */
@@ -30,16 +39,8 @@ export interface SignpostCopy {
 }
 
 export const SIGNPOSTS: Readonly<Record<SignpostId, SignpostCopy>> = {
-  analysis: {
-    text: 'cviper.ai keeps this rule set live and runs it across every job you save.',
-    url: CVIPER_URL,
-  },
-  tracker: {
-    text: 'cviper.ai syncs this to your phone and sends reminders.',
-    url: CVIPER_URL,
-  },
   privacy: {
-    text: 'Light never talks to us. The full CViper does, and here is exactly what it keeps.',
+    text: 'Here is exactly what this app keeps, and what it contacts.',
     url: CVIPER_PRIVACY_URL,
   },
 };

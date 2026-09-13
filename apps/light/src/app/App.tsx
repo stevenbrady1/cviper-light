@@ -373,7 +373,6 @@ export default function App({
             now,
             incomingCv,
             onIncomingCvHandled,
-            browser,
           },
           settings: {
             port: backupPort,
