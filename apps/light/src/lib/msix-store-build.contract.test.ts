@@ -244,6 +244,37 @@ export function patternReaches(pattern: string, file: string): boolean {
   return normalised === `capabilities/${file}`;
 }
 
+/**
+ * The shape Partner Center issues for `Identity/@Publisher` on this account.
+ *
+ * `CN=` then an UPPERCASE GUID, and anchored at both ends so a trailing space
+ * or a second RDN is a failure rather than a shrug. Partner Center compares
+ * this value to the reservation CASE SENSITIVELY, so the character class is
+ * deliberately not `[0-9A-Fa-f]` — a lowercased GUID is a real, rejected-at-
+ * upload package, and a guard that accepted it would be agreeing with the
+ * mistake.
+ *
+ * If this repository ever moves to a COMPANY account, Partner Center issues a
+ * full distinguished name (`CN=Acme Ltd, O=Acme, C=GB`) instead and this test
+ * is the right place to find that out: widen it deliberately, with the new
+ * value in front of you.
+ */
+const PUBLISHER_SHAPE = /^CN=[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/;
+
+/**
+ * The shape of `Identity/@Name`: a publisher prefix, a dot, then the app name.
+ *
+ * The prefix is issued, not chosen. Ours is `StBr` and reads like an
+ * abbreviation somebody could "tidy" into `StevenBrady` — which would be a
+ * different package that no longer matches the reservation.
+ */
+const IDENTITY_NAME_SHAPE = /^[A-Za-z0-9][A-Za-z0-9-]*\.[A-Za-z0-9][A-Za-z0-9.-]*$/;
+
+/** Is this a real pasted value, rather than blank or a leftover example? */
+export function looksPasted(value: string | null): boolean {
+  return value !== null && value.trim().length > 0 && !/placeholder/i.test(value);
+}
+
 /** The three identity values a submission replaces, or `null` where absent. */
 export function identityFields(manifestXml: string): Record<string, string | null> {
   const identity = /<Identity\b([^>]*)>/.exec(manifestXml)?.[1] ?? '';
@@ -525,6 +556,79 @@ describe('the package manifest is honest about its placeholders', () => {
     // sets it to anything else.
     const version = /<Identity\b[^>]*\bVersion="([^"]*)"/.exec(MANIFEST)?.[1];
     expect(version).toMatch(/^\d+\.\d+\.\d+\.0$/);
+  });
+});
+
+describe('the identity is the real reservation, and keeps its shape', () => {
+  // ==========================================================================
+  // WHY THIS EXISTS, AND WHY IT IS NOT THE RULE ABOVE (L-93 follow-up)
+  // ==========================================================================
+  // The all-three-or-none rule forbids the HALF-FILLED state. That was the
+  // right question while the values were unpasted, and it is the wrong one now
+  // that they are real: with nothing matching /placeholder/i, it counts zero,
+  // compares zero to zero, and passes for EVERY possible manifest. Blank all
+  // three, lowercase the GUID, drop the `StBr.` prefix, and it still passes.
+  // Each of those is a package Partner Center rejects at upload.
+  //
+  // So the rule above is kept, unchanged, for the state it was written for,
+  // and this one pins what the fields must now LOOK like. Neither asserts the
+  // literal values: a guard that hardcoded the GUID would be a copy of the
+  // manifest rather than a statement about it, and would go red for the one
+  // edit that is legitimate here — a genuine new reservation.
+  const fields = identityFields(MANIFEST);
+
+  it('all three are pasted values, not blanks or leftover examples', () => {
+    // This is the leg the rule above cannot carry. `placeholders === 0` is true
+    // of an empty string too.
+    const unpasted = Object.entries(fields)
+      .filter(([, value]) => !looksPasted(value))
+      .map(([name]) => name);
+    expect(
+      unpasted,
+      `${unpasted.join(', ')} in ${MANIFEST_PATH} is blank or still reads as a placeholder. ` +
+        'Partner Center (Product -> Product identity) is the only source for these.',
+    ).toEqual([]);
+  });
+
+  it('Publisher is `CN=` and an UPPERCASE GUID, as Partner Center issued it', () => {
+    expect(
+      fields.Publisher,
+      `Identity/@Publisher is "${fields.Publisher}". Partner Center compares it to the ` +
+        'reservation character for character, so a lowercased GUID, a missing `CN=` or a ' +
+        'trailing space is a package that is rejected at upload.',
+    ).toMatch(PUBLISHER_SHAPE);
+  });
+
+  it('Name is a `<prefix>.<name>` identity, prefix intact', () => {
+    expect(
+      fields.Name,
+      `Identity/@Name is "${fields.Name}". The publisher prefix before the dot is issued by ` +
+        'Partner Center, not chosen, and an identity without one matches no reservation.',
+    ).toMatch(IDENTITY_NAME_SHAPE);
+  });
+
+  it('the shape checks bite, and let the real values through', () => {
+    // Anti-inert. Every rule above is a match against a pattern, and a pattern
+    // that accepted anything would make all of them permanently green
+    // statements about nothing. The rejected values below are the exact
+    // placeholders this manifest shipped with, plus the near-misses that look
+    // finished and are not.
+    expect(PUBLISHER_SHAPE.test('CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399')).toBe(true);
+    expect(PUBLISHER_SHAPE.test('CN=PLACEHOLDER-Partner-Center-Publisher-Id')).toBe(false);
+    expect(PUBLISHER_SHAPE.test('CN=f08f8dd5-fef4-41dc-84e4-37c56c36b399')).toBe(false);
+    expect(PUBLISHER_SHAPE.test('F08F8DD5-FEF4-41DC-84E4-37C56C36B399')).toBe(false);
+    expect(PUBLISHER_SHAPE.test('CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399 ')).toBe(false);
+    expect(PUBLISHER_SHAPE.test('')).toBe(false);
+
+    expect(IDENTITY_NAME_SHAPE.test('StBr.CViperLight')).toBe(true);
+    expect(IDENTITY_NAME_SHAPE.test('PLACEHOLDER-Partner-Center-Identity-Name')).toBe(false);
+    expect(IDENTITY_NAME_SHAPE.test('CViperLight')).toBe(false);
+    expect(IDENTITY_NAME_SHAPE.test('')).toBe(false);
+
+    expect(looksPasted('Steven Brady')).toBe(true);
+    expect(looksPasted('PLACEHOLDER-Owners-Own-Name')).toBe(false);
+    expect(looksPasted('   ')).toBe(false);
+    expect(looksPasted(null)).toBe(false);
   });
 });
 
