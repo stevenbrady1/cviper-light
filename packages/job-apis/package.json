@@ -14,5 +14,8 @@
   },
   "dependencies": {
     "@cviper/core-types": "workspace:*"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1"
   }
 }

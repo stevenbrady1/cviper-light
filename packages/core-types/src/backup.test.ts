@@ -454,7 +454,7 @@ describe('backup guards', () => {
     }
   });
 
-  it('rejects a job source outside the five known providers', () => {
+  it('rejects a job source outside the known providers', () => {
     const document = parseDocument(exportBackup(makeFixture()));
     at(asRecordArray(document['jobs']), 0)['source'] = 'monster';
     expect(expectError(importBackup(document)).code).toBe('INVALID_RECORD');

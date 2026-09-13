@@ -41,7 +41,22 @@ export type IsoDate = string;
  */
 export type ExtraFields = Readonly<Record<string, unknown>>;
 
-export type JobSource = 'adzuna' | 'reed' | 'manual' | 'linkedin' | 'indeed';
+/**
+ * Where an advert came from.
+ *
+ * `arbeitnow` and `guardian` are the two KEYLESS feeds (L-110): whole recent
+ * listings the app reads with no credential and filters on this machine. They
+ * are separate members rather than a label reused from a keyed board, because
+ * `jobs (source, external_id)` is a unique index — two boards sharing a source
+ * name would let one advert's id collide with an unrelated advert's id — and
+ * because a card that names the wrong board is a lie on screen.
+ *
+ * Adding a member here means adding it to `JobSchema` below as well. The
+ * `jobs.source` COLUMN is deliberately not CHECK-constrained (see the header of
+ * `0001_init.sql`), so growing this set needs no migration.
+ */
+export type JobSource =
+  'adzuna' | 'reed' | 'arbeitnow' | 'guardian' | 'manual' | 'linkedin' | 'indeed';
 
 /**
  * The unit `salary_min` / `salary_max` are quoted in.
@@ -164,7 +179,7 @@ const isoDate = z.iso.date();
 
 export const JobSchema = z.object({
   id: z.string(),
-  source: z.enum(['adzuna', 'reed', 'manual', 'linkedin', 'indeed']),
+  source: z.enum(['adzuna', 'reed', 'arbeitnow', 'guardian', 'manual', 'linkedin', 'indeed']),
   external_id: z.string().nullable(),
   title: z.string(),
   company: z.string(),
