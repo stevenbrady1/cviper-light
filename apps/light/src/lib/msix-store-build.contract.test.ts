@@ -813,3 +813,243 @@ describe('the package contains one binary, and the kit scans only that', () => {
     expect(dllCopiesIntoTheLayout('Write-Host "not staging light_lib.dll"')).toEqual([]);
   });
 });
+
+// ── The artefact is installable, and carries no private key ──────────────────
+
+/**
+ * Key material: the things that must never be downloadable from a public
+ * repository.
+ *
+ * `.cer` is deliberately NOT here. A DER certificate is a public key and a
+ * signature; publishing one is the whole point of the section below, and a
+ * forbid-list that also forbade the fix would be a rule nobody could satisfy.
+ */
+const KEY_MATERIAL = /\.(pfx|p12|pem|key|snk|jks|keystore)\b/i;
+
+/** Indentation width, without a non-null assertion on a regex group. */
+function indentOf(line: string): number {
+  return line.length - line.trimStart().length;
+}
+
+/**
+ * The steps of a workflow job, as `{ name, body }`.
+ *
+ * Line-based rather than a YAML parse, for the same reason the detectors above
+ * are: the question is only ever "is this step still here, and does its body
+ * still do the thing", and a parser would add a dependency to answer it.
+ *
+ * The step indent is DISCOVERED as the shallowest `- name:`/`- uses:` rather
+ * than hardcoded, so re-indenting the file does not silently return zero steps
+ * — which every assertion below would read as "no offending step found".
+ */
+export function workflowSteps(workflowText: string): { name: string; body: string }[] {
+  const lines = workflowText.replaceAll('\r\n', '\n').split('\n');
+
+  const starts: number[] = [];
+  for (const [index, line] of lines.entries()) {
+    if (/^\s*-\s+(name|uses):/.test(line)) starts.push(index);
+  }
+  if (starts.length === 0) return [];
+
+  const stepIndent = Math.min(...starts.map((index) => indentOf(lines[index] ?? '')));
+  const boundaries = starts.filter((index) => indentOf(lines[index] ?? '') === stepIndent);
+
+  return boundaries.map((start, position) => ({
+    name: /^\s*-\s+name:\s*(.*)$/.exec(lines[start] ?? '')?.[1]?.trim() ?? '',
+    body: lines.slice(start, boundaries[position + 1] ?? lines.length).join('\n'),
+  }));
+}
+
+/**
+ * Every file name the workflow writes into `OUT_DIR` — the directory that
+ * BECOMES the artefact.
+ *
+ * Comments are stripped first, for the reason `repo-scan.ts` gives and this
+ * file already relies on once: the paragraphs explaining why the private key
+ * stays out name `devcert.pfx` repeatedly, and a guard that fired on its own
+ * rationale is a guard somebody deletes.
+ *
+ * A name must start with an alphanumeric, so a bare extension in a forbid-list
+ * (`'.pfx'`) is not mistaken for a file this job writes.
+ */
+export function artefactFileNames(workflowText: string): string[] {
+  const names = new Set<string>();
+
+  for (const raw of workflowText.replaceAll('\r\n', '\n').split('\n')) {
+    const code = raw.replace(/#.*$/, '');
+    if (!/\bOUT_DIR\b/.test(code)) continue;
+    for (const match of code.matchAll(/'([A-Za-z0-9][^']*\.[A-Za-z0-9]+)'/g)) {
+      const name = match[1];
+      if (name !== undefined) names.add(name);
+    }
+  }
+
+  return [...names].sort();
+}
+
+/**
+ * Lines that put key material into the uploaded directory.
+ *
+ * `uploadedSecretMaterial` in `no-automation-server-in-shipped-builds.contract
+ * .test.ts` reads the `upload-artifact` step and cannot see this: the step
+ * names a DIRECTORY, so a `.pfx` written into that directory ten steps earlier
+ * is invisible to it and lands in the artefact all the same. This is the same
+ * rule asked one step upstream, where the file is created.
+ *
+ * KNOWN COUPLING, stated so nobody rediscovers it in a red build: the workflow
+ * carries the same forbid-list at runtime, and the line that NAMES the
+ * extensions must stay separate from the line that names `OUT_DIR`, or this
+ * detector fires on the guard rather than on a leak.
+ */
+export function keyMaterialIntoTheArtefact(workflowText: string): string[] {
+  return workflowText
+    .replaceAll('\r\n', '\n')
+    .split('\n')
+    .map((line) => line.replace(/#.*$/, ''))
+    .filter((line) => /\bOUT_DIR\b/.test(line) && KEY_MATERIAL.test(line))
+    .map((line) => line.trim());
+}
+
+/**
+ * Exactly what the `cviper-light-msix` artefact contains.
+ *
+ * An allow-list, which the rest of this file argues against — and the argument
+ * does not apply here. LESSON-033 is about proving a property of CODE, where
+ * "X must be present" rots into a shape somebody satisfies with a comment.
+ * This is a published download from a PUBLIC repository: the risk is a file
+ * arriving that nobody decided to publish, and only a closed list catches that.
+ * Adding one means adding it here, in front of a reviewer.
+ */
+const ARTEFACT_FILES = [
+  // The submission itself, and the manifest it was packed from.
+  'CViperLight-store.msix',
+  'Package.appxmanifest',
+  // The public half of the per-run signer, so the package can be installed
+  // for the one-time open test (L-119).
+  'devcert-public.cer',
+  // Evidence: what went into the package, and what the kit made of it.
+  'target-inventory.txt',
+  'wack-report.xml',
+  'wack-verdict.md',
+].sort();
+
+describe('the artefact can be installed, and carries no private key', () => {
+  const MSIX = read(`${WORKFLOW_DIRECTORY}/msix.yml`);
+
+  /**
+   * ==========================================================================
+   * WHY THE PUBLIC CERTIFICATE HAS TO TRAVEL WITH THE PACKAGE
+   * ==========================================================================
+   * WACK is static analysis — its own report says "Running tests without
+   * application deployment" — so a package can pass every certification check
+   * and still fail to open. Nothing had ever installed this one (L-119).
+   *
+   * It cannot be installed by double-clicking, either. The package is signed
+   * by a self-signed certificate generated during the run, which no machine
+   * trusts, and `Add-AppxPackage -AllowUnsigned` does not apply: that switch
+   * is for genuinely UNSIGNED packages carrying the unsigned-package OID,
+   * while this one is signed and carries the real Store publisher. The
+   * supported route is to trust the signer for the length of the test, which
+   * needs its PUBLIC half — and only its public half.
+   */
+
+  it('anti-inert: the upload step publishes exactly the directory these rules scan', () => {
+    // Every rule below reasons about `OUT_DIR`. That only means anything while
+    // `OUT_DIR` is the directory that gets uploaded — so both halves are
+    // pinned here, and a workflow that started uploading somewhere else fails
+    // loudly rather than leaving the rules scanning a private folder.
+    expect(MSIX, 'OUT_DIR must still be the temp `out` directory').toContain(
+      'OUT_DIR=${{ runner.temp }}/out',
+    );
+
+    const uploads = workflowSteps(MSIX).filter((step) =>
+      /uses:\s*actions\/upload-artifact/.test(step.body),
+    );
+    expect(uploads, 'exactly one artefact is published from this job').toHaveLength(1);
+    expect(uploads[0]?.body).toMatch(/path:\s*\$\{\{\s*runner\.temp\s*\}\}\/out\s*$/m);
+  });
+
+  it('publishes exactly the files somebody decided to publish', () => {
+    expect(
+      artefactFileNames(MSIX),
+      'The artefact is a download link for anyone signed in, and this repository is public. ' +
+        'A file written into OUT_DIR that is not on this list is a file nobody agreed to ' +
+        'publish. Add it here, with a reason, in the same commit that writes it.',
+    ).toEqual(ARTEFACT_FILES);
+  });
+
+  it('exports the public certificate, in a step that is really there', () => {
+    // Anti-inert, and the reason this reads the parsed STEP rather than the
+    // file: `toContain('devcert-public.cer')` over the whole workflow would
+    // still pass if the export were deleted and only the comment explaining it
+    // survived — which is exactly how this repository has lost cover before.
+    const exporters = workflowSteps(MSIX).filter((step) =>
+      step.body
+        .split('\n')
+        .some((line) => !/^\s*#/.test(line) && line.includes('devcert-public.cer')),
+    );
+
+    expect(
+      exporters,
+      'No step writes `devcert-public.cer`. Without it the artefact is a package that cannot ' +
+        'be installed on any machine: the signer is a per-run self-signed certificate nobody ' +
+        'trusts, and `-AllowUnsigned` does not apply to a signed package.',
+    ).toHaveLength(1);
+
+    const exporter = exporters[0]?.body ?? '';
+    expect(exporter, 'the certificate must land in the directory that is uploaded').toMatch(
+      /\$env:OUT_DIR/,
+    );
+    expect(
+      exporter,
+      'export the PUBLIC content type — `X509ContentType::Cert` is a public key and a ' +
+        'signature by construction, not by convention',
+    ).toMatch(/X509ContentType\]::Cert\b/);
+    expect(
+      exporter,
+      'the thumbprint goes to the job summary, so the owner can untrust exactly what they ' +
+        'trusted rather than guessing at the certificate store afterwards',
+    ).toMatch(/GITHUB_STEP_SUMMARY/);
+  });
+
+  it('writes no key material into the uploaded directory', () => {
+    expect(
+      keyMaterialIntoTheArtefact(MSIX),
+      'The private half must never leave the runner. `devcert.pfx` lives in PACK_DIR, which ' +
+        'is not uploaded; anything with a key in it that reaches OUT_DIR is published to a ' +
+        'public repository the moment the run finishes.',
+    ).toEqual([]);
+  });
+
+  it('asks the same question of the real files, not just of the YAML', () => {
+    // The artefact-level half, named here so that deleting it from the
+    // workflow is a failing test rather than a silent loss of cover. A static
+    // scan cannot see a key written by a TOOL into a path nobody wrote down.
+    expect(MSIX).toMatch(/\$forbiddenExtensions/);
+    expect(MSIX).toMatch(/Signing material in the artefact/);
+  });
+
+  it('the detectors bite, and let the honest lines through', () => {
+    // A leak: the export writing the private half instead of the public one.
+    expect(keyMaterialIntoTheArtefact("$p = Join-Path $env:OUT_DIR 'devcert.pfx'")).toHaveLength(1);
+    expect(keyMaterialIntoTheArtefact('Copy-Item k.p12 -Destination $env:OUT_DIR')).toHaveLength(1);
+    // Honest: the key used where it is generated, and never sent to OUT_DIR.
+    expect(keyMaterialIntoTheArtefact('winapp pack --cert devcert.pfx --output $out')).toEqual([]);
+    // Honest: the comment that explains the rule must not trip the rule.
+    expect(keyMaterialIntoTheArtefact('  # devcert.pfx never reaches OUT_DIR')).toEqual([]);
+    // Honest: the public half is not key material.
+    expect(keyMaterialIntoTheArtefact("Join-Path $env:OUT_DIR 'devcert-public.cer'")).toEqual([]);
+
+    expect(artefactFileNames("$x = Join-Path $env:OUT_DIR 'a.txt'")).toEqual(['a.txt']);
+    // A bare extension in a forbid-list is not a file this job writes.
+    expect(artefactFileNames("$forbidden = @('.pfx') # near $env:OUT_DIR")).toEqual([]);
+    expect(artefactFileNames("Join-Path $env:PACK_DIR 'b.txt'")).toEqual([]);
+
+    const steps = workflowSteps(
+      ['      - name: one', '        run: echo', '      - uses: x'].join('\n'),
+    );
+    expect(steps.map((step) => step.name)).toEqual(['one', '']);
+    expect(steps[0]?.body).toContain('run: echo');
+    expect(workflowSteps('')).toEqual([]);
+  });
+});
