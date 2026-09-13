@@ -48,9 +48,9 @@ import { KEYWORD_SCORING_VERSION, scoreByKeywords } from '@cviper/keyword-scorin
 
 import { createTauriTransport } from '../../ai/transport';
 
-import { createTauriConsentPort, type ConsentProviderKind } from './consent';
+import { isCloudKind, readStoredConsent, type ConsentProviderKind } from './consent';
 import { providerLabel } from './model';
-import { type ProviderKind, type ProviderOption } from './providers';
+import { type ProviderOption } from './providers';
 
 export interface RunRequest {
   readonly option: ProviderOption;
@@ -81,22 +81,6 @@ export interface RunFailure {
  * like the app contradicting itself, when in fact the engine moved.
  */
 const KEYWORD_MODEL = `keyword-v${KEYWORD_SCORING_VERSION}`;
-
-/** The two kinds that need the user's consent before a CV can reach them. */
-function isCloudKind(kind: ProviderKind): kind is ConsentProviderKind {
-  return kind === 'anthropic' || kind === 'openai';
-}
-
-/**
- * The default consent check: reads the real store, fresh, on every call.
- *
- * Fails CLOSED like the port itself — see `consent.ts` — so a store that
- * cannot be read is "not granted", never "granted".
- */
-async function readStoredConsent(kind: ConsentProviderKind): Promise<boolean> {
-  const state = await createTauriConsentPort().read();
-  return state.ok && state.value[kind];
-}
 
 /** How a chosen option becomes a provider adapter. */
 function providerFor(option: ProviderOption, transport: ChatTransport): AiProvider | null {

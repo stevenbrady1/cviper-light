@@ -13,12 +13,21 @@
  * network without it" — the transport factory is never even called.
  *
  * ============================================================================
- * THE GUARD AT THE BOTTOM IS PROVED, NOT ASSUMED
+ * THE GUARD AT THE BOTTOM IS ABOUT THIS FILE ONLY — AND SAYS SO (L-115)
  * ============================================================================
- * `the consent gate cannot be bypassed` reads the shipped source of
+ * `the ordering inside runAnalysis.ts` reads the shipped source of
  * `runAnalysis.ts` and asserts the consent check appears BEFORE the transport
- * can be built. It is deliberately broken and restored as part of delivering
- * this file — see the PR description for the RED output.
+ * can be built. It used to be called "the consent gate cannot be bypassed",
+ * which claimed the whole app while reading one hard-coded filename: when
+ * `features/tracker/runExtraction.ts` started building the same transport with
+ * no check at all, this stayed green, because a second call site was invisible
+ * to it rather than failing it.
+ *
+ * The population-wide rule now lives in
+ * `lib/ai-call-sites-consent.contract.test.ts`, which derives its list — every
+ * module importing `createTauriTransport` — instead of naming one. What is left
+ * here is the local ordering assertion for this one file, under a name that
+ * only claims that.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -252,7 +261,7 @@ describe('runAnalysis — the consent gate', () => {
   });
 });
 
-describe('the consent gate cannot be bypassed', () => {
+describe('the ordering inside runAnalysis.ts', () => {
   /** Drop `//` and `/* *\/` comments so a rule about code cannot be tripped by prose. */
   function withoutComments(source: string): string {
     return source
@@ -268,6 +277,10 @@ describe('the consent gate cannot be bypassed', () => {
   it('guard: the consent check is reached before the transport can ever be built', () => {
     // Reads the SHIPPED file, not a copy — a future refactor that reorders
     // this fails here, not in a code review nobody remembers to do.
+    //
+    // ONE FILE, DELIBERATELY. Every OTHER module that can build the transport
+    // is covered by `lib/ai-call-sites-consent.contract.test.ts`, which finds
+    // them rather than being told about them (L-115).
     const source = withoutComments(readFileSync(join(HERE, 'runAnalysis.ts'), 'utf8'));
 
     const consentCheckIndex = source.indexOf('hasConsent(');

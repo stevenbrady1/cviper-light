@@ -14,6 +14,23 @@
  * it cannot forget the failure case, because there is no failure case — there
  * is an outcome whose `available` is false and whose fields are empty, and the
  * review form renders it exactly as it renders any other.
+ *
+ * ============================================================================
+ * A CLOUD EXTRACTION WITHOUT CONSENT NEVER BUILDS A TRANSPORT (Apple 5.1.2(i))
+ * ============================================================================
+ * What leaves the machine on this path is whatever is in the advert box — the
+ * whole advert or a recruiter's email, that person's name and address
+ * included. Until L-115 it left with nothing disclosed and nothing recorded,
+ * while the analysis path next door had been gated since the guideline landed.
+ *
+ * The gate is the SAME `isCloudKind` / `hasConsent` pair `runAnalysis.ts` uses,
+ * imported from `features/analysis/consent.ts` rather than copied: one check,
+ * two call sites, and `lib/ai-call-sites-consent.contract.test.ts` now derives
+ * the list of call sites instead of being told it.
+ *
+ * `ollama` is structurally exempt, exactly as it is for analysis:
+ * `ConsentProviderKind` is `Exclude<ProviderId, 'ollama'>`, so there is no
+ * branch here for a local model to fall into and nothing to remember.
  */
 import {
   createAnthropicProvider,
@@ -28,6 +45,8 @@ import { EMPTY_JOB_EXTRACTION } from '@cviper/core-types';
 
 import { createTauriTransport } from '../../ai/transport';
 
+import { isCloudKind, readStoredConsent, type ConsentProviderKind } from '../analysis/consent';
+import { providerLabel } from '../analysis/model';
 import { type ProviderOption } from '../analysis/providers';
 
 export interface ExtractionRequest {
@@ -66,6 +85,7 @@ function unavailable(reason: string): JobExtractionOutcome {
 export async function runExtraction(
   request: ExtractionRequest,
   createTransport: () => ChatTransport = createTauriTransport,
+  hasConsent: (kind: ConsentProviderKind) => Promise<boolean> = readStoredConsent,
 ): Promise<JobExtractionOutcome> {
   const model = request.option.model;
 
@@ -75,6 +95,26 @@ export async function runExtraction(
     return unavailable(
       'That way of reading the advert is not available in this build. Fill the form in by hand.',
     );
+  }
+
+  // ── The consent gate (Apple 5.1.2(i)) ────────────────────────────────────
+  // The same check `runAnalysis` makes, from the same file, for the same
+  // reason: what goes to the provider here is the whole advert or recruiter
+  // email, names and addresses included. Only the two cloud kinds reach it —
+  // `isCloudKind` narrows to `ConsentProviderKind`, which structurally excludes
+  // 'ollama' — and it is refused BEFORE `createTransport()` is ever called. See
+  // `runExtraction.consent.test.ts`, and `lib/ai-call-sites-consent.contract.test.ts`
+  // for the guard that now watches every call site rather than one.
+  if (isCloudKind(request.option.kind)) {
+    const consented = await hasConsent(request.option.kind);
+    if (!consented) {
+      const label = providerLabel(request.option.kind);
+      return unavailable(
+        `${label} needs your permission before the advert can be sent to it. Grant it on ` +
+          `the Analysis screen, where the first run with ${label} asks — or fill the form ` +
+          'in by hand.',
+      );
+    }
   }
 
   const provider = providerFor(request.option, createTransport());

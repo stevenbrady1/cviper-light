@@ -47,6 +47,8 @@
 import { err, ok, type Result } from '@cviper/core-types';
 import { type ProviderId } from '@cviper/ai-providers';
 
+import { type ProviderKind } from './providers';
+
 /** The only two kinds a CV can actually be sent to. Ollama has no key here. */
 export type ConsentProviderKind = Exclude<ProviderId, 'ollama'>;
 
@@ -97,6 +99,21 @@ function describeThrown(cause: unknown): string {
   if (cause instanceof Error) return cause.message;
   if (typeof cause === 'string' && cause.trim() !== '') return cause;
   return 'The file could not be read or written.';
+}
+
+/**
+ * The kinds that need the user's agreement before anything is sent to them.
+ *
+ * Lives HERE, next to `ConsentProviderKind`, rather than in the one feature
+ * that happened to need it first. It was private to `runAnalysis.ts` until
+ * L-115, which is how the tracker's extraction path came to build the same
+ * transport with no gate at all: a second call site could not reuse a check it
+ * could not see. The narrowing is the point — everything downstream of a `true`
+ * from here is typed as a provider this file actually has a flag for, so
+ * 'ollama' has nowhere to go.
+ */
+export function isCloudKind(kind: ProviderKind): kind is ConsentProviderKind {
+  return kind === 'anthropic' || kind === 'openai';
 }
 
 export function createTauriConsentPort(): ConsentPort {
@@ -158,4 +175,20 @@ export function createTauriConsentPort(): ConsentPort {
     grant: (kind) => setKind(kind, true),
     revoke: (kind) => setKind(kind, false),
   };
+}
+
+/**
+ * The default consent check every call site gets: the real store, read fresh.
+ *
+ * Fresh on every call rather than from a snapshot, so a consent withdrawn a
+ * second ago is honoured by a run started now. Fails CLOSED like the port
+ * itself — an unreadable store is `false`, never `true`.
+ *
+ * Shared by `runAnalysis` and `runExtraction` (L-115). Two copies of this would
+ * be two places to get the `state.ok &&` wrong, and one of them would be the
+ * copy nobody read.
+ */
+export async function readStoredConsent(kind: ConsentProviderKind): Promise<boolean> {
+  const state = await createTauriConsentPort().read();
+  return state.ok && state.value[kind];
 }
