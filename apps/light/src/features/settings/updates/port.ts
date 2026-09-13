@@ -2,16 +2,41 @@
  * The ONLY module in this app that imports the updater plugin.
  *
  * ============================================================================
- * ONE IMPORT SITE, SO THE PROMISE IS AUDITABLE BY GREP.
+ * ONE IMPORT SITE, SO WHAT THIS APP ASKS FOR IS AUDITABLE BY GREP.
  * ============================================================================
- * "There is no automatic update check" is a claim about the whole application,
- * and a claim like that is worth exactly as much as the search that verifies
- * it. With every call funnelled through this file, verifying it means reading
- * one short module rather than trusting a convention — and `noAutoCheck.test.ts`
- * asserts the funnel is intact by scanning the source for a second import.
+ * "Every update request this app makes is made here" is a claim about the
+ * whole application, and a claim like that is worth exactly as much as the
+ * search that verifies it. With every call funnelled through this file,
+ * verifying it means reading one short module rather than trusting a
+ * convention — and `noAutoCheck.test.ts` asserts the funnel is intact by
+ * scanning the source for a second import. That half is unchanged and still
+ * true.
  *
- * Nothing here runs on mount. Both methods are called from a click handler, and
- * from nowhere else.
+ * ============================================================================
+ * `check` DOES RUN ON MOUNT, AND THIS COMMENT USED TO DENY IT (L-108)
+ * ============================================================================
+ * It said: "Nothing here runs on mount. Both methods are called from a click
+ * handler, and from nowhere else." That stopped being true the day the launch
+ * check landed (L-92) and was still sitting here two work items later — which
+ * is the hazard of a comment stating a global property. It is the thing a
+ * reader checks INSTEAD of reading the callers, so it is believed for exactly
+ * as long as it is wrong.
+ *
+ * What actually happens:
+ *
+ *   * `check` has two callers. `App.tsx` calls it once from a mount effect,
+ *     but only after `updateCheckOnLaunchEnabled()` has said yes — and an
+ *     unconfigured machine says yes, so on most installs this runs at startup
+ *     with nobody pressing anything. The Settings "Check for updates" button is
+ *     the other, and it works whatever that preference says.
+ *   * `install` is still only ever reached from a click — the banner's Install
+ *     button and the Settings one. Nothing is downloaded or written to disk
+ *     without somebody pressing it.
+ *
+ * `launch.test.tsx` pins both halves of the startup path: zero requests when
+ * the preference is off, exactly one when it is on. The welcome screen
+ * discloses the startup request on first run, held to the outbound-host
+ * registry by `launchCheckDisclosure.contract.test.tsx`.
  */
 import { err, ok, type Result } from '@cviper/core-types';
 

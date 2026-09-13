@@ -426,6 +426,7 @@ export function Tracker({
               entry={selected}
               today={today}
               now={clock}
+              browser={browserPort}
               onEdit={(changes) => onEdit(selected.application.id, changes)}
               onStatusChange={(status) => onStatusChange(selected.application.id, status)}
               onDelete={() => void onDelete(selected)}

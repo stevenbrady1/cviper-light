@@ -5,7 +5,7 @@
  * THREE STEPS, BECAUSE THERE ARE THREE PLACES
  * ============================================================================
  * `dataLocations.ts` lists where every byte lives: the SQLite database, the
- * OS credential store, and the preferences (a Tauri store file plus this
+ * OS credential store, and the preferences (the Tauri store files plus this
  * app's browser storage). Each has its own failure mode — a locked database,
  * a credential store that wants the user's password, a file that will not
  * write — and a user who is told "delete everything failed" learns nothing.
@@ -27,6 +27,7 @@ import { err, ok, type Result } from '@cviper/core-types';
 
 import { wipeAll } from '../../../db';
 import { SECRET_KEYS } from '../../../status/environment';
+import { CONSENT_STORE_FILE } from '../../analysis/consent';
 import { BOARD_STORE_FILE } from '../../boards/port';
 
 /** A step that would not do what was asked, in words a user can read. */
@@ -49,6 +50,30 @@ export interface ErasePort {
  * would survive "delete everything", and the guard fails the build instead.
  */
 export const LOCAL_STORAGE_PREFIX = 'cviper.light.';
+
+/**
+ * Every `tauri-plugin-store` file the preferences step empties, in order, each
+ * with the sentence shown if it refuses.
+ *
+ * A LIST, NOT A LINE OF CODE PER FILE (L-106). This step cleared the board
+ * file and returned. `ai-provider-consent.json` was written months later and
+ * nothing pointed the erase path at it, so "CViper Light is back to the way it
+ * was when you first installed it" was false: the record that somebody agreed
+ * to send a CV to OpenAI outlived the CV, and the next person to use the
+ * machine was never shown the disclosure that consent stands for. Adding a
+ * store file now means adding a line HERE, and
+ * `localStorageKeys.contract.test.ts` fails the build if you do not.
+ */
+const PREFERENCE_STORES: readonly { readonly file: string; readonly refusal: string }[] = [
+  { file: BOARD_STORE_FILE, refusal: 'Your job-board choices file could not be cleared.' },
+  {
+    file: CONSENT_STORE_FILE,
+    refusal: 'Your record of which AI providers you agreed to could not be cleared.',
+  },
+];
+
+/** Just the filenames, so the contract test can ask what the erase step reaches. */
+export const ERASED_STORE_FILES: readonly string[] = PREFERENCE_STORES.map((store) => store.file);
 
 /** The text of an unknown thrown value, without assuming it is an `Error`. */
 function describeThrown(cause: unknown): string {
@@ -98,23 +123,29 @@ export function createTauriErasePort(): ErasePort {
     },
 
     async forgetPreferences() {
-      // Browser storage first: it cannot fail, and doing it before the file
+      // Browser storage first: it cannot fail, and doing it before the files
       // means a store error never leaves it behind.
       forgetLocalStorage(typeof localStorage === 'undefined' ? null : localStorage);
 
-      try {
-        // Imported inside the call, as `boards/port.ts` does: rendering a
-        // screen should not pull a Tauri plugin into the module graph.
-        const { load } = await import('@tauri-apps/plugin-store');
-        const store = await load(BOARD_STORE_FILE, { autoSave: false });
-        await store.clear();
-        await store.save();
-        return ok(undefined);
-      } catch (cause) {
-        return err({
-          message: `Your job-board choices file could not be cleared. ${describeThrown(cause)}`,
-        });
+      // Every file is attempted and the message names the FIRST that refused,
+      // exactly as `forgetKeys` does above. Returning at the first failure
+      // would leave a later file untouched with nothing said about it, which
+      // is the same silent half-erase in a different place.
+      let first: EraseProblem | null = null;
+      for (const { file, refusal } of PREFERENCE_STORES) {
+        try {
+          // Imported inside the call, as `boards/port.ts` does: rendering a
+          // screen should not pull a Tauri plugin into the module graph. The
+          // module is cached, so the second pass round costs nothing.
+          const { load } = await import('@tauri-apps/plugin-store');
+          const store = await load(file, { autoSave: false });
+          await store.clear();
+          await store.save();
+        } catch (cause) {
+          first ??= { message: `${refusal} ${describeThrown(cause)}` };
+        }
       }
+      return first === null ? ok(undefined) : err(first);
     },
   };
 }
