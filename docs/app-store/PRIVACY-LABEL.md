@@ -81,5 +81,7 @@ also **No** — links open in the user's own browser, and the one exception,
 Fetch, only reads a single job-advert page the user pastes and asks for. It
 carries no cookies, no sign-in and no key, cannot reach the user's saved keys,
 follows no links, and refuses addresses on the user's own computer or home
-network (see the `fetched-advert` entry in `lib/outbound-hosts.ts`).
+network. The site sees the user's IP address, exactly as it would if they had
+clicked the link themselves (see the `fetched-advert` entry in
+`lib/outbound-hosts.ts`).
 Result: **4+**.
