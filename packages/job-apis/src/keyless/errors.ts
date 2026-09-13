@@ -29,6 +29,8 @@ import { KEYLESS_SOURCE_LABEL, type KeylessSourceId } from './types';
 export type KeylessErrorKind =
   /** The request never completed: DNS, connection, timeout. */
   | 'network'
+  /** Two browses too close together. Rust enforces the gap - see `keyless.rs`. */
+  | 'throttled'
   /** 429 — the feed is asking us to slow down. */
   | 'rate-limit'
   /** 5xx, or a 4xx that means the address has moved or gone. */

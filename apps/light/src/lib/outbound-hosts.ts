@@ -98,6 +98,15 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     why: 'A job search you start, sent with the free Reed key you registered yourself. Reed’s developer page is also opened in your browser from Settings.',
   },
   {
+    host: 'www.arbeitnow.com',
+    purpose: 'fetched-on-request',
+    why:
+      'The list of recent jobs this free job board publishes, read when you press Browse. It ' +
+      'takes no key and no account, and nothing about you is sent — the site sees your IP ' +
+      'address, exactly as it would if you opened its job board in your browser. It cannot ' +
+      'search: CViper reads the recent list and narrows it down on your computer.',
+  },
+  {
     host: 'developer.adzuna.com',
     purpose: 'opened-in-your-browser',
     why: 'The page where you register your own Adzuna key. Opened in your browser from Settings; the app does not load it.',
@@ -139,8 +148,18 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
   },
   {
     host: 'jobs.theguardian.com',
-    purpose: 'opened-in-your-browser',
-    why: 'A keyless search link for Guardian Jobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.',
+    // Two different things at one address, and the entry has to say both
+    // (L-110). It was only ever a link handed to the browser; since the
+    // keyless browse it is also a feed the app itself reads. Describing only
+    // the older half would make this list a summary rather than the complete
+    // statement it claims to be.
+    purpose: 'fetched-on-request',
+    why:
+      'Guardian Jobs’ public list of its twenty most recent UK jobs, read when you press ' +
+      'Browse. It takes no key and no account, and nothing about you is sent — the site sees ' +
+      'your IP address, exactly as it would if you opened the page yourself. Its own search ' +
+      'page is also opened in your browser by the keyless buttons on the search screen, and ' +
+      'the app does not load that one.',
   },
   {
     host: 'www.jobserve.com',
