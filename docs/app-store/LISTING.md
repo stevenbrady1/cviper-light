@@ -103,7 +103,7 @@ them.)
 | ------------------ | ----------------------------------------------------- |
 | Support URL        | `https://github.com/stevenbrady1/cviper-light/issues` |
 | Marketing URL      | `https://cviper.ai/light` (CV-1394)                   |
-| Privacy Policy URL | `https://cviper.ai/light/privacy` (CV-1394)           |
+| Privacy Policy URL | `https://cviper.ai/privacy/` (CV-1394)                |
 
 ## App Review Information
 

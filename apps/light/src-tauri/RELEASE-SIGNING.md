@@ -222,7 +222,7 @@ Everything past that is human, in this order:
    certificate installed, then upload with Transporter or the release job.
 4. The App Privacy questionnaire: every answer "no" — Light collects nothing,
    and the contract tests under `src/lib/` are the evidence. Apple still
-   requires a privacy policy URL; the hosted `cviper.ai/light/privacy` page
+   requires a privacy policy URL; the hosted `https://cviper.ai/privacy/` page
    (CV-1394) is that URL.
 
 The updater plugin is not part of an iOS build at all (Cargo.toml target

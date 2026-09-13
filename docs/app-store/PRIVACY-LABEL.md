@@ -58,7 +58,7 @@ Diagnostics or Location. None of it is collected by anyone.
 Required even for "Data Not Collected". Enter:
 
 ```
-https://cviper.ai/light/privacy
+https://cviper.ai/privacy/
 ```
 
 The page is `privacy-policy.md` in this folder, generated from the app's own
@@ -76,6 +76,10 @@ tell Apple the app tracks.
 ## Age rating
 
 Every question **None** / **No**: no violence, no mature themes, no gambling,
-no unrestricted web access (the app opens links in the user's own browser and
-never loads a page itself), no user-generated content shared with others.
+no user-generated content shared with others. **Unrestricted web access** is
+also **No** — links open in the user's own browser, and the one exception,
+Fetch, only reads a single job-advert page the user pastes and asks for. It
+carries no cookies, no sign-in and no key, cannot reach the user's saved keys,
+follows no links, and refuses addresses on the user's own computer or home
+network (see the `fetched-advert` entry in `lib/outbound-hosts.ts`).
 Result: **4+**.

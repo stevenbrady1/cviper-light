@@ -24,7 +24,7 @@ import { GROUPS } from './PrivacyNotice';
  * page on the website does not. So the page is rendered from the registry,
  * `docs/app-store/privacy-policy.md` is a file snapshot of that render, and
  * `policyDocument.test.ts` fails the build the moment the two disagree. The
- * hosted site (CV-1394) publishes that file at cviper.ai/light/privacy.
+ * hosted site (CV-1394) publishes that file at https://cviper.ai/privacy/.
  *
  * No date is printed: a generated document is as current as the code it was
  * generated from, and a hand-typed date would be the one thing in it that
