@@ -106,9 +106,11 @@ purpose, with the wording kept in the description, because turning a day rate
 into a yearly figure is how a good contract ends up looking like a bad
 permanent job.
 
-Paste the advert's **link** into that box instead of the advert and the app
-says so rather than asking a model: a model cannot open a link, and given one
-it invents a job from the words in the address. The link is moved up to the
+Paste a web link starting with `http` or `https`, and nothing else, into that
+box instead of the advert, and the app says so rather than asking a model: a
+model cannot open a link, and given one it invents a job from the words in the
+address. Anything else — a link with words beside it, or an address without
+`http` — is read as an ordinary advert. The link-only paste is moved up to the
 link box, where Fetch can do something with it.
 
 This one needs an AI provider: free with [Ollama](https://ollama.com) on your
@@ -117,7 +119,7 @@ typing them in, and everything else carries on as normal — the tracker and the
 browser job-search links never needed a key and still do not.
 
 **About us, briefly.** Settings → Privacy carries one sentence that opens this
-app's own privacy policy at `cviper.ai/privacy`, and Settings → About says
+app's own privacy policy at `https://cviper.ai/privacy/`, and Settings → About says
 where Light was made and links to its page and its source. Each opens your own
 browser only when you tap it. There is no badge, no count, no timer and no
 nag: the same sentence every time, and a test fails the build if one of those

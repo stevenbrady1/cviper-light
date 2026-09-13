@@ -780,7 +780,7 @@ text editor and starts with `"schemaVersion": 1`.
    screenshots to take. **One** thing is owed before submitting: the name has to
    be reserved, because the identity fields do not exist until it is.
 
-   The privacy page is **no longer owed** — `cviper.ai/light/privacy` is live
+   The privacy page is **no longer owed** — `https://cviper.ai/privacy/` is live
    (checked 2026-09-13; a bogus path under the same prefix 404s, so it is a real
    page and not a catch-all). The Azure mothballing on 2026-09-10 did not take it
    with it: it is served from the `cviper-landing` GitHub Pages repository, which

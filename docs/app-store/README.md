@@ -26,7 +26,7 @@ npx vitest run apps/light/src/features/settings/privacy/policyDocument.test.ts -
 ```
 
 and commit the regenerated file with the change. The hosted site publishes it
-at `cviper.ai/light/privacy` (CV-1394), which is the URL App Store Connect
+at `https://cviper.ai/privacy/` (CV-1394), which is the URL App Store Connect
 asks for.
 
 ## Order of work

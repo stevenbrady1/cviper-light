@@ -514,8 +514,12 @@ explicitly names Win32 and Desktop Bridge products.
 Partner Center runs the IARC questionnaire. Answer **no** or **none** to every
 question. There is no violence, no mature content, no gambling, no in-app
 purchase, no user-generated content shared between users, and no unrestricted
-web browsing — the app hands links to the user's own browser and does not load
-pages itself.
+web browsing — links open in the user's own browser, and the one exception,
+Fetch, only reads a single job-advert page the user pastes and asks for. It
+carries no cookies, no sign-in and no key, cannot reach the user's saved keys,
+follows no links, and refuses addresses on the user's own computer or home
+network. The site sees the user's IP address, exactly as it would if they had
+clicked the link themselves.
 
 The expected result is the lowest rating in each region (PEGI 3 / ESRB
 Everyone).
