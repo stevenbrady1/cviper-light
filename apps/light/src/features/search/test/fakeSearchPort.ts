@@ -40,10 +40,19 @@ export interface FakeSearchPort extends SearchPort {
   readonly nextOutcome: (outcome: JobSearchOutcome) => void;
   /** Everything currently "on the tracker board". */
   readonly savedJobs: () => readonly Job[];
+  /** What `latestCvText` answers. Set BEFORE rendering: the screen reads it once, on mount. */
+  readonly nextCvText: (text: string | null) => void;
+  /** What `dealBreakers` answers. Set BEFORE rendering, for the same reason. */
+  readonly nextDealBreakers: (entries: readonly string[]) => void;
   /** Make the next call to the named method fail. */
-  readonly failNext: (method: 'loadTracked' | 'saveToTracker') => void;
-  readonly calls: Record<'search' | 'browseKeyless' | 'loadTracked' | 'saveToTracker', number>;
+  readonly failNext: (method: FailableMethod) => void;
+  readonly calls: Record<
+    'search' | 'browseKeyless' | 'loadTracked' | 'saveToTracker' | 'latestCvText' | 'dealBreakers',
+    number
+  >;
 }
+
+type FailableMethod = 'loadTracked' | 'saveToTracker' | 'latestCvText' | 'dealBreakers';
 
 const FAILURE: DbError = {
   code: 'QUERY_FAILED',
@@ -115,12 +124,23 @@ export function createFakeSearchPort(
   let stored: Job[] = [...initial];
   const sent: JobSearchRequest[] = [];
   const browsed: KeylessBrowseRequest[] = [];
-  const failing = new Set<'loadTracked' | 'saveToTracker'>();
-  const calls = { search: 0, browseKeyless: 0, loadTracked: 0, saveToTracker: 0 };
+  const failing = new Set<FailableMethod>();
+  const calls = {
+    search: 0,
+    browseKeyless: 0,
+    loadTracked: 0,
+    saveToTracker: 0,
+    latestCvText: 0,
+    dealBreakers: 0,
+  };
 
   let outcome: JobSearchOutcome | null = null;
+  // No CV and no profile by default: every user's first launch, and what the
+  // tests about the other half of the screen want — no pills in the way.
+  let cvText: string | null = null;
+  let dealBreakers: readonly string[] = [];
 
-  function refuses(method: 'loadTracked' | 'saveToTracker'): boolean {
+  function refuses(method: FailableMethod): boolean {
     if (!failing.has(method)) return false;
     failing.delete(method);
     return true;
@@ -135,6 +155,12 @@ export function createFakeSearchPort(
       outcome = next;
     },
     failNext: (method) => failing.add(method),
+    nextCvText: (text) => {
+      cvText = text;
+    },
+    nextDealBreakers: (entries) => {
+      dealBreakers = entries;
+    },
 
     async search(request) {
       calls.search += 1;
@@ -159,6 +185,18 @@ export function createFakeSearchPort(
         if (key !== null) tracked.add(key);
       }
       return ok(tracked);
+    },
+
+    async latestCvText(): Promise<Result<string | null, DbError>> {
+      calls.latestCvText += 1;
+      if (refuses('latestCvText')) return { ok: false, error: { ...FAILURE, table: 'cvs' } };
+      return ok(cvText);
+    },
+
+    async dealBreakers(): Promise<Result<string[], DbError>> {
+      calls.dealBreakers += 1;
+      if (refuses('dealBreakers')) return { ok: false, error: { ...FAILURE, table: 'profile' } };
+      return ok([...dealBreakers]);
     },
 
     async saveToTracker(job): Promise<Result<SaveOutcome, DbError>> {

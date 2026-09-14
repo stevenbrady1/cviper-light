@@ -43,7 +43,9 @@ import { ok, type Application, type IsoTimestamp, type Job, type Result } from '
 
 import {
   findJobByExternalId,
+  getProfile,
   listApplications,
+  listCvs,
   listJobs,
   upsertApplication,
   upsertJob,
@@ -75,6 +77,17 @@ export interface SearchPort {
   browseKeyless(request: KeylessBrowseRequest): Promise<KeylessBrowseOutcome>;
   /** `source:external_id` for every advert already on the tracker board. */
   loadTracked(): Promise<Result<ReadonlySet<string>, DbError>>;
+  /**
+   * The text of the most recent CV, for ranking results against (L-157).
+   *
+   * `null` when there is no CV, or the newest one has no extracted text yet —
+   * both mean "nothing to rank against", and neither is an error. Read once
+   * when the screen opens; the ranking itself runs on this machine and touches
+   * nothing outside the process.
+   */
+  latestCvText(): Promise<Result<string | null, DbError>>;
+  /** The profile's deal-breakers, or `[]` when no profile has been saved. */
+  dealBreakers(): Promise<Result<string[], DbError>>;
   /** Add an advert and the application chasing it. */
   saveToTracker(
     job: Job,
@@ -142,6 +155,21 @@ export function createDbSearchPort(
         if (key !== null) tracked.add(key);
       }
       return ok(tracked);
+    },
+
+    async latestCvText() {
+      // `listCvs` orders by `created_at DESC`, so the first row is the newest.
+      // One ordering rule, in the data layer — not a second one here that
+      // happens to agree with it today.
+      const cvs = await listCvs();
+      if (!cvs.ok) return cvs;
+      return ok(cvs.value[0]?.extracted_text ?? null);
+    },
+
+    async dealBreakers() {
+      const profile = await getProfile();
+      if (!profile.ok) return profile;
+      return ok(profile.value?.deal_breakers ?? []);
     },
 
     async saveToTracker(job, ids, now) {

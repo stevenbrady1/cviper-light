@@ -1,8 +1,10 @@
+import { type Verdict } from '@cviper/core-types';
 import { SOURCE_LABEL, type SearchResultJob } from '@cviper/job-apis';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 
 import { describeCluster, postedLabel } from './model';
+import { type RankBand } from './rank';
 import { describeSalary, formatSalary } from './salary';
 
 /**
@@ -40,7 +42,34 @@ import { describeSalary, formatSalary } from './salary';
  * while there were two boards and silently labelled every advert from the
  * keyless feeds "Reed" the moment there were four — a wrong attribution on the
  * one line of the card whose job is to say where the advert came from.
+ *
+ * ============================================================================
+ * THE BAND IS THE ANALYSIS SCREEN'S BAND, AND NO BAND IS NO PILL (L-157)
+ * ============================================================================
+ * `rank` comes from the same keyword scorer and the same `deriveVerdict` the
+ * Analysis screen uses, in the same three tones, so "Strong match · 84" here
+ * and "Strong match" there are one fact said twice. When there is nothing to
+ * score against — no CV, or an advert that is a title and nothing else — the
+ * card shows NOTHING, not "unranked": a grey pill on every card the day the
+ * app is installed reads as the app being broken.
+ *
+ * A deal-breaker is a gold chip, one per profile entry the advert mentions.
+ * Gold, not red: it is a thing to read before applying, not a verdict, and
+ * the user wrote the list.
  */
+
+/** The verdict pill's tones — the same three the Analysis screen uses. */
+const RANK_TONE: Readonly<Record<Verdict, string>> = {
+  strong: 'bg-teal/10 text-teal',
+  possible: 'bg-gold/10 text-gold',
+  weak: 'bg-sunken text-ink-muted',
+};
+
+const RANK_LABEL: Readonly<Record<Verdict, string>> = {
+  strong: 'Strong match',
+  possible: 'Possible match',
+  weak: 'Weak match',
+};
 
 interface ResultCardProps {
   readonly entry: SearchResultJob;
@@ -53,6 +82,10 @@ interface ResultCardProps {
   /** What happened the last time Save was pressed on this card. */
   readonly note: string | null;
   readonly problem: string | null;
+  /** The keyless band against the CV on file, or `null` for no pill at all. */
+  readonly rank: RankBand | null;
+  /** The profile's deal-breakers this advert mentions, in profile order. */
+  readonly dealBreakers: readonly string[];
   readonly onSave: () => void;
   readonly onOpen: () => void;
 }
@@ -65,6 +98,8 @@ export function ResultCard({
   busy,
   note,
   problem,
+  rank,
+  dealBreakers,
   onSave,
   onOpen,
 }: ResultCardProps) {
@@ -84,17 +119,29 @@ export function ResultCard({
     >
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="min-w-0 font-medium text-ink">{job.title}</h3>
-        {/*
-          The board this advert came from. Named on every card — Adzuna's API
-          terms require their data to be attributed wherever it appears, and the
-          user needs to know which board an odd advert came from anyway.
-        */}
-        <span
-          data-testid={`result-source-${job.id}`}
-          className="shrink-0 rounded-pill bg-sunken px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] text-ink-muted uppercase"
-        >
-          {SOURCE_LABEL[job.source]}
-        </span>
+        <div className="flex shrink-0 items-baseline gap-2">
+          {rank === null ? null : (
+            <span
+              data-testid={`result-rank-${job.id}`}
+              data-verdict={rank.verdict}
+              className={`rounded-pill px-2 py-0.5 text-[11px] font-medium ${RANK_TONE[rank.verdict]}`}
+            >
+              {RANK_LABEL[rank.verdict]} ·{' '}
+              <span className="font-mono tabular-nums">{rank.score}</span>
+            </span>
+          )}
+          {/*
+            The board this advert came from. Named on every card — Adzuna's API
+            terms require their data to be attributed wherever it appears, and
+            the user needs to know which board an odd advert came from anyway.
+          */}
+          <span
+            data-testid={`result-source-${job.id}`}
+            className="rounded-pill bg-sunken px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] text-ink-muted uppercase"
+          >
+            {SOURCE_LABEL[job.source]}
+          </span>
+        </div>
       </div>
 
       <p className="truncate text-xs text-ink-muted">{where}</p>
@@ -125,6 +172,20 @@ export function ResultCard({
           </span>
         )}
       </div>
+
+      {dealBreakers.length === 0 ? null : (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {dealBreakers.map((text, index) => (
+            <span
+              key={text}
+              data-testid={`result-dealbreaker-${job.id}-${index}`}
+              className="rounded-pill bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold"
+            >
+              Deal-breaker: {text}
+            </span>
+          ))}
+        </div>
+      )}
 
       {clusterSize === null ? null : (
         <p
