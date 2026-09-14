@@ -11,6 +11,7 @@ import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { useDebouncedField } from '../../lib/useDebouncedField';
+import { createTauriFilePort, type FilePort } from '../../platform/files';
 
 import {
   addLanguage,
@@ -25,6 +26,8 @@ import {
 } from './model';
 import { GapsPanel } from './GapsPanel';
 import { createDbGapsPort, type GapsPort } from './gapsPort';
+import { ImportAiJobSearch } from './ImportAiJobSearch';
+import { mergeImportedProfile, type ImportedProfile } from './importAiJobSearch';
 import { createDbProfilePort, type ProfilePort } from './port';
 
 /**
@@ -41,6 +44,9 @@ import { createDbProfilePort, type ProfilePort } from './port';
  *
  * So this view has NO primary button at all. Blue means "the thing this
  * screen is for", and this screen is for writing, which needs no button.
+ * (The one exception is inside the import review at the bottom (L-167):
+ * "Add to my profile" is a decision about somebody else's file, and a
+ * decision gets a button.)
  *
  * ============================================================================
  * ONE ROW, LOADED ONCE, EDITED IN PLACE
@@ -77,6 +83,11 @@ export interface ProfileProps {
    * as `port`; defaults to the real SQLite-backed one.
    */
   readonly gapsPort?: GapsPort | undefined;
+  /**
+   * The folder picker behind "Import from an ai-job-search folder…" (L-167).
+   * Injected by tests; defaults to the real Tauri-backed port.
+   */
+  readonly filePort?: FilePort | undefined;
 }
 
 /** The loaded profile plus the stable keys for its two lists of rows. */
@@ -89,10 +100,16 @@ interface Loaded {
 const FIELD = 'mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink';
 const LABEL = 'block text-xs font-medium text-ink-muted';
 
-export function Profile({ port, now, gapsPort }: ProfileProps) {
+export function Profile({ port, now, gapsPort, filePort }: ProfileProps) {
   // Created once. A new port object every render would restart the load.
   const profilePort = useMemo(() => port ?? createDbProfilePort(), [port]);
   const skillsPort = useMemo(() => gapsPort ?? createDbGapsPort(), [gapsPort]);
+  const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
+  // Bumped by an import, which changes fields from OUTSIDE their boxes. Every
+  // `useDebouncedField` takes its initial value once, so the form is remounted
+  // to show the merged profile; each box's pending draft flushes on the way
+  // out, through `apply`, and so builds on the merge rather than undoing it.
+  const [formGeneration, setFormGeneration] = useState(0);
 
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(true);
@@ -235,6 +252,28 @@ export function Profile({ port, now, gapsPort }: ProfileProps) {
     [apply],
   );
 
+  const onImport = useCallback(
+    (imported: ImportedProfile) => {
+      apply((current) => {
+        const profile = mergeImportedProfile(current.profile, imported);
+        // The merge appends, so every existing row keeps its key and index.
+        return {
+          profile,
+          languageKeys: [
+            ...current.languageKeys,
+            ...keysFor(profile.languages.length - current.languageKeys.length),
+          ],
+          starKeys: [
+            ...current.starKeys,
+            ...keysFor(profile.star_examples.length - current.starKeys.length),
+          ],
+        };
+      });
+      setFormGeneration((generation) => generation + 1);
+    },
+    [apply, keysFor],
+  );
+
   const view = viewById('profile');
 
   return (
@@ -260,6 +299,7 @@ export function Profile({ port, now, gapsPort }: ProfileProps) {
 
         {loaded === null ? null : (
           <ProfileForm
+            key={formGeneration}
             loaded={loaded}
             onEdit={edit}
             onAddLanguage={onAddLanguage}
@@ -272,6 +312,8 @@ export function Profile({ port, now, gapsPort }: ProfileProps) {
         )}
 
         <GapsPanel port={skillsPort} />
+
+        {loaded === null ? null : <ImportAiJobSearch filePort={files} onApply={onImport} />}
       </div>
     </section>
   );

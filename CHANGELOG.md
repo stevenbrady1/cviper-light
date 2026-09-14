@@ -87,5 +87,9 @@ source of truth.
   original, saving to the application, and export as plain text.
 - A cover letter from the tailored CV and the advert (L-161), with a word
   count and a note over 400 words; saved and exportable.
+- Import a candidate profile from an ai-job-search folder (L-167): pick the
+  folder, four Markdown files are read by name on this computer, and what was
+  found is reviewed before it is added; lists are unioned and typed text is
+  never overwritten. No name, contact details or work history are read.
 
 [Unreleased]: https://github.com/stevenbrady1/cviper-light/commits/main

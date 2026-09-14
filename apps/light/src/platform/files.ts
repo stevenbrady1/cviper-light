@@ -76,6 +76,26 @@ export interface FileError {
  */
 export type TextExportExtension = 'txt' | 'md';
 
+/**
+ * The four Markdown files an ai-job-search workspace keeps a candidate
+ * profile in (L-167), each as text or `null` when the folder does not have it.
+ *
+ * Read by Rust from FIXED relative names inside the folder the user picked —
+ * the directory is never listed and nothing else in it is opened. The keys
+ * are the Rust struct's field names, and `parseAiJobSearchWorkspace` in
+ * `features/profile/importAiJobSearch.ts` is the only reader.
+ */
+export interface WorkspaceFiles {
+  /** `CLAUDE.md` at the top of the folder. */
+  readonly claude_md: string | null;
+  /** `.claude/skills/job-application-assistant/01-candidate-profile.md`. */
+  readonly candidate_profile: string | null;
+  /** `.../04-job-evaluation.md`. */
+  readonly job_evaluation: string | null;
+  /** `.../07-interview-prep.md`. */
+  readonly interview_prep: string | null;
+}
+
 export interface FilePort {
   /** Ask for a CV and read it. `null` means the user cancelled. */
   pickCv(): Promise<Result<PickedCv | null, FileError>>;
@@ -99,6 +119,13 @@ export interface FilePort {
     suggestedName: string,
     extension: TextExportExtension,
   ): Promise<Result<string | null, FileError>>;
+  /**
+   * Ask for an ai-job-search folder and read the four profile files in it
+   * (L-167). `null` means the user cancelled; a file the folder does not have
+   * is `null` inside the answer. A folder with none of the four is an error
+   * with Rust's own sentence.
+   */
+  pickProfileWorkspace(): Promise<Result<WorkspaceFiles | null, FileError>>;
 }
 
 /**
@@ -174,6 +201,17 @@ function readString(source: unknown, key: string): string | null {
   if (typeof source !== 'object' || source === null) return null;
   const value = (source as Record<string, unknown>)[key];
   return typeof value === 'string' ? value : null;
+}
+
+/**
+ * Read a property that is a string OR an explicit `null` off an IPC reply.
+ * `undefined` means the property was neither — a reply of a shape we do not
+ * know — which the caller reports rather than reads as "not there".
+ */
+function readStringOrNull(source: unknown, key: string): string | null | undefined {
+  if (typeof source !== 'object' || source === null) return undefined;
+  const value = (source as Record<string, unknown>)[key];
+  return typeof value === 'string' || value === null ? value : undefined;
 }
 
 /**
@@ -333,6 +371,39 @@ export function createTauriFilePort(): FilePort {
       }
 
       return ok(reply);
+    },
+
+    async pickProfileWorkspace() {
+      let reply: unknown;
+      try {
+        // No arguments, like `pick_and_read_cv`: the folder is chosen in the
+        // dialog Rust opens, and the four file names are constants there.
+        reply = await invoke('pick_and_read_profile_workspace');
+      } catch (thrown) {
+        return err({
+          message: rejectionMessage(thrown, 'That folder could not be read. Try again.'),
+        });
+      }
+
+      if (cancelled(reply)) return ok(null);
+
+      const claude_md = readStringOrNull(reply, 'claude_md');
+      const candidate_profile = readStringOrNull(reply, 'candidate_profile');
+      const job_evaluation = readStringOrNull(reply, 'job_evaluation');
+      const interview_prep = readStringOrNull(reply, 'interview_prep');
+
+      if (
+        claude_md === undefined ||
+        candidate_profile === undefined ||
+        job_evaluation === undefined ||
+        interview_prep === undefined
+      ) {
+        return err({
+          message: 'CViper read that folder but could not make sense of what came back. Try again.',
+        });
+      }
+
+      return ok({ claude_md, candidate_profile, job_evaluation, interview_prep });
     },
   };
 }
