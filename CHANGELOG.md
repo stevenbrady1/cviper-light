@@ -80,5 +80,12 @@ source of truth.
 - An interview prep pack from the archived application (L-163): likely
   questions with STAR-shaped answers, talking points, questions to ask, and
   gaps to bridge honestly; saved as a document.
+- Tailor a CV to an advert (L-160): a structured rewrite that may use only
+  what the CV already says, a second-context reviewer that lists issues and
+  never rewrites, a deterministic fabrication check (new metrics, employers,
+  years or certifications absent from the original), a line diff against the
+  original, saving to the application, and export as plain text.
+- A cover letter from the tailored CV and the advert (L-161), with a word
+  count and a note over 400 words; saved and exportable.
 
 [Unreleased]: https://github.com/stevenbrady1/cviper-light/commits/main

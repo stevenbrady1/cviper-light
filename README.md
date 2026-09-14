@@ -219,6 +219,15 @@ advert, the CV and letter you sent, and the STAR examples in your profile:
 likely questions with suggested answers, talking points, questions to ask, and
 the gaps to bridge honestly. Save the pack against the application.
 
+**Rewrite your CV for one advert, and draft the letter.** _Needs an AI
+provider._ The Tailor view rewrites your CV for a single advert using only
+what the CV already says — a rule the prompt states and a check enforces:
+every new number, employer, year or certification that is not in the original
+is flagged before you see the text. You get the rewrite as a diff against the
+original, a second read that lists problems without rewriting, and a cover
+letter drawn from the same facts. Save both against the application, or as a
+text file.
+
 **About us, briefly.** Settings → Privacy carries one sentence that opens this
 app's own privacy policy at `https://cviper.ai/privacy/`, and Settings → About says
 where Light was made and links to its page and its source. Each opens your own
@@ -248,6 +257,7 @@ lines ever reads or writes any state.
 | Funnel strip                        | **No.**                                                                |
 | Follow-up and thank-you drafts      | Yes — a local Ollama model, or your own key.                           |
 | Interview prep pack                 | Yes — a local Ollama model, or your own key.                           |
+| Tailored CV and cover letter        | Yes — a local Ollama model, or your own key.                           |
 
 Getting the free keys takes a few minutes; Settings links to both signup pages
 and tests a key before it saves it.
