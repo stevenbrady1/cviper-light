@@ -123,7 +123,7 @@ describe('export', () => {
     expect(filePort.written()).toHaveLength(1);
     const written = JSON.parse(filePort.written()[0]?.contents ?? '{}') as Record<string, unknown>;
     expect(written['schemaVersion']).toBe(1);
-    expect(written['app']).toEqual({ name: 'cviper-light', version: '0.1.0' });
+    expect(written['app']).toEqual({ name: 'cviper-light', version: '0.2.0' });
     expect(written['jobs']).toHaveLength(1);
   });
 

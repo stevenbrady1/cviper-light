@@ -1,6 +1,6 @@
 # CViper Light privacy policy
 
-_For CViper Light 0.1.0. This page is generated from the app's own list of the addresses it may contact — the same list the app shows under Settings → Privacy, and the one a test holds the code to. It changes when that list changes and not otherwise._
+_For CViper Light 0.2.0. This page is generated from the app's own list of the addresses it may contact — the same list the app shows under Settings → Privacy, and the one a test holds the code to. It changes when that list changes and not otherwise._
 
 ## The short version
 
