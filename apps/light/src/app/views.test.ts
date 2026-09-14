@@ -13,15 +13,16 @@ import {
 } from './views';
 
 describe('the view registry', () => {
-  it('lists the four steps in workflow order', () => {
-    // Profile, then Search, then Tracker, then Analysis — who you are, then
-    // the order a job hunt happens in. A reorder here changes what the rail
-    // teaches, so it should have to be deliberate.
+  it('lists the five steps in workflow order', () => {
+    // Profile, then Search, then Tracker, then Analysis, then Tailor — who
+    // you are, then the order a job hunt happens in. A reorder here changes
+    // what the rail teaches, so it should have to be deliberate.
     expect(SEQUENCE_VIEWS.map((view) => view.id)).toEqual([
       'profile',
       'search',
       'tracker',
       'analysis',
+      'tailor',
     ]);
   });
 
@@ -50,11 +51,12 @@ describe('the view registry', () => {
 });
 
 describe('keyboard shortcuts', () => {
-  it('binds Ctrl+1 to Ctrl+4 to the four steps, in order', () => {
+  it('binds Ctrl+1 to Ctrl+5 to the five steps, in order', () => {
     expect(viewForShortcut(1)).toBe('profile');
     expect(viewForShortcut(2)).toBe('search');
     expect(viewForShortcut(3)).toBe('tracker');
     expect(viewForShortcut(4)).toBe('analysis');
+    expect(viewForShortcut(5)).toBe('tailor');
   });
 
   it('never binds two views to the same digit', () => {
@@ -63,9 +65,9 @@ describe('keyboard shortcuts', () => {
   });
 
   it('boundary: an unbound digit resolves to nothing rather than to a default', () => {
-    // Ctrl+5 must do nothing at all. Falling through to a default would move
+    // Ctrl+6 must do nothing at all. Falling through to a default would move
     // the user somewhere they did not ask to go.
-    expect(viewForShortcut(5)).toBeNull();
+    expect(viewForShortcut(6)).toBeNull();
     expect(viewForShortcut(0)).toBeNull();
   });
 
