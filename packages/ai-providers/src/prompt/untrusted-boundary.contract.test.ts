@@ -101,6 +101,25 @@ const FIXTURES: Readonly<Record<string, readonly unknown[]>> = {
   buildAnalysisPrompt: [{ cvText: 'Jane Doe. 8 years Python.', jobText: 'Python role, 5+ years.' }],
   buildExtractionPrompt: [{ text: 'Credit Risk Analyst\nLloyds Banking Group\nLondon\n£45k' }],
   buildRepairPrompt: ['=== CV ===\nJane Doe\n=== END CV ===', '{}', 'summary: required'],
+  buildTailorPrompt: [
+    { cvText: 'Jane Doe. 8 years Python.', jobText: 'Python role, 5+ years.', profileNotes: null },
+  ],
+  buildCoverLetterPrompt: [
+    {
+      cvText: 'Jane Doe. 8 years Python.',
+      jobText: 'Python role, 5+ years.',
+      tailoredCvText: null,
+      profileNotes: null,
+    },
+  ],
+  buildReviewPrompt: [
+    {
+      draftText: 'PROFESSIONAL SUMMARY\nEight years of Python.',
+      jobText: 'Python role, 5+ years.',
+      cvText: 'Jane Doe. 8 years Python.',
+      kind: 'cv',
+    },
+  ],
 };
 
 /** A bare string that opens with a role sentence is a system prompt. */
