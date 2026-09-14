@@ -183,6 +183,42 @@ own machine, or your own AI provider's key. Without one you add jobs by
 typing them in, and everything else carries on as normal — the tracker and the
 browser job-search links never needed a key and still do not.
 
+**Tell it who you are.** _Works now, no setup._ The Profile view — the first
+screen on the rail — holds the things a CV does not say: the languages you
+work in and how well, your right to work, the deal-breakers, the sectors you
+want, what energises you and what drains you, and a few STAR examples. It is
+kept in the same database file as everything else and travels in the backup.
+
+**Check the gates before the score.** _Needs nothing to start._ Before an
+analysis puts a number on screen it reads the advert for citizenship,
+residency, clearance and language requirements and holds them against your
+profile — as a pass, a "check this", or a hard stop that quotes the advert's
+own line. A gate never moves the score; it sits above it.
+
+**Rank what you find.** _Needs nothing to start._ Every search result is
+matched against your newest CV by the same word comparison the basic check
+uses, and any deal-breaker from your profile is called out on the card. A
+"Best match first" toggle sorts the page.
+
+**See what the market keeps asking for.** _Needs nothing to start._ The Profile
+view lists the skills the adverts on your board ask for that your CV does not
+mention, ranked by how many of them want each one.
+
+**Know where you stand.** _Works now, no setup._ A strip under the tracker
+header counts sent, interviewing, offers and rejected, with the interview and
+offer rates.
+
+**Chase what has gone quiet.** _Needs an AI provider._ An application quiet for
+ten days is offered a follow-up draft, written only from the advert and the
+documents you actually sent — no new claims — at most twice, and logged in the
+notes when you mark it sent. Moving a card to Interviewing offers a thank-you
+note. These are drafts in a box for you to copy; the app never sends anything.
+
+**Prepare for the interview.** _Needs an AI provider._ From the archived
+advert, the CV and letter you sent, and the STAR examples in your profile:
+likely questions with suggested answers, talking points, questions to ask, and
+the gaps to bridge honestly. Save the pack against the application.
+
 **About us, briefly.** Settings → Privacy carries one sentence that opens this
 app's own privacy policy at `https://cviper.ai/privacy/`, and Settings → About says
 where Light was made and links to its page and its source. Each opens your own
@@ -205,6 +241,13 @@ lines ever reads or writes any state.
 | Job search in your browser          | **No.** One click, no key at all.                                      |
 | Paste a job advert into the tracker | Yes — a local Ollama model, or your own key.                           |
 | Export and import your data         | **No.**                                                                |
+| Candidate profile                   | **No.** Kept in the same local database.                               |
+| Eligibility and language gates      | **No.** Read from the advert and your profile, on your machine.        |
+| Rank search results against your CV | **No.** The same word comparison, run locally.                         |
+| Skills-gap heatmap                  | **No.** Counted from the adverts on your board.                        |
+| Funnel strip                        | **No.**                                                                |
+| Follow-up and thank-you drafts      | Yes — a local Ollama model, or your own key.                           |
+| Interview prep pack                 | Yes — a local Ollama model, or your own key.                           |
 
 Getting the free keys takes a few minutes; Settings links to both signup pages
 and tests a key before it saves it.

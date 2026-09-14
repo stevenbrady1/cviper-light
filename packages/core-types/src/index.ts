@@ -48,6 +48,26 @@ export {
 } from './analysis';
 
 export {
+  COVER_LETTER_JSON_SCHEMA,
+  CoverLetterSchema,
+  DRAFT_REVIEW_JSON_SCHEMA,
+  DraftReviewIssueSchema,
+  DraftReviewSchema,
+  TAILORED_CV_JSON_SCHEMA,
+  TailoredCvRoleSchema,
+  TailoredCvSchema,
+  renderCoverLetter,
+  renderTailoredCv,
+  wordCount,
+  type CoverLetter,
+  type DraftReview,
+  type DraftReviewIssue,
+  type DraftReviewVerdict,
+  type TailoredCv,
+  type TailoredCvRole,
+} from './tailoring';
+
+export {
   EMPTY_JOB_EXTRACTION,
   JOB_EXTRACTION_JSON_SCHEMA,
   JobExtractionSchema,

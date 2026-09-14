@@ -42,6 +42,7 @@ import {
   FIT_SCORE_ANCHORS,
   FIT_SCORE_WEIGHTS,
   JSON_ONLY,
+  NO_FABRICATION,
   UNTRUSTED_CONTENT_BOUNDARY,
 } from './constants';
 
@@ -50,6 +51,14 @@ import {
 describe('constants ported verbatim', () => {
   it('JSON_ONLY is exactly what the Python holds', () => {
     expect(JSON_ONLY).toBe('Return ONLY valid JSON.');
+  });
+
+  it('NO_FABRICATION is exactly what the Python holds', () => {
+    // `constants.py :: NO_FABRICATION` (@ dea8c15), the joined implicit concat.
+    expect(NO_FABRICATION).toBe(
+      'Do NOT fabricate companies, roles, dates, achievements, skills, ' +
+        "or certifications. Every fact must come from the candidate's base CV.",
+    );
   });
 
   it('FAIRNESS_GUARDRAIL is exactly what the Python holds', () => {

@@ -66,6 +66,7 @@ export {
   FIT_SCORE_ANCHORS,
   FIT_SCORE_WEIGHTS,
   JSON_ONLY,
+  NO_FABRICATION,
   UNTRUSTED_CONTENT_BOUNDARY,
   type PromptFragment,
 } from './prompt/constants';
@@ -145,3 +146,70 @@ export {
   type FollowUpMeta,
   type FollowUpSuccess,
 } from './follow-up';
+
+export {
+  MAX_PROFILE_NOTES_CHARS,
+  buildTailorPrompt,
+  type TailorPrompt,
+  type TailorPromptInput,
+} from './prompt/build-tailor-prompt';
+
+export {
+  MAX_TAILORED_CONTEXT_CHARS,
+  buildCoverLetterPrompt,
+  type CoverLetterPrompt,
+  type CoverLetterPromptInput,
+} from './prompt/build-cover-letter-prompt';
+
+export {
+  MAX_DRAFT_CHARS,
+  buildReviewPrompt,
+  type ReviewKind,
+  type ReviewPrompt,
+  type ReviewPromptInput,
+} from './prompt/build-review-prompt';
+
+export {
+  describeSchemaIssues,
+  runStructuredCall,
+  type PipelineError,
+  type PipelineMeta,
+  type SchemaIssue,
+  type StructuredCallOptions,
+} from './tailor-pipeline';
+
+export {
+  DEFAULT_MAX_TAILOR_TOKENS,
+  tailorCv,
+  type TailorCvOptions,
+  type TailorError,
+  type TailorMeta,
+  type TailorSuccess,
+} from './tailor';
+
+export {
+  DEFAULT_MAX_COVER_LETTER_TOKENS,
+  writeCoverLetter,
+  type CoverLetterError,
+  type CoverLetterMeta,
+  type CoverLetterSuccess,
+  type WriteCoverLetterOptions,
+} from './cover-letter';
+
+export {
+  DEFAULT_MAX_REVIEW_TOKENS,
+  reviewDraft,
+  type ReviewDraftOptions,
+  type ReviewError,
+  type ReviewMeta,
+  type ReviewSuccess,
+} from './review';
+
+export {
+  METRIC_PATTERN,
+  checkFabrication,
+  checkLetterClaims,
+  type FabricationFlag,
+  type FabricationKind,
+  type FabricationReport,
+} from './fabrication';

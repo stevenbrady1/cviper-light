@@ -67,6 +67,15 @@ export interface FileError {
   readonly message: string;
 }
 
+/**
+ * The two formats a plain-text export can be saved as (L-160).
+ *
+ * A closed union rather than a string: Rust refuses anything else before a
+ * dialog opens, and typing it here means a caller cannot ask for `.html` and
+ * find out at runtime.
+ */
+export type TextExportExtension = 'txt' | 'md';
+
 export interface FilePort {
   /** Ask for a CV and read it. `null` means the user cancelled. */
   pickCv(): Promise<Result<PickedCv | null, FileError>>;
@@ -79,6 +88,17 @@ export interface FilePort {
    * contract as `saveBackup`: the path, or `null` for a cancel.
    */
   saveCvJson(contents: string, suggestedName: string): Promise<Result<string | null, FileError>>;
+  /**
+   * Ask where to save a plain-text export — a tailored CV, a cover letter
+   * (L-160) — then write it. Same contract as `saveBackup`: the path, or
+   * `null` for a cancel. `extension` picks the dialog's filter and the only
+   * extension the written file may have.
+   */
+  saveText(
+    contents: string,
+    suggestedName: string,
+    extension: TextExportExtension,
+  ): Promise<Result<string | null, FileError>>;
 }
 
 /**
@@ -282,6 +302,33 @@ export function createTauriFilePort(): FilePort {
       if (typeof reply !== 'string') {
         return err({
           message: 'CViper saved that CV but could not report where it went.',
+        });
+      }
+
+      return ok(reply);
+    },
+
+    async saveText(contents, suggestedName, extension) {
+      let reply: unknown;
+      try {
+        // Its own literal call, for the same reason as `saveCvJson`. All three
+        // keys are one word, so the camelCase conversion cannot touch them.
+        reply = await invoke('pick_and_write_text', {
+          contents,
+          suggestion: suggestedName,
+          extension,
+        });
+      } catch (thrown) {
+        return err({
+          message: rejectionMessage(thrown, 'The text could not be saved. Try again.'),
+        });
+      }
+
+      if (cancelled(reply)) return ok(null);
+
+      if (typeof reply !== 'string') {
+        return err({
+          message: 'CViper saved that text but could not report where it went.',
         });
       }
 

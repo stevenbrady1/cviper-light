@@ -112,6 +112,24 @@ const FALLBACK_BACKUP_NAME: &str = "cviper-backup.json";
 /// plain file name (L-20b). See `bare_json_name`.
 const FALLBACK_CV_JSON_NAME: &str = "cv.json";
 
+/// Extensions a plain-text export — a tailored CV, a cover letter (L-160) —
+/// may be saved under. Lower-case, no dot. Exactly these two: the frontend
+/// asks for one BY NAME and anything else is refused before a dialog opens,
+/// so this command cannot be talked into writing `.html`, `.bat` or `.json`.
+const TEXT_EXTENSIONS: [&str; 2] = ["txt", "md"];
+
+/// The largest text export we will write, in bytes.
+///
+/// A tailored CV or a cover letter is a few kilobytes. 4 MB is a thousand of
+/// them, and small enough that the string a compromised frontend could ask us
+/// to write is not a disk-filling one.
+const MAX_TEXT_BYTES: u64 = 4 * 1024 * 1024;
+
+/// The stem of the save dialog's pre-fill for a text export whose suggested
+/// name is not a plain file name. The extension is the one the caller asked
+/// for, so `cviper-export.txt` or `cviper-export.md`. See `bare_text_name`.
+const FALLBACK_TEXT_STEM: &str = "cviper-export";
+
 /// The longest suggested file name we will hand to the dialog.
 ///
 /// Windows caps one path component at 255 characters; 128 is comfortably inside
@@ -351,18 +369,52 @@ fn bare_file_name(suggested: &str) -> String {
 /// `cviper-backup.json`, a CV export to `cv.json`. A CV's name is the user's
 /// own file name, so `Steve Brady CV.json` is welcome and `..\CV.json` is not.
 fn bare_json_name(suggested: &str, fallback: &str) -> String {
+    bare_name(suggested, "json", fallback)
+}
+
+/// The same rule again for a plain-text export (L-160), where the extension
+/// is whichever of `TEXT_EXTENSIONS` the caller asked for: `Tailored CV.md` is
+/// welcome under `md`, and the same name under `txt` is not a plain name for
+/// THIS save and falls back to `cviper-export.txt`.
+fn bare_text_name(suggested: &str, extension: &str) -> String {
+    bare_name(
+        suggested,
+        extension,
+        &format!("{FALLBACK_TEXT_STEM}.{extension}"),
+    )
+}
+
+/// The guard behind all three: a plain name is non-empty, short enough, has
+/// no separator, drive letter, `..` or control character, and ends in exactly
+/// the extension this save is for. Anything else is REPLACED with the
+/// fallback, never repaired.
+fn bare_name(suggested: &str, extension: &str, fallback: &str) -> String {
     let is_a_plain_name = !suggested.is_empty()
         && suggested.chars().count() <= MAX_SUGGESTED_NAME_CHARS
         && !suggested.contains(['/', '\\', ':'])
         && !suggested.contains("..")
         && !suggested.chars().any(char::is_control)
-        && extension_of(Path::new(suggested)).as_deref() == Some("json");
+        && extension_of(Path::new(suggested)).as_deref() == Some(extension);
 
     if is_a_plain_name {
         suggested.to_string()
     } else {
         fallback.to_string()
     }
+}
+
+/// The one extension a text export may use, or a refusal.
+///
+/// Lower-cased so `TXT` is `txt`; anything outside `TEXT_EXTENSIONS` is an
+/// error BEFORE a dialog opens — the frontend names the format, and the only
+/// formats it can name are the two plain-text ones.
+fn text_extension(requested: &str) -> Result<&'static str, String> {
+    let lowered = requested.trim().to_ascii_lowercase();
+    TEXT_EXTENSIONS
+        .iter()
+        .find(|allowed| **allowed == lowered)
+        .copied()
+        .ok_or_else(|| "A text export can only be saved as .txt or .md.".to_string())
 }
 
 // ── Reading and writing, once the user has chosen ───────────────────────────
@@ -459,6 +511,28 @@ fn write_cv_json_at(path: &Path, contents: &str) -> Result<(), String> {
         path,
         contents,
         "The CV could not be written. Try saving it somewhere else.",
+    )
+}
+
+/// Write a plain-text export — a tailored CV or a cover letter (L-160) — to
+/// the path the user chose. `extension` has already passed `text_extension`;
+/// the path the dialog answered with must carry that same extension, so a
+/// user who types `letter.exe` into the save box gets a refusal, not a file.
+fn write_text_export_at(path: &Path, contents: &str, extension: &str) -> Result<(), String> {
+    let Some(actual) = extension_of(path) else {
+        return Err(format!("Give the file a name ending in .{extension}."));
+    };
+    if actual != extension {
+        return Err(format!("This export must be saved as a .{extension} file."));
+    }
+    if contents.len() as u64 > MAX_TEXT_BYTES {
+        return Err("That text is too large to write.".to_string());
+    }
+
+    write_text_at(
+        path,
+        contents,
+        "The text could not be written. Try saving it somewhere else.",
     )
 }
 
@@ -691,6 +765,51 @@ pub(crate) async fn pick_and_write_cv_json(
 
     let path = local_path(chosen)?;
     write_cv_json_at(&path, &contents)?;
+
+    Ok(Some(path.display().to_string()))
+}
+
+/// Ask where to save a plain-text export — a tailored CV or a cover letter
+/// (L-160) — then write it. Same shape as `pick_and_write_cv_json`:
+/// `Ok(None)` is a cancel, `Ok(Some(path))` is where it went, and the path
+/// never passes through JavaScript on the way in.
+///
+/// `extension` is the ONLY new thing the frontend contributes, and it is a
+/// choice between two words: `txt` or `md`. Anything else is refused before
+/// the dialog opens (`text_extension`), the dialog's filter is that one
+/// extension, and the chosen path is checked against it again before a byte
+/// is written (`write_text_export_at`).
+#[tauri::command]
+pub(crate) async fn pick_and_write_text(
+    app: AppHandle,
+    contents: String,
+    // One word, for the reason given on `pick_and_write_backup`.
+    suggestion: String,
+    extension: String,
+) -> Result<Option<String>, String> {
+    let extension = text_extension(&extension)?;
+
+    if contents.len() as u64 > MAX_TEXT_BYTES {
+        return Err("That text is too large to write.".to_string());
+    }
+
+    let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
+
+    app.dialog()
+        .file()
+        .set_title("Save as text")
+        .set_file_name(bare_text_name(&suggestion, extension))
+        .add_filter(extension, &[extension])
+        .save_file(move |chosen| {
+            let _ = answer.try_send(chosen);
+        });
+
+    let Some(chosen) = wait_for_choice(answers).await? else {
+        return Ok(None);
+    };
+
+    let path = local_path(chosen)?;
+    write_text_export_at(&path, &contents, extension)?;
 
     Ok(Some(path.display().to_string()))
 }
@@ -1207,6 +1326,104 @@ mod tests {
 
     // ── The two rules the module comment states ─────────────────────────────
 
+    // ── The text export (L-160) ─────────────────────────────────────────────
+
+    #[test]
+    fn a_text_export_accepts_only_txt_and_md() {
+        assert_eq!(text_extension("txt").unwrap(), "txt");
+        assert_eq!(text_extension("md").unwrap(), "md");
+        // Boundary: case and surrounding whitespace are tidied, not refused.
+        assert_eq!(text_extension(" TXT ").unwrap(), "txt");
+
+        // Negative: everything else is an error before a dialog could open.
+        for refused in ["exe", "json", "html", "bat", "", ".txt", "txt md", "docx"] {
+            let error = text_extension(refused).expect_err(refused);
+            assert!(
+                error.contains(".txt or .md"),
+                "{refused:?} produced: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_text_export_is_refused_when_the_chosen_path_has_another_extension() {
+        // The dialog's filter is advisory on some platforms: a user can type
+        // `letter.exe` into the box. The write refuses it, and writes nothing.
+        let wrong = temp_path("letter.exe");
+        let error = write_text_export_at(&wrong, "Dear Hiring Manager,", "txt").unwrap_err();
+        assert!(error.contains(".txt"), "{error}");
+        assert!(!wrong.exists());
+
+        // The OTHER allowed extension is still the wrong one for THIS save.
+        let other = temp_path("letter.md");
+        let error = write_text_export_at(&other, "Dear Hiring Manager,", "txt").unwrap_err();
+        assert!(error.contains(".txt"), "{error}");
+        assert!(!other.exists());
+
+        let none = temp_path("letter");
+        assert!(write_text_export_at(&none, "x", "md")
+            .unwrap_err()
+            .contains(".md"));
+    }
+
+    #[test]
+    fn a_text_export_writes_the_text_verbatim_under_either_extension() {
+        for extension in TEXT_EXTENSIONS {
+            let path = temp_path(&format!("Tailored CV.{extension}"));
+            let text = "PROFESSIONAL SUMMARY\nEight years of Python.\n\n- Bullet one\n";
+            write_text_export_at(&path, text, extension).unwrap();
+            assert_eq!(fs::read_to_string(&path).unwrap(), text);
+            let _ = fs::remove_file(&path);
+        }
+    }
+
+    #[test]
+    fn a_text_export_over_the_size_cap_is_refused_before_anything_is_written() {
+        let path = temp_path("huge.txt");
+        let too_big = "a".repeat(MAX_TEXT_BYTES as usize + 1);
+        let error = write_text_export_at(&path, &too_big, "txt").unwrap_err();
+        assert!(error.contains("too large"), "{error}");
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn a_text_name_that_is_not_a_plain_name_falls_back_for_that_extension() {
+        assert_eq!(
+            bare_text_name("Tailored CV — Analyst.txt", "txt"),
+            "Tailored CV — Analyst.txt"
+        );
+        assert_eq!(bare_text_name("Cover letter.md", "md"), "Cover letter.md");
+
+        // The right shape under the WRONG extension is not a plain name for
+        // this save, and the fallback carries the extension actually asked for.
+        assert_eq!(
+            bare_text_name("Cover letter.md", "txt"),
+            "cviper-export.txt"
+        );
+        assert_eq!(bare_text_name("Tailored CV.txt", "md"), "cviper-export.md");
+
+        for hostile in [
+            "../CV.txt",
+            "..\\CV.txt",
+            "C:CV.txt",
+            "docs/CV.txt",
+            "CV\u{7}.txt",
+            "",
+        ] {
+            assert_eq!(
+                bare_text_name(hostile, "txt"),
+                "cviper-export.txt",
+                "{hostile:?}"
+            );
+        }
+
+        // And the fallback passes its own guard, so the safe answer is savable.
+        for extension in TEXT_EXTENSIONS {
+            let fallback = format!("{FALLBACK_TEXT_STEM}.{extension}");
+            assert_eq!(bare_text_name(&fallback, extension), fallback);
+        }
+    }
+
     #[test]
     fn no_message_leaks_the_path() {
         // Every failure a caller can provoke with a hostile path, checked for
@@ -1223,7 +1440,10 @@ mod tests {
             read_cv_at(&secret).unwrap_err(),
             read_backup_at(&secret).unwrap_err(),
             write_backup_at(&secret, "{}").unwrap_err(),
-            describe_io_error(&std::io::Error::new(ErrorKind::Other, secret.display().to_string())),
+            describe_io_error(&std::io::Error::new(
+                ErrorKind::Other,
+                secret.display().to_string(),
+            )),
         ];
 
         for message in messages {
@@ -1408,6 +1628,8 @@ mod tests {
             "pick_and_read_cv",
             "pick_and_read_backup",
             "pick_and_write_backup",
+            "pick_and_write_cv_json",
+            "pick_and_write_text",
         ] {
             assert!(
                 handler.contains(&format!("files::{command},")),
@@ -1441,6 +1663,7 @@ mod tests {
             "invoke('pick_and_read_backup')",
             "invoke('pick_and_write_backup', ",
             "invoke('pick_and_write_cv_json', ",
+            "invoke('pick_and_write_text', ",
         ] {
             assert!(
                 PLATFORM_FILES_TS.contains(call),
@@ -1455,6 +1678,22 @@ mod tests {
             PLATFORM_FILES_TS.contains("{ contents, suggestion: suggestedName }"),
             "src/platform/files.ts no longer passes `contents` and `suggestion`, \
              which are the parameter names pick_and_write_backup declares"
+        );
+        // The text export adds `extension` — also one word, also unchanged by
+        // the camelCase conversion. Three keys no longer fit Prettier's line,
+        // so the object is read with its whitespace collapsed and its trailing
+        // comma dropped, which is the only difference the formatter makes.
+        let compact = PLATFORM_FILES_TS
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .replace(", }", " }");
+        assert!(
+            compact.contains(
+                "invoke('pick_and_write_text', { contents, suggestion: suggestedName, extension }"
+            ),
+            "src/platform/files.ts no longer passes `contents`, `suggestion` and `extension`, \
+             which are the parameter names pick_and_write_text declares"
         );
 
         // Nothing may still be reaching for the path-taking commands.
