@@ -20,7 +20,9 @@ export {
   ANALYSIS_COLUMNS,
   APPLICATION_COLUMNS,
   CV_COLUMNS,
+  DOCUMENT_COLUMNS,
   JOB_COLUMNS,
+  PROFILE_COLUMNS,
   TABLE_COLUMNS,
   type SqlValue,
   type TableName,
@@ -43,5 +45,12 @@ export {
   upsertAnalysis,
   deleteAnalysis,
 } from './analyses';
+export { getProfile, upsertProfile } from './profile';
+export {
+  listDocuments,
+  listDocumentsForApplication,
+  upsertDocument,
+  deleteDocument,
+} from './documents';
 export { readAll, writeAll, type DbSnapshot } from './backup';
 export { wipeAll, WIPE_ORDER } from './wipe';

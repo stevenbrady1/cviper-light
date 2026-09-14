@@ -61,7 +61,14 @@ const CV: Cv = {
   created_at: '2026-08-01T09:00:00.000Z',
 };
 
-const FULL = { jobs: [JOB], applications: [APPLICATION], cvs: [CV], analyses: [] };
+const FULL = {
+  profile: null,
+  jobs: [JOB],
+  applications: [APPLICATION],
+  documents: [],
+  cvs: [CV],
+  analyses: [],
+};
 
 afterEach(() => {
   cleanup();
@@ -410,8 +417,10 @@ describe('the round trip', () => {
     // promise and the behaviour ever part company, this is where it shows.
     const other: Job = { ...JOB, id: 'job-2', title: 'Quant Developer' };
     const destination = createFakeBackupPort({
+      profile: null,
       jobs: [other],
       applications: [],
+      documents: [],
       cvs: [],
       analyses: [],
     });

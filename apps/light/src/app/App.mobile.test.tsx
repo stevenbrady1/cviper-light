@@ -22,6 +22,7 @@ const { default: App } = await import('./App');
 const { WIDE_QUERY } = await import('./viewport');
 const { markWelcomeSeen } = await import('../features/onboarding/store');
 const { createFakeTrackerPort } = await import('../features/tracker/test/fakePort');
+const { createFakeProfilePort } = await import('../features/profile/test/fakePort');
 
 const NOW = new Date(2026, 7, 19, 9, 0, 0);
 
@@ -66,7 +67,9 @@ afterEach(() => {
 });
 
 async function renderApp() {
-  const result = render(<App trackerPort={createFakeTrackerPort()} now={NOW} />);
+  const result = render(
+    <App trackerPort={createFakeTrackerPort()} profilePort={createFakeProfilePort()} now={NOW} />,
+  );
   await screen.findByTestId('shell');
   await vi.waitFor(() =>
     expect(tauri.invoke.mock.calls.some(([command]) => command === 'ollama_probe')).toBe(true),
@@ -132,12 +135,12 @@ describe('the shell at 375px', () => {
     expect(screen.getByTestId('view-settings')).toBeTruthy();
   });
 
-  it('keeps Ctrl+1/2/3 working with a keyboard attached', async () => {
+  it('keeps Ctrl+1/2/3/4 working with a keyboard attached', async () => {
     installMatchMedia(375);
     await renderApp();
 
     act(() => {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', ctrlKey: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: '2', ctrlKey: true }));
     });
     expect(screen.getByTestId('view-search')).toBeTruthy();
   });

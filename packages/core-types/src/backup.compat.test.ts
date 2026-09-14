@@ -12,8 +12,10 @@ const BASE: Omit<BackupPayload, 'cvs'> = {
   schemaVersion: BACKUP_SCHEMA_VERSION,
   exportedAt: '2026-09-08T10:00:00.000Z',
   app: { name: 'cviper-light', version: '0.1.0' },
+  profile: null,
   jobs: [],
   applications: [],
+  documents: [],
   analyses: [],
 };
 

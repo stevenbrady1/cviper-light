@@ -13,11 +13,16 @@ import {
 } from './views';
 
 describe('the view registry', () => {
-  it('lists the three steps in workflow order', () => {
-    // Search, then Tracker, then Analysis — the order a job hunt happens in. A
-    // reorder here changes what the rail teaches, so it should have to be
-    // deliberate.
-    expect(SEQUENCE_VIEWS.map((view) => view.id)).toEqual(['search', 'tracker', 'analysis']);
+  it('lists the four steps in workflow order', () => {
+    // Profile, then Search, then Tracker, then Analysis — who you are, then
+    // the order a job hunt happens in. A reorder here changes what the rail
+    // teaches, so it should have to be deliberate.
+    expect(SEQUENCE_VIEWS.map((view) => view.id)).toEqual([
+      'profile',
+      'search',
+      'tracker',
+      'analysis',
+    ]);
   });
 
   it('pins Settings to the bottom, outside the sequence', () => {
@@ -45,10 +50,11 @@ describe('the view registry', () => {
 });
 
 describe('keyboard shortcuts', () => {
-  it('binds Ctrl+1, Ctrl+2 and Ctrl+3 to the three steps, in order', () => {
-    expect(viewForShortcut(1)).toBe('search');
-    expect(viewForShortcut(2)).toBe('tracker');
-    expect(viewForShortcut(3)).toBe('analysis');
+  it('binds Ctrl+1 to Ctrl+4 to the four steps, in order', () => {
+    expect(viewForShortcut(1)).toBe('profile');
+    expect(viewForShortcut(2)).toBe('search');
+    expect(viewForShortcut(3)).toBe('tracker');
+    expect(viewForShortcut(4)).toBe('analysis');
   });
 
   it('never binds two views to the same digit', () => {
@@ -57,9 +63,9 @@ describe('keyboard shortcuts', () => {
   });
 
   it('boundary: an unbound digit resolves to nothing rather than to a default', () => {
-    // Ctrl+4 must do nothing at all. Falling through to a default would move
+    // Ctrl+5 must do nothing at all. Falling through to a default would move
     // the user somewhere they did not ask to go.
-    expect(viewForShortcut(4)).toBeNull();
+    expect(viewForShortcut(5)).toBeNull();
     expect(viewForShortcut(0)).toBeNull();
   });
 

@@ -24,8 +24,14 @@
  *   "schemaVersion": 1,
  *   "exportedAt": "2026-08-19T09:00:00.000Z",
  *   "app": { "name": "cviper-light", "version": "0.1.0" },
- *   "jobs": [...], "applications": [...], "cvs": [...], "analyses": [...]
+ *   "profile": { ... } | null,
+ *   "jobs": [...], "applications": [...], "documents": [...],
+ *   "cvs": [...], "analyses": [...]
  * }
+ *
+ * `profile` (L-154) and `documents` (L-155) arrived after v1 shipped, as
+ * `cvs.json_resume` did before them. Both are ADDITIVE: a file without the
+ * keys imports as "no profile, no documents", so the version stays 1.
  */
 import { z } from './zod';
 
@@ -33,12 +39,16 @@ import {
   AnalysisSchema,
   ApplicationSchema,
   CvSchema,
+  DocumentSchema,
   JobSchema,
+  ProfileSchema,
   type Analysis,
   type Application,
   type Cv,
+  type Document,
   type ExtraFields,
   type Job,
+  type Profile,
 } from './entities';
 import { err, ok, type Result } from './result';
 
@@ -77,8 +87,12 @@ export interface BackupPayload {
   schemaVersion: typeof BACKUP_SCHEMA_VERSION;
   exportedAt: string;
   app: BackupApp;
+  /** `null` when the user has never filled the profile in, or the file predates it. */
+  profile: Profile | null;
   jobs: Job[];
   applications: Application[];
+  /** Empty when the file predates L-155. */
+  documents: Document[];
   cvs: Cv[];
   analyses: Analysis[];
   /** @internal forward-compatibility bag — see `ExtraFields`. */
@@ -129,8 +143,10 @@ const TOP_LEVEL_FIELDS = [
   'schemaVersion',
   'exportedAt',
   'app',
+  'profile',
   'jobs',
   'applications',
+  'documents',
   'cvs',
   'analyses',
 ] as const;
@@ -296,6 +312,40 @@ function emitAnalysis(analysis: Analysis): Record<string, unknown> {
   );
 }
 
+function emitProfile(profile: Profile): Record<string, unknown> {
+  return withExtras(
+    {
+      id: profile.id,
+      headline: profile.headline,
+      languages: profile.languages,
+      work_rights: profile.work_rights,
+      deal_breakers: profile.deal_breakers,
+      target_sectors: profile.target_sectors,
+      career_goals: profile.career_goals,
+      energising: profile.energising,
+      draining: profile.draining,
+      writing_style: profile.writing_style,
+      star_examples: profile.star_examples,
+      updated_at: profile.updated_at,
+    },
+    profile.__extra,
+  );
+}
+
+function emitDocument(document: Document): Record<string, unknown> {
+  return withExtras(
+    {
+      id: document.id,
+      application_id: document.application_id,
+      kind: document.kind,
+      title: document.title,
+      text: document.text,
+      created_at: document.created_at,
+    },
+    document.__extra,
+  );
+}
+
 // --- Export -----------------------------------------------------------------
 
 /**
@@ -318,8 +368,10 @@ export function exportBackup(payload: BackupPayload): string {
         { name: payload.app.name, version: payload.app.version },
         payload.app.__extra,
       ),
+      profile: payload.profile === null ? null : emitProfile(payload.profile),
       jobs: byId(payload.jobs).map(emitJob),
       applications: byId(payload.applications).map(emitApplication),
+      documents: byId(payload.documents).map(emitDocument),
       cvs: byId(payload.cvs).map(emitCv),
       analyses: byId(payload.analyses).map(emitAnalysis),
     },
@@ -425,6 +477,49 @@ function readCollection<TSchema extends z.ZodObject>(
 }
 
 /**
+ * A collection a v1 file may legitimately not have (L-155's `documents`).
+ *
+ * ABSENT means "written before the key existed" and reads as empty. Anything
+ * PRESENT is held to the same rule as every other collection — an object or a
+ * string where the array should be is a broken file, not an old one.
+ */
+function readOptionalCollection<TSchema extends z.ZodObject>(
+  document: Record<string, unknown>,
+  key: string,
+  schema: TSchema,
+): Result<Array<z.infer<TSchema>>, BackupError> {
+  if (document[key] === undefined) return ok([]);
+  return readCollection(document, key, schema);
+}
+
+/**
+ * The single profile record, or `null`.
+ *
+ * Absent and `null` mean the same thing: no profile. A file written before
+ * L-154 has no key; a file written after it by someone who never opened the
+ * Profile view has `null`. Neither is a reason to refuse the rest.
+ */
+function readProfile(document: Record<string, unknown>): Result<Profile | null, BackupError> {
+  const raw = document['profile'];
+  if (raw === undefined || raw === null) return ok(null);
+
+  const parsed = ProfileSchema.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const suffix = issue && issue.path.length > 0 ? `.${issue.path.join('.')}` : '';
+    return err({
+      code: 'INVALID_RECORD',
+      message: `"profile" could not be read:\n${z.prettifyError(parsed.error)}`,
+      path: `profile${suffix}`,
+    });
+  }
+
+  return ok(
+    attachExtras(parsed.data, splitExtras(toRecord(raw), Object.keys(ProfileSchema.shape))),
+  );
+}
+
+/**
  * Validate and load a backup. ATOMIC: on any failure nothing is imported, so a
  * half-good file can never leave the user with a half-populated database. The
  * whole payload is built before anything is returned, and a failure returns an
@@ -462,11 +557,17 @@ export function importBackup(raw: unknown): Result<BackupPayload, BackupError> {
     splitExtras(toRecord(rawApp), Object.keys(BackupAppSchema.shape)),
   );
 
+  const profile = readProfile(document.value);
+  if (!profile.ok) return err(profile.error);
+
   const jobs = readCollection(document.value, 'jobs', JobSchema);
   if (!jobs.ok) return err(jobs.error);
 
   const applications = readCollection(document.value, 'applications', ApplicationSchema);
   if (!applications.ok) return err(applications.error);
+
+  const documents = readOptionalCollection(document.value, 'documents', DocumentSchema);
+  if (!documents.ok) return err(documents.error);
 
   const cvs = readCollection(document.value, 'cvs', CvSchema);
   if (!cvs.ok) return err(cvs.error);
@@ -481,8 +582,10 @@ export function importBackup(raw: unknown): Result<BackupPayload, BackupError> {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     exportedAt: exportedAt.data,
     app,
+    profile: profile.value,
     jobs: jobs.value,
     applications: applications.value,
+    documents: documents.value,
     cvs: cvs.value,
     analyses: analyses.value,
     ...(extra === undefined ? {} : { __extra: extra }),

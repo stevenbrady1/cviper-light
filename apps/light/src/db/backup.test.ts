@@ -10,12 +10,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  emptyProfile,
   isErr,
   isOk,
   type Analysis,
   type Application,
   type Cv,
+  type Document,
   type Job,
+  type Profile,
 } from '@cviper/core-types';
 
 const sql = vi.hoisted(() => {
@@ -112,24 +115,50 @@ const ANALYSIS: Analysis = {
   created_at: '2026-08-19T09:03:00.000Z',
 };
 
-const EMPTY = { jobs: [], applications: [], cvs: [], analyses: [] };
-const FULL = { jobs: [JOB], applications: [APPLICATION], cvs: [CV], analyses: [ANALYSIS] };
+const DOCUMENT: Document = {
+  id: 'doc-0001',
+  application_id: 'app-0001',
+  kind: 'cover_letter',
+  title: 'Cover letter',
+  text: 'Dear hiring manager,',
+  created_at: '2026-08-19T09:04:00.000Z',
+};
+
+const PROFILE: Profile = {
+  ...emptyProfile('2026-08-19T09:05:00.000Z'),
+  headline: 'Risk analyst',
+  languages: [{ name: 'French', level: 'B2' }],
+};
+
+const EMPTY = { profile: null, jobs: [], applications: [], documents: [], cvs: [], analyses: [] };
+const FULL = {
+  profile: PROFILE,
+  jobs: [JOB],
+  applications: [APPLICATION],
+  documents: [DOCUMENT],
+  cvs: [CV],
+  analyses: [ANALYSIS],
+};
 
 // --- readAll ----------------------------------------------------------------
 
 describe('readAll', () => {
-  it('reads all four tables in a fixed, deterministic order', async () => {
+  it('reads all six tables in a fixed, deterministic order', async () => {
     const { readAll } = await import('./backup');
 
     const result = await readAll();
 
     expect(isOk(result)).toBe(true);
     const queries = sql.select.mock.calls.map((call) => call[0]);
-    expect(queries).toHaveLength(4);
+    expect(queries).toHaveLength(6);
     expect(queries[0]).toMatch(/FROM jobs ORDER BY id$/);
     expect(queries[1]).toMatch(/FROM cvs ORDER BY id$/);
     expect(queries[2]).toMatch(/FROM applications ORDER BY id$/);
     expect(queries[3]).toMatch(/FROM analyses ORDER BY id$/);
+    expect(queries[4]).toMatch(/FROM documents ORDER BY id$/);
+    // The one row, by its fixed id, bound rather than interpolated.
+    expect(queries[5]).toMatch(/FROM profile WHERE id = \$1$/);
+    expect(sql.select.mock.calls[5]?.[1]).toEqual(['me']);
   });
 
   it('returns an empty snapshot when the database is empty', async () => {
@@ -144,6 +173,8 @@ describe('readAll', () => {
     const rows = await import('./rows');
     const analysisValues = rows.analysisToValues(ANALYSIS);
     if (!isOk(analysisValues)) throw new Error('fixture failed to serialise');
+    const profileValues = rows.profileToValues(PROFILE);
+    if (!isOk(profileValues)) throw new Error('fixture failed to serialise');
 
     const asRow = (columns: readonly string[], values: readonly (string | number | null)[]) =>
       Object.fromEntries(columns.map((column, index) => [column, values[index]]));
@@ -154,12 +185,34 @@ describe('readAll', () => {
       .mockResolvedValueOnce([
         asRow(rows.APPLICATION_COLUMNS, rows.applicationToValues(APPLICATION)),
       ])
-      .mockResolvedValueOnce([asRow(rows.ANALYSIS_COLUMNS, analysisValues.value)]);
+      .mockResolvedValueOnce([asRow(rows.ANALYSIS_COLUMNS, analysisValues.value)])
+      .mockResolvedValueOnce([asRow(rows.DOCUMENT_COLUMNS, rows.documentToValues(DOCUMENT))])
+      .mockResolvedValueOnce([asRow(rows.PROFILE_COLUMNS, profileValues.value)]);
 
     const { readAll } = await import('./backup');
     const result = await readAll();
 
     expect(isOk(result) && result.value).toEqual(FULL);
+  });
+
+  it('boundary: no profile row reads as null, with everything else intact', async () => {
+    const { readAll } = await import('./backup');
+
+    const result = await readAll();
+
+    expect(isOk(result) && result.value.profile).toBeNull();
+  });
+
+  it('refuses the whole snapshot when the profile row is unreadable', async () => {
+    sql.select.mockImplementation(async (query: string) =>
+      /FROM profile/.test(query) ? [{ id: 'me', languages_json: '{broken' }] : [],
+    );
+
+    const { readAll } = await import('./backup');
+    const result = await readAll();
+
+    expect(isErr(result) && result.error.code).toBe('MALFORMED_ROW');
+    expect(isErr(result) && result.error.table).toBe('profile');
   });
 
   it('refuses the whole snapshot when one row is unreadable', async () => {
@@ -172,7 +225,7 @@ describe('readAll', () => {
     expect(isErr(result) && result.error.table).toBe('jobs');
   });
 
-  it('does not let another operation slip between its four reads', async () => {
+  it('does not let another operation slip between its six reads', async () => {
     const order: string[] = [];
     sql.select.mockImplementation(async () => {
       order.push('read');
@@ -190,7 +243,7 @@ describe('readAll', () => {
     const write = upsertJob(JOB);
     await Promise.all([snapshot, write]);
 
-    expect(order).toEqual(['read', 'read', 'read', 'read', 'write']);
+    expect(order).toEqual(['read', 'read', 'read', 'read', 'read', 'read', 'write']);
   });
 
   it('reports a failed read as an error rather than an empty export', async () => {
@@ -217,12 +270,56 @@ describe('writeAll', () => {
     expect(statements()).not.toContain('ROLLBACK;');
   });
 
-  it('writes parents before children so the foreign keys hold', async () => {
+  it('writes parents before children so the foreign keys hold, then the profile', async () => {
     const { writeAll } = await import('./backup');
 
     await writeAll(FULL);
 
-    expect(insertedTables()).toEqual(['jobs', 'cvs', 'applications', 'analyses']);
+    expect(insertedTables()).toEqual([
+      'jobs',
+      'cvs',
+      'applications',
+      'documents',
+      'analyses',
+      'profile',
+    ]);
+  });
+
+  it('writes the profile INSIDE the transaction, never after the commit', async () => {
+    const { writeAll } = await import('./backup');
+
+    await writeAll(FULL);
+
+    const issued = statements();
+    const profileAt = issued.findIndex((query) => /^INSERT INTO profile/.test(query));
+    expect(profileAt).toBeGreaterThan(issued.indexOf('BEGIN IMMEDIATE;'));
+    expect(profileAt).toBeLessThan(issued.indexOf('COMMIT;'));
+  });
+
+  it('boundary: a snapshot with no profile writes no profile row and touches nothing else', async () => {
+    const { writeAll } = await import('./backup');
+
+    await writeAll({ ...FULL, profile: null });
+
+    expect(insertedTables()).not.toContain('profile');
+    expect(insertedTables()).toContain('documents');
+  });
+
+  it('writes nothing at all when the profile cannot be serialised', async () => {
+    const circular: Record<string, unknown> = {};
+    circular['self'] = circular;
+
+    const { writeAll } = await import('./backup');
+    const result = await writeAll({
+      ...FULL,
+      profile: {
+        ...PROFILE,
+        star_examples: [circular as unknown as Profile['star_examples'][number]],
+      },
+    });
+
+    expect(isErr(result) && result.error.code).toBe('SERIALISE_FAILED');
+    expect(statements()).toEqual([]);
   });
 
   it('still opens and closes a transaction for an empty payload', async () => {

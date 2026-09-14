@@ -52,7 +52,14 @@ const CV: Cv = {
   created_at: '2026-08-01T09:00:00.000Z',
 };
 
-const FULL = { jobs: [JOB], applications: [APPLICATION], cvs: [CV], analyses: [] };
+const FULL = {
+  profile: null,
+  jobs: [JOB],
+  applications: [APPLICATION],
+  documents: [],
+  cvs: [CV],
+  analyses: [],
+};
 
 afterEach(() => {
   cleanup();
