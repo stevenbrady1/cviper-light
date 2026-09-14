@@ -23,6 +23,8 @@ import {
   withLanguage,
   withStarExample,
 } from './model';
+import { GapsPanel } from './GapsPanel';
+import { createDbGapsPort, type GapsPort } from './gapsPort';
 import { createDbProfilePort, type ProfilePort } from './port';
 
 /**
@@ -70,6 +72,11 @@ export interface ProfileProps {
    * prop straight through.
    */
   readonly now?: Date | undefined;
+  /**
+   * The skills-gap panel's read port. Injected by tests for the same reason
+   * as `port`; defaults to the real SQLite-backed one.
+   */
+  readonly gapsPort?: GapsPort | undefined;
 }
 
 /** The loaded profile plus the stable keys for its two lists of rows. */
@@ -82,9 +89,10 @@ interface Loaded {
 const FIELD = 'mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink';
 const LABEL = 'block text-xs font-medium text-ink-muted';
 
-export function Profile({ port, now }: ProfileProps) {
+export function Profile({ port, now, gapsPort }: ProfileProps) {
   // Created once. A new port object every render would restart the load.
   const profilePort = useMemo(() => port ?? createDbProfilePort(), [port]);
+  const skillsPort = useMemo(() => gapsPort ?? createDbGapsPort(), [gapsPort]);
 
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(true);
@@ -262,6 +270,8 @@ export function Profile({ port, now }: ProfileProps) {
             onRemoveStar={onRemoveStar}
           />
         )}
+
+        <GapsPanel port={skillsPort} />
       </div>
     </section>
   );
