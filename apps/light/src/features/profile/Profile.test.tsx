@@ -9,13 +9,17 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { emptyProfile, type Profile as CandidateProfile } from '@cviper/core-types';
+import { emptyProfile, ok, type Profile as CandidateProfile } from '@cviper/core-types';
 
 import { AUTOSAVE_DELAY_MS, Profile } from './Profile';
+import { type GapsPort } from './gapsPort';
 import { createFakeProfilePort } from './test/fakePort';
 
 const NOW = new Date('2026-09-14T09:00:00.000Z');
 const NOW_ISO = '2026-09-14T09:00:00.000Z';
+
+/** Keeps the skills-gap panel off the database; its own states are `GapsPanel.test.tsx`. */
+const GAPS: GapsPort = { load: async () => ok({ cvText: null, jobs: [] }) };
 
 const SAVED: CandidateProfile = {
   ...emptyProfile('2026-09-01T08:00:00.000Z'),
@@ -42,7 +46,7 @@ afterEach(() => {
 async function renderProfile(initial: CandidateProfile | null = null) {
   const port = createFakeProfilePort(initial);
   const user = userEvent.setup();
-  render(<Profile port={port} now={NOW} />);
+  render(<Profile port={port} now={NOW} gapsPort={GAPS} />);
   await screen.findByTestId('profile-headline');
   return { port, user };
 }
@@ -96,7 +100,7 @@ describe('rendering', () => {
   it('negative: says so when the profile cannot be loaded, and offers no boxes to lose work in', async () => {
     const port = createFakeProfilePort(SAVED);
     port.failNext('load');
-    render(<Profile port={port} now={NOW} />);
+    render(<Profile port={port} now={NOW} gapsPort={GAPS} />);
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain('The database is locked');
