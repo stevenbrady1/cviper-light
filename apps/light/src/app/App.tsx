@@ -377,6 +377,9 @@ export default function App({
           analysis: {
             port: analysisPort,
             filePort,
+            // The SAME port the profile view uses: the gates (L-156) read what
+            // that view saved, and a test can watch one write reach both.
+            profilePort,
             createTransport,
             now,
             incomingCv,
