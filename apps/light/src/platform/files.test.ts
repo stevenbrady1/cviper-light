@@ -230,3 +230,50 @@ describe('saveBackup', () => {
     expect(saved.ok).toBe(false);
   });
 });
+
+describe('saveText (L-160)', () => {
+  it('hands Rust the contents, a suggested NAME and the extension, never a path', async () => {
+    tauri.invoke.mockResolvedValue('C:\\Users\\steve\\Documents\\Tailored CV.txt');
+
+    const saved = await createTauriFilePort().saveText(
+      'PROFESSIONAL SUMMARY',
+      'Tailored CV.txt',
+      'txt',
+    );
+
+    expect(saved).toEqual({ ok: true, value: 'C:\\Users\\steve\\Documents\\Tailored CV.txt' });
+    // Three one-word keys, pinned against the Rust signature by
+    // `the_frontend_calls_these_commands_by_these_names` in files.rs.
+    expect(tauri.invoke).toHaveBeenCalledWith('pick_and_write_text', {
+      contents: 'PROFESSIONAL SUMMARY',
+      suggestion: 'Tailored CV.txt',
+      extension: 'txt',
+    });
+  });
+
+  it('treats a cancelled save as nothing happening', async () => {
+    tauri.invoke.mockResolvedValue(null);
+
+    const saved = await createTauriFilePort().saveText('x', 'Cover letter.md', 'md');
+
+    expect(saved).toEqual({ ok: true, value: null });
+  });
+
+  it("negative: passes Rust's refusal of an extension through in Rust's own words", async () => {
+    tauri.invoke.mockRejectedValue('A text export can only be saved as .txt or .md.');
+
+    const saved = await createTauriFilePort().saveText('x', 'letter.txt', 'txt');
+
+    expect(saved.ok).toBe(false);
+    if (saved.ok) return;
+    expect(saved.error.message).toBe('A text export can only be saved as .txt or .md.');
+  });
+
+  it('boundary: reports a reply that is neither a path nor a cancellation', async () => {
+    tauri.invoke.mockResolvedValue(42);
+
+    const saved = await createTauriFilePort().saveText('x', 'letter.txt', 'txt');
+
+    expect(saved.ok).toBe(false);
+  });
+});
