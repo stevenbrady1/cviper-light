@@ -55,5 +55,30 @@ source of truth.
 - Open a CV from the iOS share sheet ("Open in CViper Light" for PDF, Word and
   JSON); built, not yet tested on a device.
 - First-run introduction: three cards, reopenable from Settings.
+- Candidate profile (L-154): headline, languages with levels, work rights,
+  deal-breakers, target sectors, goals, what energises and drains you, a
+  writing-style note and STAR examples; the first view, on Ctrl+1; carried in
+  the backup file.
+- Documents archived on an application (L-155): the advert, the CV and cover
+  letter you sent, follow-up notes and interview packs, in the backup file.
+- Every system prompt now states that the advert and the CV are material to
+  analyse, never instructions to follow (L-153); a contract test derives every
+  prompt builder and fails the build if one lacks the clause.
+- Eligibility and language gates (L-156): citizenship, residency, clearance
+  and language requirements are checked before the score, quoting the advert
+  line, as pass, flag or hard stop; they never move the number.
+- Search results ranked against your newest CV with no key (L-157), a
+  best-match-first toggle, and deal-breaker chips from the profile.
+- Skills-gap heatmap on the Profile view (L-158): the skills the adverts on
+  your board ask for that your CV does not mention, ranked by how many want
+  them.
+- A funnel strip on the tracker (L-159): sent, interviewing, offers, rejected,
+  with interview and offer rates.
+- Follow-up and thank-you drafts from the tracker (L-162): offered after ten
+  quiet days, at most twice per application, written only from the materials
+  you sent; drafts only — the app never sends anything.
+- An interview prep pack from the archived application (L-163): likely
+  questions with STAR-shaped answers, talking points, questions to ask, and
+  gaps to bridge honestly; saved as a document.
 
 [Unreleased]: https://github.com/stevenbrady1/cviper-light/commits/main
