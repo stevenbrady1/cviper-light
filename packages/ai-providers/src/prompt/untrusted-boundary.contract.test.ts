@@ -100,6 +100,16 @@ const PROMPT_DIR = dirname(fileURLToPath(import.meta.url));
 const FIXTURES: Readonly<Record<string, readonly unknown[]>> = {
   buildAnalysisPrompt: [{ cvText: 'Jane Doe. 8 years Python.', jobText: 'Python role, 5+ years.' }],
   buildExtractionPrompt: [{ text: 'Credit Risk Analyst\nLloyds Banking Group\nLondon\n£45k' }],
+  buildInterviewPrompt: [
+    {
+      jobTitle: 'Credit Risk Analyst',
+      company: 'Lloyds Banking Group',
+      advert: 'Second-line credit risk. SQL, Python.',
+      cvText: 'Jane Doe. 6 years credit risk.',
+      coverLetter: null,
+      profile: { headline: 'Credit risk analyst', starExamples: [], careerGoals: [] },
+    },
+  ],
   buildRepairPrompt: ['=== CV ===\nJane Doe\n=== END CV ===', '{}', 'summary: required'],
 };
 

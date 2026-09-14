@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { type ChatTransport } from '@cviper/ai-providers';
 import { type Application, type ApplicationStatus } from '@cviper/core-types';
 
 import { DESTRUCTIVE_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
@@ -7,9 +8,13 @@ import { daysSinceTimestamp } from '../../lib/dates';
 import { useDebouncedField } from '../../lib/useDebouncedField';
 import { isOpenableUrl, type BrowserPort } from '../../platform/browser';
 
+import { type Availability } from '../analysis/providers';
+
 import { ConfirmDelete } from './ConfirmDelete';
+import { InterviewPanel } from './InterviewPanel';
 import { NEXT_ACTION_TONES, nextActionUrgency } from './nextAction';
 import { STATUS_LABELS, TRACKER_COLUMNS, type TrackerEntry } from './model';
+import { type TrackerPort } from './port';
 import { STALENESS_BANDS, stalenessBand, stalenessDescription } from './staleness';
 
 /**
@@ -54,6 +59,17 @@ interface ApplicationDetailProps {
   ) => void;
   readonly onStatusChange: (status: ApplicationStatus) => void;
   readonly onDelete: () => void;
+  /**
+   * The board's port, for the panels that read and archive documents. Optional
+   * with `| undefined` because `exactOptionalPropertyTypes` is on and the
+   * board forwards it straight through; a pane without one simply has no
+   * document panels.
+   */
+  readonly port?: TrackerPort | undefined;
+  /** What this machine can offer an AI panel. `undefined` until the board has looked. */
+  readonly availability?: Availability | undefined;
+  /** Injected by tests so a fake provider can answer without a socket. */
+  readonly createTransport?: (() => ChatTransport) | undefined;
 }
 
 /** `''` from an input means "nothing here", and the model spells that `null`. */
@@ -70,6 +86,9 @@ export function ApplicationDetail({
   onEdit,
   onStatusChange,
   onDelete,
+  port,
+  availability,
+  createTransport,
 }: ApplicationDetailProps) {
   const { application, job } = entry;
   const [confirming, setConfirming] = useState(false);
@@ -247,6 +266,16 @@ export function ApplicationDetail({
         />
         <p className="mt-1 text-xs text-ink-faint">Saved as you type.</p>
       </div>
+
+      {port === undefined ? null : (
+        <InterviewPanel
+          entry={entry}
+          port={port}
+          availability={availability}
+          createTransport={createTransport}
+          now={now}
+        />
+      )}
 
       <div className="border-t border-line pt-3">
         <button
