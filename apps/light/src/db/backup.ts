@@ -15,11 +15,14 @@
  * failure part-way through leaves the database exactly as it was.
  */
 import {
+  PROFILE_ID,
   ok,
   type Analysis,
   type Application,
   type Cv,
+  type Document,
   type Job,
+  type Profile,
   type Result,
 } from '@cviper/core-types';
 
@@ -32,23 +35,31 @@ import {
   applicationToValues,
   cvFromRow,
   cvToValues,
+  documentFromRow,
+  documentToValues,
   jobFromRow,
   jobToValues,
   mapRows,
+  profileFromRow,
+  profileToValues,
   type SqlValue,
 } from './rows';
 import { selectFrom, upsertInto } from './statements';
 
 /**
- * Everything in the database, in the four collections the export format uses.
+ * Everything in the database, in the shape the export format uses: the five
+ * collections and the one profile row.
  *
  * Structurally a subset of `BackupPayload`, so a payload straight out of
  * `importBackup` can be handed to `writeAll` unchanged, and a snapshot out of
  * `readAll` only needs `exportedAt` and `app` added to become one.
  */
 export interface DbSnapshot {
+  /** `null` until the user has saved one. */
+  profile: Profile | null;
   jobs: Job[];
   applications: Application[];
+  documents: Document[];
   cvs: Cv[];
   analyses: Analysis[];
 }
@@ -60,25 +71,32 @@ const SELECT_JOBS = `${selectFrom('jobs')} ORDER BY id`;
 const SELECT_CVS = `${selectFrom('cvs')} ORDER BY id`;
 const SELECT_APPLICATIONS = `${selectFrom('applications')} ORDER BY id`;
 const SELECT_ANALYSES = `${selectFrom('analyses')} ORDER BY id`;
+const SELECT_DOCUMENTS = `${selectFrom('documents')} ORDER BY id`;
+// One row, by its fixed id. No ORDER BY: there is nothing to order.
+const SELECT_PROFILE = `${selectFrom('profile')} WHERE id = $1`;
 
 const UPSERT_JOB = upsertInto('jobs');
 const UPSERT_CV = upsertInto('cvs');
 const UPSERT_APPLICATION = upsertInto('applications');
+const UPSERT_DOCUMENT = upsertInto('documents');
 const UPSERT_ANALYSIS = upsertInto('analyses');
+const UPSERT_PROFILE = upsertInto('profile');
 
 /**
  * PARENTS FIRST. Foreign keys are enforced, so an application inserted before
  * its job, or an analysis before its CV, fails immediately. Jobs and CVs have
- * no parents; applications need jobs; analyses need CVs and may reference jobs.
+ * no parents; applications need jobs; documents need applications; analyses
+ * need CVs and may reference jobs. The profile has no parent and no children
+ * and is written last, inside the same transaction — see `writeAll`.
  */
-const WRITE_ORDER = ['jobs', 'cvs', 'applications', 'analyses'] as const;
+const WRITE_ORDER = ['jobs', 'cvs', 'applications', 'documents', 'analyses'] as const;
 
 /**
  * Read the whole database.
  *
- * All four reads happen inside ONE `withDb` section, so nothing the app does
+ * All six reads happen inside ONE `withDb` section, so nothing the app does
  * elsewhere can land between them and produce a snapshot containing an
- * application whose job is missing.
+ * application whose job is missing, or a document whose application is.
  */
 export async function readAll(): Promise<Result<DbSnapshot, DbError>> {
   const raw = await withDb(async (db) => ({
@@ -86,6 +104,8 @@ export async function readAll(): Promise<Result<DbSnapshot, DbError>> {
     cvs: await db.select<unknown[]>(SELECT_CVS),
     applications: await db.select<unknown[]>(SELECT_APPLICATIONS),
     analyses: await db.select<unknown[]>(SELECT_ANALYSES),
+    documents: await db.select<unknown[]>(SELECT_DOCUMENTS),
+    profile: await db.select<unknown[]>(SELECT_PROFILE, [PROFILE_ID]),
   }));
   if (!raw.ok) return raw;
 
@@ -101,9 +121,17 @@ export async function readAll(): Promise<Result<DbSnapshot, DbError>> {
   const analyses = mapRows(raw.value.analyses, analysisFromRow);
   if (!analyses.ok) return analyses;
 
+  const documents = mapRows(raw.value.documents, documentFromRow);
+  if (!documents.ok) return documents;
+
+  const profiles = mapRows(raw.value.profile, profileFromRow);
+  if (!profiles.ok) return profiles;
+
   return ok({
+    profile: profiles.value[0] ?? null,
     jobs: jobs.value,
     applications: applications.value,
+    documents: documents.value,
     cvs: cvs.value,
     analyses: analyses.value,
   });
@@ -130,14 +158,22 @@ export async function readAll(): Promise<Result<DbSnapshot, DbError>> {
  * triggers a ROLLBACK and the original error is what the caller sees.
  */
 export async function writeAll(snapshot: DbSnapshot): Promise<Result<void, DbError>> {
-  // Serialise FIRST, outside the transaction. `analysisToValues` is the only
-  // conversion that can fail, and discovering that half way through an open
-  // transaction would mean rolling back work that never needed to start.
+  // Serialise FIRST, outside the transaction. `analysisToValues` and
+  // `profileToValues` are the only conversions that can fail, and discovering
+  // that half way through an open transaction would mean rolling back work
+  // that never needed to start.
   const analyses: SqlValue[][] = [];
   for (const analysis of snapshot.analyses) {
     const values = analysisToValues(analysis);
     if (!values.ok) return values;
     analyses.push(values.value);
+  }
+
+  let profile: SqlValue[] | null = null;
+  if (snapshot.profile !== null) {
+    const values = profileToValues(snapshot.profile);
+    if (!values.ok) return values;
+    profile = values.value;
   }
 
   const batches: Record<(typeof WRITE_ORDER)[number], { sql: string; rows: SqlValue[][] }> = {
@@ -147,6 +183,7 @@ export async function writeAll(snapshot: DbSnapshot): Promise<Result<void, DbErr
       sql: UPSERT_APPLICATION,
       rows: snapshot.applications.map(applicationToValues),
     },
+    documents: { sql: UPSERT_DOCUMENT, rows: snapshot.documents.map(documentToValues) },
     analyses: { sql: UPSERT_ANALYSIS, rows: analyses },
   };
 
@@ -163,6 +200,10 @@ export async function writeAll(snapshot: DbSnapshot): Promise<Result<void, DbErr
           await db.execute(batch.sql, values);
         }
       }
+      // The profile is a MERGE like every other row: a file with a profile
+      // replaces the one row, a file without one leaves it alone. Inside the
+      // same transaction, so a profile cannot land while the rest rolls back.
+      if (profile !== null) await db.execute(UPSERT_PROFILE, profile);
       await db.execute('COMMIT;');
     } catch (cause) {
       // The ROLLBACK's own failure is deliberately not propagated: the caller

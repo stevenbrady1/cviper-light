@@ -31,8 +31,13 @@ export interface FakeFilePort extends FilePort {
   readonly written: () => readonly { path: string; contents: string }[];
   /** Everything `saveCvJson` was asked to write, in order (L-20b). */
   readonly writtenCvJson: () => readonly { path: string; contents: string }[];
+  /** Everything `saveText` was asked to write, in order (L-160). */
+  readonly writtenText: () => readonly { path: string; contents: string; extension: string }[];
   /** How many times each method was called. */
-  readonly calls: Record<'pickCv' | 'pickBackup' | 'saveBackup' | 'saveCvJson', number>;
+  readonly calls: Record<
+    'pickCv' | 'pickBackup' | 'saveBackup' | 'saveCvJson' | 'saveText',
+    number
+  >;
 }
 
 export function createFakeFilePort(): FakeFilePort {
@@ -44,12 +49,14 @@ export function createFakeFilePort(): FakeFilePort {
   let saveFailure: string | null = null;
   const written: { path: string; contents: string }[] = [];
   const writtenCvJson: { path: string; contents: string }[] = [];
-  const calls = { pickCv: 0, pickBackup: 0, saveBackup: 0, saveCvJson: 0 };
+  const writtenText: { path: string; contents: string; extension: string }[] = [];
+  const calls = { pickCv: 0, pickBackup: 0, saveBackup: 0, saveCvJson: 0, saveText: 0 };
 
   return {
     calls,
     written: () => written,
     writtenCvJson: () => writtenCvJson,
+    writtenText: () => writtenText,
     nextCv: (next) => {
       cv = next;
       cvFailure = null;
@@ -100,6 +107,15 @@ export function createFakeFilePort(): FakeFilePort {
       if (saveFailure !== null) return err({ message: saveFailure });
       if (savePath === null) return ok(null);
       writtenCvJson.push({ path: savePath, contents });
+      return ok(savePath);
+    },
+
+    // And the same fakes again for the text export (L-160).
+    async saveText(contents, _suggestedName, extension) {
+      calls.saveText += 1;
+      if (saveFailure !== null) return err({ message: saveFailure });
+      if (savePath === null) return ok(null);
+      writtenText.push({ path: savePath, contents, extension });
       return ok(savePath);
     },
   };

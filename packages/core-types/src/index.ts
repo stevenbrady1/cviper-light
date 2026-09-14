@@ -11,16 +11,27 @@ export {
   type Application,
   type ApplicationStatus,
   type Cv,
+  type Document,
+  type DocumentKind,
   type ExtraFields,
   type IsoDate,
   type IsoTimestamp,
   type Job,
   type JobSource,
+  type Profile,
+  type ProfileLanguage,
   type SalaryPeriod,
+  type StarExample,
   AnalysisSchema,
   ApplicationSchema,
   CvSchema,
+  DocumentSchema,
   JobSchema,
+  PROFILE_ID,
+  ProfileLanguageSchema,
+  ProfileSchema,
+  StarExampleSchema,
+  emptyProfile,
 } from './entities';
 
 export {
@@ -37,11 +48,42 @@ export {
 } from './analysis';
 
 export {
+  COVER_LETTER_JSON_SCHEMA,
+  CoverLetterSchema,
+  DRAFT_REVIEW_JSON_SCHEMA,
+  DraftReviewIssueSchema,
+  DraftReviewSchema,
+  TAILORED_CV_JSON_SCHEMA,
+  TailoredCvRoleSchema,
+  TailoredCvSchema,
+  renderCoverLetter,
+  renderTailoredCv,
+  wordCount,
+  type CoverLetter,
+  type DraftReview,
+  type DraftReviewIssue,
+  type DraftReviewVerdict,
+  type TailoredCv,
+  type TailoredCvRole,
+} from './tailoring';
+
+export {
   EMPTY_JOB_EXTRACTION,
   JOB_EXTRACTION_JSON_SCHEMA,
   JobExtractionSchema,
   type JobExtraction,
 } from './job-extraction';
+
+export { FOLLOW_UP_JSON_SCHEMA, FollowUpDraftSchema, type FollowUpDraft } from './follow-up';
+
+export {
+  INTERVIEW_PACK_JSON_SCHEMA,
+  InterviewPackSchema,
+  LikelyQuestionSchema,
+  renderInterviewPack,
+  type InterviewPack,
+  type LikelyQuestion,
+} from './interview';
 
 export {
   BOARD_ENCODINGS,

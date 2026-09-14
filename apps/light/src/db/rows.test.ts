@@ -13,13 +13,17 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
+  PROFILE_ID,
+  emptyProfile,
   isErr,
   isOk,
   type Analysis,
   type Application,
   type Cv,
   type CvAnalysis,
+  type Document,
   type Job,
+  type Profile,
 } from '@cviper/core-types';
 
 import {
@@ -30,16 +34,21 @@ import {
   applicationToValues,
   cvFromRow,
   cvToValues,
+  documentFromRow,
+  documentToValues,
   jobFromRow,
   jobToValues,
+  profileFromRow,
+  profileToValues,
   type SqlValue,
 } from './rows';
 
 // --- The migration, read from disk ------------------------------------------
 
 // Every migration, in version order, so a column added by a later
-// `ALTER TABLE … ADD COLUMN` (0002, L-20b) is held to rows.ts exactly as the
-// original `CREATE TABLE` columns are.
+// `ALTER TABLE … ADD COLUMN` (0002, L-20b) and a table created by a later
+// migration (0003 `profile`, 0004 `documents`) are held to rows.ts exactly as
+// the original `CREATE TABLE` columns are.
 const MIGRATIONS_DIR = new URL('../../src-tauri/migrations/', import.meta.url);
 const MIGRATION_SQL = readdirSync(MIGRATIONS_DIR)
   .filter((name) => name.endsWith('.sql'))
@@ -185,6 +194,38 @@ const ANALYSIS: Analysis = {
   created_at: '2026-08-19T09:20:00.000Z',
 };
 
+/** Every list populated, so each `_json` column has something to lose. */
+const PROFILE: Profile = {
+  ...emptyProfile('2026-09-14T09:00:00.000Z'),
+  headline: 'Credit risk analyst \u2014 moving into quant development',
+  languages: [{ name: 'French', level: 'B2' }],
+  work_rights: 'UK citizen',
+  deal_breakers: ['Fully on-site'],
+  target_sectors: ['Banking'],
+  career_goals: ['Lead a modelling team'],
+  energising: ['Hard problems'],
+  draining: ['Status meetings'],
+  writing_style: 'Plain and short.',
+  star_examples: [
+    {
+      title: 'IFRS 9 rebuild',
+      situation: 'Failed audit.',
+      task: 'Rebuild it.',
+      action: 'Rewrote it with a test per rule.',
+      result: 'Passed.',
+    },
+  ],
+};
+
+const DOCUMENT: Document = {
+  id: 'doc-0001',
+  application_id: 'app-0001',
+  kind: 'cover_letter',
+  title: 'Cover letter \u2014 Barclays',
+  text: 'Dear hiring manager,\n\nI am writing about the \u00a3457/day role.',
+  created_at: '2026-09-14T09:05:00.000Z',
+};
+
 // --- Helpers ----------------------------------------------------------------
 
 /** Rebuild the row object SQLite would hand back for a set of bound values. */
@@ -209,6 +250,16 @@ function analysisRow(overrides: Record<string, unknown> = {}): Record<string, un
   const values = analysisToValues(ANALYSIS);
   if (!isOk(values)) throw new Error('fixture analysis failed to serialise');
   return { ...rowOf(TABLE_COLUMNS.analyses, values.value), ...overrides };
+}
+
+function profileRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const values = profileToValues(PROFILE);
+  if (!isOk(values)) throw new Error('fixture profile failed to serialise');
+  return { ...rowOf(TABLE_COLUMNS.profile, values.value), ...overrides };
+}
+
+function documentRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return { ...rowOf(TABLE_COLUMNS.documents, documentToValues(DOCUMENT)), ...overrides };
 }
 
 // --- The schema-coverage guard ----------------------------------------------
@@ -256,8 +307,36 @@ describe('the migration column parser', () => {
 describe('every migration column is mapped in rows.ts', () => {
   const parsed = columnsFromMigration(MIGRATION_SQL);
 
-  it('creates exactly the four tables rows.ts knows about', () => {
+  it('creates exactly the six tables rows.ts knows about', () => {
     expect(Object.keys(parsed).sort()).toEqual(Object.keys(TABLE_COLUMNS).sort());
+  });
+
+  it('pins the profile columns in the order 0003_profile.sql declares them', () => {
+    expect([...TABLE_COLUMNS.profile]).toEqual([
+      'id',
+      'headline',
+      'languages_json',
+      'work_rights',
+      'deal_breakers_json',
+      'target_sectors_json',
+      'career_goals_json',
+      'energising_json',
+      'draining_json',
+      'writing_style',
+      'star_examples_json',
+      'updated_at',
+    ]);
+  });
+
+  it('pins the documents columns in the order 0004_documents.sql declares them', () => {
+    expect([...TABLE_COLUMNS.documents]).toEqual([
+      'id',
+      'application_id',
+      'kind',
+      'title',
+      'text',
+      'created_at',
+    ]);
   });
 
   for (const [table, columns] of Object.entries(TABLE_COLUMNS)) {
@@ -300,6 +379,100 @@ describe('round trips through a row', () => {
     const back = analysisFromRow(rowOf(TABLE_COLUMNS.analyses, values.value));
     expect(isOk(back) && back.value).toEqual(ANALYSIS);
     expect(isOk(back) && typeof back.value.result_json).toBe('object');
+  });
+
+  it('carries a fully populated profile out and back with every list as a real array', () => {
+    const back = profileFromRow(profileRow());
+    expect(isOk(back) && back.value).toEqual(PROFILE);
+    expect(isOk(back) && Array.isArray(back.value.star_examples)).toBe(true);
+  });
+
+  it('carries an empty profile out and back unchanged', () => {
+    const empty = emptyProfile('2026-09-14T09:00:00.000Z');
+    const values = profileToValues(empty);
+    if (!isOk(values)) throw new Error('empty profile failed to serialise');
+
+    const back = profileFromRow(rowOf(TABLE_COLUMNS.profile, values.value));
+    expect(isOk(back) && back.value).toEqual(empty);
+    expect(isOk(back) && back.value.id).toBe(PROFILE_ID);
+  });
+
+  it('carries a document out and back unchanged, newlines and all', () => {
+    const back = documentFromRow(documentRow());
+    expect(isOk(back) && back.value).toEqual(DOCUMENT);
+  });
+});
+
+describe('the profile lists cross the boundary as TEXT', () => {
+  const JSON_COLUMNS = TABLE_COLUMNS.profile.filter((column) => column.endsWith('_json'));
+
+  it('names every list column with a _json suffix, and nothing else', () => {
+    // The suffix is the contract with 0003_profile.sql: it is how a reader of
+    // the schema knows which columns hold a document rather than a value.
+    expect(JSON_COLUMNS).toEqual([
+      'languages_json',
+      'deal_breakers_json',
+      'target_sectors_json',
+      'career_goals_json',
+      'energising_json',
+      'draining_json',
+      'star_examples_json',
+    ]);
+  });
+
+  it('writes every list as a JSON string, never as an array', () => {
+    const row = profileRow();
+    for (const column of JSON_COLUMNS) {
+      expect(typeof row[column], column).toBe('string');
+    }
+    expect(JSON.parse(String(row['languages_json']))).toEqual(PROFILE.languages);
+    expect(JSON.parse(String(row['star_examples_json']))).toEqual(PROFILE.star_examples);
+  });
+
+  it('refuses a list column that is not text', () => {
+    for (const column of JSON_COLUMNS) {
+      const result = profileFromRow(profileRow({ [column]: 42 }));
+      expect(isErr(result) && result.error.code, column).toBe('MALFORMED_ROW');
+      expect(isErr(result) && result.error.table, column).toBe('profile');
+    }
+  });
+
+  it('refuses a list column that is not valid JSON', () => {
+    for (const column of JSON_COLUMNS) {
+      const result = profileFromRow(profileRow({ [column]: '[not json' }));
+      expect(isErr(result) && result.error.code, column).toBe('MALFORMED_ROW');
+    }
+  });
+
+  it('refuses a list column holding valid JSON of the wrong shape', () => {
+    // Parses fine; fails the schema. The two failures must land in the same
+    // place, or a hand-edited file would read as a crash instead of a row.
+    expect(isErr(profileFromRow(profileRow({ deal_breakers_json: '"just a string"' })))).toBe(true);
+    expect(isErr(profileFromRow(profileRow({ languages_json: '[{"name":"French"}]' })))).toBe(true);
+  });
+
+  it('boundary: an empty list is the two-byte string [] and reads back as an empty array', () => {
+    const row = profileRow({ deal_breakers_json: '[]' });
+    const back = profileFromRow(row);
+    expect(isOk(back) && back.value.deal_breakers).toEqual([]);
+  });
+});
+
+describe('documents', () => {
+  it('refuses a kind outside the closed set', () => {
+    const result = documentFromRow(documentRow({ kind: 'thank_you' }));
+    expect(isErr(result) && result.error.code).toBe('MALFORMED_ROW');
+    expect(isErr(result) && result.error.table).toBe('documents');
+  });
+
+  it('refuses a document with no application_id, which is not nullable', () => {
+    expect(isErr(documentFromRow(documentRow({ application_id: null })))).toBe(true);
+  });
+
+  it('keeps an empty text distinct from a missing one', () => {
+    const back = documentFromRow(documentRow({ text: '' }));
+    expect(isOk(back) && back.value.text).toBe('');
+    expect(isErr(documentFromRow(documentRow({ text: null })))).toBe(true);
   });
 });
 

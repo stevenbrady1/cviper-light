@@ -1,19 +1,32 @@
 /**
- * The four views, and the order they appear in the rail.
+ * The six views, and the order they appear in the rail.
  *
  * ============================================================================
  * WORKFLOW ORDER, NOT ALPHABETICAL AND NOT BY IMPORTANCE
  * ============================================================================
- *   Search -> Tracker -> Analysis
+ *   Profile -> Search -> Tracker -> Analysis -> Tailor
  *
- * That is the order a job hunt actually happens in: find something, record that
- * you are chasing it, then work out whether your CV is any good for it. A rail
- * that lists the app's features in the order they were built teaches nobody
- * anything; a rail that lists them in the order they are used is a diagram of
- * the process, for free, permanently on screen.
+ * That is the order a job hunt actually happens in: say who you are and what
+ * you will not take, find something, record that you are chasing it, work
+ * out whether your CV is any good for it, then rewrite the CV and draft the
+ * letter for that one advert. A rail that lists the app's features in the
+ * order they were built teaches nobody anything; a rail that lists them in
+ * the order they are used is a diagram of the process, for free, permanently
+ * on screen.
+ *
+ * Tailor is AFTER Analysis (L-160) because it is what you do once the check
+ * has told you what is missing: a rewrite that runs before the gaps are known
+ * is a rewrite aimed at nothing. It works from the same CV rows and the same
+ * tracked jobs, and it needs a model — there is no keyword fallback for
+ * writing prose, so the screen says so and points at Settings.
+ *
+ * Profile is FIRST (L-154) because it is the thing every later step reads
+ * from — a search that does not know your deal breakers cannot filter, and a
+ * cover letter that does not know how you write cannot sound like you. It is
+ * a step once, at the start, and a reference for ever after.
  *
  * Settings is PINNED TO THE BOTTOM and is not in that sequence, because it is
- * not a step. Putting it fourth in the list would imply it is what you do after
+ * not a step. Putting it fifth in the list would imply it is what you do after
  * an analysis.
  *
  * ============================================================================
@@ -29,11 +42,11 @@
  * ============================================================================
  * On a desktop window (1000x700 minimum, `tauri.conf.json`) the rail is a fixed
  * 240px and always open. On a phone (below Tailwind's `md`, L-81) the shell
- * mounts a bottom bar with these same four views instead. Nothing collapses:
+ * mounts a bottom bar with these same six views instead. Nothing collapses:
  * a control that hides the thing it controls teaches nobody anything.
  */
 
-export type ViewId = 'search' | 'tracker' | 'analysis' | 'settings';
+export type ViewId = 'profile' | 'search' | 'tracker' | 'analysis' | 'tailor' | 'settings';
 
 export interface ViewDefinition {
   readonly id: ViewId;
@@ -49,24 +62,38 @@ export interface ViewDefinition {
 
 export const VIEWS: readonly ViewDefinition[] = [
   {
+    id: 'profile',
+    label: 'Profile',
+    summary: 'Who you are, what you want, and what you will not take.',
+    shortcut: 1,
+    placement: 'sequence',
+  },
+  {
     id: 'search',
     label: 'Search',
     summary: 'Find roles and save the ones worth chasing.',
-    shortcut: 1,
+    shortcut: 2,
     placement: 'sequence',
   },
   {
     id: 'tracker',
     label: 'Tracker',
     summary: 'Every application you are chasing, and how long each has sat still.',
-    shortcut: 2,
+    shortcut: 3,
     placement: 'sequence',
   },
   {
     id: 'analysis',
     label: 'Analysis',
     summary: 'Check a CV against a role and see what is missing.',
-    shortcut: 3,
+    shortcut: 4,
+    placement: 'sequence',
+  },
+  {
+    id: 'tailor',
+    label: 'Tailor',
+    summary: 'Rewrite your CV for one advert, and draft the letter — from your own facts only.',
+    shortcut: 5,
     placement: 'sequence',
   },
   {

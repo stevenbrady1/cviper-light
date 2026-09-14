@@ -25,6 +25,19 @@ export { MIN_SCORABLE_CHARS, scoreByKeywords } from './score';
 
 export type { ScoringError, ScoringErrorCode } from './errors';
 
+// ── The gates that run BEFORE the score and are never averaged into it ──────
+
+export {
+  GATE_QUOTE_MAX_CHARS,
+  LANGUAGE_NAMES,
+  SILENT_ELIGIBILITY_REASON,
+  runGates,
+  type GateInput,
+  type GateKind,
+  type GateResult,
+  type GateVerdict,
+} from './gates';
+
 // ── The scoring layers, exposed for callers that want the detail ─────────────
 
 export {

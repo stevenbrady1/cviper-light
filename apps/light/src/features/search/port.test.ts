@@ -22,6 +22,8 @@ const db = vi.hoisted(() => ({
   findJobByExternalId: vi.fn(),
   upsertJob: vi.fn(),
   upsertApplication: vi.fn(),
+  listCvs: vi.fn(),
+  getProfile: vi.fn(),
 }));
 
 vi.mock('../../db', () => db);
@@ -75,6 +77,8 @@ beforeEach(() => {
   db.findJobByExternalId.mockResolvedValue(ok(null));
   db.upsertJob.mockResolvedValue(ok(undefined));
   db.upsertApplication.mockResolvedValue(ok(undefined));
+  db.listCvs.mockResolvedValue(ok([]));
+  db.getProfile.mockResolvedValue(ok(null));
 });
 
 describe('what is already being chased', () => {
@@ -234,5 +238,90 @@ describe('an advert with no provider identity', () => {
     expect(saved).toEqual(ok('saved'));
     expect(db.findJobByExternalId).not.toHaveBeenCalled();
     expect(db.upsertJob).toHaveBeenCalledWith(anonymous);
+  });
+});
+
+// ── What the keyless rank reads (L-157) ─────────────────────────────────────
+
+const CV_TEXT = 'Credit risk analyst with IFRS 9 impairment modelling and Basel III reporting.';
+
+function cvRow(id: string, createdAt: string, text: string | null) {
+  return {
+    id,
+    name: `${id}.pdf`,
+    file_path: null,
+    extracted_text: text,
+    created_at: createdAt,
+    json_resume: null,
+  };
+}
+
+describe('the CV the results are ranked against', () => {
+  it('is the text of the most recent CV — the first row `listCvs` returns', async () => {
+    // `listCvs` orders `created_at DESC`, and this relies on it rather than
+    // re-sorting: one ordering rule, in the data layer, not two that agree today.
+    db.listCvs.mockResolvedValue(
+      ok([
+        cvRow('cv-new', '2026-08-19T09:00:00.000Z', CV_TEXT),
+        cvRow('cv-old', '2026-01-01T09:00:00.000Z', 'Older CV text'),
+      ]),
+    );
+
+    await expect(createDbSearchPort().latestCvText()).resolves.toEqual(ok(CV_TEXT));
+  });
+
+  it('boundary: no CV at all is `null`, not an error', async () => {
+    await expect(createDbSearchPort().latestCvText()).resolves.toEqual(ok(null));
+  });
+
+  it('boundary: a CV whose text has not been extracted yet is `null`', async () => {
+    db.listCvs.mockResolvedValue(ok([cvRow('cv-new', '2026-08-19T09:00:00.000Z', null)]));
+
+    await expect(createDbSearchPort().latestCvText()).resolves.toEqual(ok(null));
+  });
+
+  it('negative: passes a database failure straight through', async () => {
+    db.listCvs.mockResolvedValue(err({ ...failure, table: 'cvs' }));
+
+    await expect(createDbSearchPort().latestCvText()).resolves.toEqual(
+      err({ ...failure, table: 'cvs' }),
+    );
+  });
+});
+
+describe('the deal-breakers the results are checked for', () => {
+  it('are the profile’s list, as saved', async () => {
+    db.getProfile.mockResolvedValue(
+      ok({
+        id: 'profile',
+        headline: null,
+        languages: [],
+        work_rights: null,
+        deal_breakers: ['on-site', 'SC clearance'],
+        target_sectors: [],
+        career_goals: [],
+        energising: [],
+        draining: [],
+        writing_style: null,
+        star_examples: [],
+        updated_at: NOW,
+      }),
+    );
+
+    await expect(createDbSearchPort().dealBreakers()).resolves.toEqual(
+      ok(['on-site', 'SC clearance']),
+    );
+  });
+
+  it('boundary: no profile yet is an empty list, not an error', async () => {
+    await expect(createDbSearchPort().dealBreakers()).resolves.toEqual(ok([]));
+  });
+
+  it('negative: passes a database failure straight through', async () => {
+    db.getProfile.mockResolvedValue(err({ ...failure, table: 'profile' }));
+
+    await expect(createDbSearchPort().dealBreakers()).resolves.toEqual(
+      err({ ...failure, table: 'profile' }),
+    );
   });
 });

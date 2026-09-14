@@ -15,12 +15,18 @@ const DELAY = 500;
 function Field({ initial, commit }: { initial: string; commit: (value: string) => void }) {
   const field = useDebouncedField(initial, commit, DELAY);
   return (
-    <input
-      data-testid="field"
-      value={field.draft}
-      onChange={(event) => field.setDraft(event.currentTarget.value)}
-      onBlur={field.flush}
-    />
+    <>
+      <input
+        data-testid="field"
+        value={field.draft}
+        onChange={(event) => field.setDraft(event.currentTarget.value)}
+        onBlur={field.flush}
+      />
+      {/* Something outside the field wrote the committed value — see `reset`. */}
+      <button type="button" data-testid="reset" onClick={() => field.reset('written elsewhere')}>
+        reset
+      </button>
+    </>
   );
 }
 
@@ -139,5 +145,45 @@ describe('useDebouncedField', () => {
     await vi.advanceTimersByTimeAsync(DELAY + 10);
 
     expect(commit).not.toHaveBeenCalled();
+  });
+
+  it('reset: shows a value written elsewhere and does NOT commit it back', async () => {
+    vi.useFakeTimers();
+    const commit = vi.fn();
+    render(<Field initial="hello" commit={commit} />);
+
+    fireEvent.click(screen.getByTestId('reset'));
+
+    expect((screen.getByTestId('field') as HTMLInputElement).value).toBe('written elsewhere');
+    await vi.advanceTimersByTimeAsync(DELAY + 10);
+    fireEvent.blur(screen.getByTestId('field'));
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it('reset: typing afterwards commits the NEW text, never the stale draft', async () => {
+    vi.useFakeTimers();
+    const commit = vi.fn();
+    render(<Field initial="hello" commit={commit} />);
+
+    fireEvent.click(screen.getByTestId('reset'));
+    fireEvent.change(screen.getByTestId('field'), {
+      target: { value: 'written elsewhere + more' },
+    });
+    await vi.advanceTimersByTimeAsync(DELAY + 10);
+
+    expect(commit).toHaveBeenCalledExactlyOnceWith('written elsewhere + more');
+  });
+
+  it('negative: reset discards a pending, uncommitted draft rather than merging it', async () => {
+    vi.useFakeTimers();
+    const commit = vi.fn();
+    render(<Field initial="hello" commit={commit} />);
+
+    fireEvent.change(screen.getByTestId('field'), { target: { value: 'half-typ' } });
+    fireEvent.click(screen.getByTestId('reset'));
+    await vi.advanceTimersByTimeAsync(DELAY + 10);
+
+    expect(commit).not.toHaveBeenCalled();
+    expect((screen.getByTestId('field') as HTMLInputElement).value).toBe('written elsewhere');
   });
 });

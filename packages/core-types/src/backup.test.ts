@@ -64,6 +64,8 @@ function makeFixture(): BackupPayload {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     exportedAt: '2026-08-19T09:00:00.000Z',
     app: { name: 'cviper-light', version: '0.1.0' },
+    profile: null,
+    documents: [],
     jobs: [
       {
         // Adzuna, every salary field populated. `salary_period: 'day'` is the
@@ -155,6 +157,8 @@ function makeEmptyFixture(): BackupPayload {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     exportedAt: '2026-08-19T09:00:00.000Z',
     app: { name: 'cviper-light', version: '0.1.0' },
+    profile: null,
+    documents: [],
     jobs: [],
     applications: [],
     cvs: [],
@@ -385,8 +389,10 @@ describe('backup round-trip', () => {
       // A different literal key order must not change a single byte either.
       analyses: second.analyses,
       cvs: second.cvs,
+      documents: second.documents,
       applications: second.applications,
       jobs: second.jobs,
+      profile: second.profile,
       app: second.app,
       exportedAt: second.exportedAt,
       schemaVersion: second.schemaVersion,

@@ -22,6 +22,8 @@ const { default: App } = await import('./App');
 const { WIDE_QUERY } = await import('./viewport');
 const { markWelcomeSeen } = await import('../features/onboarding/store');
 const { createFakeTrackerPort } = await import('../features/tracker/test/fakePort');
+const { createFakeProfilePort } = await import('../features/profile/test/fakePort');
+const { createFakeTailorPort } = await import('../features/tailor/test/fakePort');
 
 const NOW = new Date(2026, 7, 19, 9, 0, 0);
 
@@ -66,7 +68,14 @@ afterEach(() => {
 });
 
 async function renderApp() {
-  const result = render(<App trackerPort={createFakeTrackerPort()} now={NOW} />);
+  const result = render(
+    <App
+      trackerPort={createFakeTrackerPort()}
+      profilePort={createFakeProfilePort()}
+      tailorPort={createFakeTailorPort()}
+      now={NOW}
+    />,
+  );
   await screen.findByTestId('shell');
   await vi.waitFor(() =>
     expect(tauri.invoke.mock.calls.some(([command]) => command === 'ollama_probe')).toBe(true),
@@ -84,11 +93,11 @@ describe('the shell at 375px', () => {
     expect(screen.queryByTestId('sidebar')).toBeNull();
   });
 
-  it('offers all four views, once each, under the same test ids as the rail', async () => {
+  it('offers all five views, once each, under the same test ids as the rail', async () => {
     installMatchMedia(375);
     await renderApp();
 
-    for (const id of ['search', 'tracker', 'analysis', 'settings']) {
+    for (const id of ['search', 'tracker', 'analysis', 'tailor', 'settings']) {
       expect(screen.getAllByTestId(`nav-${id}`)).toHaveLength(1);
     }
   });
@@ -102,7 +111,7 @@ describe('the shell at 375px', () => {
 
     expect(screen.getByTestId('view-analysis')).toBeTruthy();
     expect(screen.queryByTestId('view-tracker')).toBeNull();
-    const current = ['search', 'tracker', 'analysis', 'settings'].filter(
+    const current = ['search', 'tracker', 'analysis', 'tailor', 'settings'].filter(
       (id) => screen.getByTestId(`nav-${id}`).getAttribute('aria-current') === 'page',
     );
     expect(current).toEqual(['analysis']);
@@ -113,7 +122,7 @@ describe('the shell at 375px', () => {
     installMatchMedia(375);
     await renderApp();
 
-    for (const id of ['search', 'tracker', 'analysis', 'settings']) {
+    for (const id of ['search', 'tracker', 'analysis', 'tailor', 'settings']) {
       expect(screen.getByTestId(`nav-${id}`).className).toMatch(/\bmin-h-11\b/);
     }
     expect(screen.getByTestId('bottom-nav').className).toMatch(/\bpb-safe\b/);
@@ -132,12 +141,12 @@ describe('the shell at 375px', () => {
     expect(screen.getByTestId('view-settings')).toBeTruthy();
   });
 
-  it('keeps Ctrl+1/2/3 working with a keyboard attached', async () => {
+  it('keeps Ctrl+1/2/3/4 working with a keyboard attached', async () => {
     installMatchMedia(375);
     await renderApp();
 
     act(() => {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', ctrlKey: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: '2', ctrlKey: true }));
     });
     expect(screen.getByTestId('view-search')).toBeTruthy();
   });

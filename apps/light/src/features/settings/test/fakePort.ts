@@ -20,7 +20,14 @@ export interface FakeBackupPort extends BackupPort {
   readonly calls: Record<'read' | 'write', number>;
 }
 
-const EMPTY: DbSnapshot = { jobs: [], applications: [], cvs: [], analyses: [] };
+const EMPTY: DbSnapshot = {
+  profile: null,
+  jobs: [],
+  applications: [],
+  documents: [],
+  cvs: [],
+  analyses: [],
+};
 
 const FAILURE: DbError = {
   code: 'QUERY_FAILED',
@@ -30,8 +37,10 @@ const FAILURE: DbError = {
 
 export function createFakeBackupPort(initial: DbSnapshot = EMPTY): FakeBackupPort {
   let stored: DbSnapshot = {
+    profile: initial.profile,
     jobs: [...initial.jobs],
     applications: [...initial.applications],
+    documents: [...initial.documents],
     cvs: [...initial.cvs],
     analyses: [...initial.analyses],
   };
@@ -61,8 +70,12 @@ export function createFakeBackupPort(initial: DbSnapshot = EMPTY): FakeBackupPor
       // nothing is ever deleted. A fake that replaced would let a test pass
       // while the real thing did something else entirely.
       stored = {
+        // A file with a profile replaces the one row; a file without one
+        // leaves it alone — the same upsert-or-skip `writeAll` does.
+        profile: snapshot.profile ?? stored.profile,
         jobs: mergeById(stored.jobs, snapshot.jobs),
         applications: mergeById(stored.applications, snapshot.applications),
+        documents: mergeById(stored.documents, snapshot.documents),
         cvs: mergeById(stored.cvs, snapshot.cvs),
         analyses: mergeById(stored.analyses, snapshot.analyses),
       };

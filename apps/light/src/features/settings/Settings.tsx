@@ -270,8 +270,10 @@ export function Settings({
     setStage({ kind: 'busy', what: 'import' });
 
     const written = await backupPort.write({
+      profile: payload.profile,
       jobs: payload.jobs,
       applications: payload.applications,
+      documents: payload.documents,
       cvs: payload.cvs,
       analyses: payload.analyses,
     });

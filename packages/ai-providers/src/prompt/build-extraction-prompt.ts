@@ -64,7 +64,7 @@
  */
 import { sanitizeForPrompt, truncateForPrompt } from '@cviper/cv-parsing';
 
-import { JSON_ONLY } from './constants';
+import { JSON_ONLY, UNTRUSTED_CONTENT_BOUNDARY } from './constants';
 
 /**
  * How much pasted advert reaches the model, in characters.
@@ -124,6 +124,13 @@ export function extractionSourceText(text: string): string {
  *
  * The null-not-guess rationale is ported verbatim, review step included: it is
  * the sentence that makes the instruction make sense rather than sound arbitrary.
+ *
+ * The trust boundary (L-153) follows: a pasted advert or a forwarded recruiter
+ * email is exactly the text an attacker gets to write, and the system message
+ * has to say out loud that it is material, not instructions. The source puts
+ * the same clause in the user turn ahead of the fence; here it lives in the
+ * system message with the other standing rules. Every system message in this
+ * package carries it — see `untrusted-boundary.contract.test.ts`.
  */
 const SYSTEM = [
   'You are a meticulous job-advert parser for UK contract and permanent roles,',
@@ -132,6 +139,7 @@ const SYSTEM = [
   'detail is absent you return null rather than guessing — the user reviews every',
   'field before saving, so a missing value costs them a few seconds while an',
   'invented one costs them a bad decision.',
+  UNTRUSTED_CONTENT_BOUNDARY,
   JSON_ONLY,
 ].join(' ');
 

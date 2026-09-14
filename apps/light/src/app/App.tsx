@@ -4,9 +4,11 @@ import { type Result } from '@cviper/core-types';
 
 import { Analysis, type AnalysisProps } from '../features/analysis/Analysis';
 import { Welcome } from '../features/onboarding/Welcome';
+import { Profile, type ProfileProps } from '../features/profile/Profile';
 import { forgetWelcome, hasSeenWelcome, markWelcomeSeen } from '../features/onboarding/store';
 import { Search, type SearchProps } from '../features/search/Search';
 import { Settings, type SettingsProps } from '../features/settings/Settings';
+import { Tailor, type TailorProps } from '../features/tailor/Tailor';
 import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
 import {
   createTauriOpenedCvPort,
@@ -48,11 +50,11 @@ import { DEFAULT_VIEW, viewForShortcut, type ViewId } from './views';
  * ============================================================================
  * KEYBOARD
  * ============================================================================
- * `Ctrl+1/2/3` switch between the three workflow views. Bound on `document` so
- * they work wherever focus happens to be, and `preventDefault()`ed so they do
- * not also trigger a WebView2 default.
+ * `Ctrl+1` to `Ctrl+5` switch between the five workflow views. Bound on
+ * `document` so they work wherever focus happens to be, and `preventDefault()`ed
+ * so they do not also trigger a WebView2 default.
  *
- * Only digits that are actually bound are intercepted: `Ctrl+4` is left alone
+ * Only digits that are actually bound are intercepted: `Ctrl+6` is left alone
  * rather than being swallowed or falling through to a default view, because
  * moving a user somewhere they did not ask to go is worse than doing nothing.
  *
@@ -76,7 +78,11 @@ export interface AppProps {
    */
   readonly trackerPort?: TrackerProps['port'];
   /** Injected by tests, for the same reason as `trackerPort`. */
+  readonly profilePort?: ProfileProps['port'];
+  /** Injected by tests, for the same reason as `trackerPort`. */
   readonly analysisPort?: AnalysisProps['port'];
+  /** Injected by tests, for the same reason as `trackerPort` (L-160). */
+  readonly tailorPort?: TailorProps['port'];
   /** Injected by tests: the real one opens an OS dialog and calls into Rust. */
   readonly filePort?: AnalysisProps['filePort'];
   /**
@@ -125,7 +131,9 @@ export interface AppProps {
 
 export default function App({
   trackerPort,
+  profilePort,
   analysisPort,
+  tailorPort,
   filePort,
   openedCv,
   createTransport,
@@ -345,6 +353,10 @@ export default function App({
         )}
 
         {renderView(activeView, {
+          profile: {
+            port: profilePort,
+            now,
+          },
           search: {
             port: searchPort,
             browser,
@@ -369,10 +381,19 @@ export default function App({
           analysis: {
             port: analysisPort,
             filePort,
+            // The SAME port the profile view uses: the gates (L-156) read what
+            // that view saved, and a test can watch one write reach both.
+            profilePort,
             createTransport,
             now,
             incomingCv,
             onIncomingCvHandled,
+          },
+          tailor: {
+            port: tailorPort,
+            filePort,
+            createTransport,
+            now,
           },
           settings: {
             port: backupPort,
@@ -395,20 +416,26 @@ export default function App({
 
 /** The props each view needs, gathered in one place the switch below reads. */
 interface ViewProps {
+  readonly profile: ProfileProps;
   readonly search: SearchProps;
   readonly tracker: TrackerProps;
   readonly analysis: AnalysisProps;
+  readonly tailor: TailorProps;
   readonly settings: SettingsProps;
 }
 
 function renderView(id: ViewId, props: ViewProps) {
   switch (id) {
+    case 'profile':
+      return <Profile {...props.profile} />;
     case 'search':
       return <Search {...props.search} />;
     case 'tracker':
       return <Tracker {...props.tracker} />;
     case 'analysis':
       return <Analysis {...props.analysis} />;
+    case 'tailor':
+      return <Tailor {...props.tailor} />;
     case 'settings':
       return <Settings {...props.settings} />;
   }

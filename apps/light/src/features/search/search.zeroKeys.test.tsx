@@ -41,6 +41,46 @@ const tauri = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 
+/**
+ * The local database, mocked at the PLUGIN, the way `src/db`'s own tests do.
+ *
+ * It used to be mocked one layer down, as `plugin:sql|select` handlers on
+ * `invoke` — and they were never reached. `@tauri-apps/plugin-sql` resolves
+ * its own copy of `@tauri-apps/api/core`, so `Database.load` threw before any
+ * command was sent, `loadTracked` failed quietly into its one-line note, and
+ * every test here passed with the screen's SQLite reads dead. That went
+ * unnoticed until L-157 asked this file to prove a CV had been READ. Now the
+ * reads run: `select` answers the `cvs` query with the one CV on this machine
+ * and every other table as empty.
+ */
+/**
+ * The one CV on this machine, as the `cvs` table hands it back. Its text is a
+ * plausible London finance CV, so a page of real adverts lands in real bands
+ * rather than all "weak". Hoisted, because the database mock above reads it.
+ */
+const CV_ROW = vi.hoisted(() => ({
+  id: 'cv-1',
+  name: 'cv.pdf',
+  file_path: null,
+  extracted_text:
+    'Credit Risk Analyst at a London bank. Built IFRS 9 impairment models in Python and SQL, ' +
+    'ran stress tests against regulatory scenarios, delivered Basel III capital reporting and ' +
+    'presented results to the chief risk officer each quarter. Strong stakeholder communication.',
+  created_at: '2026-08-01T09:00:00.000Z',
+  json_resume: null,
+}));
+
+const sql = vi.hoisted(() => {
+  const execute = vi.fn(async (_query: string, _values?: unknown[]) => ({ rowsAffected: 0 }));
+  const select = vi.fn(async (query: string, _values?: unknown[]): Promise<unknown[]> =>
+    query.includes('FROM cvs') ? [CV_ROW] : [],
+  );
+  const load = vi.fn(async (_url: string) => ({ execute, select }));
+  return { execute, select, load };
+});
+
+vi.mock('@tauri-apps/plugin-sql', () => ({ default: { load: sql.load } }));
+
 import ARBEITNOW_PAGE from '../../../../../packages/job-apis/src/fixtures/arbeitnow-page1.json';
 import GUARDIAN_FEED from '../../../../../packages/job-apis/src/fixtures/guardian-jobsrss.xml?raw';
 
@@ -108,11 +148,8 @@ beforeEach(() => {
       return JSON.stringify(keylessReply(source));
     }
 
-    // An empty but working local database, so the screen's "which of these are
-    // already in my tracker" read succeeds and this test stays about keys.
-    if (command === 'plugin:sql|load') return 'sqlite:cviper.db';
-    if (command === 'plugin:sql|execute') return [0, 0];
-    if (command === 'plugin:sql|select') return [];
+    // The local database is not a command at all — see the plugin mock at the
+    // top of the file. Anything SQL-shaped arriving here is a bug in that mock.
 
     // Anything else reaching Rust is a failure of the promise, and it fails
     // loudly rather than resolving to something the UI can paper over.
@@ -222,6 +259,16 @@ describe('the search view on a machine with no keys', () => {
     // Real adverts, from the real reader, on a machine with nothing saved.
     const cards = await screen.findAllByTestId(/^result-/);
     expect(cards.length).toBeGreaterThan(0);
+
+    // And RANKED (L-157): the CV on file was read through the REAL port and
+    // scored against every advert with a description, on this machine, with
+    // every credential absent. A band is on screen, the sort is offered, and
+    // the database was asked for the CV — proved, not assumed.
+    const bands = await screen.findAllByTestId(/^result-rank-/);
+    expect(bands.length).toBeGreaterThan(0);
+    expect((screen.getByTestId('search-sort-best') as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByTestId('search-rank-hint')).toBeNull();
+    expect(sql.select.mock.calls.some(([query]) => query.includes('FROM cvs'))).toBe(true);
 
     // The promise this file exists for is untouched: not one keyed provider
     // command was invoked, and the feed command carries no credential — see

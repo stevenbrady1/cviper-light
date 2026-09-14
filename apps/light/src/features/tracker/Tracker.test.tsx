@@ -650,6 +650,31 @@ describe('when the database will not open', () => {
   });
 });
 
+describe('the funnel strip', () => {
+  it('is absent on an empty board', async () => {
+    // Five zeros and two dashes under "Start with the last job you applied
+    // to" would be the app reporting on a campaign that has not begun.
+    await renderBoard();
+
+    expect(screen.queryByTestId('tracker-funnel')).toBeNull();
+  });
+
+  it('is present, and counts the board, once there are cards', async () => {
+    await renderBoard([
+      entry('a', { status: 'saved' }),
+      entry('b', { status: 'applied' }),
+      entry('c', { status: 'offer' }),
+    ]);
+
+    const strip = screen.getByTestId('tracker-funnel');
+    expect(within(strip).getByTestId('tracker-funnel-count-sent').textContent).toBe('2');
+    expect(screen.getByTestId('tracker-funnel-interview-rate').textContent).toBe(
+      'Interview rate 50%',
+    );
+    expect(screen.getByTestId('tracker-funnel-offer-rate').textContent).toBe('Offer rate 50%');
+  });
+});
+
 beforeEach(() => {
   vi.useRealTimers();
 });

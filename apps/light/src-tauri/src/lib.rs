@@ -147,6 +147,10 @@ pub fn run() {
             files::pick_and_read_backup,
             files::pick_and_write_backup,
             files::pick_and_write_cv_json,
+            // Saving a tailored CV or a cover letter as plain text (L-160).
+            // Same dialog-in-Rust shape; the one extra argument is the
+            // extension, and it can only be `txt` or `md`.
+            files::pick_and_write_text,
             // Fetching the ONE page whose address the user pasted, so the same
             // extraction that reads a paste can read an advert from a link.
             //

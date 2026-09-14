@@ -23,7 +23,7 @@ import { type BackupErrorCode, type BackupError, type Result } from '@cviper/cor
  * `package.json` and asserts they agree, so it can only drift deliberately.
  */
 export const APP_NAME = 'cviper-light';
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.2.0';
 
 /**
  * Every `BackupErrorCode`, as a value.

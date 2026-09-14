@@ -39,6 +39,7 @@ import {
   FIT_SCORE_ANCHORS,
   FIT_SCORE_WEIGHTS,
   JSON_ONLY,
+  UNTRUSTED_CONTENT_BOUNDARY,
 } from './constants';
 
 /**
@@ -74,6 +75,11 @@ export interface AnalysisPrompt {
  * The fused system message (§3.2): `build_job_match_system` with the evaluation
  * axes from `build_ats_scoring_system` spliced in. No new claims — the union of
  * the two, because one call gets one system message.
+ *
+ * The trust boundary (L-153) follows the role sentence: the CV and the advert
+ * in the user turn are material, and an instruction found inside either is a
+ * fact about it. Every system message in this package carries it — see
+ * `untrusted-boundary.contract.test.ts`, which derives the population.
  */
 const SYSTEM = [
   'You are an expert recruiter who also screens CVs the way a modern Applicant',
@@ -83,6 +89,7 @@ const SYSTEM = [
   'semantic intent (action+tool+impact), impact language (metrics, percentages,',
   'currency), scannability (standard headers, parseable dates) and skill',
   'clustering.',
+  UNTRUSTED_CONTENT_BOUNDARY,
   FAIRNESS_GUARDRAIL,
   JSON_ONLY,
 ].join(' ');

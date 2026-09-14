@@ -20,6 +20,8 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 const { default: App } = await import('./App');
 const { markWelcomeSeen } = await import('../features/onboarding/store');
 const { createFakeTrackerPort } = await import('../features/tracker/test/fakePort');
+const { createFakeProfilePort } = await import('../features/profile/test/fakePort');
+const { createFakeTailorPort } = await import('../features/tailor/test/fakePort');
 
 /**
  * A fixed clock and an in-memory tracker port.
@@ -53,7 +55,14 @@ afterEach(() => {
 
 /** Render and wait for the rail's first status read to land. */
 async function renderApp() {
-  const result = render(<App trackerPort={createFakeTrackerPort()} now={NOW} />);
+  const result = render(
+    <App
+      trackerPort={createFakeTrackerPort()}
+      profilePort={createFakeProfilePort()}
+      tailorPort={createFakeTailorPort()}
+      now={NOW}
+    />,
+  );
   await screen.findByTestId('status-strip');
   // The status read is three IPC promises; let them settle so no assertion
   // races the first paint.
@@ -64,10 +73,10 @@ async function renderApp() {
 }
 
 describe('the shell', () => {
-  it('shows the rail with the three steps and Settings', async () => {
+  it('shows the rail with the five steps and Settings', async () => {
     await renderApp();
 
-    for (const id of ['search', 'tracker', 'analysis', 'settings']) {
+    for (const id of ['profile', 'search', 'tracker', 'analysis', 'tailor', 'settings']) {
       expect(screen.getByTestId(`nav-${id}`)).toBeTruthy();
     }
   });
@@ -96,7 +105,7 @@ describe('the shell', () => {
 
     await user.click(screen.getByTestId('nav-settings'));
 
-    const current = ['search', 'tracker', 'analysis', 'settings'].filter(
+    const current = ['profile', 'search', 'tracker', 'analysis', 'tailor', 'settings'].filter(
       (id) => screen.getByTestId(`nav-${id}`).getAttribute('aria-current') === 'page',
     );
     expect(current).toEqual(['settings']);
@@ -104,23 +113,29 @@ describe('the shell', () => {
 });
 
 describe('keyboard shortcuts', () => {
-  it('switches to Search, Tracker and Analysis with Ctrl+1/2/3', async () => {
+  it('switches to Profile, Search, Tracker, Analysis and Tailor with Ctrl+1 to Ctrl+5', async () => {
     await renderApp();
 
     fireEvent.keyDown(document, { key: '1', ctrlKey: true });
-    expect(screen.getByTestId('view-search')).toBeTruthy();
-
-    fireEvent.keyDown(document, { key: '3', ctrlKey: true });
-    expect(screen.getByTestId('view-analysis')).toBeTruthy();
+    expect(screen.getByTestId('view-profile')).toBeTruthy();
 
     fireEvent.keyDown(document, { key: '2', ctrlKey: true });
+    expect(screen.getByTestId('view-search')).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: '4', ctrlKey: true });
+    expect(screen.getByTestId('view-analysis')).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: '5', ctrlKey: true });
+    expect(screen.getByTestId('view-tailor')).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: '3', ctrlKey: true });
     expect(screen.getByTestId('view-tracker')).toBeTruthy();
   });
 
   it('boundary: an unbound digit does nothing at all', async () => {
     await renderApp();
 
-    fireEvent.keyDown(document, { key: '4', ctrlKey: true });
+    fireEvent.keyDown(document, { key: '6', ctrlKey: true });
     fireEvent.keyDown(document, { key: '0', ctrlKey: true });
 
     expect(screen.getByTestId('view-tracker')).toBeTruthy();

@@ -59,6 +59,18 @@ pub fn migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/0002_cv_json_resume.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "profile: the candidate profile, one row with a fixed id (L-154)",
+            sql: include_str!("../migrations/0003_profile.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 4,
+            description: "documents: texts archived against an application (L-155)",
+            sql: include_str!("../migrations/0004_documents.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -124,6 +136,62 @@ mod tests {
         );
         for forbidden in ["CREATE TABLE", "DROP", "RENAME", "UPDATE", "DELETE"] {
             assert!(!sql.contains(forbidden), "0002 must be additive; found `{forbidden}`");
+        }
+    }
+
+    #[test]
+    fn the_third_migration_creates_only_the_profile_table() {
+        // L-154. One new table and nothing else: no index (a single fixed-id
+        // row needs none), nothing altered, nothing dropped. `rows.test.ts`
+        // reads the same file to check every column is mapped.
+        let migration = &migrations()[2];
+        assert_eq!(migration.version, 3);
+        let sql = executable_sql(migration.sql);
+        assert_eq!(
+            sql.matches("CREATE TABLE IF NOT EXISTS").count(),
+            1,
+            "0003 must create exactly one table"
+        );
+        assert!(
+            sql.contains("CREATE TABLE IF NOT EXISTS profile ("),
+            "0003 must create `profile`"
+        );
+        for forbidden in ["CREATE INDEX", "ALTER TABLE", "DROP", "RENAME", "UPDATE", "DELETE FROM"] {
+            assert!(!sql.contains(forbidden), "0003 must only create; found `{forbidden}`");
+        }
+    }
+
+    #[test]
+    fn the_fourth_migration_creates_only_the_documents_table_and_its_index() {
+        // L-155. One table, one index on its foreign key — SQLite does not
+        // index a foreign key for you, and `applications` cascades into it.
+        let migration = &migrations()[3];
+        assert_eq!(migration.version, 4);
+        let sql = executable_sql(migration.sql);
+        assert_eq!(
+            sql.matches("CREATE TABLE IF NOT EXISTS").count(),
+            1,
+            "0004 must create exactly one table"
+        );
+        assert!(
+            sql.contains("CREATE TABLE IF NOT EXISTS documents ("),
+            "0004 must create `documents`"
+        );
+        assert_eq!(
+            sql.matches("CREATE INDEX IF NOT EXISTS").count(),
+            1,
+            "0004 must create exactly one index"
+        );
+        assert!(
+            sql.contains("CREATE INDEX IF NOT EXISTS idx_documents_application_id"),
+            "0004 must index documents.application_id"
+        );
+        assert!(
+            sql.contains("REFERENCES applications (id) ON DELETE CASCADE"),
+            "a document belongs to one application and goes with it"
+        );
+        for forbidden in ["ALTER TABLE", "DROP", "RENAME", "UPDATE", "DELETE FROM"] {
+            assert!(!sql.contains(forbidden), "0004 must only create; found `{forbidden}`");
         }
     }
 

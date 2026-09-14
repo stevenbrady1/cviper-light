@@ -27,8 +27,20 @@ import { withDb } from './client';
 import { type DbError } from './errors';
 import { type TableName } from './rows';
 
-/** Children first. Applications need jobs; analyses need CVs (and may name jobs). */
-export const WIPE_ORDER: readonly TableName[] = ['analyses', 'applications', 'cvs', 'jobs'];
+/**
+ * Children first. Documents need applications; applications need jobs;
+ * analyses need CVs (and may name jobs). The profile stands alone and goes
+ * last — it has no parent, but a wipe that forgot it would leave the user's
+ * own description of themselves behind after "delete everything".
+ */
+export const WIPE_ORDER: readonly TableName[] = [
+  'analyses',
+  'documents',
+  'applications',
+  'cvs',
+  'jobs',
+  'profile',
+];
 
 export async function wipeAll(): Promise<Result<void, DbError>> {
   return withDb(async (db) => {
