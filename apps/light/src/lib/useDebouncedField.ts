@@ -38,6 +38,14 @@ export interface DebouncedField {
   readonly draft: string;
   /** Call from `onChange`. */
   readonly setDraft: (next: string) => void;
+  /**
+   * The committed value was changed by something OTHER than this field — the
+   * follow-up panel appending a marker to the notes, say. Shows the new value
+   * and treats it as already saved, so no commit fires for it and, more
+   * importantly, a later keystroke commits the new text rather than a stale
+   * draft that would overwrite what the other writer put there.
+   */
+  readonly reset: (committed: string) => void;
   /** Call from `onBlur`, or anywhere the pending value must land NOW. */
   readonly flush: () => void;
 }
@@ -89,5 +97,12 @@ export function useDebouncedField(
     commitRef.current(draft);
   }, [draft]);
 
-  return { draft, setDraft, flush };
+  const reset = useCallback((committed: string) => {
+    // Order matters: the ref first, so the effect that watches `draft` sees a
+    // value equal to `lastCommitted` and arms no timer for it.
+    lastCommitted.current = committed;
+    setDraft(committed);
+  }, []);
+
+  return { draft, setDraft, flush, reset };
 }

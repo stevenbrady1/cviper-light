@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { type ChatTransport } from '@cviper/ai-providers';
 import { type Application, type ApplicationStatus } from '@cviper/core-types';
 
 import { DESTRUCTIVE_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
@@ -7,9 +8,13 @@ import { daysSinceTimestamp } from '../../lib/dates';
 import { useDebouncedField } from '../../lib/useDebouncedField';
 import { isOpenableUrl, type BrowserPort } from '../../platform/browser';
 
+import { type Availability } from '../analysis/providers';
+
 import { ConfirmDelete } from './ConfirmDelete';
+import { FollowUpPanel } from './FollowUpPanel';
 import { NEXT_ACTION_TONES, nextActionUrgency } from './nextAction';
 import { STATUS_LABELS, TRACKER_COLUMNS, type TrackerEntry } from './model';
+import { type TrackerPort } from './port';
 import { STALENESS_BANDS, stalenessBand, stalenessDescription } from './staleness';
 
 /**
@@ -54,6 +59,17 @@ interface ApplicationDetailProps {
   ) => void;
   readonly onStatusChange: (status: ApplicationStatus) => void;
   readonly onDelete: () => void;
+  /**
+   * The archive half of the board's port, for the follow-up panel (L-162).
+   * Optional so the pane renders without one; the panel is mounted only when
+   * it is here, because a draft with nowhere to read materials from and
+   * nowhere to be archived is not a draft the panel can stand behind.
+   */
+  readonly port?: TrackerPort | undefined;
+  /** Injected by tests so the machine's real credentials are never consulted. */
+  readonly readAvailability?: (() => Promise<Availability>) | undefined;
+  /** Injected by tests so a fake provider can answer without a socket. */
+  readonly createTransport?: (() => ChatTransport) | undefined;
 }
 
 /** `''` from an input means "nothing here", and the model spells that `null`. */
@@ -70,6 +86,9 @@ export function ApplicationDetail({
   onEdit,
   onStatusChange,
   onDelete,
+  port,
+  readAvailability,
+  createTransport,
 }: ApplicationDetailProps) {
   const { application, job } = entry;
   const [confirming, setConfirming] = useState(false);
@@ -247,6 +266,26 @@ export function ApplicationDetail({
         />
         <p className="mt-1 text-xs text-ink-faint">Saved as you type.</p>
       </div>
+
+      {/*
+        Follow-up and thank-you drafts (L-162). When the panel records a
+        follow-up it appends a line to the notes; `notes.reset` shows that line
+        in the box above and marks it committed, so the next keystroke there
+        commits the new text rather than a stale draft that would overwrite it.
+      */}
+      {port === undefined ? null : (
+        <FollowUpPanel
+          entry={entry}
+          today={today}
+          port={port}
+          readAvailability={readAvailability}
+          createTransport={createTransport}
+          onEdit={(changes) => {
+            if (changes.notes !== undefined) notes.reset(changes.notes ?? '');
+            onEdit(changes);
+          }}
+        />
+      )}
 
       <div className="border-t border-line pt-3">
         <button

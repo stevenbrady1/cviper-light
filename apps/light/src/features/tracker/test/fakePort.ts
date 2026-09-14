@@ -1,4 +1,11 @@
-import { err, ok, type Application, type Result } from '@cviper/core-types';
+import {
+  err,
+  ok,
+  type Application,
+  type Document,
+  type Profile,
+  type Result,
+} from '@cviper/core-types';
 
 import { type DbError } from '../../../db';
 import { type TrackerEntry } from '../model';
@@ -27,13 +34,24 @@ import { type TrackerPort } from '../port';
  * would leave every error branch in the tracker unexercised.
  */
 
+type PortMethod =
+  'load' | 'create' | 'saveApplication' | 'remove' | 'documentsFor' | 'saveDocument' | 'profile';
+
 export interface FakeTrackerPort extends TrackerPort {
   /** Everything currently "stored". */
   readonly entries: () => readonly TrackerEntry[];
+  /** Every document currently "archived", in the order they were saved. */
+  readonly documents: () => readonly Document[];
   /** Make the next call to the named method fail. */
-  readonly failNext: (method: 'load' | 'create' | 'saveApplication' | 'remove') => void;
+  readonly failNext: (method: PortMethod) => void;
   /** How many times each method has been called. */
-  readonly calls: Record<'load' | 'create' | 'saveApplication' | 'remove', number>;
+  readonly calls: Record<PortMethod, number>;
+}
+
+/** What else the fake starts with. Both optional, both empty by default. */
+export interface FakePortSeed {
+  readonly documents?: readonly Document[] | undefined;
+  readonly profile?: Profile | null | undefined;
 }
 
 const FAILURE: DbError = {
@@ -42,10 +60,23 @@ const FAILURE: DbError = {
   table: 'applications',
 };
 
-export function createFakeTrackerPort(initial: readonly TrackerEntry[] = []): FakeTrackerPort {
+export function createFakeTrackerPort(
+  initial: readonly TrackerEntry[] = [],
+  seed: FakePortSeed = {},
+): FakeTrackerPort {
   let stored: TrackerEntry[] = [...initial];
+  let documents: Document[] = [...(seed.documents ?? [])];
+  const profile: Profile | null = seed.profile ?? null;
   const failing = new Set<string>();
-  const calls = { load: 0, create: 0, saveApplication: 0, remove: 0 };
+  const calls: Record<PortMethod, number> = {
+    load: 0,
+    create: 0,
+    saveApplication: 0,
+    remove: 0,
+    documentsFor: 0,
+    saveDocument: 0,
+    profile: 0,
+  };
 
   function checkFailure(method: string): Result<void, DbError> | null {
     if (!failing.has(method)) return null;
@@ -56,6 +87,7 @@ export function createFakeTrackerPort(initial: readonly TrackerEntry[] = []): Fa
   return {
     calls,
     entries: () => stored,
+    documents: () => documents,
     failNext: (method) => failing.add(method),
 
     async load() {
@@ -89,6 +121,28 @@ export function createFakeTrackerPort(initial: readonly TrackerEntry[] = []): Fa
       if (failure !== null) return failure;
       stored = stored.filter((candidate) => candidate.application.id !== entry.application.id);
       return ok(undefined);
+    },
+
+    async documentsFor(applicationId: string) {
+      calls.documentsFor += 1;
+      const failure = checkFailure('documentsFor');
+      if (failure !== null) return err(FAILURE);
+      return ok(documents.filter((document) => document.application_id === applicationId));
+    },
+
+    async saveDocument(document: Document) {
+      calls.saveDocument += 1;
+      const failure = checkFailure('saveDocument');
+      if (failure !== null) return failure;
+      documents = [...documents.filter((existing) => existing.id !== document.id), document];
+      return ok(undefined);
+    },
+
+    async profile() {
+      calls.profile += 1;
+      const failure = checkFailure('profile');
+      if (failure !== null) return err(FAILURE);
+      return ok(profile);
     },
   };
 }

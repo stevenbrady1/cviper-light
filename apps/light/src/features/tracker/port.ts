@@ -22,13 +22,16 @@
  */
 import {
   deleteJob,
+  getProfile,
   listApplications,
+  listDocumentsForApplication,
   listJobs,
   upsertApplication,
+  upsertDocument,
   upsertJob,
   type DbError,
 } from '../../db';
-import { ok, type Application, type Result } from '@cviper/core-types';
+import { ok, type Application, type Document, type Profile, type Result } from '@cviper/core-types';
 
 import { joinEntries, type TrackerEntry } from './model';
 
@@ -41,6 +44,12 @@ export interface TrackerPort {
   saveApplication(application: Application): Promise<Result<void, DbError>>;
   /** Remove an application and the job it belongs to. */
   remove(entry: TrackerEntry): Promise<Result<void, DbError>>;
+  /** Everything archived against one application, oldest first. */
+  documentsFor(applicationId: string): Promise<Result<Document[], DbError>>;
+  /** Archive one document against its application. */
+  saveDocument(document: Document): Promise<Result<void, DbError>>;
+  /** The candidate profile, or `null` before one is written. */
+  profile(): Promise<Result<Profile | null, DbError>>;
 }
 
 export function createDbTrackerPort(): TrackerPort {
@@ -76,6 +85,18 @@ export function createDbTrackerPort(): TrackerPort {
       // it. Deleting the application alone would leave an invisible orphan row
       // that nothing in the app can ever reach or clean up.
       return deleteJob(entry.job.id);
+    },
+
+    documentsFor(applicationId) {
+      return listDocumentsForApplication(applicationId);
+    },
+
+    saveDocument(document) {
+      return upsertDocument(document);
+    },
+
+    profile() {
+      return getProfile();
     },
   };
 }

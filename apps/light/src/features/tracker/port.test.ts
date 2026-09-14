@@ -13,6 +13,9 @@ const db = vi.hoisted(() => ({
   upsertJob: vi.fn(),
   upsertApplication: vi.fn(),
   deleteJob: vi.fn(),
+  listDocumentsForApplication: vi.fn(),
+  upsertDocument: vi.fn(),
+  getProfile: vi.fn(),
 }));
 
 vi.mock('../../db', () => db);
@@ -39,6 +42,9 @@ beforeEach(() => {
   db.upsertJob.mockResolvedValue(ok(undefined));
   db.upsertApplication.mockResolvedValue(ok(undefined));
   db.deleteJob.mockResolvedValue(ok(undefined));
+  db.listDocumentsForApplication.mockResolvedValue(ok([]));
+  db.upsertDocument.mockResolvedValue(ok(undefined));
+  db.getProfile.mockResolvedValue(ok(null));
 });
 
 describe('load', () => {
@@ -137,5 +143,47 @@ describe('remove', () => {
     db.deleteJob.mockResolvedValue(err(failure));
 
     await expect(createDbTrackerPort().remove(entry)).resolves.toEqual(err(failure));
+  });
+});
+
+describe('documentsFor, saveDocument and profile — the archive half of the port', () => {
+  const document = {
+    id: 'doc-1',
+    application_id: 'app-1',
+    kind: 'follow_up' as const,
+    title: 'Follow-up — 2026-09-11',
+    text: 'Subject\n\nBody',
+    created_at: NOW,
+  };
+
+  it('documentsFor asks the data layer for exactly that application', async () => {
+    db.listDocumentsForApplication.mockResolvedValue(ok([document]));
+
+    await expect(createDbTrackerPort().documentsFor('app-1')).resolves.toEqual(ok([document]));
+    expect(db.listDocumentsForApplication).toHaveBeenCalledWith('app-1');
+  });
+
+  it('negative: documentsFor passes a read failure straight through', async () => {
+    db.listDocumentsForApplication.mockResolvedValue(err(failure));
+    await expect(createDbTrackerPort().documentsFor('app-1')).resolves.toEqual(err(failure));
+  });
+
+  it('saveDocument writes the document as given', async () => {
+    await expect(createDbTrackerPort().saveDocument(document)).resolves.toEqual(ok(undefined));
+    expect(db.upsertDocument).toHaveBeenCalledWith(document);
+  });
+
+  it('negative: saveDocument passes a write failure straight through', async () => {
+    db.upsertDocument.mockResolvedValue(err(failure));
+    await expect(createDbTrackerPort().saveDocument(document)).resolves.toEqual(err(failure));
+  });
+
+  it('boundary: profile is null before one is written, not a failure', async () => {
+    await expect(createDbTrackerPort().profile()).resolves.toEqual(ok(null));
+  });
+
+  it('negative: profile passes a read failure straight through', async () => {
+    db.getProfile.mockResolvedValue(err(failure));
+    await expect(createDbTrackerPort().profile()).resolves.toEqual(err(failure));
   });
 });

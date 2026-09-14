@@ -429,6 +429,9 @@ export function Tracker({
               onEdit={(changes) => onEdit(selected.application.id, changes)}
               onStatusChange={(status) => onStatusChange(selected.application.id, status)}
               onDelete={() => void onDelete(selected)}
+              port={trackerPort}
+              readAvailability={readAvailability}
+              createTransport={createTransport}
             />
           </DetailPane>
         )}

@@ -54,6 +54,8 @@ export {
   type JobExtraction,
 } from './job-extraction';
 
+export { FOLLOW_UP_JSON_SCHEMA, FollowUpDraftSchema, type FollowUpDraft } from './follow-up';
+
 export {
   BOARD_ENCODINGS,
   BoardTemplateSchema,
