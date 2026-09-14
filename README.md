@@ -188,6 +188,10 @@ screen on the rail — holds the things a CV does not say: the languages you
 work in and how well, your right to work, the deal-breakers, the sectors you
 want, what energises you and what drains you, and a few STAR examples. It is
 kept in the same database file as everything else and travels in the backup.
+If you already keep a candidate profile in an ai-job-search folder, the
+Profile view can read it in: you pick the folder, four Markdown files are read
+by name on this computer, you see what was found, and nothing is added until
+you say so.
 
 **Check the gates before the score.** _Needs nothing to start._ Before an
 analysis puts a number on screen it reads the advert for citizenship,

@@ -814,6 +814,174 @@ pub(crate) async fn pick_and_write_text(
     Ok(Some(path.display().to_string()))
 }
 
+// ── A candidate profile kept in an ai-job-search workspace (L-167) ──────────
+//
+// ai-job-search is a job-hunt framework whose candidate profile lives in
+// Markdown files inside a folder on the user's machine. The user picks that
+// FOLDER in a dialog; this command reads exactly four files in it by fixed
+// relative name and hands their text to the frontend, where
+// `features/profile/importAiJobSearch.ts` turns them into profile fields.
+//
+// Everything the module comment says still holds — no path crosses from
+// JavaScript, and only what came back out of the dialog is touched. But a
+// folder is a wider grant than a file, so the reading is narrower than the
+// grant:
+//
+//   * the four names are constants. The directory is never listed and no
+//     other file in it is opened, whatever else the user keeps there.
+//   * each file is canonicalised and must still lie INSIDE the canonicalised
+//     folder. A link that leads out — `CLAUDE.md -> ~/.ssh/id_rsa` — is
+//     refused, and the refusal is the whole read, not a skipped file.
+//   * each file is capped at `MAX_WORKSPACE_FILE_BYTES`, checked from the
+//     directory entry before it is opened, and must be UTF-8 text.
+//   * a folder holding none of the four is refused with one fixed sentence,
+//     so a mis-click on the home directory reads nothing and says why.
+
+/// The largest of the four profile files we will read, in bytes.
+///
+/// A filled-in `CLAUDE.md` is a few kilobytes of Markdown; the framework's
+/// own longest file is under 20 KB. 512 KB is far past any real one and small
+/// enough that four of them cannot matter to a desktop machine.
+const MAX_WORKSPACE_FILE_BYTES: u64 = 512 * 1024;
+
+/// Where the framework keeps the three skill files, relative to the folder.
+/// Forward slashes: `Path::join` accepts them on Windows too.
+const WORKSPACE_SKILL_FOLDER: &str = ".claude/skills/job-application-assistant";
+
+/// The four files, and nothing else. Read with fixed names, never listed.
+#[derive(Debug, Serialize)]
+pub struct WorkspaceFiles {
+    /// `CLAUDE.md` at the top of the folder: identity, languages, target
+    /// sectors, deal-breakers.
+    claude_md: Option<String>,
+    /// `01-candidate-profile.md`: identity, languages, constraints.
+    candidate_profile: Option<String>,
+    /// `04-job-evaluation.md`: career goals, what energises and drains.
+    job_evaluation: Option<String>,
+    /// `07-interview-prep.md`: the ready-made STAR examples.
+    interview_prep: Option<String>,
+}
+
+/// Said when none of the four files is there. One fixed sentence: the folder
+/// the user picked is on their screen, and nothing here names it.
+const NOT_A_WORKSPACE: &str = "That folder does not look like an ai-job-search workspace.";
+
+/// Read one of the four by its relative name. `Ok(None)` is "not there",
+/// which is normal — a workspace where `/setup` was never run has only
+/// `CLAUDE.md` filled in. Every other outcome is decided BEFORE a byte is
+/// read: the resolved location, the kind of entry, the size.
+fn read_workspace_file(root: &Path, relative: &str) -> Result<Option<String>, String> {
+    let candidate = root.join(relative);
+
+    // `symlink_metadata` so a dangling link is "there but unreadable" below
+    // rather than silently "not there": a link is a decision somebody made.
+    if fs::symlink_metadata(&candidate).is_err() {
+        return Ok(None);
+    }
+
+    let resolved = candidate.canonicalize().map_err(|_| {
+        "One of the profile files in that folder could not be opened.".to_string()
+    })?;
+    if !resolved.starts_with(root) {
+        return Err(
+            "One of the profile files in that folder points somewhere outside it, so nothing was \
+             read."
+                .to_string(),
+        );
+    }
+
+    let metadata = fs::metadata(&resolved).map_err(|error| describe_io_error(&error))?;
+    if !metadata.is_file() {
+        // A folder wearing one of the four names is not a profile file.
+        return Ok(None);
+    }
+    // From the directory entry, BEFORE opening — the same order as
+    // `check_readable`.
+    if metadata.len() > MAX_WORKSPACE_FILE_BYTES {
+        return Err(format!(
+            "One of the profile files in that folder is larger than the {} KB CViper will read.",
+            MAX_WORKSPACE_FILE_BYTES / 1024
+        ));
+    }
+
+    fs::read_to_string(&resolved)
+        .map(Some)
+        .map_err(|error| match error.kind() {
+            ErrorKind::InvalidData => {
+                "One of the profile files in that folder is not text, so it cannot be read."
+                    .to_string()
+            }
+            _ => describe_io_error(&error),
+        })
+}
+
+/// Read the four files from the folder the user chose in the dialog.
+///
+/// Not a `#[tauri::command]`, and must not become one: it takes a path. It is
+/// a separate function so every guard above can be tested on a real folder
+/// without a dialog.
+fn read_workspace_at(folder: &Path) -> Result<WorkspaceFiles, String> {
+    // Canonicalised FIRST, so the prefix every file is checked against is the
+    // real location, not a path that itself goes through a link.
+    let root = folder.canonicalize().map_err(|error| match error.kind() {
+        ErrorKind::NotFound => {
+            "That folder is no longer there. It may have been moved or renamed since you picked \
+             it."
+                .to_string()
+        }
+        _ => "That folder could not be opened.".to_string(),
+    })?;
+    if !root.is_dir() {
+        return Err("That is a file, not a folder. Pick the ai-job-search folder itself.".to_string());
+    }
+
+    let skill = |name: &str| format!("{WORKSPACE_SKILL_FOLDER}/{name}");
+    let files = WorkspaceFiles {
+        claude_md: read_workspace_file(&root, "CLAUDE.md")?,
+        candidate_profile: read_workspace_file(&root, &skill("01-candidate-profile.md"))?,
+        job_evaluation: read_workspace_file(&root, &skill("04-job-evaluation.md"))?,
+        interview_prep: read_workspace_file(&root, &skill("07-interview-prep.md"))?,
+    };
+
+    if files.claude_md.is_none()
+        && files.candidate_profile.is_none()
+        && files.job_evaluation.is_none()
+        && files.interview_prep.is_none()
+    {
+        return Err(NOT_A_WORKSPACE.to_string());
+    }
+
+    Ok(files)
+}
+
+/// Ask for an ai-job-search folder and read the four profile files in it
+/// (L-167). `Ok(None)` means the user cancelled; inside the answer, a file
+/// that is not there is `null`.
+///
+/// A FOLDER dialog, the first in this module. It is still the plugin's own
+/// dialog run from Rust, so the same rule holds as for the three file
+/// pickers: the frontend asks for a dialog and gets back what was read, and
+/// there is no parameter through which it could name a folder itself.
+#[tauri::command]
+pub(crate) async fn pick_and_read_profile_workspace(
+    app: AppHandle,
+) -> Result<Option<WorkspaceFiles>, String> {
+    let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
+
+    app.dialog()
+        .file()
+        .set_title("Choose your ai-job-search folder")
+        .pick_folder(move |chosen| {
+            let _ = answer.try_send(chosen);
+        });
+
+    let Some(chosen) = wait_for_choice(answers).await? else {
+        return Ok(None);
+    };
+
+    read_workspace_at(&local_path(chosen)?).map(Some)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1630,6 +1798,7 @@ mod tests {
             "pick_and_write_backup",
             "pick_and_write_cv_json",
             "pick_and_write_text",
+            "pick_and_read_profile_workspace",
         ] {
             assert!(
                 handler.contains(&format!("files::{command},")),
@@ -1664,6 +1833,7 @@ mod tests {
             "invoke('pick_and_write_backup', ",
             "invoke('pick_and_write_cv_json', ",
             "invoke('pick_and_write_text', ",
+            "invoke('pick_and_read_profile_workspace')",
         ] {
             assert!(
                 PLATFORM_FILES_TS.contains(call),
@@ -1745,5 +1915,166 @@ mod tests {
             "the scan found only {} commands, which cannot be right: {seen:?}",
             seen.len()
         );
+    }
+
+    // ── An ai-job-search workspace (L-167) ──────────────────────────────────
+    //
+    // A folder rather than a file, so the guards are different in kind: not
+    // "is this the right sort of file" but "is anything read that was not
+    // named, and does any name lead out of the folder".
+
+    /// A fresh, empty folder of this call's own.
+    fn temp_folder(name: &str) -> std::path::PathBuf {
+        let folder = temp_path(name);
+        fs::create_dir_all(&folder).expect("a temp folder");
+        folder
+    }
+
+    #[test]
+    fn an_empty_folder_is_not_a_workspace() {
+        // Negative: the home directory, mis-clicked. Nothing in it is one of
+        // the four names, so nothing is read and the refusal says why.
+        let folder = temp_folder("empty-workspace");
+
+        let error = read_workspace_at(&folder).unwrap_err();
+
+        assert!(error.contains("does not look like an ai-job-search workspace"), "{error}");
+        fs::remove_dir_all(&folder).ok();
+    }
+
+    #[test]
+    fn a_folder_with_only_other_files_is_not_a_workspace() {
+        // A folder full of things that are NOT the four names is the same
+        // refusal: the names are constants, and nothing else counts.
+        let folder = temp_folder("other-files");
+        fs::write(folder.join("README.md"), "# Not a workspace").unwrap();
+        fs::write(folder.join("claude.md.bak"), "stale").unwrap();
+        fs::create_dir_all(folder.join(".claude/skills")).unwrap();
+
+        let error = read_workspace_at(&folder).unwrap_err();
+
+        assert!(error.contains("does not look like"), "{error}");
+        fs::remove_dir_all(&folder).ok();
+    }
+
+    #[test]
+    fn a_folder_with_only_claude_md_is_a_workspace_with_three_files_missing() {
+        // Happy path, minimal: one of the four is enough, and the other three
+        // come back as `None` rather than as an error or an empty string.
+        let folder = temp_folder("claude-only");
+        fs::write(folder.join("CLAUDE.md"), "# Job Application Assistant\n").unwrap();
+
+        let files = read_workspace_at(&folder).unwrap();
+
+        assert_eq!(files.claude_md.as_deref(), Some("# Job Application Assistant\n"));
+        assert!(files.candidate_profile.is_none());
+        assert!(files.job_evaluation.is_none());
+        assert!(files.interview_prep.is_none());
+        fs::remove_dir_all(&folder).ok();
+    }
+
+    #[test]
+    fn the_three_skill_files_are_read_from_their_fixed_relative_paths() {
+        let folder = temp_folder("full-workspace");
+        let skill = folder.join(WORKSPACE_SKILL_FOLDER);
+        fs::create_dir_all(&skill).unwrap();
+        fs::write(folder.join("CLAUDE.md"), "claude").unwrap();
+        fs::write(skill.join("01-candidate-profile.md"), "profile").unwrap();
+        fs::write(skill.join("04-job-evaluation.md"), "evaluation").unwrap();
+        fs::write(skill.join("07-interview-prep.md"), "interview").unwrap();
+        // A file the framework also keeps, which this command must not touch.
+        fs::write(skill.join("03-writing-style.md"), "not read").unwrap();
+
+        let files = read_workspace_at(&folder).unwrap();
+
+        assert_eq!(files.claude_md.as_deref(), Some("claude"));
+        assert_eq!(files.candidate_profile.as_deref(), Some("profile"));
+        assert_eq!(files.job_evaluation.as_deref(), Some("evaluation"));
+        assert_eq!(files.interview_prep.as_deref(), Some("interview"));
+        // The serialised shape has exactly the four keys and nothing from any
+        // other file, so the fifth file above cannot have been read into it.
+        let json = serde_json::to_value(&files).unwrap();
+        let keys: Vec<&str> = json.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(
+            keys,
+            ["candidate_profile", "claude_md", "interview_prep", "job_evaluation"]
+        );
+        assert!(!json.to_string().contains("not read"));
+        fs::remove_dir_all(&folder).ok();
+    }
+
+    #[test]
+    fn a_link_that_leads_out_of_the_folder_is_refused_not_followed() {
+        // THE guard. `CLAUDE.md -> <somewhere else>` must not be read, and the
+        // refusal must be the whole read, not a silently skipped file.
+        let folder = temp_folder("escaping-link");
+        let outside = temp_path("outside-secret.md");
+        fs::write(&outside, "s3cr3t contents").unwrap();
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&outside, folder.join("CLAUDE.md")).unwrap();
+        #[cfg(windows)]
+        if std::os::windows::fs::symlink_file(&outside, folder.join("CLAUDE.md")).is_err() {
+            // Creating a link needs Developer Mode or a privilege on Windows.
+            // Without it there is nothing to test here; the unix run covers it.
+            eprintln!("skipped: this Windows account cannot create symlinks");
+            fs::remove_dir_all(&folder).ok();
+            fs::remove_file(&outside).ok();
+            return;
+        }
+
+        let error = read_workspace_at(&folder).unwrap_err();
+
+        assert!(error.contains("outside"), "{error}");
+        assert!(!error.contains("s3cr3t"), "the refusal must not carry the target: {error}");
+        fs::remove_dir_all(&folder).ok();
+        fs::remove_file(&outside).ok();
+    }
+
+    #[test]
+    fn a_workspace_file_at_the_cap_is_read_and_one_byte_over_is_refused() {
+        // Boundary, from the directory entry before the file is opened.
+        let folder = temp_folder("oversize");
+        let at_the_cap = "a".repeat(MAX_WORKSPACE_FILE_BYTES as usize);
+        fs::write(folder.join("CLAUDE.md"), &at_the_cap).unwrap();
+        assert_eq!(
+            read_workspace_at(&folder).unwrap().claude_md.map(|text| text.len()),
+            Some(MAX_WORKSPACE_FILE_BYTES as usize)
+        );
+
+        fs::write(folder.join("CLAUDE.md"), format!("{at_the_cap}a")).unwrap();
+        let error = read_workspace_at(&folder).unwrap_err();
+        assert!(error.contains("larger than"), "{error}");
+        fs::remove_dir_all(&folder).ok();
+    }
+
+    #[test]
+    fn a_workspace_file_that_is_not_text_is_refused() {
+        let folder = temp_folder("binary-workspace");
+        fs::write(folder.join("CLAUDE.md"), [0xFFu8, 0xFE, 0x00]).unwrap();
+
+        let error = read_workspace_at(&folder).unwrap_err();
+
+        assert!(error.contains("not text"), "{error}");
+        fs::remove_dir_all(&folder).ok();
+    }
+
+    #[test]
+    fn a_file_picked_instead_of_a_folder_is_refused() {
+        let file = temp_path("CLAUDE.md");
+        fs::write(&file, "# not a folder").unwrap();
+
+        let error = read_workspace_at(&file).unwrap_err();
+
+        assert!(error.contains("not a folder"), "{error}");
+        fs::remove_file(&file).ok();
+    }
+
+    #[test]
+    fn a_missing_folder_is_reported_without_its_path() {
+        let gone = temp_path("s3cr3t-gone-folder");
+        let error = read_workspace_at(&gone).unwrap_err();
+        assert!(!error.contains("s3cr3t"), "{error}");
+        assert!(!error.is_empty());
     }
 }

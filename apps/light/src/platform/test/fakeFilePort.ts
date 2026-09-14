@@ -1,6 +1,6 @@
 import { err, ok } from '@cviper/core-types';
 
-import { type FilePort, type PickedBackup, type PickedCv } from '../files';
+import { type FilePort, type PickedBackup, type PickedCv, type WorkspaceFiles } from '../files';
 
 /**
  * An in-memory `FilePort`, for driving the upload and backup flows in a test.
@@ -33,9 +33,13 @@ export interface FakeFilePort extends FilePort {
   readonly writtenCvJson: () => readonly { path: string; contents: string }[];
   /** Everything `saveText` was asked to write, in order (L-160). */
   readonly writtenText: () => readonly { path: string; contents: string; extension: string }[];
+  /** The next `pickProfileWorkspace` answers with these files (L-167). `null` is a cancel. */
+  readonly nextWorkspace: (files: WorkspaceFiles | null) => void;
+  /** The next `pickProfileWorkspace` fails with this message. */
+  readonly failWorkspace: (message: string) => void;
   /** How many times each method was called. */
   readonly calls: Record<
-    'pickCv' | 'pickBackup' | 'saveBackup' | 'saveCvJson' | 'saveText',
+    'pickCv' | 'pickBackup' | 'saveBackup' | 'saveCvJson' | 'saveText' | 'pickProfileWorkspace',
     number
   >;
 }
@@ -50,7 +54,16 @@ export function createFakeFilePort(): FakeFilePort {
   const written: { path: string; contents: string }[] = [];
   const writtenCvJson: { path: string; contents: string }[] = [];
   const writtenText: { path: string; contents: string; extension: string }[] = [];
-  const calls = { pickCv: 0, pickBackup: 0, saveBackup: 0, saveCvJson: 0, saveText: 0 };
+  let workspace: WorkspaceFiles | null = null;
+  let workspaceFailure: string | null = null;
+  const calls = {
+    pickCv: 0,
+    pickBackup: 0,
+    saveBackup: 0,
+    saveCvJson: 0,
+    saveText: 0,
+    pickProfileWorkspace: 0,
+  };
 
   return {
     calls,
@@ -77,6 +90,13 @@ export function createFakeFilePort(): FakeFilePort {
     },
     failSave: (message) => {
       saveFailure = message;
+    },
+    nextWorkspace: (next) => {
+      workspace = next;
+      workspaceFailure = null;
+    },
+    failWorkspace: (message) => {
+      workspaceFailure = message;
     },
 
     async pickCv() {
@@ -117,6 +137,13 @@ export function createFakeFilePort(): FakeFilePort {
       if (savePath === null) return ok(null);
       writtenText.push({ path: savePath, contents, extension });
       return ok(savePath);
+    },
+
+    // The folder picker (L-167): a workspace, a cancel, or a refusal.
+    async pickProfileWorkspace() {
+      calls.pickProfileWorkspace += 1;
+      if (workspaceFailure !== null) return err({ message: workspaceFailure });
+      return ok(workspace);
     },
   };
 }
