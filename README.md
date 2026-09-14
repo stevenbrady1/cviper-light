@@ -230,7 +230,7 @@ every new number, employer, year or certification that is not in the original
 is flagged before you see the text. You get the rewrite as a diff against the
 original, a second read that lists problems without rewriting, and a cover
 letter drawn from the same facts. Save both against the application, or as a
-text file.
+text file or a Word document, built on your machine.
 
 **About us, briefly.** Settings → Privacy carries one sentence that opens this
 app's own privacy policy at `https://cviper.ai/privacy/`, and Settings → About says

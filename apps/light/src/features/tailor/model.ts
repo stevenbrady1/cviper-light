@@ -150,10 +150,15 @@ export function documentTitle(kind: 'cv' | 'cover_letter', jobTitle: string): st
 /**
  * What the save dialog is pre-filled with. Only a SUGGESTION: Rust re-checks
  * it for separators and control characters and falls back to
- * `cviper-export.txt` itself (`bare_text_name`).
+ * `cviper-export.txt` — or `.docx` for the Word export (L-165) — itself
+ * (`bare_text_name`, `bare_bytes_name`).
  */
-export function exportFileName(kind: 'cv' | 'cover_letter', jobTitle: string): string {
-  return `${documentTitle(kind, jobTitle)}.txt`;
+export function exportFileName(
+  kind: 'cv' | 'cover_letter',
+  jobTitle: string,
+  extension: 'txt' | 'docx' = 'txt',
+): string {
+  return `${documentTitle(kind, jobTitle)}.${extension}`;
 }
 
 /**

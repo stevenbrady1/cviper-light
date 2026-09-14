@@ -982,6 +982,187 @@ pub(crate) async fn pick_and_read_profile_workspace(
     read_workspace_at(&local_path(chosen)?).map(Some)
 }
 
+// ── A binary export: the Word document (L-165) ──────────────────────────────
+//
+// The same shape as the text export with one difference: the bytes cross the
+// IPC boundary as base64, because a `.docx` is a zip and a zip is not a
+// string. They are decoded HERE, in Rust, and the decoder is as strict as
+// the encoder above is exact — anything that is not padded standard base64
+// is a refusal, never a best-effort byte string that is silently wrong.
+
+/// Extensions a binary export may be saved under. Lower-case, no dot.
+/// Exactly one: the frontend asks for it BY NAME and anything else is refused
+/// before a dialog opens, so this command cannot be talked into writing an
+/// `.exe`, a `.docm` (a Word file that carries macros) or a `.zip`.
+const BYTES_EXTENSIONS: [&str; 1] = ["docx"];
+
+/// The largest binary export we will write, in bytes — measured on the
+/// DECODED size, and checked on the base64's length before a byte of it is
+/// decoded, so a payload that is about to be refused is never allocated.
+///
+/// A tailored CV as a Word document is a few tens of kilobytes. 8 MB is a
+/// few hundred of them, and small enough that the string a compromised
+/// frontend could ask us to write is not a disk-filling one.
+const MAX_BYTES_EXPORT: u64 = 8 * 1024 * 1024;
+
+/// The refusal for a payload that is not base64. The only way to reach it is
+/// a bug in our own frontend, so it says what the user would see rather than
+/// what went wrong on the wire.
+const NOT_BASE64: &str = "That document could not be built. Try running the tailoring again.";
+
+/// Decode padded standard base64 (RFC 4648), or `None` when the input is not
+/// exactly that. The inverse of `base64` above, and tested against it.
+///
+/// Strict on purpose: the length must be a multiple of four, every character
+/// must be in the alphabet, and `=` may appear only as the last one or two
+/// characters. Whitespace, the URL-safe alphabet and missing padding are all
+/// refused — the one caller is our own `encodeBase64` in `platform/files.ts`,
+/// which produces none of them, so anything looser would only ever be
+/// accepting a payload that did not come from it.
+fn debase64(encoded: &str) -> Option<Vec<u8>> {
+    let bytes = encoded.as_bytes();
+    if bytes.len() % 4 != 0 {
+        return None;
+    }
+
+    let padding = bytes.iter().rev().take_while(|byte| **byte == b'=').count();
+    if padding > 2 {
+        return None;
+    }
+    let body = &bytes[..bytes.len() - padding];
+
+    let mut out = Vec::with_capacity(body.len() / 4 * 3);
+    let mut buffer = 0u32;
+    let mut held = 0u32;
+    for byte in body {
+        let value = B64.iter().position(|letter| letter == byte)? as u32;
+        buffer = (buffer << 6) | value;
+        held += 6;
+        if held >= 8 {
+            held -= 8;
+            out.push((buffer >> held) as u8);
+            buffer &= (1 << held) - 1;
+        }
+    }
+
+    // Two padding characters leave one byte of the last quartet, one leaves
+    // two: anything else means `=` appeared somewhere other than the end, or
+    // the padding did not match the length.
+    match padding {
+        0 => (held == 0).then_some(out),
+        1 => (held == 2 && out.len() % 3 == 2).then_some(out),
+        _ => (held == 4 && out.len() % 3 == 1).then_some(out),
+    }
+}
+
+/// The one extension a binary export may use, or a refusal. The same rule as
+/// `text_extension`: lower-cased, and anything outside `BYTES_EXTENSIONS` is
+/// an error BEFORE a dialog opens.
+fn bytes_extension(requested: &str) -> Result<&'static str, String> {
+    let lowered = requested.trim().to_ascii_lowercase();
+    BYTES_EXTENSIONS
+        .iter()
+        .find(|allowed| **allowed == lowered)
+        .copied()
+        .ok_or_else(|| "A Word export can only be saved as .docx.".to_string())
+}
+
+/// The same rule as `bare_text_name`, for the binary export's extension.
+fn bare_bytes_name(suggested: &str, extension: &str) -> String {
+    bare_name(
+        suggested,
+        extension,
+        &format!("{FALLBACK_TEXT_STEM}.{extension}"),
+    )
+}
+
+/// The bytes behind a binary export's base64, under the size cap.
+///
+/// The cap is applied to the base64's LENGTH first — four characters carry
+/// three bytes, so the decoded size is known without decoding — and then to
+/// the decoded bytes, so nothing here trusts the arithmetic alone.
+fn decode_bytes_export(encoded: &str) -> Result<Vec<u8>, String> {
+    if (encoded.len() as u64 / 4) * 3 > MAX_BYTES_EXPORT + 2 {
+        return Err("That document is too large to write.".to_string());
+    }
+    let bytes = debase64(encoded).ok_or_else(|| NOT_BASE64.to_string())?;
+    if bytes.len() as u64 > MAX_BYTES_EXPORT {
+        return Err("That document is too large to write.".to_string());
+    }
+    Ok(bytes)
+}
+
+/// Write a binary export — a Word document (L-165) — to the path the user
+/// chose. `extension` has already passed `bytes_extension`; the path the
+/// dialog answered with must carry that same extension, so a user who types
+/// `cv.exe` into the save box gets a refusal, not a file.
+fn write_bytes_export_at(path: &Path, bytes: &[u8], extension: &str) -> Result<(), String> {
+    let Some(actual) = extension_of(path) else {
+        return Err(format!("Give the file a name ending in .{extension}."));
+    };
+    if actual != extension {
+        return Err(format!("This export must be saved as a .{extension} file."));
+    }
+    if bytes.len() as u64 > MAX_BYTES_EXPORT {
+        return Err("That document is too large to write.".to_string());
+    }
+
+    fs::write(path, bytes).map_err(|error| match error.kind() {
+        ErrorKind::NotFound => {
+            "That folder no longer exists. Pick somewhere else to save the file.".to_string()
+        }
+        ErrorKind::PermissionDenied => {
+            "Windows would not let CViper write there. Pick a folder you own, such as Documents."
+                .to_string()
+        }
+        _ => "The document could not be written. Try saving it somewhere else.".to_string(),
+    })
+}
+
+/// Ask where to save a binary export — a tailored CV or a cover letter as a
+/// Word document (L-165) — then write it. Same shape as `pick_and_write_text`:
+/// `Ok(None)` is a cancel, `Ok(Some(path))` is where it went, and the path
+/// never passes through JavaScript on the way in.
+///
+/// `encoded` is the file's bytes as base64, decoded here under the size cap
+/// BEFORE the dialog opens (`decode_bytes_export`). `extension` can only be
+/// `docx`: anything else is refused before the dialog too
+/// (`bytes_extension`), the dialog's filter is that one extension, and the
+/// chosen path is checked against it again before a byte is written
+/// (`write_bytes_export_at`).
+#[tauri::command]
+pub(crate) async fn pick_and_write_bytes(
+    app: AppHandle,
+    // One word, for the reason given on `pick_and_write_backup`: a
+    // `contents_base64` here would have to be `contentsBase64` in JavaScript.
+    encoded: String,
+    suggestion: String,
+    extension: String,
+) -> Result<Option<String>, String> {
+    let extension = bytes_extension(&extension)?;
+    let bytes = decode_bytes_export(&encoded)?;
+
+    let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
+
+    app.dialog()
+        .file()
+        .set_title("Save as a Word document")
+        .set_file_name(bare_bytes_name(&suggestion, extension))
+        .add_filter("Word document", &[extension])
+        .save_file(move |chosen| {
+            let _ = answer.try_send(chosen);
+        });
+
+    let Some(chosen) = wait_for_choice(answers).await? else {
+        return Ok(None);
+    };
+
+    let path = local_path(chosen)?;
+    write_bytes_export_at(&path, &bytes, extension)?;
+
+    Ok(Some(path.display().to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1592,6 +1773,154 @@ mod tests {
         }
     }
 
+    // ── The Word export (L-165) ─────────────────────────────────────────────
+
+    #[test]
+    fn debase64_matches_the_rfc_vectors() {
+        assert_eq!(debase64("").unwrap(), b"");
+        assert_eq!(debase64("Zg==").unwrap(), b"f");
+        assert_eq!(debase64("Zm8=").unwrap(), b"fo");
+        assert_eq!(debase64("Zm9v").unwrap(), b"foo");
+        assert_eq!(debase64("Zm9vYg==").unwrap(), b"foob");
+        assert_eq!(debase64("Zm9vYmE=").unwrap(), b"fooba");
+        assert_eq!(debase64("Zm9vYmFy").unwrap(), b"foobar");
+    }
+
+    #[test]
+    fn debase64_undoes_base64_for_every_byte_value_and_every_length() {
+        // The encoder above is tested against the RFC; the decoder is tested
+        // against the encoder, over every byte value and every padding case.
+        let all: Vec<u8> = (0u16..=255).map(|value| value as u8).collect();
+        assert_eq!(debase64(&base64(&all)).unwrap(), all);
+
+        for length in 0..64usize {
+            let bytes: Vec<u8> = (0..length).map(|index| (index * 37 % 256) as u8).collect();
+            assert_eq!(debase64(&base64(&bytes)).unwrap(), bytes, "length {length}");
+        }
+    }
+
+    #[test]
+    fn debase64_refuses_anything_that_is_not_padded_standard_base64() {
+        // Negative: a character outside the alphabet, a length that is not a
+        // multiple of four, padding anywhere but the end, too much padding,
+        // whitespace and the URL-safe alphabet are all refusals, never a
+        // best-effort byte string that is silently wrong.
+        for bad in [
+            "not base64!!",
+            "Zg=",
+            "Z",
+            "Zm9v=",
+            "Zg==Zg==",
+            "====",
+            "Zm9v\n",
+            "Zm 9v",
+            "Zm9-",
+            "Zm9_",
+            "Z===",
+        ] {
+            assert!(debase64(bad).is_none(), "{bad:?} decoded");
+        }
+    }
+
+    #[test]
+    fn a_bytes_export_accepts_only_docx() {
+        assert_eq!(bytes_extension("docx").unwrap(), "docx");
+        // Boundary: case and surrounding whitespace are tidied, not refused.
+        assert_eq!(bytes_extension(" DOCX ").unwrap(), "docx");
+
+        // Negative: everything else is an error before a dialog could open —
+        // including the text extensions, which have their own command.
+        for refused in ["exe", "json", "html", "bat", "", ".docx", "doc", "txt", "md", "docm"] {
+            let error = bytes_extension(refused).expect_err(refused);
+            assert!(error.contains(".docx"), "{refused:?} produced: {error}");
+        }
+    }
+
+    #[test]
+    fn a_bytes_export_decodes_the_base64_and_refuses_what_is_not() {
+        assert_eq!(
+            decode_bytes_export(&base64(b"PK\x03\x04")).unwrap(),
+            b"PK\x03\x04"
+        );
+
+        let error = decode_bytes_export("not base64!!").unwrap_err();
+        assert!(error.contains("could not be built"), "{error}");
+    }
+
+    #[test]
+    fn a_bytes_export_over_the_size_cap_is_refused_before_it_is_decoded() {
+        // Boundary: exactly the cap decodes; one byte past it is refused. The
+        // base64's length alone refuses anything clearly past the cap before
+        // it is decoded; the decoded length refuses the last byte or two.
+        let at_cap = vec![0x2Au8; MAX_BYTES_EXPORT as usize];
+        assert_eq!(decode_bytes_export(&base64(&at_cap)).unwrap().len(), at_cap.len());
+
+        let over = vec![0x2Au8; MAX_BYTES_EXPORT as usize + 1];
+        let error = decode_bytes_export(&base64(&over)).unwrap_err();
+        assert!(error.contains("too large"), "{error}");
+
+        // And the write refuses the same payload if it is handed the bytes
+        // directly, so the cap does not depend on the command remembering.
+        let path = temp_path("huge.docx");
+        let error = write_bytes_export_at(&path, &over, "docx").unwrap_err();
+        assert!(error.contains("too large"), "{error}");
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn a_bytes_export_is_refused_when_the_chosen_path_has_another_extension() {
+        // The dialog's filter is advisory on some platforms: a user can type
+        // `cv.exe` into the box. The write refuses it, and writes nothing.
+        let wrong = temp_path("cv.exe");
+        let error = write_bytes_export_at(&wrong, b"PK", "docx").unwrap_err();
+        assert!(error.contains(".docx"), "{error}");
+        assert!(!wrong.exists());
+
+        // A near miss — the legacy Word extension — is still the wrong one.
+        let legacy = temp_path("cv.doc");
+        let error = write_bytes_export_at(&legacy, b"PK", "docx").unwrap_err();
+        assert!(error.contains(".docx"), "{error}");
+        assert!(!legacy.exists());
+
+        let none = temp_path("cv");
+        assert!(write_bytes_export_at(&none, b"PK", "docx")
+            .unwrap_err()
+            .contains(".docx"));
+    }
+
+    #[test]
+    fn a_bytes_export_writes_the_bytes_verbatim() {
+        // Every byte value, so a zip's binary sections survive the trip.
+        let bytes: Vec<u8> = (0u16..=255).map(|value| value as u8).collect();
+        let path = temp_path("Tailored CV.docx");
+        write_bytes_export_at(&path, &bytes, "docx").unwrap();
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn a_bytes_name_that_is_not_a_plain_name_falls_back_to_the_docx_fallback() {
+        assert_eq!(
+            bare_bytes_name("Tailored CV — Analyst.docx", "docx"),
+            "Tailored CV — Analyst.docx"
+        );
+
+        // The right shape under the WRONG extension is not a plain name for
+        // this save.
+        assert_eq!(bare_bytes_name("Tailored CV.txt", "docx"), "cviper-export.docx");
+
+        for hostile in ["../CV.docx", "..\\CV.docx", "C:CV.docx", "docs/CV.docx", "CV\u{7}.docx", ""] {
+            assert_eq!(
+                bare_bytes_name(hostile, "docx"),
+                "cviper-export.docx",
+                "{hostile:?}"
+            );
+        }
+
+        // And the fallback passes its own guard, so the safe answer is savable.
+        assert_eq!(bare_bytes_name("cviper-export.docx", "docx"), "cviper-export.docx");
+    }
+
     #[test]
     fn no_message_leaks_the_path() {
         // Every failure a caller can provoke with a hostile path, checked for
@@ -1799,6 +2128,7 @@ mod tests {
             "pick_and_write_cv_json",
             "pick_and_write_text",
             "pick_and_read_profile_workspace",
+            "pick_and_write_bytes",
         ] {
             assert!(
                 handler.contains(&format!("files::{command},")),
@@ -1834,6 +2164,7 @@ mod tests {
             "invoke('pick_and_write_cv_json', ",
             "invoke('pick_and_write_text', ",
             "invoke('pick_and_read_profile_workspace')",
+            "invoke('pick_and_write_bytes', ",
         ] {
             assert!(
                 PLATFORM_FILES_TS.contains(call),
@@ -1864,6 +2195,16 @@ mod tests {
             ),
             "src/platform/files.ts no longer passes `contents`, `suggestion` and `extension`, \
              which are the parameter names pick_and_write_text declares"
+        );
+        // The Word export (L-165) takes the bytes as `encoded` — one word, not
+        // `contents_base64`, which Tauri would expect as `contentsBase64` on
+        // the JavaScript side with nothing to say so if the two ever drifted.
+        assert!(
+            compact.contains(
+                "invoke('pick_and_write_bytes', { encoded, suggestion: suggestedName, extension }"
+            ),
+            "src/platform/files.ts no longer passes `encoded`, `suggestion` and `extension`, \
+             which are the parameter names pick_and_write_bytes declares"
         );
 
         // Nothing may still be reaching for the path-taking commands.

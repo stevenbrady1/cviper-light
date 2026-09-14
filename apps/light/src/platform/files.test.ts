@@ -17,7 +17,7 @@ const tauri = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 
-const { createTauriFilePort, decodeBase64 } = await import('./files');
+const { createTauriFilePort, decodeBase64, encodeBase64 } = await import('./files');
 
 beforeEach(() => {
   tauri.invoke.mockReset();
@@ -55,6 +55,45 @@ describe('decodeBase64', () => {
     // Only reachable through a bug in our own Rust, so it must fail as a value
     // the caller has to handle rather than as an exception in a click handler.
     expect(decodeBase64('not base64!!')).toBeNull();
+  });
+});
+
+describe('encodeBase64 (L-165)', () => {
+  it.each([
+    ['', ''],
+    ['f', 'Zg=='],
+    ['fo', 'Zm8='],
+    ['foo', 'Zm9v'],
+    ['foob', 'Zm9vYg=='],
+    ['fooba', 'Zm9vYmE='],
+    ['foobar', 'Zm9vYmFy'],
+  ])('encodes %s to the RFC vector %s', (text, expected) => {
+    expect(encodeBase64(bytesOf(text))).toBe(expected);
+  });
+
+  it('survives every byte value, which is what a zip actually contains', () => {
+    // No `TextDecoder` on the way in, for the same reason `decodeBase64` has
+    // no `TextEncoder`: a byte above 0x7F is one byte, not a UTF-8 sequence.
+    const all = new Uint8Array(256);
+    for (let value = 0; value < 256; value += 1) all[value] = value;
+
+    const encoded = encodeBase64(all);
+
+    expect(encoded).toBe(btoa(String.fromCharCode(...all)));
+    expect(decodeBase64(encoded)).toEqual(all);
+  });
+
+  it('boundary: a payload longer than one call-stack of arguments still round-trips', () => {
+    // `String.fromCharCode(...bytes)` throws "Maximum call stack size
+    // exceeded" somewhere past 100k arguments, which is smaller than a Word
+    // document. The encoder must chunk.
+    const big = new Uint8Array(1_000_003);
+    for (let index = 0; index < big.length; index += 1) big[index] = (index * 31) & 0xff;
+
+    const encoded = encodeBase64(big);
+
+    expect(encoded.length % 4).toBe(0);
+    expect(decodeBase64(encoded)).toEqual(big);
   });
 });
 
@@ -274,6 +313,63 @@ describe('saveText (L-160)', () => {
 
     const saved = await createTauriFilePort().saveText('x', 'letter.txt', 'txt');
 
+    expect(saved.ok).toBe(false);
+  });
+});
+
+describe('saveBytes (L-165)', () => {
+  it('hands Rust the bytes as base64, a suggested NAME and the extension, never a path', async () => {
+    tauri.invoke.mockResolvedValue('C:\\Users\\steve\\Documents\\Tailored CV.docx');
+
+    const saved = await createTauriFilePort().saveBytes(
+      bytesOf('PK\u0003\u0004'),
+      'Tailored CV.docx',
+      'docx',
+    );
+
+    expect(saved).toEqual({ ok: true, value: 'C:\\Users\\steve\\Documents\\Tailored CV.docx' });
+    // Three one-word keys, pinned against the Rust signature by
+    // `the_frontend_calls_these_commands_by_these_names` in files.rs. The
+    // bytes travel as base64 because a zip is not a string.
+    expect(tauri.invoke).toHaveBeenCalledWith('pick_and_write_bytes', {
+      encoded: encodeBase64(bytesOf('PK\u0003\u0004')),
+      suggestion: 'Tailored CV.docx',
+      extension: 'docx',
+    });
+  });
+
+  it('treats a cancelled save as nothing happening', async () => {
+    tauri.invoke.mockResolvedValue(null);
+
+    const saved = await createTauriFilePort().saveBytes(
+      new Uint8Array([1]),
+      'Cover letter.docx',
+      'docx',
+    );
+
+    expect(saved).toEqual({ ok: true, value: null });
+  });
+
+  it("negative: passes Rust's refusal through in Rust's own words", async () => {
+    tauri.invoke.mockRejectedValue('A Word export can only be saved as .docx.');
+
+    const saved = await createTauriFilePort().saveBytes(new Uint8Array([1]), 'cv.docx', 'docx');
+
+    expect(saved.ok).toBe(false);
+    if (saved.ok) return;
+    expect(saved.error.message).toBe('A Word export can only be saved as .docx.');
+  });
+
+  it('boundary: an empty payload is still sent, and a reply that is neither a path nor a cancellation is reported', async () => {
+    tauri.invoke.mockResolvedValue(42);
+
+    const saved = await createTauriFilePort().saveBytes(new Uint8Array(0), 'cv.docx', 'docx');
+
+    expect(tauri.invoke).toHaveBeenCalledWith('pick_and_write_bytes', {
+      encoded: '',
+      suggestion: 'cv.docx',
+      extension: 'docx',
+    });
     expect(saved.ok).toBe(false);
   });
 });

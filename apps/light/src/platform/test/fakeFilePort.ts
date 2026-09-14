@@ -33,13 +33,30 @@ export interface FakeFilePort extends FilePort {
   readonly writtenCvJson: () => readonly { path: string; contents: string }[];
   /** Everything `saveText` was asked to write, in order (L-160). */
   readonly writtenText: () => readonly { path: string; contents: string; extension: string }[];
+  /**
+   * Everything `saveBytes` was asked to write, in order (L-165). The
+   * suggested name is recorded too: the Word export is the one save whose
+   * name carries an extension the test cares about.
+   */
+  readonly writtenBytes: () => readonly {
+    path: string;
+    bytes: Uint8Array;
+    suggestedName: string;
+    extension: string;
+  }[];
   /** The next `pickProfileWorkspace` answers with these files (L-167). `null` is a cancel. */
   readonly nextWorkspace: (files: WorkspaceFiles | null) => void;
   /** The next `pickProfileWorkspace` fails with this message. */
   readonly failWorkspace: (message: string) => void;
   /** How many times each method was called. */
   readonly calls: Record<
-    'pickCv' | 'pickBackup' | 'saveBackup' | 'saveCvJson' | 'saveText' | 'pickProfileWorkspace',
+    | 'pickCv'
+    | 'pickBackup'
+    | 'saveBackup'
+    | 'saveCvJson'
+    | 'saveText'
+    | 'pickProfileWorkspace'
+    | 'saveBytes',
     number
   >;
 }
@@ -56,6 +73,12 @@ export function createFakeFilePort(): FakeFilePort {
   const writtenText: { path: string; contents: string; extension: string }[] = [];
   let workspace: WorkspaceFiles | null = null;
   let workspaceFailure: string | null = null;
+  const writtenBytes: {
+    path: string;
+    bytes: Uint8Array;
+    suggestedName: string;
+    extension: string;
+  }[] = [];
   const calls = {
     pickCv: 0,
     pickBackup: 0,
@@ -63,6 +86,7 @@ export function createFakeFilePort(): FakeFilePort {
     saveCvJson: 0,
     saveText: 0,
     pickProfileWorkspace: 0,
+    saveBytes: 0,
   };
 
   return {
@@ -70,6 +94,7 @@ export function createFakeFilePort(): FakeFilePort {
     written: () => written,
     writtenCvJson: () => writtenCvJson,
     writtenText: () => writtenText,
+    writtenBytes: () => writtenBytes,
     nextCv: (next) => {
       cv = next;
       cvFailure = null;
@@ -144,6 +169,15 @@ export function createFakeFilePort(): FakeFilePort {
       calls.pickProfileWorkspace += 1;
       if (workspaceFailure !== null) return err({ message: workspaceFailure });
       return ok(workspace);
+    },
+
+    // And once more for the Word export (L-165).
+    async saveBytes(bytes, suggestedName, extension) {
+      calls.saveBytes += 1;
+      if (saveFailure !== null) return err({ message: saveFailure });
+      if (savePath === null) return ok(null);
+      writtenBytes.push({ path: savePath, bytes, suggestedName, extension });
+      return ok(savePath);
     },
   };
 }

@@ -92,6 +92,11 @@ source of truth.
   found is reviewed before it is added; lists are unioned and typed text is
   never overwritten. No name, contact details or work history are read.
 
+- Save the tailored CV and the cover letter as a Word document (L-165), built
+  on your machine and sent nowhere: a single column, the standard headings,
+  one plain font, no tables and no images, so a parser reads it the way you
+  do.
+
 ### Fixed
 
 - Settings said the backup held jobs, applications, CVs and checks, and counted
