@@ -26,7 +26,7 @@ import {
 } from './model';
 import { GapsPanel } from './GapsPanel';
 import { createDbGapsPort, type GapsPort } from './gapsPort';
-import { ImportAiJobSearch } from './ImportAiJobSearch';
+import { ImportAiJobSearch } from './ImportAiJobSearchPanel';
 import { mergeImportedProfile, type ImportedProfile } from './importAiJobSearch';
 import { createDbProfilePort, type ProfilePort } from './port';
 
