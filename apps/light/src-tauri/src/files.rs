@@ -842,10 +842,12 @@ pub(crate) async fn pick_and_write_text(
 /// A filled-in `CLAUDE.md` is a few kilobytes of Markdown; the framework's
 /// own longest file is under 20 KB. 512 KB is far past any real one and small
 /// enough that four of them cannot matter to a desktop machine.
+#[cfg_attr(any(target_os = "ios", target_os = "android"), allow(dead_code))]
 const MAX_WORKSPACE_FILE_BYTES: u64 = 512 * 1024;
 
 /// Where the framework keeps the three skill files, relative to the folder.
 /// Forward slashes: `Path::join` accepts them on Windows too.
+#[cfg_attr(any(target_os = "ios", target_os = "android"), allow(dead_code))]
 const WORKSPACE_SKILL_FOLDER: &str = ".claude/skills/job-application-assistant";
 
 /// The four files, and nothing else. Read with fixed names, never listed.
@@ -864,12 +866,14 @@ pub struct WorkspaceFiles {
 
 /// Said when none of the four files is there. One fixed sentence: the folder
 /// the user picked is on their screen, and nothing here names it.
+#[cfg_attr(any(target_os = "ios", target_os = "android"), allow(dead_code))]
 const NOT_A_WORKSPACE: &str = "That folder does not look like an ai-job-search workspace.";
 
 /// Read one of the four by its relative name. `Ok(None)` is "not there",
 /// which is normal — a workspace where `/setup` was never run has only
 /// `CLAUDE.md` filled in. Every other outcome is decided BEFORE a byte is
 /// read: the resolved location, the kind of entry, the size.
+#[cfg_attr(any(target_os = "ios", target_os = "android"), allow(dead_code))]
 fn read_workspace_file(root: &Path, relative: &str) -> Result<Option<String>, String> {
     let candidate = root.join(relative);
 
@@ -920,6 +924,7 @@ fn read_workspace_file(root: &Path, relative: &str) -> Result<Option<String>, St
 /// Not a `#[tauri::command]`, and must not become one: it takes a path. It is
 /// a separate function so every guard above can be tested on a real folder
 /// without a dialog.
+#[cfg_attr(any(target_os = "ios", target_os = "android"), allow(dead_code))]
 fn read_workspace_at(folder: &Path) -> Result<WorkspaceFiles, String> {
     // Canonicalised FIRST, so the prefix every file is checked against is the
     // real location, not a path that itself goes through a link.
@@ -962,24 +967,45 @@ fn read_workspace_at(folder: &Path) -> Result<WorkspaceFiles, String> {
 /// dialog run from Rust, so the same rule holds as for the three file
 /// pickers: the frontend asks for a dialog and gets back what was read, and
 /// there is no parameter through which it could name a folder itself.
+/// Said on a phone, where there is no folder dialog to open.
+#[cfg_attr(not(any(target_os = "ios", target_os = "android")), allow(dead_code))]
+const NO_FOLDER_DIALOG_HERE: &str =
+    "Importing from a folder is not available on this device. Use the desktop app.";
+
 #[tauri::command]
 pub(crate) async fn pick_and_read_profile_workspace(
     app: AppHandle,
 ) -> Result<Option<WorkspaceFiles>, String> {
-    let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
+    // A folder dialog does not exist on a phone: `tauri-plugin-dialog` has no
+    // `pick_folder` for iOS or Android, and iOS gives an app no way to be
+    // handed a directory in the first place. The command still exists on
+    // those targets — so the registration and the frontend pairing hold
+    // everywhere — and it answers with a sentence instead of failing to
+    // compile. The Profile view does not offer the button on a phone; this
+    // is the floor under that, not the message anyone should normally see.
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    {
+        let _ = app;
+        Err(NO_FOLDER_DIALOG_HERE.to_string())
+    }
 
-    app.dialog()
-        .file()
-        .set_title("Choose your ai-job-search folder")
-        .pick_folder(move |chosen| {
-            let _ = answer.try_send(chosen);
-        });
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    {
+        let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
 
-    let Some(chosen) = wait_for_choice(answers).await? else {
-        return Ok(None);
-    };
+        app.dialog()
+            .file()
+            .set_title("Choose your ai-job-search folder")
+            .pick_folder(move |chosen| {
+                let _ = answer.try_send(chosen);
+            });
 
-    read_workspace_at(&local_path(chosen)?).map(Some)
+        let Some(chosen) = wait_for_choice(answers).await? else {
+            return Ok(None);
+        };
+
+        read_workspace_at(&local_path(chosen)?).map(Some)
+    }
 }
 
 // ── A binary export: the Word document (L-165) ──────────────────────────────

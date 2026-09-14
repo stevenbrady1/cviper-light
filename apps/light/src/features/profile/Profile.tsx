@@ -27,6 +27,7 @@ import {
 import { GapsPanel } from './GapsPanel';
 import { createDbGapsPort, type GapsPort } from './gapsPort';
 import { ImportAiJobSearch } from './ImportAiJobSearchPanel';
+import { detectMobileOs } from '../../platform/os';
 import { mergeImportedProfile, type ImportedProfile } from './importAiJobSearch';
 import { createDbProfilePort, type ProfilePort } from './port';
 
@@ -313,7 +314,15 @@ export function Profile({ port, now, gapsPort, filePort }: ProfileProps) {
 
         <GapsPanel port={skillsPort} />
 
-        {loaded === null ? null : <ImportAiJobSearch filePort={files} onApply={onImport} />}
+        {/*
+          Not on a phone: there is no folder dialog there (`pick_folder` does
+          not exist on iOS or Android), so the button would only ever produce
+          the refusal sentence Rust keeps as a floor. Absent, not disabled —
+          a control with no working state on this device teaches nothing.
+        */}
+        {loaded === null || detectMobileOs() !== null ? null : (
+          <ImportAiJobSearch filePort={files} onApply={onImport} />
+        )}
       </div>
     </section>
   );
