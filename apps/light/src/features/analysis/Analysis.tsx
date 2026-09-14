@@ -6,8 +6,10 @@ import {
   type Cv,
   type CvAnalysis,
   type Job,
+  type Profile,
   type Result,
 } from '@cviper/core-types';
+import { runGates } from '@cviper/keyword-scoring';
 
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { DetailPane } from '../../app/DetailPane';
@@ -21,11 +23,13 @@ import {
   type PickedCv,
 } from '../../platform/files';
 
+import { createDbProfilePort, type ProfilePort } from '../profile/port';
 import { APP_NAME } from '../settings/backup';
 
 import { AnalysisResult } from './AnalysisResult';
 import { readAvailability } from './availability';
 import { ConsentGate, ConsentStatus } from './ConsentGate';
+import { GateNotice } from './GateNotice';
 import {
   createTauriConsentPort,
   isCloudKind,
@@ -128,6 +132,12 @@ export interface AnalysisProps {
    * (Apple 5.1.2(i)) — see `consent.ts`.
    */
   readonly consentPort?: ConsentPort | undefined;
+  /**
+   * Injected by tests. Defaults to the real SQLite-backed port. The gates
+   * (L-156) read the PROFILE — languages and work rights — never the CV, and
+   * this is the only reason the analysis view knows the profile exists.
+   */
+  readonly profilePort?: ProfilePort | undefined;
 }
 
 /**
@@ -149,12 +159,14 @@ export function Analysis({
   incomingCv,
   onIncomingCvHandled,
   consentPort,
+  profilePort,
 }: AnalysisProps = {}) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke in the advert box.
   const analysisPort = useMemo(() => port ?? createDbAnalysisPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
   const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
+  const profiles = useMemo(() => profilePort ?? createDbProfilePort(), [profilePort]);
 
   const [cvs, setCvs] = useState<readonly Cv[]>([]);
   /**
@@ -190,6 +202,16 @@ export function Analysis({
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [result, setResult] = useState<RunResult | null>(null);
+  /**
+   * The advert the LAST run was scored against, for the gates (L-156).
+   *
+   * Not `jobText`: the user can edit the box after a run, and the gates must
+   * quote the advert the result on screen was computed from. Only read while
+   * `result` is non-null, so it is never cleared separately.
+   */
+  const [checkedAdvert, setCheckedAdvert] = useState<string | null>(null);
+  /** The saved profile, or `null` — never saved, or could not be read. */
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [history, setHistory] = useState<readonly AnalysisRow[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -231,6 +253,23 @@ export function Analysis({
       cancelled = true;
     };
   }, [consentStore]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void profiles.load().then((loaded) => {
+      // A failed read is SILENT here, and deliberately so: the gates then run
+      // with no languages and no work rights, which `runGates` treats as
+      // silence — every requirement becomes "check this", never a hard stop.
+      // A red banner over a screen that scores perfectly well would be the
+      // wrong lesson, and the profile view reports its own read failures.
+      if (!cancelled && loaded.ok) setProfile(loaded.value);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profiles]);
 
   useEffect(() => {
     let cancelled = false;
@@ -468,6 +507,7 @@ export function Analysis({
       }
 
       setResult(run.value);
+      setCheckedAdvert(jobText);
 
       const record = newAnalysisRecord({
         id: crypto.randomUUID(),
@@ -552,6 +592,20 @@ export function Analysis({
 
   const aiAvailable = options.some((option) => option.kind !== 'keyword');
   const view = viewById('analysis');
+
+  // Recomputed, not stored: a profile that finishes loading after the run
+  // should still be judged, and the gates never touch `result`.
+  const gates = useMemo(
+    () =>
+      checkedAdvert === null
+        ? null
+        : runGates({
+            advertText: checkedAdvert,
+            languages: profile?.languages ?? [],
+            workRights: profile?.work_rights ?? null,
+          }),
+    [checkedAdvert, profile],
+  );
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-analysis">
@@ -833,13 +887,17 @@ export function Analysis({
               </p>
             </div>
           ) : (
-            <AnalysisResult
-              analysis={result.analysis}
-              provider={result.provider}
-              model={result.model}
-              retried={result.retried}
-              aiAvailable={aiAvailable}
-            />
+            <>
+              {/* Before the score, never in it — see `GateNotice.tsx`. */}
+              {gates === null ? null : <GateNotice results={gates} />}
+              <AnalysisResult
+                analysis={result.analysis}
+                provider={result.provider}
+                model={result.model}
+                retried={result.retried}
+                aiAvailable={aiAvailable}
+              />
+            </>
           )}
         </div>
 
