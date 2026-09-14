@@ -66,6 +66,7 @@ export {
   FIT_SCORE_ANCHORS,
   FIT_SCORE_WEIGHTS,
   JSON_ONLY,
+  UNTRUSTED_CONTENT_BOUNDARY,
   type PromptFragment,
 } from './prompt/constants';
 
