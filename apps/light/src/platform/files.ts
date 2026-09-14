@@ -76,6 +76,15 @@ export interface FileError {
  */
 export type TextExportExtension = 'txt' | 'md';
 
+/**
+ * The one format a binary export can be saved as (L-165): a Word document.
+ *
+ * A closed union of one, for the same reason as `TextExportExtension`: Rust
+ * refuses anything else before a dialog opens, and typing it here means a
+ * caller cannot ask for `.docm` or `.zip` and find out at runtime.
+ */
+export type BytesExportExtension = 'docx';
+
 export interface FilePort {
   /** Ask for a CV and read it. `null` means the user cancelled. */
   pickCv(): Promise<Result<PickedCv | null, FileError>>;
@@ -98,6 +107,19 @@ export interface FilePort {
     contents: string,
     suggestedName: string,
     extension: TextExportExtension,
+  ): Promise<Result<string | null, FileError>>;
+  /**
+   * Ask where to save a binary export — a tailored CV or a cover letter as a
+   * Word document (L-165) — then write it. Same contract as `saveText`: the
+   * path, or `null` for a cancel. The bytes are built on this machine by
+   * `features/tailor/docx.ts` and cross to Rust as base64, because a `.docx`
+   * is a zip and a zip is not a string; Rust decodes them, caps their size
+   * and refuses any extension but the one named here.
+   */
+  saveBytes(
+    bytes: Uint8Array,
+    suggestedName: string,
+    extension: BytesExportExtension,
   ): Promise<Result<string | null, FileError>>;
 }
 
@@ -144,6 +166,34 @@ export function decodeBase64(encoded: string): Uint8Array | null {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+}
+
+/**
+ * How many bytes `encodeBase64` turns into a string at a time.
+ *
+ * `String.fromCharCode(...bytes)` spreads the bytes as arguments, and an
+ * engine's argument limit is somewhere past 100k — smaller than a Word
+ * document. A multiple of three, so no chunk ends in padding that would then
+ * sit in the middle of the output.
+ */
+const ENCODE_CHUNK_BYTES = 3 * 8192;
+
+/**
+ * Encode bytes as padded standard base64: the inverse of `decodeBase64`, and
+ * the ONLY way bytes leave this file for Rust (L-165).
+ *
+ * `btoa` takes one character per byte, each in 0-255, so the bytes are turned
+ * into exactly that string — no `TextDecoder`, which would read anything
+ * above 0x7F as the start of a UTF-8 sequence and corrupt every zip. Rust's
+ * `debase64` is strict about padding and alphabet, and this produces only
+ * what it accepts.
+ */
+export function encodeBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += ENCODE_CHUNK_BYTES) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + ENCODE_CHUNK_BYTES));
+  }
+  return btoa(binary);
 }
 
 /**
@@ -329,6 +379,38 @@ export function createTauriFilePort(): FilePort {
       if (typeof reply !== 'string') {
         return err({
           message: 'CViper saved that text but could not report where it went.',
+        });
+      }
+
+      return ok(reply);
+    },
+
+    async saveBytes(bytes, suggestedName, extension) {
+      // Encoded BEFORE the try: a failure here is our bug, not a rejection
+      // from Rust, and it must not be dressed up in Rust's words.
+      const encoded = encodeBase64(bytes);
+      let reply: unknown;
+      try {
+        // Its own literal call, for the same reason as `saveCvJson`. `encoded`
+        // is one word on purpose — Rust's parameter is not `contents_base64`,
+        // which Tauri would expect as `contentsBase64` here with nothing on
+        // either side to say so if the two ever drifted.
+        reply = await invoke('pick_and_write_bytes', {
+          encoded,
+          suggestion: suggestedName,
+          extension,
+        });
+      } catch (thrown) {
+        return err({
+          message: rejectionMessage(thrown, 'The document could not be saved. Try again.'),
+        });
+      }
+
+      if (cancelled(reply)) return ok(null);
+
+      if (typeof reply !== 'string') {
+        return err({
+          message: 'CViper saved that document but could not report where it went.',
         });
       }
 

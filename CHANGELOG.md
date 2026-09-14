@@ -87,5 +87,9 @@ source of truth.
   original, saving to the application, and export as plain text.
 - A cover letter from the tailored CV and the advert (L-161), with a word
   count and a note over 400 words; saved and exportable.
+- Save the tailored CV and the cover letter as a Word document (L-165), built
+  on your machine and sent nowhere: a single column, the standard headings,
+  one plain font, no tables and no images, so a parser reads it the way you
+  do.
 
 [Unreleased]: https://github.com/stevenbrady1/cviper-light/commits/main

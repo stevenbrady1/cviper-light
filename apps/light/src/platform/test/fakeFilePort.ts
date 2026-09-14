@@ -33,9 +33,20 @@ export interface FakeFilePort extends FilePort {
   readonly writtenCvJson: () => readonly { path: string; contents: string }[];
   /** Everything `saveText` was asked to write, in order (L-160). */
   readonly writtenText: () => readonly { path: string; contents: string; extension: string }[];
+  /**
+   * Everything `saveBytes` was asked to write, in order (L-165). The
+   * suggested name is recorded too: the Word export is the one save whose
+   * name carries an extension the test cares about.
+   */
+  readonly writtenBytes: () => readonly {
+    path: string;
+    bytes: Uint8Array;
+    suggestedName: string;
+    extension: string;
+  }[];
   /** How many times each method was called. */
   readonly calls: Record<
-    'pickCv' | 'pickBackup' | 'saveBackup' | 'saveCvJson' | 'saveText',
+    'pickCv' | 'pickBackup' | 'saveBackup' | 'saveCvJson' | 'saveText' | 'saveBytes',
     number
   >;
 }
@@ -50,13 +61,27 @@ export function createFakeFilePort(): FakeFilePort {
   const written: { path: string; contents: string }[] = [];
   const writtenCvJson: { path: string; contents: string }[] = [];
   const writtenText: { path: string; contents: string; extension: string }[] = [];
-  const calls = { pickCv: 0, pickBackup: 0, saveBackup: 0, saveCvJson: 0, saveText: 0 };
+  const writtenBytes: {
+    path: string;
+    bytes: Uint8Array;
+    suggestedName: string;
+    extension: string;
+  }[] = [];
+  const calls = {
+    pickCv: 0,
+    pickBackup: 0,
+    saveBackup: 0,
+    saveCvJson: 0,
+    saveText: 0,
+    saveBytes: 0,
+  };
 
   return {
     calls,
     written: () => written,
     writtenCvJson: () => writtenCvJson,
     writtenText: () => writtenText,
+    writtenBytes: () => writtenBytes,
     nextCv: (next) => {
       cv = next;
       cvFailure = null;
@@ -116,6 +141,15 @@ export function createFakeFilePort(): FakeFilePort {
       if (saveFailure !== null) return err({ message: saveFailure });
       if (savePath === null) return ok(null);
       writtenText.push({ path: savePath, contents, extension });
+      return ok(savePath);
+    },
+
+    // And once more for the Word export (L-165).
+    async saveBytes(bytes, suggestedName, extension) {
+      calls.saveBytes += 1;
+      if (saveFailure !== null) return err({ message: saveFailure });
+      if (savePath === null) return ok(null);
+      writtenBytes.push({ path: savePath, bytes, suggestedName, extension });
       return ok(savePath);
     },
   };
