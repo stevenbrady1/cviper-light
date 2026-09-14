@@ -11,6 +11,7 @@ import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser
 import { todayIsoDate } from '../../lib/dates';
 import { viewById } from '../../app/views';
 
+import { readAvailability as readRealAvailability } from '../analysis/availability';
 import { type Availability } from '../analysis/providers';
 
 import { ApplicationDetail } from './ApplicationDetail';
@@ -135,6 +136,24 @@ export function Tracker({
   const [error, setError] = useState<string | null>(null);
   const [pane, setPane] = useState<Pane>({ kind: 'closed' });
   const [settlingId, setSettlingId] = useState<string | null>(null);
+  /**
+   * What this machine can offer the detail pane's AI panels. `null` until the
+   * first card is opened: the probe (Ollama's port, the credential store) is
+   * not paid for by a board that is only being read, and it is paid once.
+   */
+  const [availability, setAvailability] = useState<Availability | null>(null);
+  const probe = useMemo(() => readAvailability ?? readRealAvailability, [readAvailability]);
+
+  useEffect(() => {
+    if (pane.kind !== 'entry' || availability !== null) return;
+    let cancelled = false;
+    void probe().then((found) => {
+      if (!cancelled) setAvailability(found);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [availability, pane.kind, probe]);
 
   useEffect(() => {
     let cancelled = false;
@@ -429,6 +448,9 @@ export function Tracker({
               onEdit={(changes) => onEdit(selected.application.id, changes)}
               onStatusChange={(status) => onStatusChange(selected.application.id, status)}
               onDelete={() => void onDelete(selected)}
+              port={trackerPort}
+              availability={availability ?? undefined}
+              createTransport={createTransport}
             />
           </DetailPane>
         )}

@@ -55,6 +55,15 @@ export {
 } from './job-extraction';
 
 export {
+  INTERVIEW_PACK_JSON_SCHEMA,
+  InterviewPackSchema,
+  LikelyQuestionSchema,
+  renderInterviewPack,
+  type InterviewPack,
+  type LikelyQuestion,
+} from './interview';
+
+export {
   BOARD_ENCODINGS,
   BoardTemplateSchema,
   KEYWORD_PLACEHOLDER,

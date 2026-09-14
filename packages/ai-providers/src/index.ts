@@ -102,3 +102,25 @@ export {
   type JobExtractionMeta,
   type JobExtractionOutcome,
 } from './extract-job';
+
+export {
+  MAX_INTERVIEW_ADVERT_CHARS,
+  MAX_INTERVIEW_CV_CHARS,
+  MAX_INTERVIEW_LETTER_CHARS,
+  MAX_INTERVIEW_STAR_CHARS,
+  buildInterviewPrompt,
+  type InterviewPrompt,
+  type InterviewPromptInput,
+  type InterviewPromptProfile,
+  type InterviewStarExample,
+} from './prompt/build-interview-prompt';
+
+export {
+  DEFAULT_MAX_INTERVIEW_TOKENS,
+  NO_MATERIAL_MESSAGE,
+  prepareInterview,
+  type InterviewError,
+  type InterviewMeta,
+  type InterviewSuccess,
+  type PrepareInterviewOptions,
+} from './interview';
