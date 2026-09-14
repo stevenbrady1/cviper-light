@@ -32,6 +32,7 @@ import { ProviderToggles } from './ProviderToggles';
 import { ResultCard } from './ResultCard';
 import { readSearchMemory, rememberSearch, writeDraft } from './memory';
 import { combineResults, nothingMatchedNote, submitLabel } from './keylessModel';
+import { dealBreakersIn, isScorable, rankResult, sortByBand, type RankBand } from './rank';
 import {
   CONTRACT_CHOICES,
   EMPTY_FORM,
@@ -80,6 +81,18 @@ import { createDbSearchPort, type SearchPort } from './port';
  * so Reed being down is not a reason to throw away the Adzuna adverts the user
  * was also waiting for. Each failure is rendered as its own line, above results
  * that are still there.
+ *
+ * ============================================================================
+ * RESULTS ARE RANKED AGAINST THE CV, HERE, WITH NO KEY (L-157)
+ * ============================================================================
+ * The CV on file and the profile's deal-breakers are read ONCE, when the
+ * screen opens, through the port — two SQLite reads, no network. After every
+ * search or browse each advert gets a band from the keyword scorer (see
+ * `rank.ts`) and a chip per deal-breaker it mentions, and the list is shown
+ * best first unless the user unticks that. Both reads fail SILENTLY: the
+ * ranking is a convenience, and a red banner over a search that worked
+ * perfectly would be the larger error. `search.rank.test.tsx` builds the two
+ * transport factories to throw and proves none of this touches them.
  */
 
 /** How long after the last keystroke the draft is written to `localStorage`. */
@@ -151,6 +164,14 @@ export function Search({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [quota, setQuota] = useState<QuotaState>(() => readQuota(now ?? new Date()));
   /*
+    `undefined` until the port has answered, so the screen draws NEITHER the
+    toggle nor the "upload a CV" hint for the half-second before it knows —
+    a hint that flashes and vanishes on every open would be read as a bug.
+  */
+  const [cvText, setCvText] = useState<string | null | undefined>(undefined);
+  const [dealBreakers, setDealBreakers] = useState<readonly string[]>([]);
+  const [bestFirst, setBestFirst] = useState(true);
+  /*
     Seeded with the SHIPPED list rather than an empty one, so the buttons are
     there on the first paint instead of appearing a moment later. The user's own
     list replaces it as soon as the store answers; if the store cannot be read
@@ -213,6 +234,31 @@ export function Search({
   useEffect(() => {
     let cancelled = false;
 
+    /*
+      Two reads, once, and SILENT on failure. What is lost if either fails is
+      the band on each card and the deal-breaker chips; the search itself is
+      untouched, and a banner saying "could not read your CV" over a working
+      search screen would be the larger error. `null` on failure means the
+      screen shows the same quiet hint it shows when there is no CV — which is
+      true enough: there is no CV it can rank against.
+    */
+    void searchPort.latestCvText().then((loaded) => {
+      if (cancelled) return;
+      setCvText(loaded.ok ? loaded.value : null);
+    });
+    void searchPort.dealBreakers().then((loaded) => {
+      if (cancelled) return;
+      setDealBreakers(loaded.ok ? loaded.value : []);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchPort]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     void boards.read().then((loaded) => {
       if (cancelled) return;
       // A failed read is NOT surfaced here. The shipped boards are already on
@@ -260,7 +306,33 @@ export function Search({
     pair worth flagging, and neither half can see it alone. Nothing is merged
     and nothing is removed; see `keylessModel.ts`.
   */
-  const results = combineResults(outcome, keylessOutcome);
+  const results = useMemo(() => combineResults(outcome, keylessOutcome), [outcome, keylessOutcome]);
+
+  /*
+    Is there a CV worth ranking against? A CV shorter than the scorer accepts
+    counts as none: the toggle would otherwise sit there over a list with no
+    bands on it, and the hint says the true thing — upload a CV.
+  */
+  const rankable = cvText !== undefined && isScorable(cvText);
+
+  /*
+    One band per advert, computed ONCE per list rather than once per render:
+    the scorer is a few hundred regex tests per advert, and this runs over a
+    whole page of results. Keyed by advert id so the sort and the cards read
+    the same map. `null` entries are "no pill", never "weak" — see `rank.ts`.
+  */
+  const bands = useMemo(() => {
+    const computed = new Map<string, RankBand | null>();
+    for (const item of results.jobs) {
+      computed.set(item.job.id, rankable ? rankResult(cvText, item.job) : null);
+    }
+    return computed;
+  }, [cvText, rankable, results]);
+
+  const ordered = useMemo(
+    () => (rankable && bestFirst ? sortByBand(results.jobs, bands) : results.jobs),
+    [bands, bestFirst, rankable, results],
+  );
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -623,6 +695,28 @@ export function Search({
           )}
 
           {/*
+            The toggle when there is a CV to rank against; one quiet line when
+            there is not; NOTHING until the port has said which. The toggle is
+            hidden rather than disabled because a disabled "Best match first"
+            with no explanation is a promise the screen is visibly not keeping.
+          */}
+          {cvText === undefined ? null : rankable ? (
+            <label className="flex items-center gap-2 text-ink-muted">
+              <input
+                type="checkbox"
+                data-testid="search-sort-best"
+                checked={bestFirst}
+                onChange={(event) => setBestFirst(event.currentTarget.checked)}
+              />
+              Best match first
+            </label>
+          ) : (
+            <p data-testid="search-rank-hint" className="text-xs text-ink-faint">
+              Upload a CV on the Analysis screen and results will be ranked against it.
+            </p>
+          )}
+
+          {/*
             One line per board that failed, ABOVE results that are still there.
             Losing a whole page of Adzuna adverts because Reed was down is the
             failure this shape exists to prevent.
@@ -715,7 +809,7 @@ export function Search({
               ) : null}
 
               <div className="space-y-3">
-                {results.jobs.map((entry) => {
+                {ordered.map((entry) => {
                   const siblings = clusterSiblings(entry.job.id, results.clusters);
                   const key = externalKey(entry.job.source, entry.job.external_id);
 
@@ -729,6 +823,8 @@ export function Search({
                       busy={savingId === entry.job.id}
                       note={notes[entry.job.id] || null}
                       problem={problems[entry.job.id] || null}
+                      rank={bands.get(entry.job.id) ?? null}
+                      dealBreakers={dealBreakersIn(dealBreakers, entry.job)}
                       onSave={() => void onSave(entry.job.id)}
                       onOpen={() => onOpen(entry.job.url)}
                     />
