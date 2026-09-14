@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { DESTRUCTIVE_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
-import { describeCounts, type BackupCounts, type BackupPort } from '../backup';
+import { countBackup, describeCounts, type BackupCounts, type BackupPort } from '../backup';
 import { DATA_LOCATIONS } from '../privacy/dataLocations';
 
 import {
@@ -67,14 +67,7 @@ export function EraseEverything({ port, backupPort, onErased }: EraseEverythingP
     const snapshot = await backupPort.read();
     setStage({
       kind: 'confirm',
-      counts: snapshot.ok
-        ? {
-            jobs: snapshot.value.jobs.length,
-            applications: snapshot.value.applications.length,
-            cvs: snapshot.value.cvs.length,
-            analyses: snapshot.value.analyses.length,
-          }
-        : null,
+      counts: snapshot.ok ? countBackup(snapshot.value) : null,
     });
   }, [backupPort]);
 

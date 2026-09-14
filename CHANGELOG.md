@@ -88,4 +88,12 @@ source of truth.
 - A cover letter from the tailored CV and the advert (L-161), with a word
   count and a note over 400 words; saved and exportable.
 
+### Fixed
+
+- Settings said the backup held jobs, applications, CVs and checks, and counted
+  only those, while the file had carried the profile and the archived documents
+  since L-154 and L-155 (L-166). The "Your data" paragraph, the export message,
+  the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
+  3 archived documents and your profile".
+
 [Unreleased]: https://github.com/stevenbrady1/cviper-light/commits/main

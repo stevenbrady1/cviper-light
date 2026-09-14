@@ -20,10 +20,22 @@ import {
   APP_NAME,
   APP_VERSION,
   BACKUP_ERROR_CODES,
+  countBackup,
   defaultBackupFilename,
   describeBackupError,
   describeCounts,
+  type BackupCounts,
 } from './backup';
+
+/** Every count zero, no profile — the file somebody exported before entering anything. */
+const NONE: BackupCounts = {
+  jobs: 0,
+  applications: 0,
+  cvs: 0,
+  analyses: 0,
+  documents: 0,
+  profile: false,
+};
 
 describe('the app stamp on an exported file', () => {
   it('matches the version in package.json', () => {
@@ -61,35 +73,101 @@ describe('defaultBackupFilename', () => {
   });
 });
 
+describe('countBackup', () => {
+  it('counts every collection a snapshot or payload carries, and whether it has a profile', () => {
+    // Structural on purpose: `DbSnapshot` and `BackupPayload` share this shape,
+    // and both sides of the Settings screen need the same sentence out of them.
+    expect(
+      countBackup({
+        profile: { id: 'me' },
+        jobs: [{}, {}],
+        applications: [{}],
+        documents: [{}, {}, {}],
+        cvs: [{}],
+        analyses: [{}, {}, {}, {}],
+      }),
+    ).toEqual({ jobs: 2, applications: 1, documents: 3, cvs: 1, analyses: 4, profile: true });
+  });
+
+  it('boundary: an empty snapshot with no profile counts to nothing', () => {
+    expect(
+      countBackup({
+        profile: null,
+        jobs: [],
+        applications: [],
+        documents: [],
+        cvs: [],
+        analyses: [],
+      }),
+    ).toEqual(NONE);
+  });
+});
+
 describe('describeCounts', () => {
   it('lists everything the file holds, in plain words', () => {
-    expect(describeCounts({ jobs: 43, applications: 12, cvs: 2, analyses: 7 })).toBe(
-      '43 jobs, 12 applications, 2 CVs and 7 past checks',
-    );
+    expect(
+      describeCounts({
+        jobs: 43,
+        applications: 12,
+        cvs: 2,
+        analyses: 7,
+        documents: 3,
+        profile: true,
+      }),
+    ).toBe('43 jobs, 12 applications, 2 CVs, 7 past checks, 3 archived documents and your profile');
   });
 
   it('gets the singulars right', () => {
-    expect(describeCounts({ jobs: 1, applications: 1, cvs: 1, analyses: 1 })).toBe(
-      '1 job, 1 application, 1 CV and 1 past check',
-    );
+    expect(
+      describeCounts({
+        jobs: 1,
+        applications: 1,
+        cvs: 1,
+        analyses: 1,
+        documents: 1,
+        profile: false,
+      }),
+    ).toBe('1 job, 1 application, 1 CV, 1 past check and 1 archived document');
   });
 
   it('leaves out what is not there', () => {
-    expect(describeCounts({ jobs: 3, applications: 0, cvs: 1, analyses: 0 })).toBe(
-      '3 jobs and 1 CV',
+    expect(describeCounts({ ...NONE, jobs: 3, cvs: 1 })).toBe('3 jobs and 1 CV');
+  });
+
+  it('lists archived documents after past checks', () => {
+    expect(describeCounts({ ...NONE, analyses: 2, documents: 5 })).toBe(
+      '2 past checks and 5 archived documents',
+    );
+  });
+
+  it('names the profile last, after every count', () => {
+    // The brief's own example: the profile is not a count, so it reads as a
+    // noun phrase at the end rather than a number in the middle.
+    expect(describeCounts({ ...NONE, jobs: 2, cvs: 1, profile: true })).toBe(
+      '2 jobs, 1 CV and your profile',
+    );
+  });
+
+  it('boundary: a profile with nothing else is "your profile", with no "and"', () => {
+    // Somebody filled the Profile view in and exported before saving a single
+    // job. The file is not empty, and must not be described as if it were.
+    expect(describeCounts({ ...NONE, profile: true })).toBe('your profile');
+  });
+
+  it('boundary: one count plus the profile needs no comma', () => {
+    expect(describeCounts({ ...NONE, documents: 1, profile: true })).toBe(
+      '1 archived document and your profile',
     );
   });
 
   it('boundary: an empty file says so rather than producing an empty sentence', () => {
     // A real case: somebody exports before they have entered anything, then
     // imports it later wondering why nothing happened.
-    expect(describeCounts({ jobs: 0, applications: 0, cvs: 0, analyses: 0 })).toBe(
-      'nothing at all',
-    );
+    expect(describeCounts(NONE)).toBe('nothing at all');
   });
 
   it('boundary: a single category needs no comma and no "and"', () => {
-    expect(describeCounts({ jobs: 0, applications: 0, cvs: 4, analyses: 0 })).toBe('4 CVs');
+    expect(describeCounts({ ...NONE, cvs: 4 })).toBe('4 CVs');
   });
 });
 

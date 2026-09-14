@@ -45,11 +45,11 @@ import { type UpdatePort } from './updates/port';
 import {
   APP_NAME,
   APP_VERSION,
+  countBackup,
   createDbBackupPort,
   defaultBackupFilename,
   describeBackupError,
   describeCounts,
-  type BackupCounts,
   type BackupPort,
   type BackupProblem,
 } from './backup';
@@ -146,27 +146,6 @@ export interface SettingsProps {
   readonly onErased?: (() => void) | undefined;
 }
 
-/**
- * Count what is in a snapshot or a payload.
- *
- * Structural rather than typed to either, because `DbSnapshot` and
- * `BackupPayload` carry the same four collections and both sides of this screen
- * need the same sentence out of them.
- */
-function countsOf(source: {
-  readonly jobs: readonly unknown[];
-  readonly applications: readonly unknown[];
-  readonly cvs: readonly unknown[];
-  readonly analyses: readonly unknown[];
-}): BackupCounts {
-  return {
-    jobs: source.jobs.length,
-    applications: source.applications.length,
-    cvs: source.cvs.length,
-    analyses: source.analyses.length,
-  };
-}
-
 export function Settings({
   port,
   filePort,
@@ -229,7 +208,7 @@ export function Settings({
     if (saved.value === null) return;
 
     setMessage(
-      `Saved to ${saved.value}. It holds ${describeCounts(countsOf(snapshot.value))}, ` +
+      `Saved to ${saved.value}. It holds ${describeCounts(countBackup(snapshot.value))}, ` +
         'and it never left this machine.',
     );
   }, [backupPort, files, now]);
@@ -288,7 +267,7 @@ export function Settings({
       return;
     }
 
-    setMessage(`Imported ${describeCounts(countsOf(payload))} from ${from}.`);
+    setMessage(`Imported ${describeCounts(countBackup(payload))} from ${from}.`);
   }, [backupPort, stage]);
 
   const busy = stage.kind === 'busy';
@@ -326,10 +305,12 @@ export function Settings({
             <h2 className="font-medium text-ink">Your data</h2>
             <p className="mt-1 text-ink-muted">
               Everything CViper Light knows lives in one file on this computer: the jobs you have
-              saved, the applications you are chasing, the text of your CVs and every check you have
-              run. Exporting writes all of it into a single <code>.json</code> file that you choose
-              the location of. Nothing is uploaded, and nothing is sent anywhere — the file goes
-              exactly where you put it and nowhere else.
+              saved, the applications you are chasing, the text of your CVs, every check you have
+              run, the profile you filled in, and every document the app wrote for an application —
+              tailored CVs, cover letters, follow-ups and interview packs. Exporting writes all of
+              it into a single <code>.json</code> file that you choose the location of. Nothing is
+              uploaded, and nothing is sent anywhere — the file goes exactly where you put it and
+              nowhere else.
             </p>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -382,7 +363,7 @@ export function Settings({
                 right file" into a fact the user can check.
               */}
               <p data-testid="settings-counts" className="mt-1 text-ink">
-                This will add or update {describeCounts(countsOf(stage.payload))}.
+                This will add or update {describeCounts(countBackup(stage.payload))}.
               </p>
               <p className="mt-1 text-ink-muted">
                 Anything already on this machine is kept. Records with the same id are updated;
