@@ -157,3 +157,6 @@ export function createFakeTrackerPort(
     },
   };
 }
+
+/** L-162 named the seed differently; both spellings mean the same thing. */
+export type FakePortSeed = FakeTrackerSeed;

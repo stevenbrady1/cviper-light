@@ -110,6 +110,16 @@ const FIXTURES: Readonly<Record<string, readonly unknown[]>> = {
       profile: { headline: 'Credit risk analyst', starExamples: [], careerGoals: [] },
     },
   ],
+  buildFollowUpPrompt: [
+    {
+      kind: 'follow_up',
+      jobTitle: 'Credit Risk Analyst',
+      company: 'Lloyds Banking Group',
+      daysQuiet: 12,
+      materials: { advert: 'Credit Risk Analyst, London.', cv: 'Jane Doe.', coverLetter: null },
+      writingStyle: null,
+    },
+  ],
   buildRepairPrompt: ['=== CV ===\nJane Doe\n=== END CV ===', '{}', 'summary: required'],
 };
 

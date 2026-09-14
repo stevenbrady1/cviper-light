@@ -12,6 +12,7 @@ import { type Availability } from '../analysis/providers';
 
 import { ConfirmDelete } from './ConfirmDelete';
 import { InterviewPanel } from './InterviewPanel';
+import { FollowUpPanel } from './FollowUpPanel';
 import { NEXT_ACTION_TONES, nextActionUrgency } from './nextAction';
 import { STATUS_LABELS, TRACKER_COLUMNS, type TrackerEntry } from './model';
 import { type TrackerPort } from './port';
@@ -68,6 +69,8 @@ interface ApplicationDetailProps {
   readonly port?: TrackerPort | undefined;
   /** What this machine can offer an AI panel. `undefined` until the board has looked. */
   readonly availability?: Availability | undefined;
+  /** Injected by tests so the machine's real credentials are never consulted. */
+  readonly readAvailability?: (() => Promise<Availability>) | undefined;
   /** Injected by tests so a fake provider can answer without a socket. */
   readonly createTransport?: (() => ChatTransport) | undefined;
 }
@@ -88,6 +91,7 @@ export function ApplicationDetail({
   onDelete,
   port,
   availability,
+  readAvailability,
   createTransport,
 }: ApplicationDetailProps) {
   const { application, job } = entry;
@@ -274,6 +278,26 @@ export function ApplicationDetail({
           availability={availability}
           createTransport={createTransport}
           now={now}
+        />
+      )}
+
+      {/*
+        Follow-up and thank-you drafts (L-162). When the panel records a
+        follow-up it appends a line to the notes; `notes.reset` shows that line
+        in the box above and marks it committed, so the next keystroke there
+        commits the new text rather than a stale draft that would overwrite it.
+      */}
+      {port === undefined ? null : (
+        <FollowUpPanel
+          entry={entry}
+          today={today}
+          port={port}
+          readAvailability={readAvailability}
+          createTransport={createTransport}
+          onEdit={(changes) => {
+            if (changes.notes !== undefined) notes.reset(changes.notes ?? '');
+            onEdit(changes);
+          }}
         />
       )}
 

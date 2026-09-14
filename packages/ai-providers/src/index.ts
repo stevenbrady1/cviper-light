@@ -124,3 +124,24 @@ export {
   type InterviewSuccess,
   type PrepareInterviewOptions,
 } from './interview';
+
+export {
+  MAX_FOLLOW_UP_ADVERT_CHARS,
+  MAX_FOLLOW_UP_CV_CHARS,
+  MAX_FOLLOW_UP_LETTER_CHARS,
+  MAX_WRITING_STYLE_CHARS,
+  buildFollowUpPrompt,
+  type FollowUpKind,
+  type FollowUpMaterials,
+  type FollowUpPrompt,
+  type FollowUpPromptInput,
+} from './prompt/build-follow-up-prompt';
+
+export {
+  DEFAULT_MAX_FOLLOW_UP_TOKENS,
+  draftFollowUp,
+  type DraftFollowUpOptions,
+  type FollowUpError,
+  type FollowUpMeta,
+  type FollowUpSuccess,
+} from './follow-up';

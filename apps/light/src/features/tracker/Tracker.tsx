@@ -458,6 +458,7 @@ export function Tracker({
               onDelete={() => void onDelete(selected)}
               port={trackerPort}
               availability={availability ?? undefined}
+              readAvailability={readAvailability}
               createTransport={createTransport}
             />
           </DetailPane>
