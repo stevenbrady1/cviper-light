@@ -14,6 +14,7 @@ import { viewById } from '../../app/views';
 import { type Availability } from '../analysis/providers';
 
 import { ApplicationDetail } from './ApplicationDetail';
+import { FunnelStrip } from './FunnelStrip';
 import { NewApplicationForm } from './NewApplicationForm';
 import { type PageFetchTransport } from './pageFetch';
 import { PasteJobForm } from './PasteJobForm';
@@ -304,6 +305,13 @@ export function Tracker({
           )
         }
       />
+
+      {/*
+        Not while loading and not on an empty board: five zeros and two dashes
+        under the invitation to start would be the app reporting on a campaign
+        that has not begun.
+      */}
+      {loading || boardIsEmpty ? null : <FunnelStrip entries={entries} />}
 
       {error === null ? null : (
         <p
