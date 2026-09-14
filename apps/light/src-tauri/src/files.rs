@@ -377,7 +377,11 @@ fn bare_json_name(suggested: &str, fallback: &str) -> String {
 /// welcome under `md`, and the same name under `txt` is not a plain name for
 /// THIS save and falls back to `cviper-export.txt`.
 fn bare_text_name(suggested: &str, extension: &str) -> String {
-    bare_name(suggested, extension, &format!("{FALLBACK_TEXT_STEM}.{extension}"))
+    bare_name(
+        suggested,
+        extension,
+        &format!("{FALLBACK_TEXT_STEM}.{extension}"),
+    )
 }
 
 /// The guard behind all three: a plain name is non-empty, short enough, has
@@ -1334,7 +1338,10 @@ mod tests {
         // Negative: everything else is an error before a dialog could open.
         for refused in ["exe", "json", "html", "bat", "", ".txt", "txt md", "docx"] {
             let error = text_extension(refused).expect_err(refused);
-            assert!(error.contains(".txt or .md"), "{refused:?} produced: {error}");
+            assert!(
+                error.contains(".txt or .md"),
+                "{refused:?} produced: {error}"
+            );
         }
     }
 
@@ -1354,7 +1361,9 @@ mod tests {
         assert!(!other.exists());
 
         let none = temp_path("letter");
-        assert!(write_text_export_at(&none, "x", "md").unwrap_err().contains(".md"));
+        assert!(write_text_export_at(&none, "x", "md")
+            .unwrap_err()
+            .contains(".md"));
     }
 
     #[test]
@@ -1379,16 +1388,33 @@ mod tests {
 
     #[test]
     fn a_text_name_that_is_not_a_plain_name_falls_back_for_that_extension() {
-        assert_eq!(bare_text_name("Tailored CV — Analyst.txt", "txt"), "Tailored CV — Analyst.txt");
+        assert_eq!(
+            bare_text_name("Tailored CV — Analyst.txt", "txt"),
+            "Tailored CV — Analyst.txt"
+        );
         assert_eq!(bare_text_name("Cover letter.md", "md"), "Cover letter.md");
 
         // The right shape under the WRONG extension is not a plain name for
         // this save, and the fallback carries the extension actually asked for.
-        assert_eq!(bare_text_name("Cover letter.md", "txt"), "cviper-export.txt");
+        assert_eq!(
+            bare_text_name("Cover letter.md", "txt"),
+            "cviper-export.txt"
+        );
         assert_eq!(bare_text_name("Tailored CV.txt", "md"), "cviper-export.md");
 
-        for hostile in ["../CV.txt", "..\\CV.txt", "C:CV.txt", "docs/CV.txt", "CV\u{7}.txt", ""] {
-            assert_eq!(bare_text_name(hostile, "txt"), "cviper-export.txt", "{hostile:?}");
+        for hostile in [
+            "../CV.txt",
+            "..\\CV.txt",
+            "C:CV.txt",
+            "docs/CV.txt",
+            "CV\u{7}.txt",
+            "",
+        ] {
+            assert_eq!(
+                bare_text_name(hostile, "txt"),
+                "cviper-export.txt",
+                "{hostile:?}"
+            );
         }
 
         // And the fallback passes its own guard, so the safe answer is savable.
@@ -1414,7 +1440,10 @@ mod tests {
             read_cv_at(&secret).unwrap_err(),
             read_backup_at(&secret).unwrap_err(),
             write_backup_at(&secret, "{}").unwrap_err(),
-            describe_io_error(&std::io::Error::new(ErrorKind::Other, secret.display().to_string())),
+            describe_io_error(&std::io::Error::new(
+                ErrorKind::Other,
+                secret.display().to_string(),
+            )),
         ];
 
         for message in messages {
@@ -1660,7 +1689,9 @@ mod tests {
             .join(" ")
             .replace(", }", " }");
         assert!(
-            compact.contains("invoke('pick_and_write_text', { contents, suggestion: suggestedName, extension }"),
+            compact.contains(
+                "invoke('pick_and_write_text', { contents, suggestion: suggestedName, extension }"
+            ),
             "src/platform/files.ts no longer passes `contents`, `suggestion` and `extension`, \
              which are the parameter names pick_and_write_text declares"
         );
