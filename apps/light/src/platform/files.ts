@@ -76,6 +76,35 @@ export interface FileError {
  */
 export type TextExportExtension = 'txt' | 'md';
 
+/**
+ * The four Markdown files an ai-job-search workspace keeps a candidate
+ * profile in (L-167), each as text or `null` when the folder does not have it.
+ *
+ * Read by Rust from FIXED relative names inside the folder the user picked —
+ * the directory is never listed and nothing else in it is opened. The keys
+ * are the Rust struct's field names, and `parseAiJobSearchWorkspace` in
+ * `features/profile/importAiJobSearch.ts` is the only reader.
+ */
+export interface WorkspaceFiles {
+  /** `CLAUDE.md` at the top of the folder. */
+  readonly claude_md: string | null;
+  /** `.claude/skills/job-application-assistant/01-candidate-profile.md`. */
+  readonly candidate_profile: string | null;
+  /** `.../04-job-evaluation.md`. */
+  readonly job_evaluation: string | null;
+  /** `.../07-interview-prep.md`. */
+  readonly interview_prep: string | null;
+}
+
+/**
+ * The one format a binary export can be saved as (L-165): a Word document.
+ *
+ * A closed union of one, for the same reason as `TextExportExtension`: Rust
+ * refuses anything else before a dialog opens, and typing it here means a
+ * caller cannot ask for `.docm` or `.zip` and find out at runtime.
+ */
+export type BytesExportExtension = 'docx';
+
 export interface FilePort {
   /** Ask for a CV and read it. `null` means the user cancelled. */
   pickCv(): Promise<Result<PickedCv | null, FileError>>;
@@ -98,6 +127,26 @@ export interface FilePort {
     contents: string,
     suggestedName: string,
     extension: TextExportExtension,
+  ): Promise<Result<string | null, FileError>>;
+  /**
+   * Ask for an ai-job-search folder and read the four profile files in it
+   * (L-167). `null` means the user cancelled; a file the folder does not have
+   * is `null` inside the answer. A folder with none of the four is an error
+   * with Rust's own sentence.
+   */
+  pickProfileWorkspace(): Promise<Result<WorkspaceFiles | null, FileError>>;
+  /**
+   * Ask where to save a binary export — a tailored CV or a cover letter as a
+   * Word document (L-165) — then write it. Same contract as `saveText`: the
+   * path, or `null` for a cancel. The bytes are built on this machine by
+   * `features/tailor/docx.ts` and cross to Rust as base64, because a `.docx`
+   * is a zip and a zip is not a string; Rust decodes them, caps their size
+   * and refuses any extension but the one named here.
+   */
+  saveBytes(
+    bytes: Uint8Array,
+    suggestedName: string,
+    extension: BytesExportExtension,
   ): Promise<Result<string | null, FileError>>;
 }
 
@@ -147,6 +196,34 @@ export function decodeBase64(encoded: string): Uint8Array | null {
 }
 
 /**
+ * How many bytes `encodeBase64` turns into a string at a time.
+ *
+ * `String.fromCharCode(...bytes)` spreads the bytes as arguments, and an
+ * engine's argument limit is somewhere past 100k — smaller than a Word
+ * document. A multiple of three, so no chunk ends in padding that would then
+ * sit in the middle of the output.
+ */
+const ENCODE_CHUNK_BYTES = 3 * 8192;
+
+/**
+ * Encode bytes as padded standard base64: the inverse of `decodeBase64`, and
+ * the ONLY way bytes leave this file for Rust (L-165).
+ *
+ * `btoa` takes one character per byte, each in 0-255, so the bytes are turned
+ * into exactly that string — no `TextDecoder`, which would read anything
+ * above 0x7F as the start of a UTF-8 sequence and corrupt every zip. Rust's
+ * `debase64` is strict about padding and alphabet, and this produces only
+ * what it accepts.
+ */
+export function encodeBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += ENCODE_CHUNK_BYTES) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + ENCODE_CHUNK_BYTES));
+  }
+  return btoa(binary);
+}
+
+/**
  * The text of something `invoke` rejected with.
  *
  * ============================================================================
@@ -174,6 +251,17 @@ function readString(source: unknown, key: string): string | null {
   if (typeof source !== 'object' || source === null) return null;
   const value = (source as Record<string, unknown>)[key];
   return typeof value === 'string' ? value : null;
+}
+
+/**
+ * Read a property that is a string OR an explicit `null` off an IPC reply.
+ * `undefined` means the property was neither — a reply of a shape we do not
+ * know — which the caller reports rather than reads as "not there".
+ */
+function readStringOrNull(source: unknown, key: string): string | null | undefined {
+  if (typeof source !== 'object' || source === null) return undefined;
+  const value = (source as Record<string, unknown>)[key];
+  return typeof value === 'string' || value === null ? value : undefined;
 }
 
 /**
@@ -329,6 +417,71 @@ export function createTauriFilePort(): FilePort {
       if (typeof reply !== 'string') {
         return err({
           message: 'CViper saved that text but could not report where it went.',
+        });
+      }
+
+      return ok(reply);
+    },
+
+    async pickProfileWorkspace() {
+      let reply: unknown;
+      try {
+        // No arguments, like `pick_and_read_cv`: the folder is chosen in the
+        // dialog Rust opens, and the four file names are constants there.
+        reply = await invoke('pick_and_read_profile_workspace');
+      } catch (thrown) {
+        return err({
+          message: rejectionMessage(thrown, 'That folder could not be read. Try again.'),
+        });
+      }
+
+      if (cancelled(reply)) return ok(null);
+
+      const claude_md = readStringOrNull(reply, 'claude_md');
+      const candidate_profile = readStringOrNull(reply, 'candidate_profile');
+      const job_evaluation = readStringOrNull(reply, 'job_evaluation');
+      const interview_prep = readStringOrNull(reply, 'interview_prep');
+
+      if (
+        claude_md === undefined ||
+        candidate_profile === undefined ||
+        job_evaluation === undefined ||
+        interview_prep === undefined
+      ) {
+        return err({
+          message: 'CViper read that folder but could not make sense of what came back. Try again.',
+        });
+      }
+
+      return ok({ claude_md, candidate_profile, job_evaluation, interview_prep });
+    },
+
+    async saveBytes(bytes, suggestedName, extension) {
+      // Encoded BEFORE the try: a failure here is our bug, not a rejection
+      // from Rust, and it must not be dressed up in Rust's words.
+      const encoded = encodeBase64(bytes);
+      let reply: unknown;
+      try {
+        // Its own literal call, for the same reason as `saveCvJson`. `encoded`
+        // is one word on purpose — Rust's parameter is not `contents_base64`,
+        // which Tauri would expect as `contentsBase64` here with nothing on
+        // either side to say so if the two ever drifted.
+        reply = await invoke('pick_and_write_bytes', {
+          encoded,
+          suggestion: suggestedName,
+          extension,
+        });
+      } catch (thrown) {
+        return err({
+          message: rejectionMessage(thrown, 'The document could not be saved. Try again.'),
+        });
+      }
+
+      if (cancelled(reply)) return ok(null);
+
+      if (typeof reply !== 'string') {
+        return err({
+          message: 'CViper saved that document but could not report where it went.',
         });
       }
 

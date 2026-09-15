@@ -512,3 +512,74 @@ describe('saving', () => {
     expect(screen.queryByTestId('tailor-error')).toBeNull();
   });
 });
+
+describe('saving as a Word document (L-165)', () => {
+  /** `PK\x03\x04`: the signature every zip — and so every .docx — opens with. */
+  const ZIP_SIGNATURE = [0x50, 0x4b, 0x03, 0x04];
+
+  it('builds the CV into .docx bytes, hands them to the file port under a .docx name, and reports where', async () => {
+    const { user, filePort } = await renderReady([FAITHFUL]);
+    await user.selectOptions(screen.getByTestId('tailor-job-pick'), 'job-1');
+    await user.click(screen.getByTestId('tailor-run'));
+    await screen.findByTestId('tailor-result');
+
+    filePort.nextSavePath('C:\\Users\\steve\\Documents\\Tailored CV.docx');
+    await user.click(screen.getByTestId('tailor-save-docx-cv'));
+
+    const message = await screen.findByTestId('tailor-save-message');
+    expect(message.textContent).toContain('Tailored CV.docx');
+    expect(filePort.writtenBytes()).toHaveLength(1);
+    const written = filePort.writtenBytes()[0];
+    expect(written?.extension).toBe('docx');
+    expect(written?.suggestedName).toBe('Tailored CV — Credit Risk Analyst.docx');
+    expect([...(written?.bytes.subarray(0, 4) ?? [])]).toEqual(ZIP_SIGNATURE);
+    // The Word save is its own path: nothing went out as text.
+    expect(filePort.writtenText()).toHaveLength(0);
+  });
+
+  it('builds the letter into .docx bytes under its own name', async () => {
+    const { user, filePort } = await renderReady([FAITHFUL, LETTER]);
+    await user.selectOptions(screen.getByTestId('tailor-job-pick'), 'job-1');
+    await user.click(screen.getByTestId('tailor-run'));
+    await screen.findByTestId('tailor-result');
+    await user.click(screen.getByTestId('tailor-letter-run'));
+    await screen.findByTestId('tailor-letter');
+
+    filePort.nextSavePath('C:\\Users\\steve\\Documents\\Cover letter.docx');
+    await user.click(screen.getByTestId('tailor-save-docx-letter'));
+
+    await screen.findByTestId('tailor-save-message');
+    const written = filePort.writtenBytes()[0];
+    expect(written?.suggestedName).toBe('Cover letter — Credit Risk Analyst.docx');
+    expect([...(written?.bytes.subarray(0, 4) ?? [])]).toEqual(ZIP_SIGNATURE);
+  });
+
+  it('boundary: cancelling the save dialog says nothing', async () => {
+    const { user, filePort } = await renderReady([FAITHFUL]);
+    await user.type(screen.getByTestId('tailor-job-text'), JOB.description ?? '');
+    await user.click(screen.getByTestId('tailor-run'));
+    await screen.findByTestId('tailor-result');
+
+    filePort.nextSavePath(null);
+    await user.click(screen.getByTestId('tailor-save-docx-cv'));
+
+    await vi.waitFor(() => expect(filePort.calls.saveBytes).toBe(1));
+    expect(screen.queryByTestId('tailor-save-message')).toBeNull();
+    expect(screen.queryByTestId('tailor-error')).toBeNull();
+  });
+
+  it('negative: a refused write is reported and the draft stays on screen', async () => {
+    const { user, filePort } = await renderReady([FAITHFUL]);
+    await user.type(screen.getByTestId('tailor-job-text'), JOB.description ?? '');
+    await user.click(screen.getByTestId('tailor-run'));
+    await screen.findByTestId('tailor-result');
+
+    filePort.failSave('Windows would not let CViper write there.');
+    await user.click(screen.getByTestId('tailor-save-docx-cv'));
+
+    const error = await screen.findByTestId('tailor-error');
+    expect(error.textContent).toContain('Windows would not let CViper write there.');
+    expect(screen.getByTestId('tailor-cv')).toBeTruthy();
+    expect(filePort.writtenBytes()).toHaveLength(0);
+  });
+});

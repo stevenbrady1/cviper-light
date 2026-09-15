@@ -44,6 +44,7 @@ import {
 } from '../analysis/providers';
 
 import { lineDiff } from './diff';
+import { buildCoverLetterDocx, buildCvDocx } from './docx';
 import {
   LETTER_WORD_LIMIT,
   documentTitle,
@@ -511,6 +512,51 @@ export function Tailor({ port, filePort, createTransport, consentPort, now }: Ta
     [files, jobTitle, letter, result],
   );
 
+  // The Word export (L-165): the same structured result the text render
+  // reads, built into a `.docx` on this machine and handed to the same
+  // dialog-in-Rust save. Success and cancel are worded exactly as the text
+  // path's, so the two buttons side by side behave as one feature.
+  const onSaveDocx = useCallback(
+    async (kind: 'cv' | 'cover_letter') => {
+      // `null` for the name: the app never asks the model for one, and this
+      // screen has nothing else to offer (see `renderTailoredCv`).
+      const build =
+        kind === 'cv'
+          ? result === null
+            ? null
+            : () => buildCvDocx(result.cv, null)
+          : letter === null
+            ? null
+            : () => buildCoverLetterDocx(letter.letter);
+      if (build === null) return;
+      setError(null);
+      setSaveMessage(null);
+      setSaving(true);
+
+      let bytes: Uint8Array;
+      try {
+        bytes = await build();
+      } catch {
+        // The builder runs over our own validated result, so this is our bug;
+        // it still ends in a sentence on screen rather than a stuck spinner.
+        setSaving(false);
+        setError('That document could not be built. Try running the tailoring again.');
+        return;
+      }
+
+      const saved = await files.saveBytes(bytes, exportFileName(kind, jobTitle, 'docx'), 'docx');
+      setSaving(false);
+
+      if (!saved.ok) {
+        setError(`That could not be saved: ${saved.error.message}`);
+        return;
+      }
+      if (saved.value === null) return;
+      setSaveMessage(`Saved to ${saved.value}.`);
+    },
+    [files, jobTitle, letter, result],
+  );
+
   // ── Rendering ────────────────────────────────────────────────────────────
 
   const aiAvailable = options.length > 0;
@@ -834,6 +880,15 @@ export function Tailor({ port, filePort, createTransport, consentPort, now }: Ta
               >
                 Save CV as text…
               </button>
+              <button
+                type="button"
+                data-testid="tailor-save-docx-cv"
+                disabled={running || saving}
+                onClick={() => void onSaveDocx('cv')}
+                className={SECONDARY_BUTTON}
+              >
+                Save CV as Word…
+              </button>
             </div>
 
             {review === null ? null : (
@@ -908,6 +963,15 @@ export function Tailor({ port, filePort, createTransport, consentPort, now }: Ta
                   className={SECONDARY_BUTTON}
                 >
                   Save letter as text…
+                </button>
+                <button
+                  type="button"
+                  data-testid="tailor-save-docx-letter"
+                  disabled={running || saving}
+                  onClick={() => void onSaveDocx('cover_letter')}
+                  className={SECONDARY_BUTTON}
+                >
+                  Save letter as Word…
                 </button>
               </div>
             )}

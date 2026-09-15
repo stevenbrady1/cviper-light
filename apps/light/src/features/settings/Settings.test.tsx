@@ -16,7 +16,14 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { type Application, type Cv, type Job } from '@cviper/core-types';
+import {
+  PROFILE_ID,
+  type Application,
+  type Cv,
+  type Document,
+  type Job,
+  type Profile,
+} from '@cviper/core-types';
 
 import { Settings } from './Settings';
 import { createFakeBackupPort } from './test/fakePort';
@@ -61,6 +68,39 @@ const CV: Cv = {
   created_at: '2026-08-01T09:00:00.000Z',
 };
 
+const PROFILE: Profile = {
+  id: PROFILE_ID,
+  headline: 'Credit risk analyst',
+  languages: [{ name: 'English', level: 'Native' }],
+  work_rights: 'UK citizen',
+  deal_breakers: ['No relocation'],
+  target_sectors: ['Banking'],
+  career_goals: ['Lead a risk team'],
+  energising: ['Modelling'],
+  draining: ['Status meetings'],
+  writing_style: null,
+  star_examples: [],
+  updated_at: '2026-08-03T09:00:00.000Z',
+};
+
+const COVER_LETTER: Document = {
+  id: 'doc-1',
+  application_id: 'app-1',
+  kind: 'cover_letter',
+  title: 'Cover letter — Lloyds',
+  text: 'Dear Priya,',
+  created_at: '2026-08-02T10:00:00.000Z',
+};
+
+const INTERVIEW_PACK: Document = {
+  id: 'doc-2',
+  application_id: 'app-1',
+  kind: 'interview_pack',
+  title: 'Interview pack — Lloyds',
+  text: 'Likely questions.',
+  created_at: '2026-08-03T10:00:00.000Z',
+};
+
 const FULL = {
   profile: null,
   jobs: [JOB],
@@ -93,6 +133,10 @@ describe('the screen itself', () => {
 
     const copy = screen.getByTestId('view-settings').textContent ?? '';
     expect(copy).toContain('one file on this computer');
+    // L-166: the file carries the profile and the archived documents too, and
+    // the paragraph that says what it holds must not stop short of them.
+    expect(copy).toContain('the profile you filled in');
+    expect(copy).toContain('every document the app wrote for an application');
     expect(copy).toContain('Nothing is uploaded');
     // And what import does, before anybody presses it.
     expect(copy).toContain('Nothing is deleted');
@@ -125,6 +169,23 @@ describe('export', () => {
     expect(written['schemaVersion']).toBe(1);
     expect(written['app']).toEqual({ name: 'cviper-light', version: '0.2.0' });
     expect(written['jobs']).toHaveLength(1);
+  });
+
+  it('says so when the file carries the profile and archived documents (L-166)', async () => {
+    const { user } = renderSettings(
+      createFakeBackupPort({
+        ...FULL,
+        profile: PROFILE,
+        documents: [COVER_LETTER, INTERVIEW_PACK],
+      }),
+    );
+
+    await user.click(screen.getByTestId('settings-export'));
+
+    const message = await screen.findByTestId('settings-message');
+    expect(message.textContent).toContain(
+      'It holds 1 job, 1 application, 1 CV, 2 archived documents and your profile,',
+    );
   });
 
   it('offers a dated filename', async () => {
@@ -210,6 +271,34 @@ describe('import', () => {
     // The load-bearing half: nothing has been written yet.
     expect(port.calls.write).toBe(0);
     expect(port.snapshot().jobs).toEqual([]);
+  });
+
+  it('names the profile in the preview when the file carries one (L-166)', async () => {
+    const port = createFakeBackupPort();
+    const { user, filePort } = renderSettings(port);
+
+    filePort.nextBackup({
+      name: 'with-profile.json',
+      path: 'C:\\with-profile.json',
+      text: JSON.stringify({
+        schemaVersion: 1,
+        exportedAt: '2026-08-19T09:00:00.000Z',
+        app: { name: 'cviper-light', version: '0.2.0' },
+        profile: PROFILE,
+        jobs: [JOB],
+        applications: [],
+        documents: [],
+        cvs: [],
+        analyses: [],
+      }),
+    });
+
+    await user.click(screen.getByTestId('settings-import'));
+
+    expect((await screen.findByTestId('settings-counts')).textContent).toBe(
+      'This will add or update 1 job and your profile.',
+    );
+    expect(port.calls.write).toBe(0);
   });
 
   it('has one enabled primary while confirming, and it is the confirm button', async () => {

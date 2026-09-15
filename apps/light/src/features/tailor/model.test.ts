@@ -157,6 +157,11 @@ describe('titles and file names', () => {
   it('suggests a .txt file name', () => {
     expect(exportFileName('cover_letter', 'Analyst')).toBe('Cover letter — Analyst.txt');
   });
+
+  it('suggests a .docx file name for the Word export (L-165)', () => {
+    expect(exportFileName('cv', 'Analyst', 'docx')).toBe('Tailored CV — Analyst.docx');
+    expect(exportFileName('cover_letter', '', 'docx')).toBe('Cover letter.docx');
+  });
 });
 
 describe('newDocument', () => {

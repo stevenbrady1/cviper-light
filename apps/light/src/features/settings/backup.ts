@@ -110,9 +110,45 @@ export interface BackupCounts {
   readonly applications: number;
   readonly cvs: number;
   readonly analyses: number;
+  /** The documents the app wrote for an application (L-155). */
+  readonly documents: number;
+  /** There is at most one profile, so it is a fact rather than a count (L-154). */
+  readonly profile: boolean;
 }
 
-/** "3 jobs and 1 CV". Categories with nothing in them are left out entirely. */
+/**
+ * Count what is in a snapshot or a payload.
+ *
+ * Structural rather than typed to either, because `DbSnapshot` and
+ * `BackupPayload` carry the same five collections and the same one profile
+ * row, and every sentence on the Settings screen — export, import preview,
+ * delete confirmation — needs the same numbers out of them. One counter, so a
+ * collection added to the file cannot be counted on one screen and forgotten
+ * on another (L-166: the profile and the documents were, for a while).
+ */
+export function countBackup(source: {
+  readonly profile: object | null;
+  readonly jobs: readonly unknown[];
+  readonly applications: readonly unknown[];
+  readonly documents: readonly unknown[];
+  readonly cvs: readonly unknown[];
+  readonly analyses: readonly unknown[];
+}): BackupCounts {
+  return {
+    jobs: source.jobs.length,
+    applications: source.applications.length,
+    cvs: source.cvs.length,
+    analyses: source.analyses.length,
+    documents: source.documents.length,
+    profile: source.profile !== null,
+  };
+}
+
+/**
+ * "3 jobs, 1 CV and your profile". Categories with nothing in them are left
+ * out entirely, and the profile — which is one row, not a count — comes last,
+ * as a noun phrase rather than a number.
+ */
 export function describeCounts(counts: BackupCounts): string {
   const parts = [
     [counts.jobs, 'job', 'jobs'],
@@ -121,11 +157,15 @@ export function describeCounts(counts: BackupCounts): string {
     // Called "past checks" rather than "analyses", which is the word used
     // everywhere the user can see one.
     [counts.analyses, 'past check', 'past checks'],
+    // "Archived" because that is where the user finds them: on the application
+    // they were written for, not in a list of their own.
+    [counts.documents, 'archived document', 'archived documents'],
   ] as const;
 
   const phrases = parts
     .filter(([count]) => count > 0)
     .map(([count, singular, plural]) => `${count} ${count === 1 ? singular : plural}`);
+  if (counts.profile) phrases.push('your profile');
 
   // An empty file is a real thing to import — somebody exported before they had
   // entered anything — and "This will add ." is not a sentence.

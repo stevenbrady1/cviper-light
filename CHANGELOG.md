@@ -87,5 +87,22 @@ source of truth.
   original, saving to the application, and export as plain text.
 - A cover letter from the tailored CV and the advert (L-161), with a word
   count and a note over 400 words; saved and exportable.
+- Import a candidate profile from an ai-job-search folder (L-167): pick the
+  folder, four Markdown files are read by name on this computer, and what was
+  found is reviewed before it is added; lists are unioned and typed text is
+  never overwritten. No name, contact details or work history are read.
+
+- Save the tailored CV and the cover letter as a Word document (L-165), built
+  on your machine and sent nowhere: a single column, the standard headings,
+  one plain font, no tables and no images, so a parser reads it the way you
+  do.
+
+### Fixed
+
+- Settings said the backup held jobs, applications, CVs and checks, and counted
+  only those, while the file had carried the profile and the archived documents
+  since L-154 and L-155 (L-166). The "Your data" paragraph, the export message,
+  the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
+  3 archived documents and your profile".
 
 [Unreleased]: https://github.com/stevenbrady1/cviper-light/commits/main

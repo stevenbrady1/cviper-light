@@ -151,6 +151,8 @@ pub fn run() {
             // Same dialog-in-Rust shape; the one extra argument is the
             // extension, and it can only be `txt` or `md`.
             files::pick_and_write_text,
+            files::pick_and_read_profile_workspace,
+            files::pick_and_write_bytes,
             // Fetching the ONE page whose address the user pasted, so the same
             // extraction that reads a paste can read an advert from a link.
             //
