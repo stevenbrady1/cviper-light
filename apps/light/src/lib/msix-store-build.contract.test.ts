@@ -63,6 +63,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DISTRIBUTION_ENV, MICROSOFT_STORE } from '../platform/distribution.ts';
 
+import { identityAttributes, manifestVersion } from './appx-manifest.ts';
 import { KEY_MATERIAL_EXTENSIONS, namesKeyMaterial } from './key-material.ts';
 import { REPO_ROOT } from './repo-scan.ts';
 
@@ -287,17 +288,6 @@ const IDENTITY_NAME_SHAPE = /^[A-Za-z0-9][A-Za-z0-9-]*\.[A-Za-z0-9][A-Za-z0-9.-]
 /** Is this a real pasted value, rather than blank or a leftover example? */
 export function looksPasted(value: string | null): boolean {
   return value !== null && value.trim().length > 0 && !/placeholder/i.test(value);
-}
-
-/** The three identity values a submission replaces, or `null` where absent. */
-export function identityFields(manifestXml: string): Record<string, string | null> {
-  const identity = /<Identity\b([^>]*)>/.exec(manifestXml)?.[1] ?? '';
-  return {
-    Name: /\bName="([^"]*)"/.exec(identity)?.[1] ?? null,
-    Publisher: /\bPublisher="([^"]*)"/.exec(identity)?.[1] ?? null,
-    PublisherDisplayName:
-      /<PublisherDisplayName>([^<]*)<\/PublisherDisplayName>/.exec(manifestXml)?.[1] ?? null,
-  };
 }
 
 // ── The corpus ──────────────────────────────────────────────────────────────
@@ -538,7 +528,7 @@ describe('the screen agrees with the binary', () => {
 });
 
 describe('the package manifest is honest about its placeholders', () => {
-  const fields = identityFields(MANIFEST);
+  const fields = identityAttributes(MANIFEST);
   const values = Object.values(fields);
 
   it('carries all three identity fields', () => {
@@ -568,8 +558,7 @@ describe('the package manifest is honest about its placeholders', () => {
   it('uses a four-part version whose fourth number is zero', () => {
     // The Microsoft Store reserves the fourth number and rejects a package that
     // sets it to anything else.
-    const version = /<Identity\b[^>]*\bVersion="([^"]*)"/.exec(MANIFEST)?.[1];
-    expect(version).toMatch(/^\d+\.\d+\.\d+\.0$/);
+    expect(manifestVersion(MANIFEST)).toMatch(/^\d+\.\d+\.\d+\.0$/);
   });
 });
 
@@ -589,7 +578,7 @@ describe('the identity is the real reservation, and keeps its shape', () => {
   // literal values: a guard that hardcoded the GUID would be a copy of the
   // manifest rather than a statement about it, and would go red for the one
   // edit that is legitimate here — a genuine new reservation.
-  const fields = identityFields(MANIFEST);
+  const fields = identityAttributes(MANIFEST);
 
   it('all three are pasted values, not blanks or leftover examples', () => {
     // This is the leg the rule above cannot carry. `placeholders === 0` is true
@@ -745,7 +734,7 @@ describe('the detectors bite, and let the honest shapes through', () => {
     const half =
       '<Identity Name="Real.Name" Publisher="CN=PLACEHOLDER-x" Version="1.0.0.0" />' +
       '<PublisherDisplayName>A Real Name</PublisherDisplayName>';
-    const fields = identityFields(half);
+    const fields = identityAttributes(half);
 
     expect(fields.Name).toBe('Real.Name');
     expect(fields.Publisher).toBe('CN=PLACEHOLDER-x');
@@ -753,6 +742,26 @@ describe('the detectors bite, and let the honest shapes through', () => {
 
     const placeholders = Object.values(fields).filter((value) => /placeholder/i.test(value ?? ''));
     expect(placeholders).toHaveLength(1);
+  });
+
+  it('regression (L-168 C1): a commented-out example Identity above the real one is not read', () => {
+    // Same hazard as the sibling regression test in
+    // appxManifestVersion.contract.test.ts, for the OTHER reader this file
+    // owns: a reviewer illustrating the version rule (or the all-three-or-
+    // none identity rule) with a worked example pastes an `<Identity …/>`
+    // into a comment ABOVE the real element, and a raw-text regex scan finds
+    // that one first.
+    const withPlantedExample =
+      '<Package>\n' +
+      '  <!-- e.g. <Identity Name="x" Publisher="CN=Y" Version="9.9.9.0" /> -->\n' +
+      '  <Identity Name="Real.Name" Publisher="CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399" ' +
+      'Version="1.2.3.0" />\n' +
+      '  <PublisherDisplayName>Steven Brady</PublisherDisplayName>\n' +
+      '</Package>';
+    const fields = identityAttributes(withPlantedExample);
+
+    expect(fields.Name).toBe('Real.Name');
+    expect(fields.Publisher).toBe('CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399');
   });
 });
 

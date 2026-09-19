@@ -32,12 +32,18 @@
  * would turn a real ambiguity into a wrong answer nobody reviewed. It throws
  * instead, so a version shape this repository has never used yet fails loudly
  * here rather than packaging something nobody decided.
+ *
+ * `manifestVersion` itself lives in `../lib/appx-manifest.ts`, shared with
+ * `msix-store-build.contract.test.ts` — see that module's docblock for why a
+ * reader that did not strip XML comments first was a real, mutation-proven
+ * hole (L-168 review, C1).
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { manifestVersion } from '../lib/appx-manifest.ts';
 import { REPO_ROOT } from '../lib/repo-scan.ts';
 
 const TAURI_CONF_PATH = 'apps/light/src-tauri/tauri.conf.json';
@@ -78,28 +84,50 @@ export function packageVersion(cargoToml: string): string {
   throw new Error(`${CARGO_TOML_PATH} [package] section has no version.`);
 }
 
-/** `Identity/@Version` out of the raw manifest XML, or `null` if absent. */
-export function manifestVersion(manifestXml: string): string | null {
-  return /<Identity\b[^>]*\bVersion="([^"]*)"/.exec(manifestXml)?.[1] ?? null;
-}
+/**
+ * One version segment: either exactly `0`, or a non-zero digit followed by
+ * more digits. A leading zero (`02`) matches neither branch, so it is
+ * rejected the same way a pre-release suffix is — semver forbids it, and it
+ * is not a shape either `tauri.conf.json` or the Store has ever been asked
+ * to accept.
+ */
+const VERSION_SEGMENT = String.raw`(0|[1-9]\d*)`;
+const THREE_PART_VERSION = new RegExp(
+  `^${VERSION_SEGMENT}\\.${VERSION_SEGMENT}\\.${VERSION_SEGMENT}$`,
+);
+
+/** MSIX stores each version segment in 16 bits. Store submission fails above this. */
+const MAX_SEGMENT_VALUE = 65535;
 
 /**
  * The manifest `Identity/@Version` a plain app version maps to: the same
  * three numbers, with the Store's reserved fourth segment appended as `0`.
  *
- * Throws on anything that is not exactly `major.minor.patch` — see the
- * docblock above for why silently reformatting a pre-release or an
- * already-four-part value would be worse than refusing it.
+ * Throws on anything that is not exactly `major.minor.patch` with each
+ * segment in `0..=65535` and no leading zero — see the docblock above for why
+ * silently reformatting a pre-release or an already-four-part value would be
+ * worse than refusing it. The same reasoning applies to a segment MSIX cannot
+ * represent: truncating or wrapping it would produce a manifest that looks
+ * plausible and is rejected at Partner Center.
  */
 export function expectedManifestVersion(appVersion: string): string {
-  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(appVersion);
+  const match = THREE_PART_VERSION.exec(appVersion);
   if (match === null) {
     throw new Error(
-      `"${appVersion}" is not a plain major.minor.patch version. A pre-release suffix or a ` +
-        'fourth segment has no unambiguous Store manifest version to map to.',
+      `"${appVersion}" is not a plain major.minor.patch version with no leading zeros. A ` +
+        'pre-release suffix or a fourth segment has no unambiguous Store manifest version to ' +
+        'map to.',
     );
   }
-  return `${match[1]}.${match[2]}.${match[3]}.0`;
+  const segments = [match[1], match[2], match[3]] as const;
+  const tooLarge = segments.find((segment) => Number(segment) > MAX_SEGMENT_VALUE);
+  if (tooLarge !== undefined) {
+    throw new Error(
+      `"${appVersion}" has a version segment ("${tooLarge}") greater than ${MAX_SEGMENT_VALUE}, ` +
+        'which MSIX stores in 16 bits and the Microsoft Store rejects at upload.',
+    );
+  }
+  return `${segments[0]}.${segments[1]}.${segments[2]}.0`;
 }
 
 // ── The premise ─────────────────────────────────────────────────────────────
@@ -186,6 +214,21 @@ describe('expectedManifestVersion', () => {
   it('boundary: multi-digit version numbers are not truncated or reordered', () => {
     expect(expectedManifestVersion('10.20.30')).toBe('10.20.30.0');
   });
+
+  it('negative: a segment over 65535 throws — MSIX cannot represent it', () => {
+    // MSIX (and the Store) store each version segment in 16 bits. A silent
+    // pass-through here would produce a manifest the packaging tool or the
+    // Store rejects, discovered far later than a two-second test.
+    expect(() => expectedManifestVersion('70000.0.0')).toThrow();
+  });
+
+  it('negative: a leading zero throws — neither MSIX nor semver accepts one', () => {
+    expect(() => expectedManifestVersion('0.02.0')).toThrow();
+  });
+
+  it('boundary: the largest representable segment value is accepted on all three positions', () => {
+    expect(expectedManifestVersion('65535.65535.65535')).toBe('65535.65535.65535.0');
+  });
 });
 
 // ── Proof the detectors can actually fail ───────────────────────────────────
@@ -208,10 +251,43 @@ describe('the detectors bite, and let the honest shapes through', () => {
     expect(() => packageVersion(cargoToml)).toThrow();
   });
 
+  it('packageVersion stops at the next section, rather than reading into it for a version', () => {
+    // A `[package]` table with no version, immediately followed by a table
+    // that HAS one. Without the section-break, the scan would walk straight
+    // past `[package]` and return the dependency's version instead of
+    // throwing — the exact failure `[dependencies]` alone (the fixture
+    // above) cannot catch, because that fixture has no `[package]` table at
+    // all and throws before the break is ever reached.
+    const cargoToml = [
+      '[package]',
+      'name = "light"',
+      '',
+      '[dependencies.tauri]',
+      'version = "2"',
+    ].join('\n');
+    expect(() => packageVersion(cargoToml)).toThrow();
+  });
+
   it('manifestVersion finds the Identity Version attribute, and null when absent', () => {
     expect(manifestVersion('<Package><Identity Name="x" Version="1.2.3.0" /></Package>')).toBe(
       '1.2.3.0',
     );
     expect(manifestVersion('<Package><Identity Name="x" /></Package>')).toBeNull();
+  });
+
+  it('regression (L-168 C1): a commented-out example Identity above the real one is not read', () => {
+    // Proved by mutation: the manifest's own header comment explains the
+    // version rule with a worked example, and the obvious next edit to that
+    // prose is to paste an illustrative `<Identity … Version="9.9.9.0" />`
+    // above the real element — exactly the shape a reviewer adds to show a
+    // "before". A reader that regex-scans the RAW file finds that one first
+    // and reports it as the manifest's version, so the guard above would pass
+    // on a manifest that had actually drifted.
+    const withPlantedExample =
+      '<Package>\n' +
+      '  <!-- e.g. <Identity Name="x" Publisher="CN=Y" Version="9.9.9.0" /> -->\n' +
+      '  <Identity Name="real" Version="1.2.3.0" />\n' +
+      '</Package>';
+    expect(manifestVersion(withPlantedExample)).toBe('1.2.3.0');
   });
 });
