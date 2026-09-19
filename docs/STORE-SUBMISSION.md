@@ -348,13 +348,21 @@ next to the explanation of why they are not fields:
 | **Package Family Name** | `StBr.CViperLight_wjvg8g4k0t6gr` |
 | **Store ID**            | `9PKWNV9CGPWV`                   |
 
-### The version's fourth number must be 0
+### The version's fourth number must be 0, and the rest must match the app
 
-`Version="0.1.0.0"`, not `Version="0.1.0"`. MSIX versions are four-part and the
-Store **reserves the fourth number** for its own use; a package that sets it to
-anything else is rejected at upload. The app's own version stays the three-part
-`0.1.0` in `tauri.conf.json` — the trailing `.0` belongs in the manifest and
-nowhere else.
+E.g. `Version="1.2.3.0"`, not `Version="1.2.3"`. MSIX versions are four-part
+and the Store **reserves the fourth number** for its own use; a package that
+sets it to anything else is rejected at upload. The app's own version stays
+three-part in `tauri.conf.json` — the trailing `.0` belongs in the manifest
+and nowhere else.
+
+This drifted once (L-168): the app moved to 0.2.0 while the manifest stayed at
+`0.1.0.0`, because nothing tied the two together. A guard test,
+[`appxManifestVersion.contract.test.ts`](../apps/light/src/packaging/appxManifestVersion.contract.test.ts),
+now pins the manifest to `tauri.conf.json`'s version on every commit, and
+separately requires `tauri.conf.json`, `Cargo.toml` and `package.json` to all
+agree with each other — two checks, so a partial bump that only reaches one of
+the three still fails loudly.
 
 **A package built before the identity landed cannot be uploaded.** The three
 values were merged on 13 September 2026
@@ -628,8 +636,10 @@ compliance position is that keys are optional.
       `StBr.CViperLight`, `CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399` and
       `Steven Brady`, merged in
       [#76](https://github.com/stevenbrady1/cviper-light/pull/76)
-- [x] Version ends `.0` — the manifest reads `Version="0.1.0.0"`, and has since
-      the file was created
+- [x] Version ends `.0` and matches the app version — pinned to
+      `tauri.conf.json` by `appxManifestVersion.contract.test.ts` since L-168,
+      so this stays true as the app version changes rather than naming a
+      value that goes stale at the next bump
 - [ ] MSIX rebuilt **after** the identity was pasted, and downloaded from CI
 - [ ] Certification kit reported overall **PASS** in the run summary
 - [ ] Step 4a done: the package installed on a real PC, the window opened, **and
