@@ -44,13 +44,20 @@
   or reverted to a placeholder fails there rather than at upload.
 
   ============================================================================
-  THE VERSION'S FOURTH NUMBER MUST BE 0.
+  THE VERSION'S FOURTH NUMBER MUST BE 0, AND THE REST MUST MATCH THE APP.
   ============================================================================
-  `0.1.0.0`, not `0.1.0`. MSIX versions are four-part, and the Microsoft Store
-  RESERVES the fourth number for its own use — a package that sets it to
+  E.g. `1.2.3.0`, not `1.2.3`. MSIX versions are four-part, and the Microsoft
+  Store RESERVES the fourth number for its own use — a package that sets it to
   anything else is rejected at upload. The app's own version (`tauri.conf.json`,
-  `Cargo.toml`) stays the three-part `0.1.0`; the trailing `.0` belongs here and
-  only here.
+  `Cargo.toml`, `package.json`) stays three-part; the trailing `.0` belongs
+  here and only here.
+
+  This drifted once (L-168): the app moved to 0.2.0 and this attribute stayed
+  at `0.1.0.0`, because nothing tied the two together. A shape check alone
+  cannot catch a STALE value that still looks like a version, so
+  `src/packaging/appxManifestVersion.contract.test.ts` now compares this
+  attribute against `tauri.conf.json`, `Cargo.toml` and `package.json`
+  directly, on every commit.
 
   ============================================================================
   ASSETS ARE GENERATED, NOT COLLECTED.
@@ -77,7 +84,7 @@
   <Identity
     Name="StBr.CViperLight"
     Publisher="CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399"
-    Version="0.1.0.0" />
+    Version="0.2.0.0" />
 
   <Properties>
     <DisplayName>CViper Light</DisplayName>
