@@ -12,6 +12,7 @@ import { todayIsoDate } from '../../lib/dates';
 import { viewById } from '../../app/views';
 
 import { readAvailability as readRealAvailability } from '../analysis/availability';
+import { type ConsentPort } from '../analysis/consent';
 import { type Availability } from '../analysis/providers';
 
 import { ApplicationDetail } from './ApplicationDetail';
@@ -97,6 +98,11 @@ export interface TrackerProps {
   readonly createPageTransport?: (() => PageFetchTransport) | undefined;
   /** Injected by tests so the machine's real credentials are never consulted. */
   readonly readAvailability?: (() => Promise<Availability>) | undefined;
+  /**
+   * Injected by tests. Defaults to the real store-backed port, shared with
+   * every other consent screen (L-141). Forwarded to the paste form only.
+   */
+  readonly consentPort?: ConsentPort | undefined;
   /** Injected by tests: the real one opens the user's browser at the advert. */
   readonly browser?: BrowserPort | undefined;
 }
@@ -124,6 +130,7 @@ export function Tracker({
   createPageTransport,
   readAvailability,
   browser,
+  consentPort,
 }: TrackerProps) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke.
@@ -401,6 +408,7 @@ export function Tracker({
               createTransport={createTransport}
               createPageTransport={createPageTransport}
               readAvailability={readAvailability}
+              consentPort={consentPort}
             />
           </DetailPane>
         ) : pane.kind === 'new' ? (

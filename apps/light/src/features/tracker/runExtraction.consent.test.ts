@@ -163,13 +163,12 @@ describe('runExtraction — the consent gate', () => {
     const reason = outcome.reason ?? '';
     expect(reason).toContain('OpenAI');
     expect(reason.toLowerCase()).toContain('permission');
-    // Names the screen that can actually grant it today — the tracker has no
-    // consent affordance of its own (L-141, #81) — AND the precondition that
-    // screen imposes. Without "choose a CV", the route is a dead end: the
-    // dialog only opens when a check runs, and the button that runs one is
-    // disabled until a CV is selected.
-    expect(reason).toContain('Analysis');
-    expect(reason.toLowerCase()).toContain('choose a cv');
+    // Names the route that actually works: the form the user is on asks
+    // itself (L-141, #81). Never a detour to another screen — that was the
+    // dead end L-141 closed, so a sentence sending people there is a
+    // regression this test now refuses.
+    expect(reason).toContain('Read the advert');
+    expect(reason).not.toContain('Analysis');
   });
 
   it('the counter would notice a call: a consented OpenAI extraction runs exactly as before', async () => {
