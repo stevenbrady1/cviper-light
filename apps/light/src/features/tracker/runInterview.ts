@@ -112,13 +112,14 @@ export async function runInterview(
     const consented = await hasConsent(request.option.kind);
     if (!consented) {
       const label = providerLabel(request.option.kind);
-      // Says the PRECONDITION, not just the destination — the same route
-      // `runExtraction` gives, because the tracker still has no consent
-      // affordance of its own (L-141).
+      // Reached only when the panel's own dialog (L-171) and this check
+      // disagree — a consent withdrawn between the press and the run, or a
+      // store that could not be read. The route it names is the button the
+      // user just pressed; never "grant it elsewhere", the detour L-171 closed.
       return unavailable(
         `${label} needs your permission before your CV and this advert can be sent to it. ` +
-          `Grant it on the Analysis screen: choose a CV there and run a check with ${label}, ` +
-          'and it will ask — or prepare with a local model instead.',
+          'Press “Prepare for this interview” again and the app will ask — or prepare with a ' +
+          'local model instead.',
       );
     }
   }

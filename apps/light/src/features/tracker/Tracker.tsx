@@ -100,7 +100,8 @@ export interface TrackerProps {
   readonly readAvailability?: (() => Promise<Availability>) | undefined;
   /**
    * Injected by tests. Defaults to the real store-backed port, shared with
-   * every other consent screen (L-141). Forwarded to the paste form only.
+   * every other consent screen (L-141, L-171). Forwarded to the paste form and
+   * to the detail pane's follow-up and interview panels.
    */
   readonly consentPort?: ConsentPort | undefined;
   /** Injected by tests: the real one opens the user's browser at the advert. */
@@ -468,6 +469,7 @@ export function Tracker({
               availability={availability ?? undefined}
               readAvailability={readAvailability}
               createTransport={createTransport}
+              consentPort={consentPort}
             />
           </DetailPane>
         )}

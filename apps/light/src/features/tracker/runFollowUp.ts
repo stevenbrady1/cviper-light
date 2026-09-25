@@ -118,12 +118,13 @@ export async function runFollowUp(
     const consented = await hasConsent(request.option.kind);
     if (!consented) {
       const label = providerLabel(request.option.kind);
-      // Says the PRECONDITION, not just the destination — see the identical
-      // note in `runExtraction.ts` for why "choose a CV" has to be in it.
+      // Reached only when the panel's own dialog (L-171) and this check
+      // disagree — a consent withdrawn between the press and the run, or a
+      // store that could not be read. The route it names is the button the
+      // user just pressed; never "grant it elsewhere", the detour L-171 closed.
       return unavailable(
         `${label} needs your permission before your CV and the advert can be sent to it. ` +
-          `Grant it on the Analysis screen: choose a CV there and run a check with ${label}, ` +
-          'and it will ask — or write the note by hand.',
+          'Press the draft button again and the app will ask — or write the note by hand.',
       );
     }
   }

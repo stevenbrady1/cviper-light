@@ -154,9 +154,10 @@ describe('runInterview — the consent gate', () => {
       expect(outcome.reason.toLowerCase()).toContain('permission');
       // Says what is being sent — this path carries the CV, not just the advert.
       expect(outcome.reason.toLowerCase()).toContain('your cv');
-      // And the route that can grant it today, precondition included.
-      expect(outcome.reason).toContain('Analysis');
-      expect(outcome.reason.toLowerCase()).toContain('choose a cv');
+      // And the route that actually works: the panel asks itself (L-171).
+      // A sentence pointing at another screen is the dead end L-171 closed.
+      expect(outcome.reason).toContain('Prepare for this interview');
+      expect(outcome.reason).not.toContain('Analysis');
     }
   });
 
