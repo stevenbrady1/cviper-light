@@ -11,6 +11,13 @@ import {
 import { SECONDARY_BUTTON } from '../../app/buttons';
 import { todayIsoDate } from '../../lib/dates';
 
+import { ConsentGate } from '../analysis/ConsentGate';
+import {
+  createTauriConsentPort,
+  isCloudKind,
+  type ConsentPort,
+  type ConsentProviderKind,
+} from '../analysis/consent';
 import { optionByKey, type Availability, type ProviderOption } from '../analysis/providers';
 
 import { extractionOptions, extractionProgressNote } from './extraction';
@@ -42,6 +49,17 @@ import { runInterview } from './runInterview';
  * and both stay at zero through the whole board loop.
  *
  * ============================================================================
+ * THE PANEL ASKS FOR CONSENT ITSELF (L-171)
+ * ============================================================================
+ * `runInterview` refuses a cloud run until the per-provider consent exists,
+ * and this path carries the CV and the profile's worked examples as well as
+ * the advert. Until L-171 the only place that consent could be GIVEN was the
+ * Analysis screen — the dead end L-141 closed for paste-a-job. So this panel
+ * raises the SAME `ConsentGate`, recorded in the SAME store, read at PRESS
+ * time, and prepares the pack that was pending the moment the user says yes.
+ * `runInterview` keeps its own gate underneath regardless.
+ *
+ * ============================================================================
  * THE PACK IS NOT SAVED UNTIL THE USER SAYS SO.
  * ============================================================================
  * A generated pack is on screen first, then "Save this pack" archives it as an
@@ -66,6 +84,11 @@ export interface InterviewPanelProps {
   readonly availability?: Availability | undefined;
   /** Injected by tests so a fake provider can answer without a socket. */
   readonly createTransport?: (() => ChatTransport) | undefined;
+  /**
+   * Injected by tests. Defaults to the real `tauri-plugin-store`-backed port —
+   * the one store every consent screen in the app shares (L-171).
+   */
+  readonly consentPort?: ConsentPort | undefined;
   readonly now: Date;
 }
 
@@ -101,9 +124,11 @@ export function InterviewPanel({
   port,
   availability,
   createTransport,
+  consentPort,
   now,
 }: InterviewPanelProps) {
   const { application, job } = entry;
+  const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
 
   const options = useMemo(
     () => (availability === undefined ? [] : extractionOptions(availability)),
@@ -118,6 +143,11 @@ export function InterviewPanel({
   const [note, setNote] = useState<string | null>(null);
   const [saved, setSaved] = useState<Document | null>(null);
   const [saving, setSaving] = useState(false);
+  /** The cloud run waiting on the user's answer in the dialog, or `null`. */
+  const [pendingConsent, setPendingConsent] = useState<{
+    readonly option: ProviderOption;
+    readonly kind: ConsentProviderKind;
+  } | null>(null);
 
   // Keep the chosen option inside the list. Local before cloud is the order
   // `providerOptions` already returns.
@@ -153,7 +183,17 @@ export function InterviewPanel({
 
   const selected = optionKey === null ? null : optionByKey(options, optionKey);
 
-  const onPrepare = useCallback(
+  /**
+   * The check `runInterview` makes underneath, reading the SAME port this
+   * panel asks through. Fails closed, as everywhere.
+   */
+  const hasConsent = useCallback(
+    (kind: ConsentProviderKind) => consentStore.read().then((read) => read.ok && read.value[kind]),
+    [consentStore],
+  );
+
+  /** The run itself, once nothing stands in its way. */
+  const perform = useCallback(
     async (option: ProviderOption) => {
       setRunning(true);
       setNote(null);
@@ -199,7 +239,7 @@ export function InterviewPanel({
         },
       };
 
-      const outcome = await runInterview({ option, input }, createTransport);
+      const outcome = await runInterview({ option, input }, createTransport, hasConsent);
       setRunning(false);
 
       if (outcome.available) {
@@ -209,8 +249,43 @@ export function InterviewPanel({
         setNote(outcome.reason);
       }
     },
-    [application.id, createTransport, job.company, job.description, job.title, port],
+    [application.id, createTransport, hasConsent, job.company, job.description, job.title, port],
   );
+
+  const onPrepare = useCallback(
+    async (option: ProviderOption) => {
+      // The consent gate (Apple 5.1.2(i)), asked HERE (L-171). Read fresh
+      // from the store on every press, never from a snapshot.
+      if (isCloudKind(option.kind) && !(await hasConsent(option.kind))) {
+        setPendingConsent({ option, kind: option.kind });
+        return;
+      }
+      await perform(option);
+    },
+    [hasConsent, perform],
+  );
+
+  /**
+   * The user said yes in the dialog: record it, then run what was waiting.
+   * Recorded FIRST, so `runInterview`'s own gate agrees with the answer.
+   */
+  const onConsentAccept = useCallback(async () => {
+    const pending = pendingConsent;
+    setPendingConsent(null);
+    if (pending === null) return;
+
+    const granted = await consentStore.grant(pending.kind);
+    if (!granted.ok) {
+      // Said on screen and nothing sent: a consent that was not recorded is
+      // a consent the app does not have.
+      setNote(granted.error.message);
+      return;
+    }
+    await perform(pending.option);
+  }, [consentStore, pendingConsent, perform]);
+
+  /** "Not now": nothing recorded, nothing run, the button live again. */
+  const onConsentDecline = useCallback(() => setPendingConsent(null), []);
 
   const onSave = useCallback(async () => {
     if (pack === null) return;
@@ -411,6 +486,18 @@ export function InterviewPanel({
           </summary>
           <pre className="mt-2 font-sans text-sm whitespace-pre-wrap text-ink">{saved.text}</pre>
         </details>
+      )}
+
+      {/*
+        The same dialog, from the same file, as every other consent screen
+        (L-171). One consent, one store, one wording — see `ConsentGate.tsx`.
+      */}
+      {pendingConsent === null ? null : (
+        <ConsentGate
+          kind={pendingConsent.kind}
+          onAccept={() => void onConsentAccept()}
+          onDecline={onConsentDecline}
+        />
       )}
     </div>
   );

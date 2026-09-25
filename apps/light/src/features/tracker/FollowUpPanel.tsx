@@ -10,6 +10,13 @@ import { type Application, type Document, type IsoDate } from '@cviper/core-type
 import { SECONDARY_BUTTON } from '../../app/buttons';
 
 import { readAvailability as readRealAvailability } from '../analysis/availability';
+import { ConsentGate } from '../analysis/ConsentGate';
+import {
+  createTauriConsentPort,
+  isCloudKind,
+  type ConsentPort,
+  type ConsentProviderKind,
+} from '../analysis/consent';
 import { optionByKey, type Availability, type ProviderOption } from '../analysis/providers';
 
 import { extractionOptions } from './extraction';
@@ -65,6 +72,17 @@ import { runFollowUp } from './runFollowUp';
  * editable because the user is the last reader before anything goes anywhere.
  *
  * ============================================================================
+ * THE PANEL ASKS FOR CONSENT ITSELF (L-171)
+ * ============================================================================
+ * `runFollowUp` refuses a cloud draft until the per-provider consent exists.
+ * Until L-171 the only place that consent could be GIVEN was the Analysis
+ * screen — the same dead end L-141 closed for paste-a-job. So this panel
+ * raises the SAME `ConsentGate`, recorded in the SAME store, read at PRESS
+ * time (a consent withdrawn elsewhere while this card was open is honoured
+ * here), and drafts the note that was pending the moment the user says yes.
+ * `runFollowUp` keeps its own gate underneath regardless.
+ *
+ * ============================================================================
  * THE PICKER IS `PasteJobForm`'s, FOR THE SAME REASON
  * ============================================================================
  * `extractionOptions` — every configured option minus the keyword match, which
@@ -116,6 +134,11 @@ export interface FollowUpPanelProps {
   readonly readAvailability?: (() => Promise<Availability>) | undefined;
   /** Injected by tests so a fake provider can answer without a socket. */
   readonly createTransport?: (() => ChatTransport) | undefined;
+  /**
+   * Injected by tests. Defaults to the real `tauri-plugin-store`-backed port —
+   * the one store every consent screen in the app shares (L-171).
+   */
+  readonly consentPort?: ConsentPort | undefined;
   readonly onEdit: (changes: Partial<Pick<Application, 'notes'>>) => void;
 }
 
@@ -136,10 +159,12 @@ export function FollowUpPanel({
   port,
   readAvailability,
   createTransport,
+  consentPort,
   onEdit,
 }: FollowUpPanelProps) {
   const { application, job } = entry;
   const probe = useMemo(() => readAvailability ?? readRealAvailability, [readAvailability]);
+  const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
 
   const [options, setOptions] = useState<readonly ProviderOption[]>([]);
   const [probed, setProbed] = useState(false);
@@ -148,6 +173,12 @@ export function FollowUpPanel({
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  /** The cloud draft waiting on the user's answer in the dialog, or `null`. */
+  const [pendingConsent, setPendingConsent] = useState<{
+    readonly kind: FollowUpKind;
+    readonly option: ProviderOption;
+    readonly consentKind: ConsentProviderKind;
+  } | null>(null);
 
   /*
    * The thank-you offer, derived from a status TRANSITION rather than a
@@ -184,10 +215,19 @@ export function FollowUpPanel({
   const sentence = describeFollowUpState(entry, today);
   const nothingConfigured = probed && options.length === 0;
 
-  const run = useCallback(
-    async (kind: FollowUpKind) => {
-      if (selected === null) return;
+  /**
+   * The check `runFollowUp` makes underneath, reading the SAME port this
+   * panel asks through, so the dialog's answer and the run module's gate can
+   * never be looking at two different stores. Fails closed, as everywhere.
+   */
+  const hasConsent = useCallback(
+    (kind: ConsentProviderKind) => consentStore.read().then((read) => read.ok && read.value[kind]),
+    [consentStore],
+  );
 
+  /** The draft itself, once nothing stands in its way. */
+  const perform = useCallback(
+    async (kind: FollowUpKind, option: ProviderOption) => {
       setError(null);
       setNote(null);
       setRunning(kind);
@@ -209,7 +249,7 @@ export function FollowUpPanel({
 
       const outcome = await runFollowUp(
         {
-          option: selected,
+          option,
           kind,
           jobTitle: job.title,
           company: job.company,
@@ -218,6 +258,7 @@ export function FollowUpPanel({
           writingStyle: profile.value?.writing_style ?? null,
         },
         createTransport,
+        hasConsent,
       );
       setRunning(null);
 
@@ -227,8 +268,46 @@ export function FollowUpPanel({
       }
       setDraft({ kind, subject: outcome.draft.subject, body: outcome.draft.body });
     },
-    [application.id, createTransport, entry, job, port, selected, today],
+    [application.id, createTransport, entry, hasConsent, job, port, today],
   );
+
+  const run = useCallback(
+    async (kind: FollowUpKind) => {
+      if (selected === null) return;
+
+      // The consent gate (Apple 5.1.2(i)), asked HERE (L-171). Read fresh
+      // from the store on every press, never from a snapshot.
+      if (isCloudKind(selected.kind) && !(await hasConsent(selected.kind))) {
+        setPendingConsent({ kind, option: selected, consentKind: selected.kind });
+        return;
+      }
+
+      await perform(kind, selected);
+    },
+    [hasConsent, perform, selected],
+  );
+
+  /**
+   * The user said yes in the dialog: record it, then draft what was waiting.
+   * Recorded FIRST, so `runFollowUp`'s own gate agrees with the answer.
+   */
+  const onConsentAccept = useCallback(async () => {
+    const pending = pendingConsent;
+    setPendingConsent(null);
+    if (pending === null) return;
+
+    const granted = await consentStore.grant(pending.consentKind);
+    if (!granted.ok) {
+      // Said on screen and nothing drafted: a consent that was not recorded
+      // is a consent the app does not have.
+      setError(granted.error.message);
+      return;
+    }
+    await perform(pending.kind, pending.option);
+  }, [consentStore, pendingConsent, perform]);
+
+  /** "Not now": nothing recorded, nothing drafted, the button live again. */
+  const onConsentDecline = useCallback(() => setPendingConsent(null), []);
 
   const onCopy = useCallback(async () => {
     if (draft === null) return;
@@ -473,6 +552,18 @@ export function FollowUpPanel({
             </p>
           )}
         </div>
+      )}
+
+      {/*
+        The same dialog, from the same file, as every other consent screen
+        (L-171). One consent, one store, one wording — see `ConsentGate.tsx`.
+      */}
+      {pendingConsent === null ? null : (
+        <ConsentGate
+          kind={pendingConsent.consentKind}
+          onAccept={() => void onConsentAccept()}
+          onDecline={onConsentDecline}
+        />
       )}
     </div>
   );

@@ -8,6 +8,7 @@ import { daysSinceTimestamp } from '../../lib/dates';
 import { useDebouncedField } from '../../lib/useDebouncedField';
 import { isOpenableUrl, type BrowserPort } from '../../platform/browser';
 
+import { type ConsentPort } from '../analysis/consent';
 import { type Availability } from '../analysis/providers';
 
 import { ConfirmDelete } from './ConfirmDelete';
@@ -73,6 +74,8 @@ interface ApplicationDetailProps {
   readonly readAvailability?: (() => Promise<Availability>) | undefined;
   /** Injected by tests so a fake provider can answer without a socket. */
   readonly createTransport?: (() => ChatTransport) | undefined;
+  /** Injected by tests. Forwarded to the two AI panels that ask for consent (L-171). */
+  readonly consentPort?: ConsentPort | undefined;
 }
 
 /** `''` from an input means "nothing here", and the model spells that `null`. */
@@ -93,6 +96,7 @@ export function ApplicationDetail({
   availability,
   readAvailability,
   createTransport,
+  consentPort,
 }: ApplicationDetailProps) {
   const { application, job } = entry;
   const [confirming, setConfirming] = useState(false);
@@ -277,6 +281,7 @@ export function ApplicationDetail({
           port={port}
           availability={availability}
           createTransport={createTransport}
+          consentPort={consentPort}
           now={now}
         />
       )}
@@ -294,6 +299,7 @@ export function ApplicationDetail({
           port={port}
           readAvailability={readAvailability}
           createTransport={createTransport}
+          consentPort={consentPort}
           onEdit={(changes) => {
             if (changes.notes !== undefined) notes.reset(changes.notes ?? '');
             onEdit(changes);

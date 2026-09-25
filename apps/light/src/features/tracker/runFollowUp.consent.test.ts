@@ -138,8 +138,11 @@ describe('runFollowUp — the consent gate', () => {
     const reason = outcome.available ? '' : outcome.reason;
     expect(reason).toContain('OpenAI');
     expect(reason.toLowerCase()).toContain('permission');
-    expect(reason).toContain('Analysis');
-    expect(reason.toLowerCase()).toContain('choose a cv');
+    // Names the route that actually works: the panel asks itself (L-171).
+    // Never a detour to another screen — a sentence pointing there is the
+    // dead end L-171 closed, so this test now refuses it.
+    expect(reason.toLowerCase()).toContain('press the draft button again');
+    expect(reason).not.toContain('Analysis');
   });
 
   it('the counter would notice a call: a consented OpenAI draft runs and returns the draft', async () => {
