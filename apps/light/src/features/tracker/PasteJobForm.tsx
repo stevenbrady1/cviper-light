@@ -5,6 +5,13 @@ import { type ChatTransport } from '@cviper/ai-providers';
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 
 import { readAvailability as readRealAvailability } from '../analysis/availability';
+import { ConsentGate } from '../analysis/ConsentGate';
+import {
+  createTauriConsentPort,
+  isCloudKind,
+  type ConsentPort,
+  type ConsentProviderKind,
+} from '../analysis/consent';
 import { optionByKey, type Availability, type ProviderOption } from '../analysis/providers';
 
 import {
@@ -77,6 +84,24 @@ import { type ApplicationDraft } from './model';
  * to anything. See `pastedUrl.ts` for why the rule is deliberately narrow.
  *
  * ============================================================================
+ * THE FORM ASKS FOR CONSENT ITSELF (L-141)
+ * ============================================================================
+ * `runExtraction` refuses to send a pasted advert to a cloud provider until
+ * the per-provider consent exists (L-115). Until L-141 the only place that
+ * consent could be GIVEN was the Analysis screen, so a new user whose first
+ * AI action was this form was refused and sent elsewhere — to a dialog that
+ * only opens once a CV is chosen and a check is run. A dead end, politely put.
+ *
+ * So this form raises the SAME `ConsentGate` the Analysis and Tailor screens
+ * use, recorded in the SAME store, and runs the extraction that was pending
+ * the moment the user says yes. The store is read at PRESS time, not from a
+ * snapshot taken at mount: a consent withdrawn on the Analysis screen while
+ * this pane was open is honoured by the next press here. `runExtraction`
+ * keeps its own gate underneath regardless — a refusal cannot depend on this
+ * screen remembering to ask, which is what
+ * `lib/ai-call-sites-consent.contract.test.ts` holds it to.
+ *
+ * ============================================================================
  * FETCHING IS DISCLOSED BEFORE IT CAN BE PRESSED
  * ============================================================================
  * This app tells people everything stays on their machine. Fetching a page is a
@@ -112,6 +137,11 @@ export interface PasteJobFormProps {
   readonly createPageTransport?: (() => PageFetchTransport) | undefined;
   /** Injected by tests so the machine's real credentials are never consulted. */
   readonly readAvailability?: (() => Promise<Availability>) | undefined;
+  /**
+   * Injected by tests. Defaults to the real `tauri-plugin-store`-backed port —
+   * the one store every consent screen in the app shares (L-141).
+   */
+  readonly consentPort?: ConsentPort | undefined;
 }
 
 export function PasteJobForm({
@@ -121,8 +151,10 @@ export function PasteJobForm({
   createTransport,
   createPageTransport,
   readAvailability,
+  consentPort,
 }: PasteJobFormProps) {
   const probe = useMemo(() => readAvailability ?? readRealAvailability, [readAvailability]);
+  const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
 
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
@@ -137,6 +169,13 @@ export function PasteJobForm({
   /** Set when the advert box was holding a link. Cleared by the effect below. */
   const [urlNote, setUrlNote] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  /** The cloud option waiting on the user's answer in the dialog, or `null`. */
+  const [pendingConsent, setPendingConsent] = useState<{
+    readonly option: ProviderOption;
+    readonly kind: ConsentProviderKind;
+  } | null>(null);
+  /** What went wrong recording a consent answer, or `null`. */
+  const [consentNote, setConsentNote] = useState<string | null>(null);
 
   /**
    * The link note cannot outlive the paste it was about.
@@ -190,6 +229,35 @@ export function PasteJobForm({
     return () => window.clearInterval(timer);
   }, [busy]);
 
+  /**
+   * The check `runExtraction` makes underneath, reading the SAME port this
+   * form asks through — so the dialog's answer and the run module's gate can
+   * never be looking at two different stores. Fails closed, as everywhere.
+   */
+  const hasConsent = useCallback(
+    async (kind: ConsentProviderKind): Promise<boolean> => {
+      const state = await consentStore.read();
+      return state.ok && state.value[kind];
+    },
+    [consentStore],
+  );
+
+  /** The extraction itself, once nothing stands in its way. */
+  const perform = useCallback(
+    async (option: ProviderOption) => {
+      setRunning(true);
+      const outcome = await runExtraction({ option, text }, createTransport, hasConsent);
+      setRunning(false);
+
+      // Straight to the review form on BOTH paths. A failure is not a dead
+      // end: it is the blank form with everything the user pasted still in it
+      // — and, now, with whatever address is in the link box, which is a fact
+      // the user supplied rather than anything guessed. See `draftFromExtraction`.
+      onExtracted(draftFromOutcome(outcome, text, url), outcome.available ? null : outcome.reason);
+    },
+    [createTransport, hasConsent, onExtracted, text, url],
+  );
+
   const onExtract = useCallback(async () => {
     if (selected === null || text.trim() === '') return;
 
@@ -207,16 +275,42 @@ export function PasteJobForm({
       return;
     }
 
-    setRunning(true);
-    const outcome = await runExtraction({ option: selected, text }, createTransport);
-    setRunning(false);
+    // ── The consent gate (Apple 5.1.2(i)), asked HERE (L-141) ─────────────
+    // Read fresh from the store on every press, never from a snapshot: a
+    // consent withdrawn on the Analysis screen a moment ago is honoured by
+    // this press. A store that cannot be read is "not granted" — fail closed,
+    // the same rule `readStoredConsent` applies underneath.
+    if (isCloudKind(selected.kind) && !(await hasConsent(selected.kind))) {
+      setPendingConsent({ option: selected, kind: selected.kind });
+      return;
+    }
 
-    // Straight to the review form on BOTH paths. A failure is not a dead end:
-    // it is the blank form with everything the user pasted still in it — and,
-    // now, with whatever address is in the link box, which is a fact the user
-    // supplied rather than anything guessed. See `draftFromExtraction`.
-    onExtracted(draftFromOutcome(outcome, text, url), outcome.available ? null : outcome.reason);
-  }, [createTransport, onExtracted, selected, text, url]);
+    await perform(selected);
+  }, [hasConsent, perform, selected, text]);
+
+  /**
+   * The user said yes in the dialog: record it, then run the extraction that
+   * was waiting. Recorded FIRST, so `runExtraction`'s own gate — which reads
+   * the same store — agrees with the answer just given.
+   */
+  const onConsentAccept = useCallback(async () => {
+    const pending = pendingConsent;
+    setPendingConsent(null);
+    if (pending === null) return;
+
+    const granted = await consentStore.grant(pending.kind);
+    if (!granted.ok) {
+      // Said on screen and nothing sent: a consent that was not recorded is a
+      // consent the app does not have.
+      setConsentNote(granted.error.message);
+      return;
+    }
+    setConsentNote(null);
+    await perform(pending.option);
+  }, [consentStore, pendingConsent, perform]);
+
+  /** "Not now": nothing recorded, nothing sent, the paste still in the box. */
+  const onConsentDecline = useCallback(() => setPendingConsent(null), []);
 
   /**
    * Go and get the page, and put its text in the box.
@@ -471,6 +565,21 @@ export function PasteJobForm({
         </div>
       )}
 
+      {/*
+        Only ever a sentence about a consent answer that could not be RECORDED.
+        A STATUS, not an alert: the user did nothing wrong, and the next press
+        simply asks again.
+      */}
+      {consentNote === null ? null : (
+        <p
+          data-testid="paste-job-consent-note"
+          role="status"
+          className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
+        >
+          {consentNote}
+        </p>
+      )}
+
       {running && selected !== null ? (
         <p
           data-testid="paste-job-progress"
@@ -481,6 +590,18 @@ export function PasteJobForm({
           <span className="font-mono tabular-nums">{elapsed}s</span>
         </p>
       ) : null}
+
+      {/*
+        The same dialog, from the same file, as the Analysis and Tailor screens
+        (L-141). One consent, one store, one wording — see `ConsentGate.tsx`.
+      */}
+      {pendingConsent === null ? null : (
+        <ConsentGate
+          kind={pendingConsent.kind}
+          onAccept={() => void onConsentAccept()}
+          onDecline={onConsentDecline}
+        />
+      )}
     </div>
   );
 }
