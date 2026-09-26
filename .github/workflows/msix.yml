@@ -412,6 +412,30 @@ jobs:
             exit 1
           }
 
+      # ----------------------------------------------------------------------
+      # THE STAGED MANIFEST'S VERSION IS ASSERTED BEFORE IT IS PACKED (L-169).
+      # ----------------------------------------------------------------------
+      # `appxManifestVersion.contract.test.ts` (L-168) pins the manifest to the
+      # app version on every COMMIT. That is no protection for this RUN: a
+      # rebase that dropped the fix, a hotfix branch built from an older
+      # manifest, or a `workflow_dispatch` from a stale ref would pack whatever
+      # version the staged copy happens to carry, and Partner Center — which
+      # records the manifest value and demands a strictly increasing sequence —
+      # would be the first thing to notice. So the same rule runs here, against
+      # the STAGED copy (the one with `Executable=` rewritten), immediately
+      # before `winapp pack`. It also refuses a Store config fragment carrying
+      # its own `version`, which would override the app version for this
+      # flavour only.
+      - name: Assert the staged manifest version matches the app version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm check:msix-manifest --manifest "$env:MANIFEST_PATH"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error title=Version mismatch::The staged Package.appxmanifest does not match tauri.conf.json. Nothing was packed. See the check output above.'
+            exit 1
+          }
+
       - name: Pack the MSIX
         shell: pwsh
         working-directory: ${{ env.PACK_DIR }}

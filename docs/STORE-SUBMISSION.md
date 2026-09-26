@@ -364,6 +364,16 @@ separately requires `tauri.conf.json`, `Cargo.toml` and `package.json` to all
 agree with each other — two checks, so a partial bump that only reaches one of
 the three still fails loudly.
 
+That guard protects a commit, not a packaging run (L-169). So `msix.yml` also
+runs `pnpm check:msix-manifest` against the **staged** manifest — the copy with
+`Executable=` rewritten, the one actually handed to `winapp pack` — immediately
+before packing, and stops the run on a mismatch. The same check refuses a
+`tauri.microsoft-store.conf.json` that carries its own `version`, because that
+fragment is merged into `tauri.conf.json` for the Store build and would
+override the app version for this flavour only. A `workflow_dispatch` from a
+stale ref, or a hotfix branch built from an older manifest, therefore cannot
+upload a package whose version disagrees with the app's.
+
 **A package built before the identity landed cannot be uploaded.** The three
 values were merged on 13 September 2026
 ([#76](https://github.com/stevenbrady1/cviper-light/pull/76)), so submit a
@@ -638,8 +648,9 @@ compliance position is that keys are optional.
       [#76](https://github.com/stevenbrady1/cviper-light/pull/76)
 - [x] Version ends `.0` and matches the app version — pinned to
       `tauri.conf.json` by `appxManifestVersion.contract.test.ts` since L-168,
-      so this stays true as the app version changes rather than naming a
-      value that goes stale at the next bump
+      and re-asserted against the staged manifest by `msix.yml` immediately
+      before `winapp pack` since L-169, so this stays true as the app version
+      changes rather than naming a value that goes stale at the next bump
 - [ ] MSIX rebuilt **after** the identity was pasted, and downloaded from CI
 - [ ] Certification kit reported overall **PASS** in the run summary
 - [ ] Step 4a done: the package installed on a real PC, the window opened, **and
