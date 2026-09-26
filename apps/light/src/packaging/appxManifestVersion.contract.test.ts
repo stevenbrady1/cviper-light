@@ -33,6 +33,10 @@
  * instead, so a version shape this repository has never used yet fails loudly
  * here rather than packaging something nobody decided.
  *
+ * `expectedManifestVersion` and `packageVersion` live in
+ * `./appxManifestVersion.ts` (L-169), shared with the pack-time check the
+ * MSIX workflow runs — see "pack-time enforcement" below.
+ *
  * `manifestVersion` itself lives in `../lib/appx-manifest.ts`, shared with
  * `msix-store-build.contract.test.ts` — see that module's docblock for why a
  * reader that did not strip XML comments first was a real, mutation-proven
@@ -46,10 +50,19 @@ import { describe, expect, it } from 'vitest';
 import { manifestVersion } from '../lib/appx-manifest.ts';
 import { REPO_ROOT } from '../lib/repo-scan.ts';
 
+import {
+  checkStagedManifest,
+  expectedManifestVersion,
+  packageVersion,
+} from './appxManifestVersion.ts';
+
 const TAURI_CONF_PATH = 'apps/light/src-tauri/tauri.conf.json';
 const CARGO_TOML_PATH = 'apps/light/src-tauri/Cargo.toml';
 const PACKAGE_JSON_PATH = 'apps/light/package.json';
 const MANIFEST_PATH = 'apps/light/src-tauri/msix/Package.appxmanifest';
+const STORE_CONF_PATH = 'apps/light/src-tauri/tauri.microsoft-store.conf.json';
+const MSIX_WORKFLOW_PATH = '.github/workflows/msix.yml';
+const ROOT_PACKAGE_JSON_PATH = 'package.json';
 
 const read = (path: string): string => readFileSync(join(REPO_ROOT, path), 'utf8');
 
@@ -57,78 +70,15 @@ const TAURI_CONF = JSON.parse(read(TAURI_CONF_PATH)) as { version?: string };
 const PACKAGE_JSON = JSON.parse(read(PACKAGE_JSON_PATH)) as { version?: string };
 const CARGO_TOML = read(CARGO_TOML_PATH);
 const MANIFEST = read(MANIFEST_PATH);
+const STORE_CONF = read(STORE_CONF_PATH);
+const MSIX_WORKFLOW = read(MSIX_WORKFLOW_PATH);
+const ROOT_PACKAGE_JSON = read(ROOT_PACKAGE_JSON_PATH);
 
 // ── Detectors ───────────────────────────────────────────────────────────────
-
-/**
- * The `version` in a Cargo manifest's `[package]` table — never a
- * dependency's `version = "…"` line, which this repository writes as
- * `crate = { version = "…", … }` and never as a bare `version =` key.
- *
- * Stops at the next `[section]`, the same defence
- * `msix-store-build.contract.test.ts`'s `featureTable` uses: without it, a
- * `[dependencies]` table using the long `[dependencies.x]` / `version = "…"`
- * form would be read as the package version.
- */
-export function packageVersion(cargoToml: string): string {
-  const lines = cargoToml.split('\n');
-  const start = lines.findIndex((line) => line.trim() === '[package]');
-  if (start === -1) {
-    throw new Error(`${CARGO_TOML_PATH} has no [package] section.`);
-  }
-  for (const line of lines.slice(start + 1)) {
-    if (/^\s*\[/.test(line)) break;
-    const match = /^\s*version\s*=\s*"([^"]*)"/.exec(line);
-    if (match?.[1] !== undefined) return match[1];
-  }
-  throw new Error(`${CARGO_TOML_PATH} [package] section has no version.`);
-}
-
-/**
- * One version segment: either exactly `0`, or a non-zero digit followed by
- * more digits. A leading zero (`02`) matches neither branch, so it is
- * rejected the same way a pre-release suffix is — semver forbids it, and it
- * is not a shape either `tauri.conf.json` or the Store has ever been asked
- * to accept.
- */
-const VERSION_SEGMENT = String.raw`(0|[1-9]\d*)`;
-const THREE_PART_VERSION = new RegExp(
-  `^${VERSION_SEGMENT}\\.${VERSION_SEGMENT}\\.${VERSION_SEGMENT}$`,
-);
-
-/** MSIX stores each version segment in 16 bits. Store submission fails above this. */
-const MAX_SEGMENT_VALUE = 65535;
-
-/**
- * The manifest `Identity/@Version` a plain app version maps to: the same
- * three numbers, with the Store's reserved fourth segment appended as `0`.
- *
- * Throws on anything that is not exactly `major.minor.patch` with each
- * segment in `0..=65535` and no leading zero — see the docblock above for why
- * silently reformatting a pre-release or an already-four-part value would be
- * worse than refusing it. The same reasoning applies to a segment MSIX cannot
- * represent: truncating or wrapping it would produce a manifest that looks
- * plausible and is rejected at Partner Center.
- */
-export function expectedManifestVersion(appVersion: string): string {
-  const match = THREE_PART_VERSION.exec(appVersion);
-  if (match === null) {
-    throw new Error(
-      `"${appVersion}" is not a plain major.minor.patch version with no leading zeros. A ` +
-        'pre-release suffix or a fourth segment has no unambiguous Store manifest version to ' +
-        'map to.',
-    );
-  }
-  const segments = [match[1], match[2], match[3]] as const;
-  const tooLarge = segments.find((segment) => Number(segment) > MAX_SEGMENT_VALUE);
-  if (tooLarge !== undefined) {
-    throw new Error(
-      `"${appVersion}" has a version segment ("${tooLarge}") greater than ${MAX_SEGMENT_VALUE}, ` +
-        'which MSIX stores in 16 bits and the Microsoft Store rejects at upload.',
-    );
-  }
-  return `${segments[0]}.${segments[1]}.${segments[2]}.0`;
-}
+//
+// `packageVersion` and `expectedManifestVersion` moved to
+// `./appxManifestVersion.ts` (L-169) so the pack-time check in `msix.yml` can
+// share them — one rule, two moments. Their tests stay here.
 
 // ── The premise ─────────────────────────────────────────────────────────────
 
@@ -289,5 +239,158 @@ describe('the detectors bite, and let the honest shapes through', () => {
       '  <Identity Name="real" Version="1.2.3.0" />\n' +
       '</Package>';
     expect(manifestVersion(withPlantedExample)).toBe('1.2.3.0');
+  });
+});
+
+// ── L-169: the Store config fragment is not a second version ─────────────────
+
+describe('the Store config fragment carries no version (L-169)', () => {
+  it('tauri.microsoft-store.conf.json has no top-level "version" key', () => {
+    const parsed = JSON.parse(STORE_CONF) as Record<string, unknown>;
+    expect(
+      Object.hasOwn(parsed, 'version'),
+      `${STORE_CONF_PATH} carries a "version" key. It is merged into ${TAURI_CONF_PATH} for ` +
+        'the Store build, so it would override the app version for the Store flavour only, ' +
+        'and nothing compares that to the manifest.',
+    ).toBe(false);
+  });
+});
+
+// ── L-169: the pack-time check ───────────────────────────────────────────────
+
+const GOOD_MANIFEST = '<Package><Identity Name="x" Publisher="CN=y" Version="0.2.0.0" /></Package>';
+const GOOD_CONF = JSON.stringify({ version: '0.2.0' });
+const GOOD_STORE_CONF = JSON.stringify({ bundle: { createUpdaterArtifacts: false } });
+
+describe('checkStagedManifest (L-169)', () => {
+  it('happy: a staged manifest matching the app version, with a clean fragment, passes', () => {
+    const verdict = checkStagedManifest({
+      manifestXml: GOOD_MANIFEST,
+      tauriConfJson: GOOD_CONF,
+      storeConfJson: GOOD_STORE_CONF,
+    });
+    expect(verdict).toEqual({ ok: true, appVersion: '0.2.0', manifestVersion: '0.2.0.0' });
+  });
+
+  it('negative: a stale staged manifest is refused, naming both versions', () => {
+    const verdict = checkStagedManifest({
+      manifestXml: GOOD_MANIFEST.replace('0.2.0.0', '0.1.0.0'),
+      tauriConfJson: GOOD_CONF,
+      storeConfJson: GOOD_STORE_CONF,
+    });
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) {
+      expect(verdict.problems).toHaveLength(1);
+      expect(verdict.problems[0]).toContain('"0.1.0.0"');
+      expect(verdict.problems[0]).toContain('"0.2.0.0"');
+    }
+  });
+
+  it('negative: a fragment carrying a version is refused even when the manifest matches', () => {
+    const verdict = checkStagedManifest({
+      manifestXml: GOOD_MANIFEST,
+      tauriConfJson: GOOD_CONF,
+      storeConfJson: JSON.stringify({ version: '0.3.0', bundle: {} }),
+    });
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) {
+      expect(verdict.problems.some((problem) => problem.includes('"version" key'))).toBe(true);
+    }
+  });
+
+  it('negative: a manifest with no Identity/@Version is refused, never read as a match', () => {
+    const verdict = checkStagedManifest({
+      manifestXml: '<Package><Identity Name="x" /></Package>',
+      tauriConfJson: GOOD_CONF,
+      storeConfJson: GOOD_STORE_CONF,
+    });
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.problems[0]).toContain('no readable Identity/@Version');
+  });
+
+  it('negative: an app version with no Store mapping (pre-release) is refused, not reformatted', () => {
+    const verdict = checkStagedManifest({
+      manifestXml: GOOD_MANIFEST,
+      tauriConfJson: JSON.stringify({ version: '0.2.0-beta.1' }),
+      storeConfJson: GOOD_STORE_CONF,
+    });
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.problems[0]).toContain('pre-release');
+  });
+
+  it('boundary: unreadable JSON on either side is a refusal that names the file, not a crash', () => {
+    const verdict = checkStagedManifest({
+      manifestXml: GOOD_MANIFEST,
+      tauriConfJson: '{ not json',
+      storeConfJson: '[]',
+    });
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) {
+      expect(verdict.problems.some((problem) => problem.includes(TAURI_CONF_PATH))).toBe(true);
+      expect(verdict.problems.some((problem) => problem.includes(STORE_CONF_PATH))).toBe(true);
+    }
+  });
+
+  it('every problem is reported at once, not just the first', () => {
+    const verdict = checkStagedManifest({
+      manifestXml: GOOD_MANIFEST.replace('0.2.0.0', '0.1.0.0'),
+      tauriConfJson: GOOD_CONF,
+      storeConfJson: JSON.stringify({ version: '9.9.9' }),
+    });
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.problems.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('regression (L-168 C1): a commented-out Identity in the staged manifest is not the one compared', () => {
+    const verdict = checkStagedManifest({
+      manifestXml:
+        '<Package><!-- <Identity Name="x" Version="0.2.0.0" /> -->' +
+        '<Identity Name="real" Version="0.1.0.0" /></Package>',
+      tauriConfJson: GOOD_CONF,
+      storeConfJson: GOOD_STORE_CONF,
+    });
+    expect(verdict.ok).toBe(false);
+  });
+
+  it('the real repository files pass the same check the workflow runs', () => {
+    const verdict = checkStagedManifest({
+      manifestXml: MANIFEST,
+      tauriConfJson: read(TAURI_CONF_PATH),
+      storeConfJson: STORE_CONF,
+    });
+    expect(verdict).toMatchObject({ ok: true });
+  });
+});
+
+// ── L-169: the workflow actually runs it, against the STAGED manifest, before packing ──
+
+describe('msix.yml enforces the check at pack time (L-169)', () => {
+  /** The workflow as the runner sees it: `#` commentary gone, CRLF normalised. */
+  const runnable = MSIX_WORKFLOW.replaceAll('\r\n', '\n').replace(/(^|\s)#.*$/gm, '$1');
+
+  it('the root package.json exposes the check as a script the workflow can call', () => {
+    const scripts = (JSON.parse(ROOT_PACKAGE_JSON) as { scripts: Record<string, string> }).scripts;
+    expect(scripts['check:msix-manifest']).toBe(
+      'node apps/light/src/packaging/checkAppxManifestVersion.ts',
+    );
+  });
+
+  it('runs the check against the staged manifest ($env:MANIFEST_PATH), not the source file', () => {
+    expect(runnable).toMatch(/pnpm check:msix-manifest --manifest "\$env:MANIFEST_PATH"/);
+  });
+
+  it('runs it BEFORE `winapp pack` — a check after packing protects nothing', () => {
+    const check = runnable.indexOf('pnpm check:msix-manifest');
+    const pack = runnable.indexOf('winapp pack');
+    expect(check).toBeGreaterThan(-1);
+    expect(pack).toBeGreaterThan(-1);
+    expect(check).toBeLessThan(pack);
+  });
+
+  it('runs it AFTER the manifest is staged — MANIFEST_PATH must already exist', () => {
+    const staged = runnable.indexOf('MANIFEST_PATH=$manifestPacked');
+    const check = runnable.indexOf('pnpm check:msix-manifest');
+    expect(staged).toBeGreaterThan(-1);
+    expect(staged).toBeLessThan(check);
   });
 });

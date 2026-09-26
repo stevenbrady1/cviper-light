@@ -22,6 +22,7 @@
     "verify:updater-manifest": "node apps/light/src/release/verifyUpdaterManifest.ts",
     "check:l-numbers": "node apps/light/src/numbering/checkLNumbers.ts",
     "assets:msix": "node apps/light/src/packaging/generateMsixAssets.ts",
+    "check:msix-manifest": "node apps/light/src/packaging/checkAppxManifestVersion.ts",
     "build:msix": "pnpm --filter @cviper/light exec tauri build --no-bundle --features microsoft-store --config src-tauri/tauri.microsoft-store.conf.json -- --no-default-features",
     "dev": "pnpm --filter @cviper/light tauri dev",
     "format": "prettier --write .",
