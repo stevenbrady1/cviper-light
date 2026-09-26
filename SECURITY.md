@@ -133,5 +133,5 @@ advert as a suggestion from someone who has just read that advert.
 - Out of scope: the hosted CViper product, which was mothballed in September
   2026 and no longer runs; `apps/cloud`, which is an empty stub; and the
   `cviper.ai` website, which lives in its own repository.
-- No release has been published yet. Fixes land on `main`; once releases
-  exist, only the latest one is supported.
+- Releases exist as of `light-v0.2.0` (2026-09-19). Fixes land on `main`;
+  only the latest release is supported.

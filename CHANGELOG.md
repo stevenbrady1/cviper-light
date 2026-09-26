@@ -6,10 +6,36 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
-The first tagged release is pending (L-117). The tag `light-v0.1.0` exists and
-the release workflow builds and signs installers from it, but no release has
-been published yet. Everything below is built and on `main` today; it is
-listed from the "Built" rows of
+### Added
+
+- Pasting a job advert asks for AI consent right there (L-141): the paste form
+  raises the same consent dialog as the Analysis screen, records the answer in
+  the same store, and runs the pending extraction the moment you say yes.
+  Decline and nothing is sent, with the paste still in the box. Previously the
+  only place consent could be given was the Analysis screen, so a new user's
+  first paste with a cloud key was refused and sent on a detour.
+- The follow-up and interview panels ask for consent themselves the same way
+  (L-171), instead of refusing and pointing at another screen.
+- The Store package's version is asserted at pack time (L-169): packing stops
+  with a clear message if the staged manifest's version disagrees with the app
+  version, rather than shipping a stale one for the Store to reject.
+
+### Fixed
+
+- The Store package's manifest version had stayed at `0.1.0.0` after the app
+  moved to 0.2.0, because nothing tied the two together (L-168). A contract
+  test now compares the manifest against the app version on every commit, and
+  the manifest readers strip XML comments first, so a commented-out example
+  pasted above the real entry can no longer fool every guard at once.
+
+## [0.2.0] — 2026-09-19
+
+The first published release. An earlier tag, `light-v0.1.0` (2026-09-13),
+built installers but its GitHub release was never published — it stayed a
+draft, and its contents are folded into this release. `light-v0.2.0` was
+tagged 2026-09-15 and published 2026-09-19; the Windows installer it built is
+the one the [cviper.ai](https://cviper.ai) download button points at.
+Everything below is listed from the "Built" rows of
 [docs/FEATURE-MATRIX.md](docs/FEATURE-MATRIX.md), which is the per-feature
 source of truth.
 
@@ -105,4 +131,5 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/commits/main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.2.0...main
+[0.2.0]: https://github.com/stevenbrady1/cviper-light/releases/tag/light-v0.2.0
