@@ -16,10 +16,15 @@ and no payment — it is free and MIT-licensed, for anyone, now and later — an
 the tracker, the CV text extraction and the basic keyword match work with no
 internet connection at all.
 
-It is early. There is a version tag, `light-v0.1.0`, and a release workflow
-that builds and signs installers from it, but no release has been published
-yet, so the way to run it today is to build it yourself (below). There are no
-screenshots in this repository either;
+It is early, and it is released. The first published release is
+[`light-v0.2.0`](https://github.com/stevenbrady1/cviper-light/releases/latest)
+(2026-09-19): a Windows installer, also linked from
+[cviper.ai](https://cviper.ai). Windows shows a SmartScreen warning on it
+because the installer carries the project's own updater signature, not a paid
+Authenticode certificate — the Microsoft Store listing, which re-signs the
+package, is the planned fix. On other platforms the way to run it today is to
+build it yourself (below). There are no
+screenshots in this repository;
 [docs/app-store/SCREENSHOTS.md](docs/app-store/SCREENSHOTS.md) says which
 screens get captured and how.
 

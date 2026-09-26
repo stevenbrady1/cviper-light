@@ -11,7 +11,7 @@
 
 # CViper Light — Build Plan
 
-## Status (2026-08-19)
+## Status (2026-08-19, updated 2026-09-26)
 
 **Phases 0 to 3 are built.** The verification loop, the tracker, CV analysis,
 job search, the Ollama path, the updater, onboarding and the release workflows
@@ -273,6 +273,34 @@ constraints L-99 recorded: the listing leads with the keyless features
 (10.8.3), and the publisher display name is the owner's own (10.14). The 10.14
 trade-or-profession tension is carried forward there as an accepted open risk,
 not a cleared one.
+
+### The first release is published (L-172, 2026-09-26)
+
+Human-only task "the first tagged release" is done, with one wrinkle worth
+recording: **`light-v0.2.0`, tagged 2026-09-15 and published 2026-09-19, is
+the first PUBLISHED release.** The earlier `light-v0.1.0` tag (2026-09-13)
+built installers, but its GitHub release stayed an unpublished draft — nobody
+outside the repository ever saw it — and its contents shipped inside 0.2.0.
+[CHANGELOG.md](../CHANGELOG.md) records the release the same way.
+
+Where that leaves the bottom-of-file human-only list: real API keys, the
+public repository and the first release are done. Two things remain, in
+order:
+
+1. **Microsoft Store enrolment and name reservation** (L-99/L-100, then
+   [`STORE-SUBMISSION.md`](STORE-SUBMISSION.md)) — still the recommended next
+   step, because the Store re-signing the MSIX is the free fix for the
+   SmartScreen warning that greets every direct download today.
+2. **Install and open the packed MSIX on a real PC** (L-119, #67) before
+   anything is submitted.
+
+Context outside this repository, recorded because the plan's "second,
+separate product" framing predates it: the hosted CViper was mothballed on
+2026-09-10 (its repo's `docs/MOTHBALL-2026-09.md`) — Light is the live
+product. `https://cviper.ai` is a static holding page served from the
+`cviper-landing` repository; its download button points at this repository's
+latest release, and its `/privacy` page transcribes the policy this app
+generates.
 
 ---
 
