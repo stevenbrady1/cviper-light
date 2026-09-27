@@ -6,24 +6,6 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
-### Changed
-
-- Tracker cards say what the date is for (L-175): the footer reads "Reply by
-  Friday · due in 2 days", "Due today" or "1 day overdue", in the same
-  urgency colours, instead of a bare `2026-09-29`. The status pill is gone from
-  the card, because the column above it already says the status.
-- The funnel strip's labels say it counts flow: Applied and Interviewed, not
-  Sent and Interviewing, so "Interviewed 2" no longer sits above an
-  Interviewing column holding one card as if one of them were wrong.
-- The Tailor screen, with no local model or key, has an Open Settings button
-  beside the reason instead of only the words.
-
-### Fixed
-
-- Opening an application no longer crushes the board: columns keep a minimum
-  width and the board scrolls sideways, where titles used to shrink to
-  "Senior Pr…" and dates spilled past the edge of the card (L-175).
-
 ## [0.3.0] — not yet published
 
 The version the Microsoft Store submission and the next download are built
@@ -43,6 +25,18 @@ from (L-174). The date is set when `light-v0.3.0` is tagged.
   with a clear message if the staged manifest's version disagrees with the app
   version, rather than shipping a stale one for the Store to reject.
 
+### Changed
+
+- Tracker cards say what the date is for (L-175): the footer reads "Reply by
+  Friday · due in 2 days", "Due today" or "1 day overdue", in the same
+  urgency colours, instead of a bare `2026-09-29`. The status pill is gone from
+  the card, because the column above it already says the status.
+- The funnel strip's labels say it counts flow: Applied and Interviewed, not
+  Sent and Interviewing, so "Interviewed 2" no longer sits above an
+  Interviewing column holding one card as if one of them were wrong.
+- The Tailor screen, with no local model or key, has an Open Settings button
+  beside the reason instead of only the words.
+
 ### Fixed
 
 - The Store package's manifest version had stayed at `0.1.0.0` after the app
@@ -50,6 +44,9 @@ from (L-174). The date is set when `light-v0.3.0` is tagged.
   test now compares the manifest against the app version on every commit, and
   the manifest readers strip XML comments first, so a commented-out example
   pasted above the real entry can no longer fool every guard at once.
+- Opening an application no longer crushes the board: columns keep a minimum
+  width and the board scrolls sideways, where titles used to shrink to
+  "Senior Pr…" and dates spilled past the edge of the card (L-175).
 
 ## [0.2.0] — 2026-09-19
 
