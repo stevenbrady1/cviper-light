@@ -70,7 +70,9 @@ describe('FunnelStrip', () => {
     expect(within(strip).getByTestId('tracker-funnel-count-offers').textContent).toBe('1');
     expect(within(strip).getByTestId('tracker-funnel-count-rejected').textContent).toBe('0');
 
-    for (const label of ['Saved', 'Sent', 'Interviewing', 'Offers', 'Rejected']) {
+    // Flow words, not the column words (L-175): "Interviewing 2" above a column
+    // holding one card read as a contradiction.
+    for (const label of ['Saved', 'Applied', 'Interviewed', 'Offers', 'Rejected']) {
       expect(within(strip).getByText(label)).toBeTruthy();
     }
   });
@@ -117,5 +119,23 @@ describe('FunnelStrip', () => {
     const dash = within(screen.getByTestId('tracker-funnel-offer-rate')).getByText('—');
     expect(dash.className).toContain('text-ink-faint');
     expect(dash.className).not.toContain('text-teal');
+  });
+});
+
+describe('the strip says it counts flow, not columns (L-175)', () => {
+  it('explains that each figure counts everything that got that far', () => {
+    render(<FunnelStrip entries={board('applied', 'offer')} />);
+
+    expect(screen.getByTestId('tracker-funnel').getAttribute('title')).toBe(
+      'Every application that got this far, including the ones that moved on',
+    );
+  });
+
+  it('negative: does not use the column word for a cumulative figure', () => {
+    render(<FunnelStrip entries={board('interviewing', 'offer')} />);
+
+    const strip = screen.getByTestId('tracker-funnel');
+    expect(within(strip).queryByText('Interviewing')).toBeNull();
+    expect(within(strip).queryByText('Sent')).toBeNull();
   });
 });

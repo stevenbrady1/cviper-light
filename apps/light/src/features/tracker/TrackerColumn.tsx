@@ -78,7 +78,7 @@ export function TrackerColumn({
         if (applicationId === '') return;
         onDropCard(applicationId, status);
       }}
-      className={`flex min-h-0 min-w-[85vw] flex-1 snap-start flex-col rounded-card md:min-w-0 ${
+      className={`flex min-h-0 min-w-[85vw] flex-1 snap-start flex-col rounded-card md:min-w-44 ${
         over ? 'bg-sunken' : 'bg-transparent'
       }`}
     >

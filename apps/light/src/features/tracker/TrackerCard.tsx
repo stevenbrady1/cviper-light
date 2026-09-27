@@ -1,17 +1,29 @@
 import { daysSinceTimestamp } from '../../lib/dates';
 
-import { NEXT_ACTION_TONES, nextActionDescription, nextActionUrgency } from './nextAction';
-import { STATUS_LABELS, STATUS_PILL_TONES, type TrackerEntry } from './model';
+import {
+  NEXT_ACTION_TONES,
+  nextActionDescription,
+  nextActionLine,
+  nextActionUrgency,
+} from './nextAction';
+import { type TrackerEntry } from './model';
 import { STALENESS_BANDS, stalenessBand, stalenessDescription } from './staleness';
 
 /**
  * One application, as three lines.
  *
- *   title                      Inter 500 — the thing you scan for
- *   company · location         Inter 400, muted — context, not headline
- *   [status pill]  [due date]  the footer: state on the left, deadline on the
- *                              right, the date in mono so a column of them
- *                              lines up
+ *   title                          Inter 500 — the thing you scan for
+ *   company · location             Inter 400, muted — context, not headline
+ *   Reply by Friday · due in 2 days  the next action, when there is one: the
+ *                                  user's words, then how close it is, coloured
+ *                                  by urgency. One line; the words clip with an
+ *                                  ellipsis, the due never does
+ *
+ * No status pill (L-175). The column header already says the status, so a
+ * pill repeating it on every card spent the footer on a fact already on
+ * screen, while the one fact that was NOT — what the date is for — went
+ * unsaid. The footer used to print the raw ISO date; with the detail pane open
+ * it also spilled out of the card's border.
  *
  * ============================================================================
  * THE LEFT EDGE
@@ -46,6 +58,7 @@ export function TrackerCard({ entry, today, now, selected, settling, onSelect }:
   const days = daysSinceTimestamp(application.updated_at, now);
   const band = stalenessBand(days);
   const urgency = nextActionUrgency(application.next_action_date, today);
+  const line = nextActionLine(application.next_action, application.next_action_date, today);
   const dueDescription = nextActionDescription(
     application.next_action,
     application.next_action_date,
@@ -85,23 +98,36 @@ export function TrackerCard({ entry, today, now, selected, settling, onSelect }:
       <p className="truncate font-medium text-ink">{job.title}</p>
       <p className="truncate text-xs text-ink-muted">{where}</p>
 
-      <p className="mt-2 flex items-center justify-between gap-2">
-        <span
-          className={`rounded-pill px-2 py-0.5 text-[11px] font-medium ${STATUS_PILL_TONES[application.status]}`}
+      {line === null || urgency === 'none' ? null : (
+        <p
+          data-testid={`tracker-card-due-${application.id}`}
+          data-urgency={urgency}
+          className="mt-2 flex min-w-0 text-[11px]"
         >
-          {STATUS_LABELS[application.status]}
-        </span>
-
-        {application.next_action_date === null || urgency === 'none' ? null : (
+          {/*
+            Only the user's words shrink. The due holds its width, so a long
+            action can never push "due today" off the card — the first cut of
+            this line clipped the whole thing, and the due was what went.
+          */}
+          {line.action === null ? null : (
+            <>
+              <span
+                data-testid={`tracker-card-due-action-${application.id}`}
+                className="min-w-0 truncate text-ink-muted"
+              >
+                {line.action}
+              </span>
+              <span className="shrink-0 whitespace-pre text-ink-muted"> · </span>
+            </>
+          )}
           <span
-            data-testid={`tracker-card-due-${application.id}`}
-            data-urgency={urgency}
-            className={`shrink-0 text-[11px] ${NEXT_ACTION_TONES[urgency]}`}
+            data-testid={`tracker-card-due-when-${application.id}`}
+            className={`shrink-0 ${NEXT_ACTION_TONES[urgency]}`}
           >
-            {application.next_action_date}
+            {line.when}
           </span>
-        )}
-      </p>
+        </p>
+      )}
     </button>
   );
 }

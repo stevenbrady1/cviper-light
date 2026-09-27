@@ -213,3 +213,15 @@ describe('the status strip on a machine with nothing set up', () => {
     });
   });
 });
+
+describe('Tailor hands "set up a model" back to the shell (L-175)', () => {
+  it('switches to Settings from the Tailor screen', async () => {
+    const user = userEvent.setup();
+    await renderApp();
+
+    await user.click(screen.getByTestId('nav-tailor'));
+    await user.click(await screen.findByTestId('tailor-open-settings'));
+
+    expect(screen.getByTestId('nav-settings').getAttribute('aria-current')).toBe('page');
+  });
+});

@@ -47,6 +47,7 @@ import { lineDiff } from './diff';
 import { buildCoverLetterDocx, buildCvDocx } from './docx';
 import {
   LETTER_WORD_LIMIT,
+  NO_AI_REASON,
   documentTitle,
   exportFileName,
   newDocument,
@@ -136,6 +137,13 @@ export interface TailorProps {
   readonly consentPort?: ConsentPort | undefined;
   /** Injected by tests so stored timestamps are deterministic. */
   readonly now?: Date | undefined;
+  /**
+   * Switch to Settings (L-175). The shell owns which view is showing, so the
+   * "needs a model — set one up in Settings" state hands the request back to
+   * it, the same arrangement as Search and Paste-a-job. Left undefined, no
+   * button is drawn: a button that goes nowhere is worse than none.
+   */
+  readonly onOpenSettings?: (() => void) | undefined;
 }
 
 function consentKindFor(kind: ProviderOption['kind']): ConsentProviderKind | null {
@@ -149,7 +157,14 @@ const FLAG_LABELS: Readonly<Record<FabricationFlag['kind'], string>> = {
   metric: 'Figure not in your CV',
 };
 
-export function Tailor({ port, filePort, createTransport, consentPort, now }: TailorProps = {}) {
+export function Tailor({
+  port,
+  filePort,
+  createTransport,
+  consentPort,
+  now,
+  onOpenSettings,
+}: TailorProps = {}) {
   const tailorPort = useMemo(() => port ?? createDbTailorPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
   const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
@@ -743,6 +758,17 @@ export function Tailor({ port, filePort, createTransport, consentPort, now }: Ta
               {disabledReason}
             </p>
           )}
+
+          {disabledReason === NO_AI_REASON && onOpenSettings !== undefined ? (
+            <button
+              type="button"
+              data-testid="tailor-open-settings"
+              onClick={onOpenSettings}
+              className={SECONDARY_BUTTON}
+            >
+              Open Settings
+            </button>
+          ) : null}
         </div>
 
         {running && selectedOption !== null ? (

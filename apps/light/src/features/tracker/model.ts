@@ -46,23 +46,6 @@ export const STATUS_LABELS: Record<ApplicationStatus, string> = {
 };
 
 /**
- * The status pill's colours.
- *
- * The grammar, applied strictly: teal for the states where something is
- * genuinely happening, red for `rejected` and NOTHING ELSE, plain ink for the
- * rest. `offer` is teal rather than a fifth colour — a good outcome is still
- * "present and moving", and inventing a green-that-is-not-teal for one pill is
- * how a palette starts to grow.
- */
-export const STATUS_PILL_TONES: Record<ApplicationStatus, string> = {
-  saved: 'bg-sunken text-ink-muted',
-  applied: 'bg-sunken text-ink-muted',
-  interviewing: 'bg-teal/10 text-teal',
-  offer: 'bg-teal/10 text-teal',
-  rejected: 'bg-danger/10 text-danger',
-};
-
-/**
  * Pair each application with its job.
  *
  * An application whose job is missing is DROPPED, not rendered with blanks. The

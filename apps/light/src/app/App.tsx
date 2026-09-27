@@ -394,6 +394,9 @@ export default function App({
             filePort,
             createTransport,
             now,
+            // Same arrangement as Search and the tracker (L-175): no model or
+            // key means "set one up in Settings", and the shell does the going.
+            onOpenSettings: () => setActiveView('settings'),
           },
           settings: {
             port: backupPort,

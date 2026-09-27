@@ -107,6 +107,42 @@ describe('the tailor view on a machine with no keys and no local model', () => {
     expect(screen.queryByTestId('tailor-result')).toBeNull();
   });
 
+  it('offers a way to Settings next to the reason, instead of a dead end (L-175)', async () => {
+    const user = userEvent.setup();
+    const openSettings = vi.fn();
+
+    render(
+      <Tailor
+        port={createFakeTailorPort({ cvs: [CV] })}
+        filePort={createFakeFilePort()}
+        consentPort={createFakeConsentPort()}
+        onOpenSettings={openSettings}
+      />,
+    );
+
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('tailor-run-reason').textContent).toBe(NO_AI_REASON),
+    );
+    await user.click(screen.getByTestId('tailor-open-settings'));
+
+    expect(openSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('negative: with nowhere to go, it draws no button rather than one that does nothing', async () => {
+    render(
+      <Tailor
+        port={createFakeTailorPort({ cvs: [CV] })}
+        filePort={createFakeFilePort()}
+        consentPort={createFakeConsentPort()}
+      />,
+    );
+
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('tailor-run-reason').textContent).toBe(NO_AI_REASON),
+    );
+    expect(screen.queryByTestId('tailor-open-settings')).toBeNull();
+  });
+
   it('names no provider on that surface', async () => {
     render(
       <Tailor

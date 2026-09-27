@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { NEXT_ACTION_TONES, nextActionDescription, nextActionUrgency } from './nextAction';
+import {
+  NEXT_ACTION_TONES,
+  nextActionDescription,
+  nextActionLine,
+  nextActionUrgency,
+  nextActionWhen,
+} from './nextAction';
 
 const TODAY = '2026-08-19';
 
@@ -79,5 +85,56 @@ describe('nextActionDescription — the chip is never the only telling', () => {
 
   it('boundary: says nothing at all when there is nothing to say', () => {
     expect(nextActionDescription(null, null, TODAY)).toBeNull();
+  });
+});
+
+describe('nextActionWhen — the due date as a card can say it (L-175)', () => {
+  it('says today and tomorrow in words', () => {
+    expect(nextActionWhen('2026-08-19', TODAY)).toBe('due today');
+    expect(nextActionWhen('2026-08-20', TODAY)).toBe('due tomorrow');
+  });
+
+  it('counts the days ahead', () => {
+    expect(nextActionWhen('2026-08-21', TODAY)).toBe('due in 2 days');
+    expect(nextActionWhen('2026-09-30', TODAY)).toBe('due in 42 days');
+  });
+
+  it('boundary: one day late is singular, more is plural', () => {
+    expect(nextActionWhen('2026-08-18', TODAY)).toBe('1 day overdue');
+    expect(nextActionWhen('2026-08-16', TODAY)).toBe('3 days overdue');
+  });
+
+  it('negative: no date, or one that cannot be read, says nothing', () => {
+    expect(nextActionWhen(null, TODAY)).toBeNull();
+    for (const junk of ['tomorrow', '', '19/08/2026', '2026-13-45']) {
+      expect(nextActionWhen(junk, TODAY), junk).toBeNull();
+    }
+  });
+});
+
+describe('nextActionLine — what the card footer reads (L-175)', () => {
+  it('puts the action first and the due after it', () => {
+    expect(nextActionLine('Reply by Friday', '2026-08-21', TODAY)).toEqual({
+      action: 'Reply by Friday',
+      when: 'due in 2 days',
+    });
+  });
+
+  it('with no action text, the due stands alone, capitalised', () => {
+    expect(nextActionLine(null, '2026-08-19', TODAY)).toEqual({ action: null, when: 'Due today' });
+  });
+
+  it('boundary: whitespace-only action text counts as none', () => {
+    expect(nextActionLine('   ', '2026-08-18', TODAY)).toEqual({
+      action: null,
+      when: '1 day overdue',
+    });
+  });
+
+  it('negative: no readable date means no line at all, even with action text', () => {
+    // An action with no date is a note, not a deadline; the card's job is the
+    // deadline. The note is still in the detail pane.
+    expect(nextActionLine('Chase recruiter', null, TODAY)).toBeNull();
+    expect(nextActionLine('Chase recruiter', 'soon', TODAY)).toBeNull();
   });
 });
