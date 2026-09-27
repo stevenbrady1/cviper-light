@@ -464,9 +464,10 @@ jobs:
       # Missing manifest, unparseable manifest, or a signature made by a key
       # the shipped binaries do not carry -> this exits 1 and the job stops.
       # `--bundle-dir` makes it a real signature verification against the
-      # downloaded installers rather than only a key-id check.
+      # downloaded installers rather than only a key-id check. `--tag` makes
+      # the manifest's version agree with the tag being promoted (L-142).
       - name: Verify the manifest before anything is published
-        run: pnpm verify:updater-manifest promote/latest.json --bundle-dir promote
+        run: pnpm verify:updater-manifest promote/latest.json --bundle-dir promote --tag "$TAG"
 
       # The permanent release the endpoint in tauri.conf.json points at. It is
       # created once and then only ever has its asset replaced. A pre-release

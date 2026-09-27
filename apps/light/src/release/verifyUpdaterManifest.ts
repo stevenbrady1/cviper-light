@@ -4,7 +4,7 @@
  * Usage, from the repository root:
  *
  *     node apps/light/src/release/verifyUpdaterManifest.ts <latest.json> \
- *       [--bundle-dir <directory>] [--config <tauri.conf.json>]
+ *       [--bundle-dir <directory>] [--config <tauri.conf.json>] [--tag <light-vX.Y.Z>]
  *
  * Run in `release.yml` as `pnpm verify:updater-manifest`. The judgement lives
  * in `updaterManifest.ts`, which is pure and unit-tested offline; this file is
@@ -33,6 +33,7 @@ interface Arguments {
   readonly manifestPath: string;
   readonly bundleDirectory: string | null;
   readonly configPath: string;
+  readonly tag: string | null;
 }
 
 /** `apps/light/src-tauri/tauri.conf.json`, relative to this file. */
@@ -42,7 +43,7 @@ function usage(message: string): never {
   console.error(`verify-updater-manifest: ${message}`);
   console.error(
     'usage: node apps/light/src/release/verifyUpdaterManifest.ts <latest.json> ' +
-      '[--bundle-dir <directory>] [--config <tauri.conf.json>]',
+      '[--bundle-dir <directory>] [--config <tauri.conf.json>] [--tag <light-vX.Y.Z>]',
   );
   process.exit(1);
 }
@@ -51,6 +52,7 @@ function parseArguments(argv: readonly string[]): Arguments {
   let manifestPath: string | null = null;
   let bundleDirectory: string | null = null;
   let configPath: string = DEFAULT_CONFIG;
+  let tag: string | null = null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index] ?? '';
@@ -60,6 +62,9 @@ function parseArguments(argv: readonly string[]): Arguments {
     } else if (argument === '--config') {
       index += 1;
       configPath = argv[index] ?? usage('--config needs a path');
+    } else if (argument === '--tag') {
+      index += 1;
+      tag = argv[index] ?? usage('--tag needs the release tag being promoted');
     } else if (argument.startsWith('--')) {
       usage(`unknown option ${argument}`);
     } else if (manifestPath === null) {
@@ -70,7 +75,7 @@ function parseArguments(argv: readonly string[]): Arguments {
   }
 
   if (manifestPath === null) usage('the path to latest.json is required');
-  return { manifestPath, bundleDirectory, configPath };
+  return { manifestPath, bundleDirectory, configPath, tag };
 }
 
 /** The manifest's text, or `null` when the file is not there at all. */
@@ -89,7 +94,7 @@ function readManifest(path: string): string | null {
 }
 
 function main(): void {
-  const { manifestPath, bundleDirectory, configPath } = parseArguments(process.argv.slice(2));
+  const { manifestPath, bundleDirectory, configPath, tag } = parseArguments(process.argv.slice(2));
 
   const config = JSON.parse(readFileSync(configPath, 'utf8')) as {
     plugins?: { updater?: { pubkey?: string } };
@@ -106,6 +111,7 @@ function main(): void {
   const problems = checkUpdaterManifest({
     manifestText,
     pubkeyBase64,
+    ...(tag === null ? {} : { expectedTag: tag }),
     ...(bundleDirectory === null
       ? {}
       : {
@@ -141,7 +147,11 @@ function main(): void {
   const targets = Object.keys(manifest.platforms ?? {}).sort();
 
   console.log(`verify-updater-manifest: ${manifestPath} is good.`);
-  console.log(`  version:   ${manifest.version ?? '(none)'}`);
+  console.log(
+    tag === null
+      ? `  version:   ${manifest.version ?? '(none)'} - NOT compared to a tag; pass --tag`
+      : `  version:   ${manifest.version ?? '(none)'}, matching ${tag}`,
+  );
   console.log(`  key id:    ${publicKey.keyIdHex}`);
   console.log(`  platforms: ${targets.join(', ')}`);
   console.log(

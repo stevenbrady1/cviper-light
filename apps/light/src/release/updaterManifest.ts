@@ -106,7 +106,19 @@ export interface ManifestCheckInput {
    * given none, the strongest check here would otherwise become a no-op.
    */
   readonly bundleFor?: ((fileName: string) => Uint8Array | null) | undefined;
+  /**
+   * The release tag being promoted, e.g. `light-v0.3.0` (L-142).
+   *
+   * When given, the manifest's `version` must equal the tag without its
+   * `light-v` prefix, exactly. The promote job always passes it — a contract
+   * test holds `release.yml` to that — so a `latest.json` announcing one
+   * version under another version's tag fails before anything is published.
+   */
+  readonly expectedTag?: string | undefined;
 }
+
+/** Every release tag this project builds starts with this. */
+const RELEASE_TAG_PREFIX = 'light-v';
 
 /** A key id as minisign prints it: the stored bytes, reversed, upper-case hex. */
 export function displayKeyId(keyId: Uint8Array): string {
@@ -245,7 +257,7 @@ function messageOf(thrown: unknown): string {
  * targets should report both rather than the first.
  */
 export function checkUpdaterManifest(input: ManifestCheckInput): ManifestProblem[] {
-  const { manifestText, pubkeyBase64, bundleFor } = input;
+  const { manifestText, pubkeyBase64, bundleFor, expectedTag } = input;
 
   if (manifestText === null) {
     return [
@@ -297,6 +309,33 @@ export function checkUpdaterManifest(input: ManifestCheckInput): ManifestProblem
         'the manifest carries no version, so the plugin cannot compare it against the running ' +
         'build and every check fails to deserialise the response.',
     });
+  }
+
+  if (expectedTag !== undefined) {
+    const tagIsARelease =
+      expectedTag.startsWith(RELEASE_TAG_PREFIX) && expectedTag.length > RELEASE_TAG_PREFIX.length;
+    if (!tagIsARelease) {
+      problems.push({
+        where: 'promoted tag',
+        found: JSON.stringify(expectedTag),
+        why:
+          `the tag being promoted is not a release tag. Every release this project builds is ` +
+          `tagged ${RELEASE_TAG_PREFIX}<version>, and without one there is nothing to hold the ` +
+          "manifest's version against.",
+      });
+    } else if (
+      typeof record.version === 'string' &&
+      record.version !== expectedTag.slice(RELEASE_TAG_PREFIX.length)
+    ) {
+      problems.push({
+        where: 'latest.json — version',
+        found: JSON.stringify(record.version),
+        why:
+          `the manifest does not name the release being promoted (${expectedTag}). Every ` +
+          'installed copy compares this version against its own to decide whether to update, ' +
+          'so promoting it would announce the wrong release — or none — to all of them.',
+      });
+    }
   }
 
   const platforms =

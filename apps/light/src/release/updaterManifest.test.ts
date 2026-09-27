@@ -330,6 +330,88 @@ describe('a manifest that is not fine', () => {
   });
 });
 
+describe('the promoted tag has to name the manifest (L-142)', () => {
+  // The promote job knows the tag it was asked for; the manifest knows the
+  // version it will announce to every installed copy. Without this, promoting
+  // light-v0.3.0 with a latest.json that still says 0.2.0 passes the gate, and
+  // every install is told about the wrong version.
+  it('passes when the manifest version is the tag without light-v', () => {
+    const key = throwawayMinisignKeypair();
+    const problems = checkUpdaterManifest({
+      manifestText: manifestWith(key.signatureFor(BUNDLE)),
+      pubkeyBase64: key.pubkeyBase64,
+      expectedTag: 'light-v0.2.0',
+    });
+    expect(problems, reasons(problems)).toEqual([]);
+  });
+
+  it('negative: a manifest whose version disagrees with the tag fails, naming both', () => {
+    const key = throwawayMinisignKeypair();
+    const problems = checkUpdaterManifest({
+      manifestText: manifestWith(key.signatureFor(BUNDLE)),
+      pubkeyBase64: key.pubkeyBase64,
+      expectedTag: 'light-v0.3.0',
+    });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.where).toContain('version');
+    expect(problems[0]?.found).toContain('0.2.0');
+    expect(problems[0]?.why).toContain('light-v0.3.0');
+  });
+
+  it('negative: a tag that is not a light-v release tag fails rather than being trusted', () => {
+    const key = throwawayMinisignKeypair();
+    for (const tag of ['0.2.0', 'v0.2.0', 'light-v', ' light-v0.2.0']) {
+      const problems = checkUpdaterManifest({
+        manifestText: manifestWith(key.signatureFor(BUNDLE)),
+        pubkeyBase64: key.pubkeyBase64,
+        expectedTag: tag,
+      });
+      expect(problems, `tag ${JSON.stringify(tag)}`).toHaveLength(1);
+      expect(problems[0]?.where, `tag ${JSON.stringify(tag)}`).toContain('tag');
+    }
+  });
+
+  it('boundary: the comparison is exact — a prefix, a v or whitespace is a mismatch', () => {
+    const key = throwawayMinisignKeypair();
+    const signature = key.signatureFor(BUNDLE);
+    for (const version of ['v0.2.0', '0.2.0 ', '0.2', '0.2.0.0', '0.2.0-beta.1']) {
+      const problems = checkUpdaterManifest({
+        manifestText: JSON.stringify({
+          version,
+          platforms: { 'windows-x86_64': { signature, url: 'https://example.com/installer.exe' } },
+        }),
+        pubkeyBase64: key.pubkeyBase64,
+        expectedTag: 'light-v0.2.0',
+      });
+      expect(problems, `version ${JSON.stringify(version)}`).toHaveLength(1);
+    }
+  });
+
+  it('boundary: with no expected tag the check is not made, so older callers are unchanged', () => {
+    const key = throwawayMinisignKeypair();
+    const problems = checkUpdaterManifest({
+      manifestText: manifestWith(key.signatureFor(BUNDLE)),
+      pubkeyBase64: key.pubkeyBase64,
+    });
+    expect(problems, reasons(problems)).toEqual([]);
+  });
+
+  it('release.yml hands the promoted tag to every verifier run', () => {
+    // The optional input above is only a gate if the workflow uses it. Read
+    // the workflow as the runner sees it (comments gone) and require --tag on
+    // every line that runs the verifier; the floor stops "every line among
+    // zero lines" from passing.
+    const workflow = readFileSync(join(REPO_ROOT, '.github/workflows/release.yml'), 'utf8')
+      .replaceAll('\r\n', '\n')
+      .replace(/(^|\s)#.*$/gm, '$1');
+    const runs = workflow.split('\n').filter((line) => line.includes('verify:updater-manifest'));
+    expect(runs.length).toBeGreaterThan(0);
+    for (const line of runs) {
+      expect(line, 'the verifier run must pass the promoted tag').toMatch(/--tag "\$TAG"/);
+    }
+  });
+});
+
 describe('the public-key decoder', () => {
   it('negative: refuses a key of the wrong length', () => {
     const document = `untrusted comment: bad\n${Buffer.from('too short').toString('base64')}\n`;
