@@ -10,7 +10,6 @@ import {
   MAX_FIELD_LENGTH,
   MAX_URL_LENGTH,
   STATUS_LABELS,
-  STATUS_PILL_TONES,
   TRACKER_COLUMNS,
   validateDraft,
   withEdit,
@@ -80,17 +79,10 @@ describe('the five columns', () => {
     expect(TRACKER_COLUMNS).toEqual(['saved', 'applied', 'interviewing', 'offer', 'rejected']);
   });
 
-  it('gives every column a label and a pill tone', () => {
+  it('gives every column a label', () => {
     for (const status of TRACKER_COLUMNS) {
       expect(STATUS_LABELS[status].length).toBeGreaterThan(0);
-      expect(STATUS_PILL_TONES[status].length).toBeGreaterThan(0);
     }
-  });
-
-  it('uses red for rejected and for nothing else', () => {
-    // The colour grammar has exactly one status allowed to be red.
-    const red = TRACKER_COLUMNS.filter((status) => STATUS_PILL_TONES[status].includes('danger'));
-    expect(red).toEqual(['rejected']);
   });
 });
 

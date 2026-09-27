@@ -308,6 +308,42 @@ describe('the next action chip', () => {
     expect(screen.getByTestId('tracker-card-due-today').dataset['urgency']).toBe('soon');
   });
 
+  it('reads as words: the action, then when it is due — never a bare ISO date (L-175)', async () => {
+    await renderBoard([
+      entry('soon', { next_action: 'Reply by Friday', next_action_date: '2026-08-21' }),
+      entry('bare', { next_action: null, next_action_date: '2026-08-18' }),
+    ]);
+
+    expect(screen.getByTestId('tracker-card-due-soon').textContent).toBe(
+      'Reply by Friday · due in 2 days',
+    );
+    expect(screen.getByTestId('tracker-card-due-bare').textContent).toBe('1 day overdue');
+    for (const id of ['soon', 'bare']) {
+      expect(screen.getByTestId(`tracker-card-${id}`).textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    }
+  });
+
+  it('boundary: a long action is the part that clips — the due never does', async () => {
+    await renderBoard([
+      entry('long', {
+        next_action: 'Send the portfolio link and the two references they asked for',
+        next_action_date: '2026-08-19',
+      }),
+    ]);
+
+    // jsdom cannot measure, so pin the classes. The first cut clipped the whole
+    // line, and on a real card "due today" — the part that matters — was the
+    // bit that vanished. Now only the action shrinks; the due holds its width.
+    const line = screen.getByTestId('tracker-card-due-long');
+    expect(line.className).toContain('min-w-0');
+    const action = within(line).getByTestId('tracker-card-due-action-long');
+    const when = within(line).getByTestId('tracker-card-due-when-long');
+    expect(action.className).toContain('truncate');
+    expect(when.className).toContain('shrink-0');
+    expect(when.className).not.toContain('truncate');
+    expect(when.textContent).toBe('due today');
+  });
+
   it('shows no chip at all when there is no next action', async () => {
     await renderBoard([entry('a')]);
 
@@ -677,4 +713,28 @@ describe('the funnel strip', () => {
 
 beforeEach(() => {
   vi.useRealTimers();
+});
+
+describe('the card and the board at a narrow width (L-175)', () => {
+  it('does not repeat the column name as a pill on every card', async () => {
+    await renderBoard([entry('a', { status: 'saved' }), entry('b', { status: 'applied' })]);
+
+    // The column header already says "Saved"; the card has better uses for
+    // the space.
+    expect(within(screen.getByTestId('tracker-card-a')).queryByText('Saved')).toBeNull();
+    expect(within(screen.getByTestId('tracker-card-b')).queryByText('Applied')).toBeNull();
+  });
+
+  it('keeps columns a readable width and lets the board scroll rather than crush', async () => {
+    await renderBoard([entry('a')]);
+
+    // With the 380px detail pane open, five columns shared ~630px and titles
+    // shrank to "Senior Pr…". A floor on the column plus sideways scroll on
+    // desktop is the fix; jsdom cannot measure, so the classes are the pin.
+    const column = screen.getByTestId('tracker-column-saved');
+    expect(column.className).toContain('md:min-w-44');
+    expect(column.className).not.toContain('md:min-w-0');
+    expect(column.parentElement?.className).toContain('overflow-x-auto');
+    expect(column.parentElement?.className).not.toContain('md:overflow-x-visible');
+  });
 });

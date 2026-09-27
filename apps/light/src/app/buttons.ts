@@ -17,7 +17,8 @@
  * A control that comes and goes is a control the user cannot learn.
  *
  * `destructive` is red, and red appears in exactly two places in the whole app:
- * here, and the `rejected` status pill.
+ * here, and an overdue next action on a tracker card (the `rejected` status
+ * pill that used to be the other one left the card in L-175).
  */
 
 // `min-h-11` below `md`: 44px is the smallest thing a thumb reliably hits,

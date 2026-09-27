@@ -364,11 +364,14 @@ export function Tracker({
             /*
              * Phone: the columns are wider than the screen and scroll sideways,
              * one column snapping into view at a time — the same board, read a
-             * column at a time. Desktop: all of them, side by side, as before.
+             * column at a time. Desktop: all of them, side by side, each at
+             * least 11rem wide (L-175). With the 380px detail pane open the
+             * five used to share ~630px and every title shrank to "Senior
+             * Pr…"; now the board scrolls sideways instead of crushing.
              */
             <div
               data-testid="tracker-board"
-              className="flex h-full min-h-0 snap-x snap-mandatory gap-2 overflow-x-auto md:snap-none md:overflow-x-visible"
+              className="flex h-full min-h-0 snap-x snap-mandatory gap-2 overflow-x-auto md:snap-none"
             >
               {TRACKER_COLUMNS.map((status) => (
                 <TrackerColumn

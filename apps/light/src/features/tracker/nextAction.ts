@@ -25,8 +25,8 @@
  * ============================================================================
  *   later    no colour. It is a date, not a problem
  *   soon     gold, within three days. Gold means "needs you"
- *   overdue  red. This is one of only two places red appears on a card, the
- *            other being the `rejected` status pill
+ *   overdue  red. The only red on a card since the `rejected` status pill
+ *            left it (L-175)
  *
  * Every chip is mono and `tabular-nums`, so a column of dates lines up on the
  * digit rather than shuffling about.
@@ -100,4 +100,45 @@ export function nextActionDescription(
   return nextAction === null || nextAction.trim() === ''
     ? `Next action ${when}`
     : `Next action: ${nextAction} — ${when}`;
+}
+
+/**
+ * The due date as a card footer says it (L-175): "due today", "due in 2 days",
+ * "1 day overdue". `null` when there is no date or it cannot be read — the
+ * same rule as `nextActionUrgency`, so a line never appears without a colour
+ * to match it, or the other way round.
+ *
+ * The card used to print the raw ISO date. A column of `2026-09-29`s lines up
+ * beautifully and tells nobody what the date is FOR, or how close it is.
+ */
+export function nextActionWhen(nextActionDate: IsoDate | null, today: IsoDate): string | null {
+  if (nextActionDate === null) return null;
+  const days = daysBetweenDates(today, nextActionDate);
+  if (days === null) return null;
+
+  if (days < 0) return `${Math.abs(days)} ${days === -1 ? 'day' : 'days'} overdue`;
+  if (days === 0) return 'due today';
+  if (days === 1) return 'due tomorrow';
+  return `due in ${days} days`;
+}
+
+/**
+ * What the card footer reads: the user's own words for the action, then when.
+ *
+ * With no action text the due stands alone and starts with a capital, because
+ * it is then the start of the line. An action with no readable date is `null`:
+ * it is a note, not a deadline, and it is still in the detail pane.
+ */
+export function nextActionLine(
+  nextAction: string | null,
+  nextActionDate: IsoDate | null,
+  today: IsoDate,
+): { readonly action: string | null; readonly when: string } | null {
+  const when = nextActionWhen(nextActionDate, today);
+  if (when === null) return null;
+
+  const action = nextAction === null || nextAction.trim() === '' ? null : nextAction.trim();
+  return action === null
+    ? { action: null, when: when.charAt(0).toUpperCase() + when.slice(1) }
+    : { action, when };
 }
