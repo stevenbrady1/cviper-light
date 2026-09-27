@@ -129,7 +129,8 @@ decides everything after that.
 4. **Promote the manifest.** Actions → Release → _Run workflow_, with
    `promote_tag` set to the tag you just published. **This is the moment
    existing installs begin to see the new version.** Nothing before this step
-   changes what the updater serves.
+   changes what the updater serves. The gate compares the manifest's `version`
+   to `promote_tag` and stops if they differ (L-142).
 
 Only two of those four steps start the workflow at all: **step 1 (pushing a
 `light-v*` tag)** and **step 4 (dispatching it with `promote_tag` set)**. Steps
@@ -152,7 +153,8 @@ A manual copy has none of the properties that matter here:
   made by a key the shipped binaries do not trust all fail the run _before_
   anything is uploaded — `pnpm verify:updater-manifest`, run with
   `--bundle-dir` so the signatures are checked against the real downloaded
-  installers rather than by key id alone.
+  installers rather than by key id alone, and with `--tag` so a manifest whose
+  `version` is not the promoted tag without `light-v` fails too (L-142).
 - **It leaves no record.** A workflow run says what was promoted, from which
   tag, and who pressed it.
 - **It can go wrong quietly** — the wrong file, or a forgotten `--clobber` that
