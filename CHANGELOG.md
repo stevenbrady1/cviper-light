@@ -6,6 +6,11 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] — not yet published
+
+The version the Microsoft Store submission and the next download are built
+from (L-174). The date is set when `light-v0.3.0` is tagged.
+
 ### Added
 
 - Pasting a job advert asks for AI consent right there (L-141): the paste form
@@ -131,5 +136,6 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.2.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.3.0...main
+[0.3.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.2.0...light-v0.3.0
 [0.2.0]: https://github.com/stevenbrady1/cviper-light/releases/tag/light-v0.2.0
