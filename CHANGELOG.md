@@ -6,6 +6,22 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Four more bring-your-own-key AI providers: Google Gemini, Mistral, xAI Grok
+  and OpenRouter, each with its own key card (tested before it is saved), its
+  own consent dialog, and its own entry in the generated privacy policy. All
+  four speak the OpenAI chat-completions dialect, so one adapter serves them;
+  OpenRouter's key is tested against its key endpoint because its model list
+  is public (L-177).
+
+### Changed
+
+- Settings leads with the AI provider keys. The free Adzuna and Reed keys move
+  into an Advanced section that starts closed (L-176).
+- The key box hint no longer says every key has a prefix; some providers'
+  keys do not (L-177).
+
 ## [0.3.0] — not yet published
 
 The version the Microsoft Store submission and the next download are built

@@ -280,6 +280,10 @@ const PROVIDER_LABELS: Readonly<Record<string, string>> = {
   ollama: 'Ollama',
   anthropic: 'Anthropic',
   openai: 'OpenAI',
+  google: 'Google Gemini',
+  mistral: 'Mistral',
+  grok: 'xAI Grok',
+  openrouter: 'OpenRouter',
 };
 
 export function providerLabel(provider: string): string {

@@ -254,12 +254,19 @@ describe('providerLabel', () => {
     expect(providerLabel('ollama')).toBe('Ollama');
     expect(providerLabel('anthropic')).toBe('Anthropic');
     expect(providerLabel('openai')).toBe('OpenAI');
+    // L-177.
+    expect(providerLabel('google')).toBe('Google Gemini');
+    expect(providerLabel('mistral')).toBe('Mistral');
+    expect(providerLabel('grok')).toBe('xAI Grok');
+    expect(providerLabel('openrouter')).toBe('OpenRouter');
   });
 
   it('falls back to whatever was stored, for a row written by a later version', () => {
     // Analyses survive in the database and in export files. A provider this
     // build has never heard of must render as itself, not as "Unknown".
-    expect(providerLabel('mistral')).toBe('mistral');
+    // The example was 'mistral' until L-177 made Mistral a real provider; the
+    // premise needs a name this build still has never heard of.
+    expect(providerLabel('cohere')).toBe('cohere');
   });
 });
 

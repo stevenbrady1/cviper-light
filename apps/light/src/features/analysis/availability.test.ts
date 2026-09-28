@@ -37,6 +37,14 @@ beforeEach(() => {
   tauri.invoke.mockReset();
 });
 
+/** L-177's four flags, all "no key" — `readAvailability` always reports them. */
+const NO_NEW_CLOUD_KEYS = {
+  googleKey: false,
+  mistralKey: false,
+  grokKey: false,
+  openrouterKey: false,
+} as const;
+
 /** Nothing is set up. The state every user starts in. */
 function nothingConfigured(): void {
   tauri.invoke.mockImplementation(async (command) => {
@@ -55,6 +63,7 @@ describe('readAvailability', () => {
       ollamaModels: [],
       anthropicKey: false,
       openaiKey: false,
+      ...NO_NEW_CLOUD_KEYS,
     });
   });
 
@@ -85,7 +94,41 @@ describe('readAvailability', () => {
       ollamaModels: [],
       anthropicKey: true,
       openaiKey: false,
+      ...NO_NEW_CLOUD_KEYS,
     });
+  });
+
+  it('reads each of the four keys L-177 added from its own credential slot', async () => {
+    const saved = new Set(['google_api_key', 'openrouter_api_key']);
+    const asked: unknown[] = [];
+    tauri.invoke.mockImplementation(async (command, args) => {
+      if (command === 'ollama_probe') return null;
+      if (command === 'secret_status') {
+        asked.push(args?.['key']);
+        return saved.has(String(args?.['key']));
+      }
+      throw new Error(`unexpected command: ${command}`);
+    });
+
+    await expect(readAvailability()).resolves.toEqual({
+      ollamaRunning: false,
+      ollamaModels: [],
+      anthropicKey: false,
+      openaiKey: false,
+      googleKey: true,
+      mistralKey: false,
+      grokKey: false,
+      openrouterKey: true,
+    });
+    // Six slots, each asked once, and never a name the Rust enum would refuse.
+    expect([...asked].sort()).toEqual([
+      'anthropic_api_key',
+      'google_api_key',
+      'grok_api_key',
+      'mistral_api_key',
+      'openai_api_key',
+      'openrouter_api_key',
+    ]);
   });
 
   it('negative: a credential store that will not answer offers nothing', async () => {
@@ -101,6 +144,7 @@ describe('readAvailability', () => {
       ollamaModels: [],
       anthropicKey: false,
       openaiKey: false,
+      ...NO_NEW_CLOUD_KEYS,
     });
   });
 
@@ -119,6 +163,7 @@ describe('readAvailability', () => {
       ollamaModels: [],
       anthropicKey: false,
       openaiKey: false,
+      ...NO_NEW_CLOUD_KEYS,
     });
   });
 

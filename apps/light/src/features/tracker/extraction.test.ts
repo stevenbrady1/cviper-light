@@ -137,12 +137,14 @@ describe('extractionProgressNote — silence reads as a crash', () => {
     // to two cloud kinds today, so a hypothetical third is asserted past the
     // type checker here — `providerLabel` itself is typed for exactly this,
     // falling back to the raw string for a kind it has never heard of either.
+    // (L-177 made Mistral a real kind, so the unheard-of example is now one
+    // this build still does not know.)
     const note = extractionProgressNote({
       ...local,
-      kind: 'mistral',
+      kind: 'cohere',
       local: false,
     } as unknown as ProviderOption);
-    expect(note).toContain('mistral');
+    expect(note).toContain('cohere');
     expect(note).not.toContain('OpenAI');
   });
 });

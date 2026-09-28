@@ -8,7 +8,17 @@
  */
 import { type Result } from '@cviper/core-types';
 
-export type ProviderId = 'anthropic' | 'openai' | 'ollama';
+export type ProviderId =
+  | 'anthropic'
+  | 'openai'
+  | 'ollama'
+  // L-177: four more bring-your-own-key clouds. All four speak the OpenAI
+  // chat-completions dialect, so `providers/chat-completions.ts` serves them
+  // with one adapter; the hosts and headers live in `providers.rs`.
+  | 'google'
+  | 'mistral'
+  | 'grok'
+  | 'openrouter';
 
 /** One model a provider will accept in `ChatJsonRequest.model`. */
 export interface ModelInfo {

@@ -25,12 +25,20 @@
  * always explains itself — see `model.ts`. A control the user is looking for
  * must not move; a control they have no use for should not exist.
  */
-import { ANTHROPIC_DEFAULT_MODEL, type ModelInfo } from '@cviper/ai-providers';
+import {
+  ANTHROPIC_DEFAULT_MODEL,
+  GOOGLE_DEFAULT_MODEL,
+  GROK_DEFAULT_MODEL,
+  MISTRAL_DEFAULT_MODEL,
+  OPENROUTER_DEFAULT_MODEL,
+  type ModelInfo,
+} from '@cviper/ai-providers';
 
 import { AI_KEY_PROVIDER_IDS } from '../settings/keys/aiKeyProviders';
 
 /** Which family an option belongs to. */
-export type ProviderKind = 'keyword' | 'ollama' | 'anthropic' | 'openai';
+export type ProviderKind =
+  'keyword' | 'ollama' | 'anthropic' | 'openai' | 'google' | 'mistral' | 'grok' | 'openrouter';
 
 /** The key of the always-available option. */
 export const KEYWORD_KEY = 'keyword';
@@ -87,6 +95,18 @@ export interface Availability {
   readonly ollamaModels: readonly ModelInfo[];
   readonly anthropicKey: boolean;
   readonly openaiKey: boolean;
+  /*
+   * L-177: four more clouds. OPTIONAL, and read as "no key" when absent —
+   * fail-closed, the same way `readAvailability` treats a store that will not
+   * answer. Every screen that builds an `Availability` by hand before the
+   * probe returns (the welcome cards, the analysis view's first render) is
+   * describing "nothing set up yet", and absence says exactly that.
+   * `readAvailability` itself always fills all six.
+   */
+  readonly googleKey?: boolean;
+  readonly mistralKey?: boolean;
+  readonly grokKey?: boolean;
+  readonly openrouterKey?: boolean;
 }
 
 /**
@@ -199,8 +219,67 @@ export function providerOptions(availability: Availability): ProviderOption[] {
     });
   }
 
+  // L-177: the four chat-completions clouds, under the identical rule and in
+  // the order their cards render. Same note shape as the two above — each
+  // names who receives the CV, and OpenRouter's names who it passes it on to.
+  for (const cloud of MORE_CLOUDS) {
+    if (availability[cloud.flag] === true && canBeSetUp(cloud.kind)) {
+      options.push({
+        key: cloud.kind,
+        kind: cloud.kind,
+        label: `${cloud.label} · ${cloud.model}`,
+        note: cloud.note,
+        model: cloud.model,
+        local: false,
+        needsKey: true,
+      });
+    }
+  }
+
   return options;
 }
+
+/** One of the clouds L-177 added: which flag gates it, and what it says. */
+interface MoreCloud {
+  readonly kind: 'google' | 'mistral' | 'grok' | 'openrouter';
+  readonly flag: 'googleKey' | 'mistralKey' | 'grokKey' | 'openrouterKey';
+  readonly label: string;
+  readonly model: string;
+  readonly note: string;
+}
+
+const MORE_CLOUDS: readonly MoreCloud[] = [
+  {
+    kind: 'google',
+    flag: 'googleKey',
+    label: 'Google Gemini',
+    model: GOOGLE_DEFAULT_MODEL,
+    note: 'A full reading. Your CV and the advert are sent to Google.',
+  },
+  {
+    kind: 'mistral',
+    flag: 'mistralKey',
+    label: 'Mistral',
+    model: MISTRAL_DEFAULT_MODEL,
+    note: 'A full reading. Your CV and the advert are sent to Mistral.',
+  },
+  {
+    kind: 'grok',
+    flag: 'grokKey',
+    label: 'xAI Grok',
+    model: GROK_DEFAULT_MODEL,
+    note: 'A full reading. Your CV and the advert are sent to xAI.',
+  },
+  {
+    kind: 'openrouter',
+    flag: 'openrouterKey',
+    label: 'OpenRouter',
+    model: OPENROUTER_DEFAULT_MODEL,
+    note:
+      'A full reading. Your CV and the advert are sent to OpenRouter, which passes them to ' +
+      'the company that runs the model.',
+  },
+];
 
 /**
  * What the picker starts on.

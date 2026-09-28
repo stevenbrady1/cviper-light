@@ -9,13 +9,13 @@ delete the other before pasting.
 > Do not paste this copy there: Microsoft's policy 10.8.3 constrains what a
 > free individual account's listing may lead with, and Apple's does not.
 
-> **Two AI providers, both bring-your-own-key.** Since L-149 Settings can set up
-> either an OpenAI or an Anthropic key (before that, L-102 restricted this to
-> OpenAI alone — an Anthropic key could only be read out of the OS credential
-> store if an older build had written one, and no screen could save a fresh
-> one). The analysis screen offers whichever key is saved, or a local model
-> through Ollama. Nothing supplies a key on your behalf, and nothing reaches
-> either provider until you choose it.
+> **Six AI providers, all bring-your-own-key.** Since L-177 Settings can set up
+> a key for OpenAI, Anthropic, Google Gemini, Mistral, xAI Grok or OpenRouter
+> (L-149 added Anthropic to OpenAI; before that, L-102 restricted this to OpenAI
+> alone). The analysis screen offers whichever keys are saved, or a local model
+> through Ollama. Nothing supplies a key on your behalf, and nothing reaches any
+> provider until you choose it and agree to the per-provider consent dialog.
+> OpenRouter forwards the request to the company that runs the chosen model.
 
 ## App Information
 
@@ -131,7 +131,7 @@ them.)
 > The basic match runs on the device with no key.
 >
 > The app can optionally use an AI provider. That requires the user's OWN key
-> for an AI provider of their choice (today OpenAI or Anthropic); the key is
+> for an AI provider of their choice (today OpenAI, Anthropic, Google Gemini, Mistral, xAI Grok or OpenRouter); the key is
 > stored in the Keychain and the request is made from the device to that
 > provider under the user's own account. We do not supply a key, we do not
 > proxy the request and we receive nothing. No key is needed to review any
