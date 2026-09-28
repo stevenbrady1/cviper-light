@@ -554,3 +554,50 @@ function emptyBackup(): string {
     analyses: [],
   });
 }
+
+describe('layout (L-176): the AI keys lead, the job-board keys are an advanced step', () => {
+  it('the AI provider keys come before everything else on the page', () => {
+    renderSettings();
+
+    const aiKeys = screen.getByTestId('ai-key-setup');
+    const yourData = screen.getByRole('heading', { name: 'Your data' });
+    // `compareDocumentPosition` reads document order, which is what a person
+    // scrolling the page reads. A `toBeInTheDocument` on both would pass with
+    // the sections in either order.
+    expect(aiKeys.compareDocumentPosition(yourData) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it('the Adzuna and Reed key cards sit inside an Advanced section that starts closed', () => {
+    renderSettings();
+
+    const advanced = screen.getByTestId('settings-advanced') as HTMLDetailsElement;
+    expect(advanced.tagName).toBe('DETAILS');
+    // Closed by default: the cards are still in the tree (a screen reader can
+    // find them once the section is opened), just folded away.
+    expect(advanced.open).toBe(false);
+
+    const jobKeys = screen.getByTestId('key-setup');
+    expect(advanced.contains(jobKeys)).toBe(true);
+  });
+
+  it('opening Advanced reveals the job-board key cards, with both boards named', async () => {
+    const { user } = renderSettings();
+
+    await user.click(screen.getByText('Advanced'));
+
+    const advanced = screen.getByTestId('settings-advanced') as HTMLDetailsElement;
+    expect(advanced.open).toBe(true);
+    const jobKeys = screen.getByTestId('key-setup');
+    expect(jobKeys.textContent).toContain('Adzuna');
+    expect(jobKeys.textContent).toContain('Reed');
+  });
+
+  it('negative: the AI keys are never behind the Advanced fold', () => {
+    renderSettings();
+
+    const advanced = screen.getByTestId('settings-advanced');
+    expect(advanced.contains(screen.getByTestId('ai-key-setup'))).toBe(false);
+  });
+});

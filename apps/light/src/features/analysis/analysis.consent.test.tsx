@@ -29,6 +29,7 @@ const { Analysis } = await import('./Analysis');
 const { createFakeAnalysisPort } = await import('./test/fakePort');
 const { createFakeFilePort } = await import('../../platform/test/fakeFilePort');
 const { createFakeConsentPort } = await import('./test/fakeConsentPort');
+const { NO_CONSENT } = await import('./consent');
 
 const NOW = new Date('2026-08-19T09:00:00.000Z');
 
@@ -147,7 +148,7 @@ describe('choosing a cloud provider for the first time', () => {
     await user.click(screen.getByTestId('analysis-consent-accept'));
 
     await screen.findByTestId('analysis-result');
-    expect(consentPort.state()).toEqual({ anthropic: false, openai: true });
+    expect(consentPort.state()).toEqual({ ...NO_CONSENT, openai: true });
     await vi.waitFor(() => expect(port.storedAnalyses()).toHaveLength(1));
     expect(port.storedAnalyses()[0]?.provider).toBe('openai');
   });
@@ -164,7 +165,7 @@ describe('choosing a cloud provider for the first time', () => {
 
     expect(screen.queryByTestId('analysis-consent-gate')).toBeNull();
     expect(screen.queryByTestId('analysis-result')).toBeNull();
-    expect(consentPort.state()).toEqual({ anthropic: false, openai: false });
+    expect(consentPort.state()).toEqual(NO_CONSENT);
     expect(port.storedAnalyses()).toEqual([]);
 
     // The app is still usable: the deterministic basic match still works.

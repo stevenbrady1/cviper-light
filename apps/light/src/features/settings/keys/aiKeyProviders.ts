@@ -52,4 +52,10 @@ import type { AiKeyProviderId } from './aiKeyModel';
 export const AI_KEY_PROVIDER_IDS = [
   'openai',
   'anthropic',
+  // L-177: the order the cards render in, and the order the pickers list
+  // the clouds in — the two most-used first, then the rest alphabetically.
+  'google',
+  'mistral',
+  'grok',
+  'openrouter',
 ] as const satisfies readonly AiKeyProviderId[];

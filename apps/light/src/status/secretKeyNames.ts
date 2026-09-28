@@ -1,5 +1,5 @@
 /**
- * The two AI-provider credential names, spelled exactly as the `SecretKey`
+ * The AI-provider credential names, spelled exactly as the `SecretKey`
  * enum serialises them in `src-tauri/src/secrets.rs`.
  *
  * ============================================================================
@@ -25,3 +25,8 @@
  */
 export const OPENAI_SECRET_KEY = 'openai_api_key';
 export const ANTHROPIC_SECRET_KEY = 'anthropic_api_key';
+// L-177: four more, spelled exactly as `SecretKey` serialises them.
+export const GOOGLE_SECRET_KEY = 'google_api_key';
+export const MISTRAL_SECRET_KEY = 'mistral_api_key';
+export const GROK_SECRET_KEY = 'grok_api_key';
+export const OPENROUTER_SECRET_KEY = 'openrouter_api_key';

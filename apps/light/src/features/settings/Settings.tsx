@@ -301,6 +301,14 @@ export function Settings({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
         <div className="max-w-2xl space-y-6">
+          {/*
+            First, because it is what most people open Settings for (L-176).
+            The job-board keys used to lead; they are the advanced step now,
+            folded away below Job boards, and the AI keys take the top slot
+            the way the hosted product's settings page orders them.
+          */}
+          <AiKeySetup ports={aiKeyPorts} browser={browserPort} />
+
           <section>
             <h2 className="font-medium text-ink">Your data</h2>
             <p className="mt-1 text-ink-muted">
@@ -393,17 +401,28 @@ export function Settings({
             </div>
           ) : null}
 
-          <KeySetup port={keyPort} browser={browserPort} />
+          <BoardSettings port={boardsPort} />
 
           {/*
-            The AI key, in its own section rather than as a third entry in the
-            list above. That list is typed to `JobProviderId` all the way down
-            and tests its keys with `job_test_credentials`, a command that
-            REFUSES an AI credential by design — see the note in `aiKeyModel.ts`.
-          */}
-          <AiKeySetup ports={aiKeyPorts} browser={browserPort} />
+            The job-board keys, behind a fold (L-176). Both are optional and
+            both are free, but they are the one part of Settings that asks for
+            two registrations on two other sites, so they read as an advanced
+            step rather than the first thing on the page. A native <details>
+            rather than component state: it needs no JavaScript to open, the
+            cards stay in the tree for a screen reader, and nothing here has to
+            remember whether it was open.
 
-          <BoardSettings port={boardsPort} />
+            Kept as its own list rather than merged into the AI cards above:
+            that list is typed to `JobProviderId` all the way down and tests
+            its keys with `job_test_credentials`, a command that REFUSES an AI
+            credential by design — see the note in `aiKeyModel.ts`.
+          */}
+          <details data-testid="settings-advanced" className="group">
+            <summary className="cursor-pointer font-medium text-ink">Advanced</summary>
+            <div className="mt-4">
+              <KeySetup port={keyPort} browser={browserPort} />
+            </div>
+          </details>
 
           {/*
             Three cases, one rule: the manual check is offered only where the

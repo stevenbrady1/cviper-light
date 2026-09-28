@@ -55,10 +55,23 @@ export type ConsentProviderKind = Exclude<ProviderId, 'ollama'>;
 export interface ConsentState {
   readonly anthropic: boolean;
   readonly openai: boolean;
+  // L-177. One flag per provider, never one flag for "AI": saying yes to one
+  // company is not saying yes to another.
+  readonly google: boolean;
+  readonly mistral: boolean;
+  readonly grok: boolean;
+  readonly openrouter: boolean;
 }
 
 /** The state of a machine that has never been asked. */
-export const NO_CONSENT: ConsentState = { anthropic: false, openai: false };
+export const NO_CONSENT: ConsentState = {
+  anthropic: false,
+  openai: false,
+  google: false,
+  mistral: false,
+  grok: false,
+  openrouter: false,
+};
 
 /** The file, in the app's own data directory. Exported so tests name the real one. */
 export const CONSENT_STORE_FILE = 'ai-provider-consent.json';
@@ -91,6 +104,12 @@ export function parseConsentState(raw: unknown): ConsentState {
   return {
     anthropic: record['anthropic'] === true,
     openai: record['openai'] === true,
+    // A file written before L-177 has no entry for these, and absent is
+    // "not granted" by the same fail-closed rule as a non-boolean.
+    google: record['google'] === true,
+    mistral: record['mistral'] === true,
+    grok: record['grok'] === true,
+    openrouter: record['openrouter'] === true,
   };
 }
 

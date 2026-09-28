@@ -88,6 +88,38 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     // 'anthropic', and this is that moment.
     why: 'A CV analysis, or a pasted job advert, that you start, sent with your own Anthropic key under your own Anthropic account.',
   },
+  // L-177: four more clouds a user can bring their own key for. Same shape
+  // of sentence as OpenAI's and Anthropic's above: who starts it, and whose
+  // key and account it travels under.
+  {
+    host: 'generativelanguage.googleapis.com',
+    purpose: 'fetched-with-your-key',
+    why: 'A CV analysis, or a pasted job advert, that you start, sent with your own Google Gemini key under your own Google account.',
+  },
+  {
+    host: 'api.mistral.ai',
+    purpose: 'fetched-with-your-key',
+    why: 'A CV analysis, or a pasted job advert, that you start, sent with your own Mistral key under your own Mistral account.',
+  },
+  {
+    host: 'api.x.ai',
+    purpose: 'fetched-with-your-key',
+    why: 'A CV analysis, or a pasted job advert, that you start, sent with your own xAI key under your own xAI account.',
+  },
+  {
+    host: 'openrouter.ai',
+    purpose: 'fetched-with-your-key',
+    // One host, two uses, so one entry says both — the same rule the Reed
+    // entry below follows for its API and its developer page. OpenRouter is
+    // also the one host here that is not where the model runs: it forwards
+    // the request, and a list that stopped at "sent to OpenRouter" would be
+    // a summary rather than the complete statement it claims to be.
+    why:
+      'A CV analysis, or a pasted job advert, that you start, sent with your own OpenRouter key ' +
+      'under your own OpenRouter account. OpenRouter passes the request on to the company that ' +
+      'runs the model you use. Its key page is also opened in your browser from Settings; the ' +
+      'app never loads that page.',
+  },
   {
     host: 'api.adzuna.com',
     purpose: 'fetched-with-your-key',
@@ -153,6 +185,21 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     // L-149: the Anthropic card's own "Where do I get a key?" link, alongside
     // OpenAI's platform.openai.com entry above.
     why: 'The page where you create your own Anthropic API key. The Anthropic card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.',
+  },
+  {
+    host: 'aistudio.google.com',
+    purpose: 'opened-in-your-browser',
+    why: 'The page where you create your own Google Gemini API key. The Google Gemini card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.',
+  },
+  {
+    host: 'console.mistral.ai',
+    purpose: 'opened-in-your-browser',
+    why: 'The page where you create your own Mistral API key. The Mistral card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.',
+  },
+  {
+    host: 'console.x.ai',
+    purpose: 'opened-in-your-browser',
+    why: 'The page where you create your own xAI API key. The xAI Grok card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.',
   },
   {
     host: 'www.linkedin.com',

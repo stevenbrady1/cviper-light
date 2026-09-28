@@ -84,7 +84,7 @@ pub(crate) const MAX_SECRET_BYTES: usize = 1024;
 /// If this were a `String`, JavaScript could name any account in the credential
 /// store — `git:https://github.com`, a saved Wi-Fi password, anything the user
 /// has under this service — and `secret_status` would happily confirm whether it
-/// existed. An enum makes the set of addressable credentials exactly these five,
+/// existed. An enum makes the set of addressable credentials exactly these nine,
 /// enforced by serde before our code runs at all.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -94,6 +94,11 @@ pub enum SecretKey {
     ReedApiKey,
     AnthropicApiKey,
     OpenaiApiKey,
+    // L-177: four more bring-your-own-key AI providers.
+    GoogleApiKey,
+    MistralApiKey,
+    GrokApiKey,
+    OpenrouterApiKey,
 }
 
 impl SecretKey {
@@ -110,6 +115,10 @@ impl SecretKey {
             SecretKey::ReedApiKey => "reed_api_key",
             SecretKey::AnthropicApiKey => "anthropic_api_key",
             SecretKey::OpenaiApiKey => "openai_api_key",
+            SecretKey::GoogleApiKey => "google_api_key",
+            SecretKey::MistralApiKey => "mistral_api_key",
+            SecretKey::GrokApiKey => "grok_api_key",
+            SecretKey::OpenrouterApiKey => "openrouter_api_key",
         }
     }
 }
@@ -318,20 +327,28 @@ mod tests {
     /// exercises the parts that can be tested without one: the wire format, the
     /// account names, the input guards that run before any store call, and the
     /// error messages.
-    const ALL: [SecretKey; 5] = [
+    const ALL: [SecretKey; 9] = [
         SecretKey::AdzunaAppId,
         SecretKey::AdzunaAppKey,
         SecretKey::ReedApiKey,
         SecretKey::AnthropicApiKey,
         SecretKey::OpenaiApiKey,
+        SecretKey::GoogleApiKey,
+        SecretKey::MistralApiKey,
+        SecretKey::GrokApiKey,
+        SecretKey::OpenrouterApiKey,
     ];
 
-    const EXPECTED_NAMES: [(SecretKey, &str); 5] = [
+    const EXPECTED_NAMES: [(SecretKey, &str); 9] = [
         (SecretKey::AdzunaAppId, "adzuna_app_id"),
         (SecretKey::AdzunaAppKey, "adzuna_app_key"),
         (SecretKey::ReedApiKey, "reed_api_key"),
         (SecretKey::AnthropicApiKey, "anthropic_api_key"),
         (SecretKey::OpenaiApiKey, "openai_api_key"),
+        (SecretKey::GoogleApiKey, "google_api_key"),
+        (SecretKey::MistralApiKey, "mistral_api_key"),
+        (SecretKey::GrokApiKey, "grok_api_key"),
+        (SecretKey::OpenrouterApiKey, "openrouter_api_key"),
     ];
 
     #[test]

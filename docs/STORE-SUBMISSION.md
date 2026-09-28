@@ -596,7 +596,7 @@ text into the advert box and press Check. The basic match runs on the device
 with no key and no network.
 
 The app can optionally use an AI provider. That requires the user's OWN key for
-an AI provider of their choice (today OpenAI or Anthropic), stored in
+an AI provider of their choice (today OpenAI, Anthropic, Google Gemini, Mistral, xAI Grok or OpenRouter), stored in
 Credential Manager; the request goes from the device to that provider under
 the user's own account. We do not supply a key, we do not proxy the request
 and we receive nothing. No key is needed to review any screen.

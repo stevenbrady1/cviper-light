@@ -80,7 +80,30 @@ beforeEach(() => {
 describe('parseConsentState', () => {
   it('reads a fully granted state', () => {
     expect(parseConsentState({ anthropic: true, openai: true })).toEqual({
+      ...NO_CONSENT,
       anthropic: true,
+      openai: true,
+    });
+  });
+
+  it('reads all six providers, each on its own (L-177)', () => {
+    const everyone = {
+      anthropic: true,
+      openai: true,
+      google: true,
+      mistral: true,
+      grok: true,
+      openrouter: true,
+    };
+    expect(parseConsentState(everyone)).toEqual(everyone);
+    expect(parseConsentState({ mistral: true })).toEqual({ ...NO_CONSENT, mistral: true });
+  });
+
+  it('boundary: a file written before L-177 grants none of the four providers it never named', () => {
+    // An older build wrote only two keys. Absent is "not granted", so a user
+    // who said yes to OpenAI is still asked before anything goes to Google.
+    expect(parseConsentState({ anthropic: false, openai: true })).toEqual({
+      ...NO_CONSENT,
       openai: true,
     });
   });
@@ -103,6 +126,7 @@ describe('parseConsentState', () => {
     // A hand-edited file with a string "yes" or a number 1 is not a granted
     // consent — only the boolean `true` counts. See the fail-closed header.
     expect(parseConsentState({ anthropic: true, openai: 'yes' })).toEqual({
+      ...NO_CONSENT,
       anthropic: true,
       openai: false,
     });
@@ -126,7 +150,7 @@ describe('consent survives a restart', () => {
     const after = createTauriConsentPort();
     const read = await after.read();
 
-    expect(read.ok && read.value).toEqual({ anthropic: false, openai: true });
+    expect(read.ok && read.value).toEqual({ ...NO_CONSENT, openai: true });
   });
 
   it('boundary: granting one provider does not grant the other', async () => {
@@ -146,7 +170,7 @@ describe('consent survives a restart', () => {
     await port.revoke('anthropic');
 
     const read = await createTauriConsentPort().read();
-    expect(read.ok && read.value).toEqual({ anthropic: false, openai: true });
+    expect(read.ok && read.value).toEqual({ ...NO_CONSENT, openai: true });
   });
 
   it('saves explicitly, because autoSave is off', async () => {
@@ -192,7 +216,7 @@ describe('consent survives a restart', () => {
 
     const read = await createTauriConsentPort().read();
 
-    expect(read.ok && read.value).toEqual({ anthropic: false, openai: true });
+    expect(read.ok && read.value).toEqual({ ...NO_CONSENT, openai: true });
   });
 });
 

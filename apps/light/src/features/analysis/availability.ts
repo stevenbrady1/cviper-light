@@ -30,7 +30,14 @@ import { err, ok } from '@cviper/core-types';
 import { invoke } from '@tauri-apps/api/core';
 
 import { probeOllama } from '../../ai/transport';
-import { ANTHROPIC_SECRET_KEY, OPENAI_SECRET_KEY } from '../../status/secretKeyNames';
+import {
+  ANTHROPIC_SECRET_KEY,
+  GOOGLE_SECRET_KEY,
+  GROK_SECRET_KEY,
+  MISTRAL_SECRET_KEY,
+  OPENAI_SECRET_KEY,
+  OPENROUTER_SECRET_KEY,
+} from '../../status/secretKeyNames';
 
 import { type Availability } from './providers';
 
@@ -90,16 +97,25 @@ async function hasKey(key: string): Promise<boolean> {
  * cannot stop the app finding out that Ollama is running. Nothing here rejects.
  */
 export async function readAvailability(): Promise<Availability> {
-  const [ollama, anthropicKey, openaiKey] = await Promise.all([
-    ollamaState(),
-    hasKey(ANTHROPIC_SECRET_KEY),
-    hasKey(OPENAI_SECRET_KEY),
-  ]);
+  const [ollama, anthropicKey, openaiKey, googleKey, mistralKey, grokKey, openrouterKey] =
+    await Promise.all([
+      ollamaState(),
+      hasKey(ANTHROPIC_SECRET_KEY),
+      hasKey(OPENAI_SECRET_KEY),
+      hasKey(GOOGLE_SECRET_KEY),
+      hasKey(MISTRAL_SECRET_KEY),
+      hasKey(GROK_SECRET_KEY),
+      hasKey(OPENROUTER_SECRET_KEY),
+    ]);
 
   return {
     ollamaRunning: ollama.running,
     ollamaModels: ollama.models,
     anthropicKey,
     openaiKey,
+    googleKey,
+    mistralKey,
+    grokKey,
+    openrouterKey,
   };
 }

@@ -27,6 +27,10 @@ These carry a key you pasted into Settings, under an account that is yours. The 
 
 - `api.openai.com` — A CV analysis, or a pasted job advert, that you start, sent with your own OpenAI key under your own OpenAI account.
 - `api.anthropic.com` — A CV analysis, or a pasted job advert, that you start, sent with your own Anthropic key under your own Anthropic account.
+- `generativelanguage.googleapis.com` — A CV analysis, or a pasted job advert, that you start, sent with your own Google Gemini key under your own Google account.
+- `api.mistral.ai` — A CV analysis, or a pasted job advert, that you start, sent with your own Mistral key under your own Mistral account.
+- `api.x.ai` — A CV analysis, or a pasted job advert, that you start, sent with your own xAI key under your own xAI account.
+- `openrouter.ai` — A CV analysis, or a pasted job advert, that you start, sent with your own OpenRouter key under your own OpenRouter account. OpenRouter passes the request on to the company that runs the model you use. Its key page is also opened in your browser from Settings; the app never loads that page.
 - `api.adzuna.com` — A job search you start, sent with the free Adzuna key you registered yourself. Adzuna’s API requires both parts of that key — the app ID and the app key — as parameters in the web address, so they appear in Adzuna’s own request logs. The request also carries your search words and location, which is what a search is, and Adzuna sees your IP address, exactly as it would if you searched on its own site yourself.
 - `www.reed.co.uk` — A job search you start, sent with the free Reed key you registered yourself, carrying your search words and location — Reed sees those and your IP address, exactly as it would if you searched on reed.co.uk yourself. Reed’s developer page is also opened in your browser from Settings, and so is a keyless search link for Reed from job-boards.json; the app never loads either page.
 
@@ -46,6 +50,9 @@ The app hands the address to your own browser and is not involved from then on. 
 - `developer.adzuna.com` — The page where you register your own Adzuna key. Opened in your browser from Settings; the app does not load it.
 - `platform.openai.com` — The page where you create your own OpenAI API key. The welcome screen and the OpenAI card in Settings hand the address to your browser when you tap it; the app never loads it, and nothing is added to the link.
 - `console.anthropic.com` — The page where you create your own Anthropic API key. The Anthropic card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.
+- `aistudio.google.com` — The page where you create your own Google Gemini API key. The Google Gemini card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.
+- `console.mistral.ai` — The page where you create your own Mistral API key. The Mistral card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.
+- `console.x.ai` — The page where you create your own xAI API key. The xAI Grok card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.
 - `www.linkedin.com` — A keyless search link for LinkedIn, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `uk.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.totaljobs.com` — A keyless search link for Totaljobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
