@@ -20,8 +20,16 @@ export interface FakeConsentPort extends ConsentPort {
   readonly state: () => ConsentState;
 }
 
-export function createFakeConsentPort(initial: ConsentState = NO_CONSENT): FakeConsentPort {
-  let state: ConsentState = { ...initial };
+/**
+ * `initial` is PARTIAL on purpose (L-177): a test names only the providers it
+ * is about, and every provider it does not name starts not granted — the same
+ * fail-closed reading `parseConsentState` gives a file with a missing entry.
+ * Adding a provider therefore never has to touch a test that is not about it.
+ */
+export function createFakeConsentPort(
+  initial: Partial<ConsentState> = NO_CONSENT,
+): FakeConsentPort {
+  let state: ConsentState = { ...NO_CONSENT, ...initial };
 
   async function set(
     kind: ConsentProviderKind,

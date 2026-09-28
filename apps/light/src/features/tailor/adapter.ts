@@ -11,6 +11,7 @@
  */
 import {
   createAnthropicProvider,
+  createChatCompletionsProvider,
   createOllamaProvider,
   createOpenAiProvider,
   type AiProvider,
@@ -29,6 +30,12 @@ export function providerFor(option: ProviderOption, transport: ChatTransport): A
       return createAnthropicProvider(transport);
     case 'openai':
       return createOpenAiProvider(transport);
+    case 'google':
+    case 'mistral':
+    case 'grok':
+    case 'openrouter':
+      // L-177: one chat-completions adapter, routed by the kind itself.
+      return createChatCompletionsProvider(option.kind, transport);
     case 'keyword':
       // Unreachable: `tailorOptions` filters this out before a user can pick
       // it, and every run module refuses it before reaching here. Answered

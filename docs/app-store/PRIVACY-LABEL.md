@@ -26,14 +26,24 @@ that is accessible to the developer or to the developer's third-party partners
 
 ### The one thing to be clear about with the reviewer
 
-A user may paste their **own** key for OpenAI or Anthropic and then press
+A user may paste their **own** key for OpenAI, Anthropic, Google Gemini, Mistral, xAI Grok, or OpenRouter and then press
 "Analyse". The CV text goes to whichever provider the user chose, under the
-user's own account, by the user's explicit action each time. Neither is our
-partner — we have no agreement, no account and no key with either; the user
-does — and we receive nothing from the exchange. That is why the answer is
+user's own account, by the user's explicit action each time. None of them is
+our partner — we have no agreement, no account and no key with any of them;
+the user does — and we receive nothing from the exchange. That is why the answer is
 still "no".
 
-**Both providers can be set up, and both are named here.** This section used to
+**All six can be set up, and all six are named here.** L-177 added Google
+Gemini, Mistral, xAI Grok and OpenRouter; each has its own key card, its own
+consent dialog and its own host in the generated privacy policy. OpenRouter is
+the one that is not where the model runs: it forwards the request to the company
+that runs the chosen model, and the policy says so. Google's free tier lets
+Google use what is sent to improve its products, and the Google card says so
+before a key is pasted. None of this changes the answer below — the user
+chooses, under their own account — but a reviewer testing the claim should know
+which six to expect.
+
+Before L-177: **both providers could be set up, and both were named here.** This section used to
 say "OpenAI is the only one": since L-102 no screen could save an Anthropic key,
 so `AI_KEY_PROVIDER_IDS` held `openai` alone and the picker could not present
 Anthropic even on a machine whose credential store still held a key from an

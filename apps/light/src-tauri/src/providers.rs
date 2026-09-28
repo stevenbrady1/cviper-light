@@ -40,6 +40,13 @@ pub enum ProviderId {
     Anthropic,
     Openai,
     Ollama,
+    // L-177: four more clouds. All speak OpenAI's chat-completions dialect,
+    // so only the host, the path and the key differ — which is exactly what
+    // this enum exists to pin.
+    Google,
+    Mistral,
+    Grok,
+    Openrouter,
 }
 
 impl ProviderId {
@@ -53,6 +60,12 @@ impl ProviderId {
             ProviderId::Anthropic => "https://api.anthropic.com",
             ProviderId::Openai => "https://api.openai.com",
             ProviderId::Ollama => "http://127.0.0.1:11434",
+            // Google's OpenAI-compatibility layer, not the native Gemini API:
+            // one adapter on the JavaScript side for all four (L-177).
+            ProviderId::Google => "https://generativelanguage.googleapis.com",
+            ProviderId::Mistral => "https://api.mistral.ai",
+            ProviderId::Grok => "https://api.x.ai",
+            ProviderId::Openrouter => "https://openrouter.ai",
         }
     }
 
@@ -63,6 +76,9 @@ impl ProviderId {
             // The NATIVE endpoint. Not /v1/chat/completions — Ollama's
             // OpenAI-compatible shim drops `options` and the schema `format`.
             ProviderId::Ollama => "/api/chat",
+            ProviderId::Google => "/v1beta/openai/chat/completions",
+            ProviderId::Mistral | ProviderId::Grok => "/v1/chat/completions",
+            ProviderId::Openrouter => "/api/v1/chat/completions",
         }
     }
 
@@ -70,6 +86,23 @@ impl ProviderId {
         match self {
             ProviderId::Anthropic | ProviderId::Openai => "/v1/models",
             ProviderId::Ollama => "/api/tags",
+            ProviderId::Google => "/v1beta/openai/models",
+            ProviderId::Mistral | ProviderId::Grok => "/v1/models",
+            ProviderId::Openrouter => "/api/v1/models",
+        }
+    }
+
+    /// Which endpoint proves a CANDIDATE key works.
+    ///
+    /// The model list, for every provider that authenticates it. OpenRouter's
+    /// list is public — `GET /api/v1/models` answers 200 with no key at all —
+    /// so a models probe there would pass any string the user typed and save
+    /// it. Its `/auth/key` endpoint describes the key it is given and 401s on
+    /// a bad one, which is the question being asked.
+    fn key_test_path(self) -> &'static str {
+        match self {
+            ProviderId::Openrouter => "/api/v1/auth/key",
+            other => other.models_path(),
         }
     }
 
@@ -80,6 +113,10 @@ impl ProviderId {
             ProviderId::Openai => Some(SecretKey::OpenaiApiKey),
             // Local, keyless. This is why the app is useful with no account.
             ProviderId::Ollama => None,
+            ProviderId::Google => Some(SecretKey::GoogleApiKey),
+            ProviderId::Mistral => Some(SecretKey::MistralApiKey),
+            ProviderId::Grok => Some(SecretKey::GrokApiKey),
+            ProviderId::Openrouter => Some(SecretKey::OpenrouterApiKey),
         }
     }
 
@@ -93,6 +130,10 @@ impl ProviderId {
             ProviderId::Anthropic => "Anthropic",
             ProviderId::Openai => "OpenAI",
             ProviderId::Ollama => "Ollama",
+            ProviderId::Google => "Google Gemini",
+            ProviderId::Mistral => "Mistral",
+            ProviderId::Grok => "xAI Grok",
+            ProviderId::Openrouter => "OpenRouter",
         }
     }
 
@@ -114,6 +155,20 @@ impl ProviderId {
                 "No OpenAI API key is saved. Add one in Settings before using this provider."
             }
             ProviderId::Ollama => "Ollama does not use an API key.",
+            // L-177: each of these has a card in Settings from the day it
+            // exists, so the sentence is honest from the first build.
+            ProviderId::Google => {
+                "No Google Gemini API key is saved. Add one in Settings before using this provider."
+            }
+            ProviderId::Mistral => {
+                "No Mistral API key is saved. Add one in Settings before using this provider."
+            }
+            ProviderId::Grok => {
+                "No xAI Grok API key is saved. Add one in Settings before using this provider."
+            }
+            ProviderId::Openrouter => {
+                "No OpenRouter API key is saved. Add one in Settings before using this provider."
+            }
         }
     }
 }
@@ -358,7 +413,11 @@ fn auth_headers(provider: ProviderId) -> Result<Vec<(&'static str, String)>, Str
             // Required on every request. Without it the API 400s.
             ("anthropic-version", "2023-06-01".to_string()),
         ],
-        ProviderId::Openai => vec![("authorization", format!("Bearer {secret}"))],
+        ProviderId::Openai
+        | ProviderId::Google
+        | ProviderId::Mistral
+        | ProviderId::Grok
+        | ProviderId::Openrouter => vec![("authorization", format!("Bearer {secret}"))],
         ProviderId::Ollama => Vec::new(),
     })
 }
@@ -556,7 +615,11 @@ fn candidate_auth_headers(provider: ProviderId, key: String) -> Vec<(&'static st
             ("x-api-key", key),
             ("anthropic-version", "2023-06-01".to_string()),
         ],
-        ProviderId::Openai => vec![("authorization", format!("Bearer {key}"))],
+        ProviderId::Openai
+        | ProviderId::Google
+        | ProviderId::Mistral
+        | ProviderId::Grok
+        | ProviderId::Openrouter => vec![("authorization", format!("Bearer {key}"))],
         ProviderId::Ollama => Vec::new(),
     }
 }
@@ -595,7 +658,7 @@ pub(crate) async fn provider_test_key(provider: ProviderId, key: String) -> Resu
     let candidate = candidate_key(provider, &key)?;
 
     let mut request = client()?
-        .get(format!("{}{}", provider.base_url(), provider.models_path()))
+        .get(format!("{}{}", provider.base_url(), provider.key_test_path()))
         .timeout(MODELS_TIMEOUT);
 
     for (name, value) in candidate_auth_headers(provider, candidate) {
@@ -662,16 +725,24 @@ mod tests {
     /// No test here opens a socket. Everything below exercises the parts that
     /// decide WHERE a request goes and WHAT a failure says — which is the whole
     /// security surface of this module.
-    const ALL: [ProviderId; 3] = [
+    const ALL: [ProviderId; 7] = [
         ProviderId::Anthropic,
         ProviderId::Openai,
         ProviderId::Ollama,
+        ProviderId::Google,
+        ProviderId::Mistral,
+        ProviderId::Grok,
+        ProviderId::Openrouter,
     ];
 
-    const EXPECTED_NAMES: [(ProviderId, &str); 3] = [
+    const EXPECTED_NAMES: [(ProviderId, &str); 7] = [
         (ProviderId::Anthropic, "anthropic"),
         (ProviderId::Openai, "openai"),
         (ProviderId::Ollama, "ollama"),
+        (ProviderId::Google, "google"),
+        (ProviderId::Mistral, "mistral"),
+        (ProviderId::Grok, "grok"),
+        (ProviderId::Openrouter, "openrouter"),
     ];
 
     #[test]
@@ -755,6 +826,41 @@ mod tests {
         // Loopback by IP, not by name: `localhost` resolves to ::1 first on
         // Windows and costs a failed connection on every call.
         assert_eq!(ProviderId::Ollama.base_url(), "http://127.0.0.1:11434");
+        // L-177: every added cloud is HTTPS too, and each host is the one the
+        // outbound-hosts registry on the TypeScript side discloses.
+        assert_eq!(
+            ProviderId::Google.base_url(),
+            "https://generativelanguage.googleapis.com"
+        );
+        assert_eq!(ProviderId::Mistral.base_url(), "https://api.mistral.ai");
+        assert_eq!(ProviderId::Grok.base_url(), "https://api.x.ai");
+        assert_eq!(ProviderId::Openrouter.base_url(), "https://openrouter.ai");
+        for provider in ALL {
+            if provider != ProviderId::Ollama {
+                assert!(
+                    provider.base_url().starts_with("https://"),
+                    "{provider:?} is a cloud and must be HTTPS"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_key_test_path_is_rooted_and_only_openrouter_leaves_the_model_list() {
+        // OpenRouter's model list is public, so a models probe would pass any
+        // key. Every other provider authenticates its list, and the test path
+        // IS the list path — a divergence anywhere else would be a probe that
+        // nobody has explained.
+        for provider in ALL {
+            let path = provider.key_test_path();
+            assert!(path.starts_with('/'), "{provider:?}: {path} is not rooted");
+            assert!(!path.contains('{'), "{provider:?}: {path} looks templated");
+            if provider == ProviderId::Openrouter {
+                assert_eq!(path, "/api/v1/auth/key");
+            } else {
+                assert_eq!(path, provider.models_path(), "{provider:?}");
+            }
+        }
     }
 
     #[test]
@@ -785,8 +891,23 @@ mod tests {
             Some(SecretKey::AnthropicApiKey)
         );
         assert_eq!(ProviderId::Openai.secret(), Some(SecretKey::OpenaiApiKey));
+        assert_eq!(ProviderId::Google.secret(), Some(SecretKey::GoogleApiKey));
+        assert_eq!(ProviderId::Mistral.secret(), Some(SecretKey::MistralApiKey));
+        assert_eq!(ProviderId::Grok.secret(), Some(SecretKey::GrokApiKey));
+        assert_eq!(
+            ProviderId::Openrouter.secret(),
+            Some(SecretKey::OpenrouterApiKey)
+        );
         // Keyless local analysis is a product promise, not an accident.
         assert_eq!(ProviderId::Ollama.secret(), None);
+        // No two providers share a credential slot: a key saved for one must
+        // never be sent to another.
+        let mut seen = std::collections::HashSet::new();
+        for provider in ALL {
+            if let Some(secret) = provider.secret() {
+                assert!(seen.insert(secret), "{provider:?} shares a SecretKey");
+            }
+        }
     }
 
     #[test]

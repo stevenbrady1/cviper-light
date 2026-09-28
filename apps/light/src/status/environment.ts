@@ -36,7 +36,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { probeOllama } from '../ai/transport';
 
 import { requestsToday } from './requestLog';
-import { ANTHROPIC_SECRET_KEY, OPENAI_SECRET_KEY } from './secretKeyNames';
+import {
+  ANTHROPIC_SECRET_KEY,
+  GOOGLE_SECRET_KEY,
+  GROK_SECRET_KEY,
+  MISTRAL_SECRET_KEY,
+  OPENAI_SECRET_KEY,
+  OPENROUTER_SECRET_KEY,
+} from './secretKeyNames';
 
 /**
  * The five credentials the app can hold, spelled exactly as the `SecretKey`
@@ -56,6 +63,10 @@ export const SECRET_KEYS = [
   'reed_api_key',
   ANTHROPIC_SECRET_KEY,
   OPENAI_SECRET_KEY,
+  GOOGLE_SECRET_KEY,
+  MISTRAL_SECRET_KEY,
+  GROK_SECRET_KEY,
+  OPENROUTER_SECRET_KEY,
 ] as const;
 
 export type SecretKeyName = (typeof SECRET_KEYS)[number];

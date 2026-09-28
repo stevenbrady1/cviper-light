@@ -74,6 +74,14 @@ export {
 export { ANTHROPIC_DEFAULT_MODEL, createAnthropicProvider } from './providers/anthropic';
 export { createOpenAiProvider } from './providers/openai';
 export {
+  GOOGLE_DEFAULT_MODEL,
+  GROK_DEFAULT_MODEL,
+  MISTRAL_DEFAULT_MODEL,
+  OPENROUTER_DEFAULT_MODEL,
+  createChatCompletionsProvider,
+  type ChatCompletionsProviderId,
+} from './providers/chat-completions';
+export {
   OLLAMA_DEFAULT_NUM_CTX,
   createOllamaProvider,
   type OllamaOptions,

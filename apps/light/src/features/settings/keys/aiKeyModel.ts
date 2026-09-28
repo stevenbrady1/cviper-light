@@ -37,10 +37,23 @@
  * app stores — both AI keys and all three job-board ones — to answer a question
  * only this card was asking. Telling two keys apart is not worth that.
  */
-import { ANTHROPIC_DEFAULT_MODEL } from '@cviper/ai-providers';
+import {
+  ANTHROPIC_DEFAULT_MODEL,
+  GOOGLE_DEFAULT_MODEL,
+  GROK_DEFAULT_MODEL,
+  MISTRAL_DEFAULT_MODEL,
+  OPENROUTER_DEFAULT_MODEL,
+} from '@cviper/ai-providers';
 
 import { OPENAI_DEFAULT_MODEL } from '../../analysis/providers';
-import { ANTHROPIC_SECRET_KEY, OPENAI_SECRET_KEY } from '../../../status/secretKeyNames';
+import {
+  ANTHROPIC_SECRET_KEY,
+  GOOGLE_SECRET_KEY,
+  GROK_SECRET_KEY,
+  MISTRAL_SECRET_KEY,
+  OPENAI_SECRET_KEY,
+  OPENROUTER_SECRET_KEY,
+} from '../../../status/secretKeyNames';
 
 import { MAX_KEY_BYTES } from './model';
 
@@ -60,7 +73,7 @@ import { MAX_KEY_BYTES } from './model';
  *     `analysis/providers.ts` has to decide what the picker may offer while the
  *     app is running, and a type cannot answer that (L-102).
  */
-export type AiKeyProviderId = 'openai' | 'anthropic';
+export type AiKeyProviderId = 'openai' | 'anthropic' | 'google' | 'mistral' | 'grok' | 'openrouter';
 
 /**
  * Re-exported from `status/secretKeyNames.ts`, the single source for these two
@@ -68,7 +81,14 @@ export type AiKeyProviderId = 'openai' | 'anthropic';
  * why it exists as its own dependency-free module rather than being declared
  * here as before.
  */
-export { OPENAI_SECRET_KEY, ANTHROPIC_SECRET_KEY };
+export {
+  OPENAI_SECRET_KEY,
+  ANTHROPIC_SECRET_KEY,
+  GOOGLE_SECRET_KEY,
+  MISTRAL_SECRET_KEY,
+  GROK_SECRET_KEY,
+  OPENROUTER_SECRET_KEY,
+};
 
 /**
  * A credential name this app is actually allowed to test, save or delete
@@ -96,7 +116,13 @@ export { OPENAI_SECRET_KEY, ANTHROPIC_SECRET_KEY };
  * mutation — swap the Anthropic card's `secret` to `OPENAI_SECRET_KEY` and it
  * fails by name.
  */
-export type AiKeySecret = typeof OPENAI_SECRET_KEY | typeof ANTHROPIC_SECRET_KEY;
+export type AiKeySecret =
+  | typeof OPENAI_SECRET_KEY
+  | typeof ANTHROPIC_SECRET_KEY
+  | typeof GOOGLE_SECRET_KEY
+  | typeof MISTRAL_SECRET_KEY
+  | typeof GROK_SECRET_KEY
+  | typeof OPENROUTER_SECRET_KEY;
 
 /**
  * What a saved key looks like on screen: four bullets, and nothing else.
@@ -270,6 +296,12 @@ export interface AiKeyProvider {
 interface AiKeyProviderCopy {
   readonly id: AiKeyProviderId;
   readonly label: string;
+  /**
+   * "a" or "an", as the label is SAID. Written per card rather than guessed
+   * from the first letter (L-177): "xAI" starts with a consonant letter and is
+   * spoken "ex-A-I", and "an xAI key" is the correct phrase.
+   */
+  readonly article: 'a' | 'an';
   readonly secret: AiKeySecret;
   readonly defaultModel: string;
   readonly signupUrl: string;
@@ -278,7 +310,7 @@ interface AiKeyProviderCopy {
 }
 
 function buildAiKeyProvider(copy: AiKeyProviderCopy): AiKeyProvider {
-  const { id, label, secret, defaultModel, signupUrl, billing } = copy;
+  const { id, label, article, secret, defaultModel, signupUrl, billing } = copy;
   return {
     id,
     label,
@@ -291,18 +323,20 @@ function buildAiKeyProvider(copy: AiKeyProviderCopy): AiKeyProvider {
     signupUrl,
     // Named per provider (W8, coordinator review of PR #96), mirroring
     // `keys/model.ts`'s job-board cards ("Get a free Adzuna key"), which are
-    // also never merely "Get a free key". "an" assumes a vowel-sounding name
-    // — true of both providers today; a future consonant-led one (a
-    // hypothetical "Mistral" card) would need this reworded, the same way a
-    // third job-board card would.
-    signupLabel: `Where do I get an ${label} key?`,
+    // also never merely "Get a free key". The article is the card's own
+    // (L-177): the Mistral card this comment once called hypothetical now
+    // exists, and "an Mistral key" is exactly what a guessed article writes.
+    signupLabel: `Where do I get ${article} ${label} key?`,
     privacyNote:
       'The key is stored in this computer’s own credential store — Windows Credential Manager, ' +
       'macOS Keychain, or the Linux Secret Service. It is never written to a file, never put in ' +
       `your backup, and never sent anywhere except to ${label}. CViper cannot show it back to you ` +
       'afterwards — not even the last few characters — so if you lose it, paste it again.',
     fieldLabel: 'API key',
-    fieldHint: 'Paste the whole value, including the prefix.',
+    // "including the prefix" was true of OpenAI's `sk-` and Anthropic's
+    // `sk-ant-`; a Mistral key has no prefix at all (L-177), so the hint says
+    // what is true of every provider instead.
+    fieldHint: 'Paste the whole value, exactly as the provider shows it.',
     passMessage: keyPassMessage(label),
     removedMessage: keyRemovedMessage(label),
   };
@@ -311,6 +345,7 @@ function buildAiKeyProvider(copy: AiKeyProviderCopy): AiKeyProvider {
 export const OPENAI_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   id: 'openai',
   label: 'OpenAI',
+  article: 'an',
   secret: OPENAI_SECRET_KEY,
   defaultModel: OPENAI_DEFAULT_MODEL,
   signupUrl: 'https://platform.openai.com/api-keys',
@@ -347,6 +382,7 @@ export const OPENAI_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
 export const ANTHROPIC_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   id: 'anthropic',
   label: 'Anthropic',
+  article: 'an',
   secret: ANTHROPIC_SECRET_KEY,
   defaultModel: ANTHROPIC_DEFAULT_MODEL,
   signupUrl: 'https://console.anthropic.com/settings/keys',
@@ -356,10 +392,86 @@ export const ANTHROPIC_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
 });
 
 /**
+ * ============================================================================
+ * THE FOUR CARDS L-177 ADDED, AND WHAT EACH BILLING SENTENCE IS STANDING ON
+ * ============================================================================
+ * Every one of these providers serves the OpenAI chat-completions dialect, so
+ * one adapter in `@cviper/ai-providers` drives them all; only the host and
+ * the key differ, and both of those live in Rust.
+ *
+ * The billing sentences say only what each provider publishes about itself:
+ *
+ *   * Google's Gemini API has a free tier, and Google's own terms for it say
+ *     that what is sent on the free tier may be used to improve Google's
+ *     products. A CV is exactly the sort of thing a person would want to know
+ *     that about BEFORE pasting a key, so the card says it.
+ *   * OpenRouter is not a model company. It forwards the request to whichever
+ *     company runs the model, so the card names who that is for the default
+ *     model, rather than letting "sent to OpenRouter" imply it stops there.
+ *   * Mistral and xAI bill the user's own account at published rates. No
+ *     figure is quoted: neither rate card was measured here the way
+ *     Anthropic's "a few pence" was, and an invented number would be wrong on
+ *     screen for ever.
+ */
+export const GOOGLE_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
+  id: 'google',
+  label: 'Google Gemini',
+  article: 'a',
+  secret: GOOGLE_SECRET_KEY,
+  defaultModel: GOOGLE_DEFAULT_MODEL,
+  signupUrl: 'https://aistudio.google.com/apikey',
+  billing:
+    'Google offers a free tier with daily limits and bills your own account beyond it. Google’s ' +
+    'terms let it use what is sent on the free tier to improve its products; billed use is not ' +
+    'used that way. CViper adds nothing to that, takes no cut, and never sees your bill.',
+});
+
+export const MISTRAL_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
+  id: 'mistral',
+  label: 'Mistral',
+  article: 'a',
+  secret: MISTRAL_SECRET_KEY,
+  defaultModel: MISTRAL_DEFAULT_MODEL,
+  signupUrl: 'https://console.mistral.ai/api-keys',
+  billing:
+    'Mistral bills your own account for what you use, at their published rates. CViper adds ' +
+    'nothing to that, takes no cut, and never sees your bill.',
+});
+
+export const GROK_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
+  id: 'grok',
+  label: 'xAI Grok',
+  article: 'an',
+  secret: GROK_SECRET_KEY,
+  defaultModel: GROK_DEFAULT_MODEL,
+  signupUrl: 'https://console.x.ai',
+  billing:
+    'xAI bills your own account for what you use, at their published rates. CViper adds ' +
+    'nothing to that, takes no cut, and never sees your bill.',
+});
+
+export const OPENROUTER_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
+  id: 'openrouter',
+  label: 'OpenRouter',
+  article: 'an',
+  secret: OPENROUTER_SECRET_KEY,
+  defaultModel: OPENROUTER_DEFAULT_MODEL,
+  signupUrl: 'https://openrouter.ai/keys',
+  billing:
+    'OpenRouter bills your own prepaid credit and passes each request on to the company that ' +
+    'runs the model — for the default model here, that is OpenAI. CViper adds nothing to that, ' +
+    'takes no cut, and never sees your bill.',
+});
+
+/**
  * Every card, keyed by id — what `AiKeySetup` iterates over to render one
  * article per provider in `AI_KEY_PROVIDER_IDS`.
  */
 export const AI_KEY_PROVIDERS: Readonly<Record<AiKeyProviderId, AiKeyProvider>> = {
   openai: OPENAI_KEY_PROVIDER,
   anthropic: ANTHROPIC_KEY_PROVIDER,
+  google: GOOGLE_KEY_PROVIDER,
+  mistral: MISTRAL_KEY_PROVIDER,
+  grok: GROK_KEY_PROVIDER,
+  openrouter: OPENROUTER_KEY_PROVIDER,
 };

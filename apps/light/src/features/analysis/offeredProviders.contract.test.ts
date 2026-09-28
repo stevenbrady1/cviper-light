@@ -92,14 +92,31 @@ const { readAvailability } = await import('./availability');
 const LLAMA = { id: 'llama3.2:3b', label: 'llama3.2:3b (3.2B)' };
 
 /** Every combination of the things that can be set up on a machine. */
+/*
+ * Every combination of all six cloud keys and Ollama (L-177 widened it from
+ * two). 128 states: small enough to sweep exhaustively, which is the point —
+ * the guard is a property, and a property checked on a sample is an example.
+ */
 const EVERY_AVAILABILITY: Availability[] = [false, true].flatMap((anthropicKey) =>
   [false, true].flatMap((openaiKey) =>
-    [[], [LLAMA]].map((ollamaModels) => ({
-      ollamaRunning: ollamaModels.length > 0,
-      ollamaModels,
-      anthropicKey,
-      openaiKey,
-    })),
+    [false, true].flatMap((googleKey) =>
+      [false, true].flatMap((mistralKey) =>
+        [false, true].flatMap((grokKey) =>
+          [false, true].flatMap((openrouterKey) =>
+            [[], [LLAMA]].map((ollamaModels) => ({
+              ollamaRunning: ollamaModels.length > 0,
+              ollamaModels,
+              anthropicKey,
+              openaiKey,
+              googleKey,
+              mistralKey,
+              grokKey,
+              openrouterKey,
+            })),
+          ),
+        ),
+      ),
+    ),
   ),
 );
 
