@@ -10,6 +10,7 @@ import {
   type ApplicationStatus,
   type IsoTimestamp,
   type Job,
+  type SalaryPeriod,
 } from '@cviper/core-types';
 
 import { toLocalIsoDate } from '../../lib/dates';
@@ -127,6 +128,7 @@ export function groupByStatus(
 export interface ApplicationDraft {
   readonly title: string;
   readonly company: string;
+  readonly agency: string;
   readonly location: string;
   readonly status: ApplicationStatus;
   readonly description: string;
@@ -138,18 +140,22 @@ export interface ApplicationDraft {
   readonly salaryMax: string;
   /** A three-letter ISO-4217 code as typed, or empty. */
   readonly salaryCurrency: string;
+  /** The unit for the salary fields, or empty when not stated. */
+  readonly salaryPeriod: SalaryPeriod | '';
 }
 
 export type DraftField =
   | 'title'
   | 'company'
+  | 'agency'
   | 'location'
   | 'description'
   | 'url'
   | 'postedDate'
   | 'salaryMin'
   | 'salaryMax'
-  | 'salaryCurrency';
+  | 'salaryCurrency'
+  | 'salaryPeriod';
 
 export type DraftErrors = Partial<Record<DraftField, string>>;
 
@@ -157,6 +163,7 @@ export type DraftErrors = Partial<Record<DraftField, string>>;
 export const EMPTY_DRAFT: ApplicationDraft = {
   title: '',
   company: '',
+  agency: '',
   location: '',
   status: 'saved',
   description: '',
@@ -165,6 +172,7 @@ export const EMPTY_DRAFT: ApplicationDraft = {
   salaryMin: '',
   salaryMax: '',
   salaryCurrency: '',
+  salaryPeriod: 'year',
 };
 
 /**
@@ -277,16 +285,17 @@ export function validateDraft(draft: ApplicationDraft): DraftErrors {
 
   const salaryMin = blank(draft.salaryMin) ? null : readSalaryField(draft.salaryMin);
   const salaryMax = blank(draft.salaryMax) ? null : readSalaryField(draft.salaryMax);
+  const hasSalary = salaryMin !== null || salaryMax !== null;
 
   if (!blank(draft.salaryMin) && salaryMin === null) {
-    errors.salaryMin = 'Write the salary as a plain yearly number, for example 45000.';
+    errors.salaryMin = 'Write the salary as a plain number, for example 45000.';
   } else if (salaryMin !== null && salaryMin < 0) {
     errors.salaryMin =
       'A salary cannot be less than zero. Leave it blank if the advert did not say.';
   }
 
   if (!blank(draft.salaryMax) && salaryMax === null) {
-    errors.salaryMax = 'Write the salary as a plain yearly number, for example 55000.';
+    errors.salaryMax = 'Write the salary as a plain number, for example 55000.';
   } else if (salaryMax !== null && salaryMax < 0) {
     errors.salaryMax =
       'A salary cannot be less than zero. Leave it blank if the advert did not say.';
@@ -301,6 +310,10 @@ export function validateDraft(draft: ApplicationDraft): DraftErrors {
 
   if (!blank(draft.salaryCurrency) && !/^[A-Za-z]{3}$/.test(draft.salaryCurrency.trim())) {
     errors.salaryCurrency = 'Use the three-letter code for the currency, for example GBP.';
+  }
+
+  if (hasSalary && draft.salaryPeriod === '') {
+    errors.salaryPeriod = 'Choose the period for these salary figures.';
   }
 
   return errors;
@@ -344,25 +357,14 @@ export function createEntry(
     external_id: null,
     title: draft.title.trim(),
     company: draft.company.trim(),
+    agency: trimmed(draft.agency),
     location: trimmed(draft.location),
     salary_min: salaryMin,
     salary_max: salaryMax,
     // Stored upper-case: `Job.salary_currency` is documented as ISO-4217, and
     // "gbp" and "GBP" sorting as two currencies is a bug waiting for a report.
     salary_currency: trimmed(draft.salaryCurrency)?.toUpperCase() ?? null,
-    /*
-     * `'year'` whenever there is a figure at all, and `null` when there is not.
-     *
-     * NOT A GUESS, on either path into this function. The extraction pipeline
-     * forces a day rate, an hourly rate and pro-rata pay to null precisely so
-     * that anything reaching here is annual (see `extraction-clamp.ts`), and
-     * the form's own label says "a year" to the user typing one by hand. The
-     * field exists because Reed's period-less figures once made a good contract
-     * look like an insulting permanent salary — so leaving it null when a
-     * figure IS present would reintroduce exactly the ambiguity it was added
-     * to remove.
-     */
-    salary_period: hasSalary ? 'year' : null,
+    salary_period: hasSalary && draft.salaryPeriod !== '' ? draft.salaryPeriod : null,
     description: trimmed(draft.description),
     url: trimmed(draft.url),
     posted_date: trimmed(draft.postedDate),

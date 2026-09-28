@@ -77,6 +77,7 @@ function job(id: string, description: string | null, url = `https://example.test
     external_id: id,
     title: 'A Role',
     company: 'A Company',
+    agency: null,
     location: 'London',
     salary_min: null,
     salary_max: null,

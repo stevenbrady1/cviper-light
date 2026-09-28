@@ -106,6 +106,7 @@ export function draftFromExtraction(
     ...EMPTY_DRAFT,
     title: textField(extraction.title),
     company: textField(extraction.company),
+    agency: textField(extraction.agency),
     // VERBATIM, hybrid and remote wording included. See the location rule in
     // `build-extraction-prompt.ts`: three days on site is the difference
     // between a job somebody can take and one they cannot.
@@ -123,6 +124,7 @@ export function draftFromExtraction(
     salaryMin: numberField(extraction.salary_min),
     salaryMax: numberField(extraction.salary_max),
     salaryCurrency: textField(extraction.salary_currency),
+    salaryPeriod: extraction.salary_period ?? '',
   };
 }
 

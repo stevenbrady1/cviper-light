@@ -34,6 +34,7 @@ const BASE: Omit<BackupPayload, 'profile' | 'documents'> = {
       external_id: null,
       title: 'Quant Developer',
       company: 'Man Group',
+      agency: null,
       location: null,
       salary_min: null,
       salary_max: null,

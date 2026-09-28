@@ -10,6 +10,7 @@ import {
 
 /** The nine fields of the flat extraction schema, alphabetically. */
 const EXPECTED_FIELDS = [
+  'agency',
   'company',
   'description',
   'location',
@@ -17,6 +18,7 @@ const EXPECTED_FIELDS = [
   'salary_currency',
   'salary_max',
   'salary_min',
+  'salary_period',
   'title',
   'url',
 ] as const;
@@ -35,9 +37,9 @@ const EXPECTED_FIELDS = [
  *   5    description — the model writes the role out, INCLUDING any salary
  *        wording it is about to refuse to turn into a number
  *   6    posted_date — a date, worked out from "posted last Tuesday"
- *   7-9  salary_currency, salary_min, salary_max — the derived numbers, last,
- *        so the wording in `description` is already on the page when the model
- *        decides whether a number is even available
+ *   7-10 salary_period, salary_currency, salary_min, salary_max — the derived
+ *        pay fields, last, so the wording in `description` is already on the
+ *        page when the model decides whether a number is even available
  *
  * Putting `salary_min` first would make a 3B model emit a figure as its opening
  * token, and the whole point of this feature is that it says null instead.
@@ -45,10 +47,12 @@ const EXPECTED_FIELDS = [
 const CANONICAL_FIELD_ORDER = [
   'title',
   'company',
+  'agency',
   'location',
   'url',
   'description',
   'posted_date',
+  'salary_period',
   'salary_currency',
   'salary_min',
   'salary_max',
@@ -60,6 +64,7 @@ function makeExtraction(): JobExtraction {
   return {
     title: 'Credit Risk Analyst',
     company: 'Lloyds Banking Group',
+    agency: 'Harrington Search',
     location: 'City of London (hybrid, 3 days on site)',
     url: 'https://example.invalid/jobs/1',
     description: 'Second-line credit risk for the wholesale book.',
@@ -67,6 +72,7 @@ function makeExtraction(): JobExtraction {
     salary_currency: 'GBP',
     salary_min: 45000,
     salary_max: 55000,
+    salary_period: 'year',
   };
 }
 
@@ -95,9 +101,9 @@ describe('job extraction schema — the two representations must not drift', () 
     expect(jsonProperties).toEqual(jsonRequired);
   });
 
-  it('has exactly nine fields — the locked shape, not the source app’s seventeen', () => {
-    expect(Object.keys(JobExtractionSchema.shape)).toHaveLength(9);
-    expect(JOB_EXTRACTION_JSON_SCHEMA.required).toHaveLength(9);
+  it('keeps the extraction flat — the locked shape, not the source app’s seventeen', () => {
+    expect(Object.keys(JobExtractionSchema.shape)).toHaveLength(11);
+    expect(JOB_EXTRACTION_JSON_SCHEMA.required).toHaveLength(11);
   });
 
   it('has no field the source app’s wider schema would have added', () => {
@@ -106,7 +112,6 @@ describe('job extraction schema — the two representations must not drift', () 
     // edit that quietly reinstates one has to change this list first.
     const keys = Object.keys(JobExtractionSchema.shape);
     for (const absent of [
-      'agency',
       'recruiter_name',
       'recruiter_email',
       'ir35_status',
@@ -114,7 +119,6 @@ describe('job extraction schema — the two representations must not drift', () 
       'contract_duration',
       'estimated_salary',
       'salary',
-      'salary_period',
     ]) {
       expect(keys).not.toContain(absent);
     }
@@ -177,7 +181,7 @@ describe('job extraction schema — property order is load-bearing', () => {
   it('writes the description before it derives any salary number', () => {
     const order = Object.keys(JOB_EXTRACTION_JSON_SCHEMA.properties);
     const description = order.indexOf('description');
-    for (const derived of ['salary_currency', 'salary_min', 'salary_max']) {
+    for (const derived of ['salary_period', 'salary_currency', 'salary_min', 'salary_max']) {
       expect(description, `description must precede ${derived}`).toBeLessThan(
         order.indexOf(derived),
       );
@@ -189,6 +193,30 @@ describe('JobExtractionSchema — validation', () => {
   it('accepts a fully populated extraction', () => {
     const parsed = JobExtractionSchema.safeParse(makeExtraction());
     expect(parsed.success).toBe(true);
+  });
+
+  it('keeps the recruitment agency separate from the named hiring company', () => {
+    const parsed = JobExtractionSchema.safeParse({
+      ...makeExtraction(),
+      company: 'Lloyds Banking Group',
+      agency: 'Harrington Search',
+    });
+    expect(parsed.success).toBe(true);
+    expect(JOB_EXTRACTION_JSON_SCHEMA.required).toContain('agency');
+    expect(JOB_EXTRACTION_JSON_SCHEMA.properties['agency']).toMatchObject({
+      type: ['string', 'null'],
+    });
+  });
+
+  it('allows a direct employer advert to have no agency', () => {
+    const parsed = JobExtractionSchema.safeParse({ ...makeExtraction(), agency: null });
+    expect(parsed.success).toBe(true);
+  });
+
+  it.each(['hour', 'day'] as const)('accepts the stated %s salary period', (salary_period) => {
+    expect(JobExtractionSchema.safeParse({ ...makeExtraction(), salary_period }).success).toBe(
+      true,
+    );
   });
 
   it('accepts an all-null extraction — the honest answer to a junk paste', () => {
@@ -218,6 +246,20 @@ describe('JobExtractionSchema — validation', () => {
     expect(
       JobExtractionSchema.safeParse({ ...makeExtraction(), salary_max: 55000.5 }).success,
     ).toBe(false);
+  });
+
+  it('negative: rejects a salary period the saved job model does not support', () => {
+    expect(
+      JobExtractionSchema.safeParse({ ...makeExtraction(), salary_period: 'week' }).success,
+    ).toBe(false);
+  });
+
+  it('boundary: accepts no stated period only as an explicit null', () => {
+    expect(
+      JobExtractionSchema.safeParse({ ...makeExtraction(), salary_period: null }).success,
+    ).toBe(true);
+    const { salary_period: _missing, ...withoutPeriod } = makeExtraction();
+    expect(JobExtractionSchema.safeParse(withoutPeriod).success).toBe(false);
   });
 
   it('boundary: a zero salary is a number and is accepted', () => {

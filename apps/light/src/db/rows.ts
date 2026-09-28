@@ -81,6 +81,7 @@ export const JOB_COLUMNS = [
   'url',
   'posted_date',
   'created_at',
+  'agency',
 ] as const;
 
 export const APPLICATION_COLUMNS = [
@@ -352,6 +353,7 @@ export function jobToValues(job: Job): SqlValue[] {
     external_id: job.external_id,
     title: job.title,
     company: job.company,
+    agency: job.agency,
     location: job.location,
     salary_min: job.salary_min,
     salary_max: job.salary_max,

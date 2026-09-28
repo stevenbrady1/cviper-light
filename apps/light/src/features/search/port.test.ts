@@ -38,6 +38,7 @@ const JOB: Job = {
   external_id: '55512345',
   title: 'Credit Risk Analyst',
   company: 'Barclays',
+  agency: null,
   location: 'London',
   salary_min: 457,
   salary_max: 550,

@@ -131,11 +131,13 @@ describe('extractJob — awkward adverts', () => {
     expect(outcome.extraction.description ?? '').toContain('pro rata');
   });
 
-  it('GAP: a day rate never becomes 149,500 a year', async () => {
+  it('preserves a day rate without annualising it', async () => {
     const { outcome } = await runFixture(DAY_RATE);
-    expect(outcome.extraction.salary_min).toBeNull();
+    expect(outcome.extraction.salary_min).toBe(650);
+    expect(outcome.extraction.salary_max).toBe(650);
     expect(outcome.extraction.salary_min).not.toBe(149500);
-    expect(outcome.meta.clampsApplied).toContain('salary:daily-to-null');
+    expect(outcome.extraction.salary_period).toBe('day');
+    expect(outcome.meta.clampsApplied).toContain('salary_period:advert-daily');
     expect(outcome.extraction.description ?? '').toContain('£650 per day');
   });
 

@@ -21,6 +21,7 @@ function entry(id: string, status: ApplicationStatus): TrackerEntry {
     external_id: null,
     title: `Role ${id}`,
     company: 'Acme',
+    agency: null,
     location: null,
     salary_min: null,
     salary_max: null,

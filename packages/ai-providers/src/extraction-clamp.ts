@@ -39,10 +39,11 @@
  * money, which is a different and wrong answer. The refusals matter as much as
  * the repairs.
  */
-import { EMPTY_JOB_EXTRACTION } from '@cviper/core-types';
+import { EMPTY_JOB_EXTRACTION, type SalaryPeriod } from '@cviper/core-types';
 
 import {
   blankValueSalaryWording,
+  hasUnsupportedSalaryPeriod,
   hasMoneyFigure,
   nonAnnualSalaryWording,
   salaryWordingSnippet,
@@ -62,6 +63,7 @@ const FIELDS = Object.keys(EMPTY_JOB_EXTRACTION);
 const STRING_FIELDS = [
   'title',
   'company',
+  'agency',
   'location',
   'url',
   'description',
@@ -197,6 +199,11 @@ export function clampExtraction(raw: unknown, sourceText: string): ExtractionCla
     }
   }
 
+  if (out['company'] === null && typeof out['agency'] === 'string') {
+    out['company'] = out['agency'];
+    applied.push('company:agency-fallback');
+  }
+
   // ── Salary numbers ────────────────────────────────────────────────────────
   for (const field of SALARY_NUMBER_FIELDS) {
     const current = out[field];
@@ -232,25 +239,44 @@ export function clampExtraction(raw: unknown, sourceText: string): ExtractionCla
     if (read.clamp !== null) applied.push(read.clamp);
   }
 
-  // ── THE OVERRULE. Reads the advert, never the reply. ──────────────────────
+  // ── Pay period. Explicit units in the advert beat the model's answer. ─────
   const nonAnnual = nonAnnualSalaryWording(sourceText);
+  const unsupportedPeriod = hasUnsupportedSalaryPeriod(sourceText);
   const blankValue = blankValueSalaryWording(sourceText);
 
   // A blank-value phrase only overrules when the advert quotes NO figure at
   // all. "A competitive salary of £95,000" is both competitive and a number,
   // and nulling it would throw away the one fact the user wanted.
   const blankValueWins = nonAnnual === null && blankValue !== null && !hasMoneyFigure(sourceText);
+  const hasSalaryFigure = out['salary_min'] !== null || out['salary_max'] !== null;
 
-  if (nonAnnual !== null || blankValueWins) {
-    const reason = nonAnnual ?? 'blank-value';
+  if (nonAnnual === 'hourly' || nonAnnual === 'daily') {
+    const period: SalaryPeriod = nonAnnual === 'hourly' ? 'hour' : 'day';
+    const correctedPeriod = hasSalaryFigure ? period : null;
+    if (out['salary_period'] !== correctedPeriod) {
+      out['salary_period'] = correctedPeriod;
+      applied.push(`salary_period:advert-${nonAnnual}`);
+    }
+  } else if (nonAnnual !== null || unsupportedPeriod || blankValueWins) {
+    const reason = nonAnnual ?? (unsupportedPeriod ? 'unsupported' : 'blank-value');
     const hadFigure =
-      out['salary_min'] !== null || out['salary_max'] !== null || out['salary_currency'] !== null;
+      hasSalaryFigure || out['salary_currency'] !== null || out['salary_period'] !== null;
 
     out['salary_min'] = null;
     out['salary_max'] = null;
     out['salary_currency'] = null;
+    out['salary_period'] = null;
     if (hadFigure) applied.push(`salary:${reason}-to-null`);
+  } else if (!hasSalaryFigure) {
+    out['salary_period'] = null;
+  } else if (out['salary_period'] === null) {
+    // Older model replies omitted the new field. Salary numbers in the original
+    // extraction contract were yearly unless the advert said otherwise.
+    out['salary_period'] = 'year';
+    applied.push('salary_period:absent-to-year');
+  }
 
+  if (nonAnnual !== null || unsupportedPeriod || blankValueWins) {
     const snippet = salaryWordingSnippet(sourceText);
     if (snippet !== null) {
       const before = out['description'];

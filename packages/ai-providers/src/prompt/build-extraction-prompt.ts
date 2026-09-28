@@ -1,5 +1,5 @@
 /**
- * The pasted-advert extraction prompt — ONE call, ONE flat object, nine fields.
+ * The pasted-advert extraction prompt — ONE call, ONE flat object, eleven fields.
  *
  * PORTED FROM: backend/ai/prompts/search_helpers.py  (CViper repo, @ e8a5e8b0)
  *   `build_email_job_extraction_prompt`
@@ -21,7 +21,7 @@
  * ============================================================================
  * WHAT CHANGED, AND WHY — read this before "restoring" anything.
  * ============================================================================
- * 1. NINE FIELDS, NOT SEVENTEEN. The source's JSON template lists `agency`,
+ * 1. ELEVEN FIELDS, NOT SEVENTEEN. The source's JSON template lists
  *    `recruiter_name`, `recruiter_email`, `ir35_status`, `contract_type`,
  *    `contract_duration`, `notice_period`, `seniority_level`, `benefits[]`,
  *    `essential_skills[]`, `desirable_skills[]` and a nested `estimated_salary`
@@ -37,15 +37,9 @@
  *    second prose copy is a second thing to keep in step. The FIELD RULES below
  *    name the nine keys in schema order, which is what the template was for.
  *
- * 3. THE AGENCY DISTINCTION IS DELIBERATELY COLLAPSED. The source's CRITICAL
- *    block insists `company` (the end client) and `agency` (the recruiter who
- *    sent the email) are different organisations and must never be copied into
- *    each other. We have no `agency` field, so the rule is INVERTED: an agency
- *    posting records the agency as `company`. That throws away a distinction the
- *    source considered important, and it is safe here for exactly one reason —
- *    THE USER REVIEWS EVERY FIELD BEFORE ANYTHING IS SAVED. The prompt says so
- *    out loud, because a model told "put the agency in `company`" with no
- *    explanation tends to start second-guessing it.
+ * 3. `company` and `agency` stay separate when both are named. If the client is
+ *    not named, the agency remains `company` for backward compatibility.
+ *    The review form shows both values before anything is saved.
  *
  * 4. THREE SALARY RULES THE SOURCE DOES NOT HAVE. Day rate, hourly rate and pro
  *    rata all resolve to `null` here, with the wording preserved in
@@ -147,15 +141,15 @@ const SYSTEM = [
  * The CRITICAL block — the most valuable thing in the source prompt.
  *
  * Bullets 1, 2 and 5 are the source's, reworded only where they named a field
- * we do not have. Bullet 3 REPLACES the source's company-versus-agency rule
- * (see the header, change 3). Bullet 4 is the source's `estimated_salary` rule
- * rewritten for a flat schema with no period field.
+ * we do not have. Bullet 3 preserves the company-versus-agency distinction.
+ * Bullet 4 uses the existing job-model periods;
+ * pro-rata and unsupported units remain unrepresented.
  */
 const CRITICAL = `CRITICAL — do not guess, do not invent, do not fabricate:
 - If a value is not stated in the text, return null. NEVER infer, estimate or invent a title, company, location, date or salary that is not there. An empty field is correct and useful; a plausible-looking wrong field is not.
 - If the text is not a job advert at all (a newsletter, a personal message, a shopping list), return null for every field.
-- If a recruitment agency posted the role rather than the employer, record the AGENCY in \`company\`. Do not guess who the end client is from a description like "a Tier 1 investment bank" — write that description in \`description\` instead. The person reading your answer will correct the company themselves before anything is saved.
-- Only put a YEARLY figure in \`salary_min\` and \`salary_max\`. If the pay is stated any other way, both are null.
+- If a recruitment agency posted the role and the advert names the client, put the client in \`company\` and the recruiting firm in \`agency\`. If no client is named, put the recruiting firm in BOTH \`company\` and \`agency\` so older records keep their meaning. Never infer a client from wording like "a Tier 1 investment bank"; keep that wording in \`description\`. For a direct employer, put the employer in \`company\` and return null for \`agency\`.
+- Put the amount as stated in \`salary_min\` and \`salary_max\`, and name its supported unit in \`salary_period\`. Never convert or annualise an amount.
 - Quote the advert's own words. Do not expand a technology stack into related tools the advert never mentions.
 - Ignore quoted history in a forwarded thread if it describes a different role; extract the role the message is actually about.`;
 
@@ -169,20 +163,23 @@ const CRITICAL = `CRITICAL — do not guess, do not invent, do not fabricate:
  */
 const FIELD_RULES = `Field rules, in the order you must answer them:
 - title: the job title, word for word. null if the advert gives none.
-- company: the organisation hiring. If a recruiter posted it rather than the employer, the recruiter's own firm goes here. null if no organisation is named.
+- company: the named hiring client. If no client is named and an agency posted the role, use that agency name for compatibility. For a direct employer, use the employer name. null if no organisation is named.
+- agency: the recruitment agency that posted or sent the role. Keep it separate from a named client. null for a direct employer or when no agency is named.
 - location: where the role is based, WORD FOR WORD. Keep any hybrid, remote, on-site or days-per-week wording exactly as written — "City of London (hybrid, 3 days on site)" stays whole, and "Fully remote (UK)" stays whole. Do not reduce it to a city. null if the advert does not say.
 - url: a link to the advert if one appears in the text. null otherwise.
 - description: two to four sentences on the role. If pay is stated as a day rate, an hourly rate, pro rata, or in words rather than numbers, COPY THAT WORDING HERE word for word — it is the only place it survives. null only if there is nothing at all to summarise.
 - posted_date: the date the advert was posted, as YYYY-MM-DD. null unless a date is actually stated. Do not use today's date.
+- salary_period: the unit of the amount: year, day, or hour. Use year for yearly pay, day for a day rate, and hour for hourly pay. null for pro rata, unsupported units, or no stated figure.
 - salary_currency: the three-letter code for the money, e.g. GBP, USD, EUR. null whenever salary_min and salary_max are both null.
-- salary_min and salary_max: the bottom and top of the YEARLY salary, as plain whole numbers with no symbols, commas or "k".
-  * "£45k-£55k" is 45000 and 55000, currency GBP.
-  * "£95,000" alone is 95000 for both.
-  * A day rate ("£650 per day", "£650/day") is null, null. Do NOT multiply it up to a yearly figure.
-  * An hourly rate ("£50 per hour", "£25/hr") is null, null.
-  * Pro rata pay ("£45,000 pro rata") is null, null — that is a full-time figure for a part-time job, and the real pay is not stated.
+- salary_min and salary_max: the bottom and top amounts for the stated period, as plain whole numbers with no symbols, commas or "k".
+  * "£45k-£55k" is 45000 and 55000, currency GBP, period year.
+  * "£95,000" alone is 95000 for both, period year.
+  * A day rate ("£650 per day", "£650/day") is 650 for both, period day. Do NOT multiply it up to a yearly figure.
+  * An hourly rate ("£50 per hour", "£25/hr") is 50 for both, period hour.
+  * Pro rata pay ("£45,000 pro rata") is null for both amounts and period — the real pay is not stated.
+  * Unsupported units such as weekly pay are null for both amounts and period.
   * Money described only in words — Competitive, Negotiable, DOE, Depending on experience, TBD, Market rate, Not specified — is null, null, and the currency is null too.
-  In every one of those null cases, the advert's own wording belongs in description.
+  In every null case, the advert's own wording belongs in description.
 
 ${JSON_ONLY}`;
 

@@ -49,7 +49,7 @@
  */
 import { z } from './zod';
 
-import { type IsoDate } from './entities';
+import { type IsoDate, type SalaryPeriod } from './entities';
 
 export { type JsonSchemaNode, type JsonSchemaType } from './analysis';
 
@@ -67,15 +67,18 @@ import { type JsonSchemaNode } from './analysis';
 export type JobExtraction = {
   title: string | null;
   company: string | null;
+  agency: string | null;
   location: string | null;
   url: string | null;
   description: string | null;
   posted_date: IsoDate | null;
   /** ISO-4217, e.g. `GBP`. Never a symbol — `clampExtraction` maps `£` to it. */
   salary_currency: string | null;
-  /** ANNUAL, or null. A day rate, hourly rate or pro-rata figure is never one. */
+  /** Existing job-model units only. Pro-rata and unsupported units are null. */
+  salary_period: SalaryPeriod | null;
+  /** Amount as stated for `salary_period`; never annualise another unit. */
   salary_min: number | null;
-  /** ANNUAL, or null. Same rule as `salary_min`. */
+  /** Amount as stated for `salary_period`; same rule as `salary_min`. */
   salary_max: number | null;
 };
 
@@ -91,11 +94,13 @@ export type JobExtraction = {
 export const EMPTY_JOB_EXTRACTION: JobExtraction = {
   title: null,
   company: null,
+  agency: null,
   location: null,
   url: null,
   description: null,
   posted_date: null,
   salary_currency: null,
+  salary_period: null,
   salary_min: null,
   salary_max: null,
 };
@@ -105,11 +110,13 @@ export const EMPTY_JOB_EXTRACTION: JobExtraction = {
 const jobExtractionShape = {
   title: z.string().nullable(),
   company: z.string().nullable(),
+  agency: z.string().nullable(),
   location: z.string().nullable(),
   url: z.string().nullable(),
   description: z.string().nullable(),
   posted_date: z.string().nullable(),
   salary_currency: z.string().nullable(),
+  salary_period: z.union([z.literal('year'), z.literal('day'), z.literal('hour')]).nullable(),
   salary_min: z.number().int().nullable(),
   salary_max: z.number().int().nullable(),
 };
@@ -162,15 +169,15 @@ export type _JobExtractionTypeMatchesSchema = AssertAssignable<
  *
  * So the reading order below is the REASONING order:
  *
- *   1-4  title, company, location, url — copied off the page. Nothing to derive,
- *        so they cost the model no reasoning and they establish what the advert
- *        actually is before anything harder is asked.
- *   5    description — the role written out in prose, and the place the RAW
+ *   1-5  title, company, agency, location, url — copied off the page. Nothing
+ *        to derive, so they cost the model no reasoning and establish who is
+ *        hiring and who is recruiting before anything harder is asked.
+ *   6    description — the role written out in prose, and the place the RAW
  *        salary wording is preserved. This must come before the salary numbers:
  *        writing "£500 per day, outside IR35" down is what makes the next three
  *        fields an easy `null` instead of a guess.
- *   6    posted_date — derived: "posted last Tuesday" has to become a date.
- *   7-9  salary_currency, salary_min, salary_max — the most derived fields in
+ *   7    posted_date — derived: "posted last Tuesday" has to become a date.
+ *   8-11 salary_currency, salary_min, salary_max — the most derived fields in
  *        the schema, and the ones a wrong answer does the most damage in. Last,
  *        with the wording already on the page above them.
  *
@@ -183,10 +190,12 @@ export const JOB_EXTRACTION_JSON_SCHEMA = {
   required: [
     'title',
     'company',
+    'agency',
     'location',
     'url',
     'description',
     'posted_date',
+    'salary_period',
     'salary_currency',
     'salary_min',
     'salary_max',
@@ -199,8 +208,15 @@ export const JOB_EXTRACTION_JSON_SCHEMA = {
     company: {
       type: ['string', 'null'],
       description:
-        'The organisation named as hiring. If a recruitment agency posted it, use the agency ' +
-        'name. null if no organisation is named at all.',
+        'The hiring client if named. If no client is named and a recruitment agency posted the ' +
+        'role, use that agency name for backward compatibility. For a direct employer, use the ' +
+        'employer name. null if no organisation is named.',
+    },
+    agency: {
+      type: ['string', 'null'],
+      description:
+        'The recruitment agency that posted or sent the role. Keep it separate from a named ' +
+        'hiring client. null for a direct employer or when no agency is named.',
     },
     location: {
       type: ['string', 'null'],
@@ -223,6 +239,13 @@ export const JOB_EXTRACTION_JSON_SCHEMA = {
       type: ['string', 'null'],
       description: 'The date the advert was posted, as YYYY-MM-DD. null unless a date is stated.',
     },
+    salary_period: {
+      type: ['string', 'null'],
+      enum: ['year', 'day', 'hour', null],
+      description:
+        'The unit the stated salary figures use: year, day, or hour. null for pro rata, ' +
+        'unsupported units, or no stated figure.',
+    },
     salary_currency: {
       type: ['string', 'null'],
       description:
@@ -232,14 +255,14 @@ export const JOB_EXTRACTION_JSON_SCHEMA = {
     salary_min: {
       type: ['integer', 'null'],
       description:
-        'Bottom of the YEARLY salary, as a plain number. null for a day rate, an hourly rate, ' +
-        'pro rata pay, or any advert with no yearly figure.',
+        'Bottom amount in the stated salary_period, as a plain number. null for pro rata, ' +
+        'unsupported units, or any advert with no figure.',
     },
     salary_max: {
       type: ['integer', 'null'],
       description:
-        'Top of the YEARLY salary, as a plain number. Same number as salary_min if only one ' +
-        'figure is given. null under the same rules as salary_min.',
+        'Top amount in the stated salary_period, as a plain number. Same number as salary_min ' +
+        'if only one figure is given. null under the same rules as salary_min.',
     },
   },
 } as const satisfies JsonSchemaNode;

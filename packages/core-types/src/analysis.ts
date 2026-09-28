@@ -129,7 +129,7 @@ export interface JsonSchemaNode {
   readonly required?: readonly string[];
   readonly additionalProperties?: boolean;
   readonly items?: JsonSchemaNode;
-  readonly enum?: readonly string[];
+  readonly enum?: readonly (string | null)[];
   readonly minimum?: number;
   readonly maximum?: number;
 }

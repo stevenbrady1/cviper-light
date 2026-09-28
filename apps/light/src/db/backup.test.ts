@@ -63,6 +63,7 @@ const JOB: Job = {
   external_id: 'ADZ-1',
   title: 'Risk Analyst',
   company: 'HSBC',
+  agency: null,
   location: 'London',
   salary_min: 65000,
   salary_max: 80000,

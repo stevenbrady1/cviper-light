@@ -57,6 +57,7 @@ const PRO_RATA_ADVERT = [
 const GOOD_REPLY = {
   title: 'Credit Risk Analyst',
   company: 'Lloyds Banking Group',
+  agency: null,
   location: 'City of London (hybrid, 3 days on site)',
   url: null,
   description: 'Second-line credit risk for the wholesale book.',
@@ -64,6 +65,18 @@ const GOOD_REPLY = {
   salary_currency: 'GBP',
   salary_min: 45000,
   salary_max: 55000,
+  salary_period: 'year',
+};
+
+const AGENCY_ADVERT = [
+  'Credit Risk Analyst',
+  'Harrington Search is recruiting on behalf of Lloyds Banking Group.',
+].join('\n');
+
+const AGENCY_REPLY = {
+  ...GOOD_REPLY,
+  company: 'Lloyds Banking Group',
+  agency: 'Harrington Search',
 };
 
 const WITH_OLLAMA: Availability = {
@@ -160,6 +173,7 @@ describe('the whole paste → review → save loop', () => {
     expect((screen.getByLabelText('Company') as HTMLInputElement).value).toBe(
       'Lloyds Banking Group',
     );
+    expect((screen.getByLabelText(/^Agency/) as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText(/^Salary from/) as HTMLInputElement).value).toBe('45000');
     expect((screen.getByLabelText(/^Salary to/) as HTMLInputElement).value).toBe('55000');
 
@@ -174,6 +188,7 @@ describe('the whole paste → review → save loop', () => {
     expect(port.entries()[0]?.job).toMatchObject({
       title: 'Credit Risk Analyst',
       company: 'Lloyds Banking Group',
+      agency: null,
       salary_min: 45000,
       salary_max: 55000,
       salary_currency: 'GBP',
@@ -181,10 +196,36 @@ describe('the whole paste → review → save loop', () => {
     });
   });
 
+  it('reviews and saves a named agency separately from the hiring company', async () => {
+    const user = userEvent.setup();
+    const transport = transportFor([ollamaBody(JSON.stringify(AGENCY_REPLY))]);
+    const port = renderBoard({ transport });
+
+    await openPaste(user);
+    await user.click(screen.getByTestId('paste-job-text'));
+    await user.paste(AGENCY_ADVERT);
+    await user.click(screen.getByTestId('paste-job-extract'));
+
+    await screen.findByTestId('new-application-form');
+    expect((screen.getByLabelText('Company') as HTMLInputElement).value).toBe(
+      'Lloyds Banking Group',
+    );
+    expect((screen.getByLabelText(/^Agency/) as HTMLInputElement).value).toBe('Harrington Search');
+    expect(port.calls.create).toBe(0);
+    expect(port.entries()).toEqual([]);
+
+    await user.click(screen.getByRole('button', { name: 'Save application' }));
+    await waitFor(() => expect(port.entries()).toHaveLength(1));
+    expect(port.entries()[0]?.job).toMatchObject({
+      company: 'Lloyds Banking Group',
+      agency: 'Harrington Search',
+    });
+  });
+
   it('saves the user’s CORRECTION, not the model’s answer', async () => {
     // The review step is only real if editing changes what is stored. An agency
-    // posting is the everyday case: the model records the recruiter as the
-    // company because our schema has no `agency` field, and the user fixes it.
+    // posting is the everyday case: the user can correct what the model read
+    // before anything is written.
     const user = userEvent.setup();
     const transport = transportFor([
       ollamaBody(JSON.stringify({ ...GOOD_REPLY, company: 'Harrington Search' })),
@@ -259,6 +300,40 @@ describe('the whole paste → review → save loop', () => {
     expect(port.entries()[0]?.job.salary_min).toBeNull();
     expect(port.entries()[0]?.job.salary_period).toBeNull();
   });
+
+  it.each([
+    { period: 'day', advertPay: '£750 per day', amount: '750' },
+    { period: 'hour', advertPay: '£50/hour', amount: '50' },
+  ] as const)(
+    'reviews and saves a $period rate without annualising it',
+    async ({ period, advertPay, amount }) => {
+      const user = userEvent.setup();
+      const transport = transportFor([
+        ollamaBody(
+          JSON.stringify({ ...GOOD_REPLY, salary_min: Number(amount), salary_max: Number(amount) }),
+        ),
+      ]);
+      const port = renderBoard({ transport });
+
+      await openPaste(user);
+      await user.click(screen.getByTestId('paste-job-text'));
+      await user.paste(`Credit Risk Analyst. ${advertPay}.`);
+      await user.click(screen.getByTestId('paste-job-extract'));
+
+      await screen.findByTestId('new-application-form');
+      expect((screen.getByLabelText(/^Salary from/) as HTMLInputElement).value).toBe(amount);
+      expect((screen.getByLabelText('Pay period') as HTMLSelectElement).value).toBe(period);
+      expect(port.calls.create).toBe(0);
+
+      await user.click(screen.getByRole('button', { name: 'Save application' }));
+      await waitFor(() => expect(port.entries()).toHaveLength(1));
+      expect(port.entries()[0]?.job).toMatchObject({
+        salary_min: Number(amount),
+        salary_max: Number(amount),
+        salary_period: period,
+      });
+    },
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -124,6 +124,7 @@ function normaliseRecord(raw: unknown, context: NormaliseContext): SearchResultJ
     external_id: asExternalId(record['slug']),
     title,
     company: asText(record['company_name']) ?? UNKNOWN_COMPANY,
+    agency: null,
     location: asText(record['location']),
     // The feed publishes NO salary. All four fields stay null rather than
     // being mined out of the description, which is how a card ends up

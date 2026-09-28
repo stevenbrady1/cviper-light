@@ -21,6 +21,7 @@ function job(id: string, description: string | null): Job {
     external_id: null,
     title: `Job ${id}`,
     company: 'Acme',
+    agency: null,
     location: 'London',
     salary_min: null,
     salary_max: null,

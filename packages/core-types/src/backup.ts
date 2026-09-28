@@ -233,6 +233,7 @@ function emitJob(job: Job): Record<string, unknown> {
       external_id: job.external_id,
       title: job.title,
       company: job.company,
+      agency: job.agency,
       location: job.location,
       salary_min: job.salary_min,
       salary_max: job.salary_max,

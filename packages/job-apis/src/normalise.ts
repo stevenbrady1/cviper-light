@@ -217,6 +217,7 @@ function normaliseAdzunaRecord(raw: unknown, context: NormaliseContext): SearchR
       external_id: asExternalId(result['id']),
       title,
       company: asText(asRecord(result['company'])?.['display_name']) ?? UNKNOWN_COMPANY,
+      agency: null,
       location: adzunaLocation(result),
       // Adzuna annualises every salary it publishes, so the period is known
       // even though the response carries no field for it. This is exactly the
@@ -297,6 +298,7 @@ function normaliseReedRecord(raw: unknown, context: NormaliseContext): SearchRes
       external_id: asExternalId(result['jobId']),
       title,
       company: asText(result['employerName']) ?? UNKNOWN_COMPANY,
+      agency: null,
       location: asText(result['locationName']),
       // THE PORTED FIX. Reed's figures carry no unit, so the unit is derived
       // and stored as data. See `reed-salary.ts` for what happened when it was

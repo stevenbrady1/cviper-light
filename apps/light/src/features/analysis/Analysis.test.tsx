@@ -63,6 +63,7 @@ const TRACKED_JOB: Job = {
   external_id: null,
   title: 'Credit Risk Analyst',
   company: 'Lloyds',
+  agency: null,
   location: 'London',
   salary_min: null,
   salary_max: null,

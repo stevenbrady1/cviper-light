@@ -115,6 +115,7 @@ const JOB: Job = {
   external_id: '55512345',
   title: 'Senior Credit Risk Analyst',
   company: 'Barclays',
+  agency: null,
   location: 'London, EC2',
   salary_min: 457,
   salary_max: 550,
@@ -133,6 +134,7 @@ const MANUAL_JOB: Job = {
   external_id: null,
   title: 'Quant Developer',
   company: 'Man Group',
+  agency: null,
   location: null,
   salary_min: null,
   salary_max: null,
@@ -337,6 +339,11 @@ describe('every migration column is mapped in rows.ts', () => {
       'text',
       'created_at',
     ]);
+  });
+
+  it('adds jobs.agency with a forward-only nullable column migration', () => {
+    expect(parsed['jobs']).toContain('agency');
+    expect(MIGRATION_SQL).toMatch(/ALTER TABLE jobs ADD COLUMN agency TEXT;/);
   });
 
   for (const [table, columns] of Object.entries(TABLE_COLUMNS)) {

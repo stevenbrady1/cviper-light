@@ -26,6 +26,7 @@ function job(id: string, overrides: Partial<Job> = {}): Job {
     external_id: null,
     title: `Job ${id}`,
     company: 'Acme',
+    agency: null,
     location: 'London',
     salary_min: null,
     salary_max: null,
@@ -57,6 +58,7 @@ function draft(overrides: Partial<ApplicationDraft> = {}): ApplicationDraft {
   return {
     title: 'Quant Developer',
     company: 'Jane Street',
+    agency: '',
     location: 'London',
     status: 'saved',
     // The advert fields, added when the paste-and-review flow arrived. Blank by
@@ -68,6 +70,7 @@ function draft(overrides: Partial<ApplicationDraft> = {}): ApplicationDraft {
     salaryMin: '',
     salaryMax: '',
     salaryCurrency: '',
+    salaryPeriod: 'year',
     ...overrides,
   };
 }
@@ -196,6 +199,12 @@ describe('validateDraft', () => {
 
   it('accepts an empty location, because plenty of adverts do not say', () => {
     expect(validateDraft(draft({ location: '' }))).toEqual({});
+  });
+
+  it('negative: requires a period when salary values are present', () => {
+    expect(validateDraft(draft({ salaryMin: '45000', salaryPeriod: '' })).salaryPeriod).toBe(
+      'Choose the period for these salary figures.',
+    );
   });
 
   it('reports every broken field at once, not one at a time', () => {
@@ -463,11 +472,14 @@ describe('createEntry — the advert fields', () => {
     expect(entry.job.salary_currency).toBeNull();
   });
 
-  it('marks a salary as YEARLY when there is one, and says nothing when there is not', () => {
-    // The extraction pipeline nulls a day rate, an hourly rate and pro-rata
-    // pay, so any figure that reaches this point IS annual — and the form's own
-    // label says "a year". Guessing is what `salary_period` exists to prevent.
+  it('marks a salary with its selected period, and says nothing when there is not', () => {
     expect(createEntry(draft({ salaryMin: '45000' }), ids, NOW).job.salary_period).toBe('year');
+    expect(
+      createEntry(draft({ salaryMin: '750', salaryPeriod: 'day' }), ids, NOW).job.salary_period,
+    ).toBe('day');
+    expect(
+      createEntry(draft({ salaryMin: '50', salaryPeriod: 'hour' }), ids, NOW).job.salary_period,
+    ).toBe('hour');
     expect(
       createEntry(draft({ salaryMin: '', salaryMax: '' }), ids, NOW).job.salary_period,
     ).toBeNull();
