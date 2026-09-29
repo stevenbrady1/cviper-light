@@ -60,13 +60,17 @@ https://github.com/stevenbrady1/cviper-light/releases/download/updater/latest.js
 
 It used to end `/releases/latest/download/latest.json`, which reads as "whatever
 the newest release is" and is not. GitHub resolves `/releases/latest/` to the
-newest release that is **neither a draft nor a pre-release**, and this project
-produces neither:
+newest release that is **neither a draft nor a pre-release**, and that was wrong
+here twice over:
 
 - `release.yml` always produces a DRAFT — see `releaseDraft` below, which is
   deliberate.
-- Unsigned direct-download installers ship as PRE-RELEASES, because an installer
-  SmartScreen warns about is not a headline download.
+- The first plan was to publish direct installers as PRE-RELEASES, which
+  `/releases/latest/` never serves. 0.2.0 and 0.3.0 in fact shipped as full
+  releases (L-179), and that does not rescue the old address: Latest moves the
+  moment a release is published, so an updater reading it would start serving
+  the new version BEFORE step 4's verification ran. The fixed `updater` release
+  is what keeps publishing and promoting separate steps.
 
 So the old endpoint 404ed with nothing published, and would have gone on 404ing
 after the first real release — failing in the direction nobody investigates. The
@@ -123,9 +127,12 @@ decides everything after that.
    deleted while the app still advertised it (L-114), and nothing in CI went
    red. Turning this into a script that fails loudly is tracked as a
    follow-up.
-3. **Publish the draft as a PRE-RELEASE.** Pre-release rather than latest,
-   because the direct-download installers are unsigned, SmartScreen warns about
-   them, and they are not a headline download.
+3. **Publish the draft as a full release**, so it takes GitHub's Latest badge.
+   0.2.0 and 0.3.0 both shipped this way (L-179). The updater never reads Latest,
+   so this only decides which release the releases page offers first; a
+   pre-release would leave that on the version before. To change the flag
+   afterwards, run **Actions → Release admin** (`set-prerelease` or
+   `clear-prerelease`, L-178).
 4. **Promote the manifest.** Actions → Release → _Run workflow_, with
    `promote_tag` set to the tag you just published. **This is the moment
    existing installs begin to see the new version.** Nothing before this step

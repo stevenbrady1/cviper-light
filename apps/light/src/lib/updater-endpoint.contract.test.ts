@@ -17,9 +17,10 @@
  *   * `release.yml` always produces a DRAFT (`releaseDraft: true`, and that is
  *     deliberate — publishing is the moment every existing install starts
  *     downloading, so a person presses it).
- *   * The owner's rule is that unsigned direct installers ship as
- *     PRE-RELEASES, because an installer Windows SmartScreen warns about is not
- *     something to hand the general public as a headline download.
+ *   * The plan at the time was to publish unsigned direct installers as
+ *     PRE-RELEASES. They now ship as full releases (L-179), and that does not
+ *     rescue `/releases/latest/`: Latest moves the moment a release is
+ *     published, before the promote step has verified its manifest.
  *
  * So the endpoint 404s today, with nothing published at all, and it would go on
  * 404ing after the first real release. Worse, it fails in the direction nobody

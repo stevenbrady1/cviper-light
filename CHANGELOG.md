@@ -26,10 +26,10 @@ All notable changes to CViper Light are recorded here. The format follows
 - The key box hint no longer says every key has a prefix; some providers'
   keys do not (L-177).
 
-## [0.3.0] — not yet published
+## [0.3.0] — 2026-09-28
 
 The version the Microsoft Store submission and the next download are built
-from (L-174). The date is set when `light-v0.3.0` is tagged.
+from (L-174).
 
 ### Added
 
