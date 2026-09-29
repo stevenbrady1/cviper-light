@@ -190,6 +190,20 @@ describe('a handoff that fits', () => {
     expect(pick('tailor-provider').value).toBe('ollama:qwen2.5:7b');
   });
 
+  it('says "handled" only once the screen already shows the handoff (ordering)', async () => {
+    // Read the pickers AT THE MOMENT the shell is told. Before the fix this
+    // callback ran inside the effect that queued the updates, so the screen
+    // could still show the defaults — a race that surfaced as a rare flake.
+    const seen: string[] = [];
+    const onHandoffHandled = vi.fn(() => {
+      seen.push(pick('tailor-cv-pick').value, pick('tailor-job-pick').value, advert().value);
+    });
+    await renderWith(HANDOFF, { onHandoffHandled });
+
+    await vi.waitFor(() => expect(onHandoffHandled).toHaveBeenCalledTimes(1));
+    expect(seen).toEqual(['cv-2', 'job-1', HANDOFF.jobText]);
+  });
+
   it('selects the job’s application, so the tailored CV saves straight into it', async () => {
     const { port, user } = await renderWith(HANDOFF);
     await vi.waitFor(() => expect(pick('tailor-job-pick').value).toBe('job-1'));
