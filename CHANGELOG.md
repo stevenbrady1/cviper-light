@@ -6,6 +6,12 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] — not yet published
+
+The CViper logo, a Gemini that finishes its answers, a choice of model per
+provider, and fixes to the tracker, the Analysis screen and link fetching
+(L-189). The date is set when `light-v0.5.0` is published.
+
 ### Added
 
 - The sidebar's Set up list shows which AI providers have a key: each one with
@@ -232,7 +238,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.4.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.5.0...main
+[0.5.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.4.0...light-v0.5.0
 [0.4.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.3.0...light-v0.4.0
 [0.3.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.2.0...light-v0.3.0
 [0.2.0]: https://github.com/stevenbrady1/cviper-light/releases/tag/light-v0.2.0
