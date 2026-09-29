@@ -76,6 +76,10 @@ interface ApplicationDetailProps {
   readonly createTransport?: (() => ChatTransport) | undefined;
   /** Injected by tests. Forwarded to the two AI panels that ask for consent (L-171). */
   readonly consentPort?: ConsentPort | undefined;
+  /** Take this job to the Analysis screen (L-190). Left undefined, no button. */
+  readonly onAnalyse?: (() => void) | undefined;
+  /** Take this job to the Tailor screen (L-190). Left undefined, no button. */
+  readonly onTailor?: (() => void) | undefined;
 }
 
 /** `''` from an input means "nothing here", and the model spells that `null`. */
@@ -97,6 +101,8 @@ export function ApplicationDetail({
   readAvailability,
   createTransport,
   consentPort,
+  onAnalyse,
+  onTailor,
 }: ApplicationDetailProps) {
   const { application, job } = entry;
   const [confirming, setConfirming] = useState(false);
@@ -192,6 +198,43 @@ export function ApplicationDetail({
             Open the advert →
           </button>
           <span className="text-xs text-ink-faint">Opens in your browser.</span>
+        </div>
+      )}
+
+      {/*
+        ============================================================================
+        ON TO THE NEXT STEP (L-190)
+        ============================================================================
+        The same job, taken to Analysis or Tailor with its advert, so the check,
+        the tailored CV and the letter all land on this application rather than
+        on a paste that belongs to nothing.
+
+        SECONDARY, both of them: the board's one blue button is "Add
+        application", and a pane of blue buttons would say nothing about which
+        one the screen is for. Each is drawn only when the shell can act on it.
+      */}
+      {onAnalyse === undefined && onTailor === undefined ? null : (
+        <div className="flex flex-wrap items-center gap-2">
+          {onAnalyse === undefined ? null : (
+            <button
+              type="button"
+              data-testid="detail-analyse"
+              onClick={onAnalyse}
+              className={SECONDARY_BUTTON}
+            >
+              Analyse this job
+            </button>
+          )}
+          {onTailor === undefined ? null : (
+            <button
+              type="button"
+              data-testid="detail-tailor"
+              onClick={onTailor}
+              className={SECONDARY_BUTTON}
+            >
+              Tailor my CV
+            </button>
+          )}
         </div>
       )}
 

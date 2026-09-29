@@ -49,6 +49,22 @@ export interface AnalysisSessionState {
   readonly selectedCvId: string | null;
   readonly jobText: string;
   /**
+   * The tracked job the advert in the box belongs to, or `null` for a paste
+   * (L-190). Set when a job arrives from Search or the tracker, or is picked
+   * from the saved-jobs list; the run saves its history against it, so a check
+   * is attached to the record the tailored CV and the letter attach to.
+   *
+   * Editing the box does NOT clear it — fixing a preview by pasting the full
+   * advert over it is the expected edit, and it is still that job. Emptying the
+   * box does: there is no advert left to belong to anything.
+   */
+  readonly jobId: string | null;
+  /**
+   * One sentence about the advert that came with the job — "only a preview of
+   * the advert came with this result…" — or `null`. Shown above the box.
+   */
+  readonly jobNote: string | null;
+  /**
    * The option the user PICKED, or `null` until they pick one.
    *
    * Not "the option on screen": that is derived in the view from what this
@@ -79,6 +95,8 @@ export interface AnalysisSessionState {
 export const EMPTY_ANALYSIS_SESSION: AnalysisSessionState = {
   selectedCvId: null,
   jobText: '',
+  jobId: null,
+  jobNote: null,
   optionKey: null,
   result: null,
   checkedAdvert: null,

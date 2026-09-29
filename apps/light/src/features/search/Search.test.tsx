@@ -381,7 +381,7 @@ describe('saving to the tracker', () => {
       NOW.toISOString(),
     );
 
-    expect(again).toEqual({ ok: true, value: 'already-saved' });
+    expect(again.ok && again.value.outcome).toBe('already-saved');
     expect(port.savedJobs()).toHaveLength(1);
   });
 

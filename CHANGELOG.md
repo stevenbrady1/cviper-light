@@ -6,6 +6,22 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Find a job, check your CV against it and tailor your CV for it, without
+  copying anything between screens. "Analyse this job" on a search result saves
+  it to your tracker (once — a job already there is reused) and opens it on
+  Analysis with the advert filled in. Adzuna, Reed and the Guardian only send a
+  preview of each advert, so the app reads the rest from the advert's own page
+  when you press the button; if the site blocks apps, Analysis says so and asks
+  you to paste the full advert. After a check, "Tailor my CV for this job"
+  opens Tailor with the same job, CV and model. A tracker application has
+  "Analyse this job" and "Tailor my CV" too, and the check is saved against
+  that job (L-190).
+- Fetching an advert from its link now reads the job details the page publishes
+  for search engines when it has them, so the advert comes in without the menus,
+  cookie banners and "similar jobs" around it (L-190).
+
 ## [0.5.0] — 2026-09-29
 
 The CViper logo, a Gemini that finishes its answers, a choice of model per

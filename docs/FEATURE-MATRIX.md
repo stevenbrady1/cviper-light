@@ -52,7 +52,7 @@ product that exists (L-114).
 | API key setup                                | Yes — tested before saved, never read back                                                                                                                                                       | Not applicable                     | Built                     |
 | Application tracker                          | Yes — local SQLite                                                                                                                                                                               | Yes — synced                       | Built                     |
 | Paste a job advert                           | Yes — AI reads it, you check every box                                                                                                                                                           | Yes — server-side                  | Built                     |
-| Fetch an advert from a link                  | Yes — one page, on request, no credentials                                                                                                                                                       | Yes — server-side, no user IP      | Built                     |
+| Fetch an advert from a link                  | Yes — one page, on request, no credentials; the page's own JobPosting data is read first when it has it                                                                                          | Yes — server-side, no user IP      | Built                     |
 | A link pasted in the advert box              | A paste that is only a web link starting with http or https is spotted and never sent to a model; anything else — a link with words beside it, or an address without http — is read as an advert | No — not built there               | Built                     |
 | CV parsing                                   | Yes — fully local                                                                                                                                                                                | Yes — server-side                  | Extraction built          |
 | JSON Resume import                           | Yes — any JSON Resume 1.0 file, read here                                                                                                                                                        | Yes — server-side                  | Built                     |
@@ -78,6 +78,7 @@ product that exists (L-114).
 | Follow-up and thank-you drafts (L-162)       | Yes — quiet after 10 days, two at most, drafted from the archived materials only; never sends                                                                                                    | Not applicable                     | Built                     |
 | Interview prep pack (L-163)                  | Yes — from the archived advert, CV and letter plus the profile's STAR examples; saved as a document                                                                                              | Not applicable                     | Built                     |
 | Prompt trust boundary (L-153)                | Yes — every system prompt says the advert and CV are data, not instructions; a contract test derives the population                                                                              | Not applicable                     | Built                     |
+| Find Job → Analyse → Tailor (L-190)          | Yes — one job carried from a search result or the tracker to Analysis and on to Tailor, saved to the tracker once; a preview has its full advert read from its own page, on the press            | Not applicable                     | Built                     |
 | Tailor a CV to an advert (L-160)             | Yes — structured rewrite from the CV only, reviewer pass, deterministic fabrication check, line diff, saved to the application, plain-text export                                                | Yes — server-side                  | Built                     |
 | Cover letter (L-161)                         | Yes — from the tailored CV and the advert, word count with a 400-word note, saved and exportable                                                                                                 | Yes — server-side                  | Built                     |
 | Import a profile from ai-job-search (L-167)  | Yes — pick the folder, four Markdown files read here by fixed name, reviewed before anything is added; lists union, typed text is never overwritten                                              | Not applicable                     | Built                     |
@@ -186,6 +187,13 @@ product that exists (L-114).
   model time before the user can see that the page came back as "Sign in to
   continue", and puts an advert they have never read in front of them as a
   filled-in form.
+
+  Since L-190 the same command, with the same rules, is also reached from
+  **Analyse this job** on a search result — only when the result carries a
+  preview of the advert (Adzuna, Reed and the Guardian always do), and only
+  that result's own page. It is disclosed beside the results before the button
+  is pressed, and a site that blocks apps is named as such on the Analysis
+  screen, with the route that works: paste the advert.
 
   It is disclosed at the control, not in a policy page: _"Fetching opens that
   page from your computer, the same as visiting it in your browser — the site

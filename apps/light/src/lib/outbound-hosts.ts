@@ -309,11 +309,20 @@ export interface OutboundCapability {
 export const OUTBOUND_CAPABILITIES: readonly OutboundCapability[] = [
   {
     id: 'fetched-advert',
-    what: 'any job-advert page you ask it to open — only when you press Fetch',
+    // L-190: "Analyse this job" on a search result that carries only a
+    // preview of the advert reads that result's own page, through the same
+    // command and the same rules. Both buttons are named, because "only when
+    // you press Fetch" stopped being the whole truth the day the second one
+    // shipped.
+    what:
+      'any job-advert page you ask it to open — only when you press Fetch, or Analyse this ' +
+      'job on a search result',
     purpose: 'fetched-on-request',
     why:
       'You paste a link and press Fetch, and the app reads that one page so it can fill in the ' +
-      'form. The address is whichever one you pasted, so it cannot be listed here in advance. ' +
+      'form. Pressing Analyse this job on a search result that carries only a preview of the ' +
+      'advert reads that result’s own page, once, so the whole advert is scored. The address ' +
+      'is whichever one you pasted or the result links to, so it cannot be listed here in advance. ' +
       'It carries no cookies, no sign-in and no key, it cannot reach your saved keys, it ' +
       'follows no links, and addresses on your own computer or home network are refused. The ' +
       'site sees your IP address, exactly as it would if you had clicked the link yourself.',

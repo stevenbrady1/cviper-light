@@ -88,6 +88,12 @@ interface ResultCardProps {
   readonly dealBreakers: readonly string[];
   readonly onSave: () => void;
   readonly onOpen: () => void;
+  /**
+   * "Analyse this job" (L-190): save it, read the full advert if this is a
+   * preview, and go to Analysis with it. Left undefined, no button is drawn —
+   * a button that goes nowhere is worse than none.
+   */
+  readonly onAnalyse?: (() => void) | undefined;
 }
 
 export function ResultCard({
@@ -102,6 +108,7 @@ export function ResultCard({
   dealBreakers,
   onSave,
   onOpen,
+  onAnalyse,
 }: ResultCardProps) {
   const { job, contractType } = entry;
 
@@ -212,6 +219,24 @@ export function ResultCard({
         >
           {tracked ? 'In your tracker' : 'Save to tracker'}
         </button>
+
+        {/*
+          Secondary, like Save, and NOT disabled once the advert is tracked:
+          analysing a job already on the board is the common case, and it
+          reuses that record rather than adding another. Disabled only while
+          this card is busy, so one press cannot become two saves.
+        */}
+        {onAnalyse === undefined ? null : (
+          <button
+            type="button"
+            data-testid={`result-analyse-${job.id}`}
+            disabled={busy}
+            onClick={onAnalyse}
+            className={SECONDARY_BUTTON}
+          >
+            Analyse this job
+          </button>
+        )}
 
         <button
           type="button"

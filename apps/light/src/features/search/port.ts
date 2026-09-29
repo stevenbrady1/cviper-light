@@ -53,11 +53,43 @@ import {
 } from '../../db';
 import { createTauriJobTransport } from '../../jobs/transport';
 import { createTauriKeylessTransport } from '../../jobs/keylessTransport';
+import { fetchFullAdvert } from '../flow/advert';
+import { createTauriPageTransport, type PageFetchTransport } from '../tracker/pageFetch';
 
 import { externalKey } from './model';
 
 /** What happened when the user pressed Save. Neither of these is a failure. */
 export type SaveOutcome = 'saved' | 'already-saved';
+
+/**
+ * What a save left in the database — the STORED job, not the one passed in.
+ *
+ * ============================================================================
+ * WHY THE JOB COMES BACK (L-190)
+ * ============================================================================
+ * "Analyse this job" saves the advert and then attaches the analysis, the
+ * tailored CV and the cover letter to it. When the advert was already saved,
+ * the stored row carries a DIFFERENT id from the fresh UUID this search gave
+ * it, so anything keyed on the search's copy would point at a job that is not
+ * in the database. The caller gets the row that is.
+ */
+export interface SavedToTracker {
+  readonly outcome: SaveOutcome;
+  readonly job: Job;
+  /**
+   * The application chasing that job. `null` only in the one race described
+   * in `saveToTracker`: another window wrote the job and has not yet written
+   * its application.
+   */
+  readonly applicationId: string | null;
+}
+
+/** A job with the best advert text there is, and the sentence to show beside it. */
+export interface FullAdvertRead {
+  readonly job: Job;
+  /** Safe to show verbatim; `null` when the job now carries the whole advert. */
+  readonly note: string | null;
+}
 
 export interface SearchPort {
   /** Run one search. Never rejects: each board succeeds or fails on its own. */
@@ -93,7 +125,16 @@ export interface SearchPort {
     job: Job,
     ids: { readonly applicationId: string },
     now: IsoTimestamp,
-  ): Promise<Result<SaveOutcome, DbError>>;
+  ): Promise<Result<SavedToTracker, DbError>>;
+  /**
+   * Bring in the full advert for a job whose search result was only a preview
+   * (L-190), and write it onto the stored job.
+   *
+   * Reads ONE page — the job's own — and only when the stored text is a
+   * preview; see `flow/advert.ts`. Never rejects: a page that cannot be read
+   * leaves the job as it was and comes back with a note saying what to do.
+   */
+  readFullAdvert(job: Job): Promise<FullAdvertRead>;
 }
 
 /**
@@ -117,9 +158,17 @@ function newApplication(jobId: string, applicationId: string, now: IsoTimestamp)
   };
 }
 
+/** The first application chasing this job, or `null`. */
+async function applicationFor(jobId: string): Promise<Result<string | null, DbError>> {
+  const applications = await listApplications();
+  if (!applications.ok) return applications;
+  return ok(applications.value.find((application) => application.job_id === jobId)?.id ?? null);
+}
+
 export function createDbSearchPort(
   transport?: JobSearchTransport,
   keylessTransport?: KeylessFetchTransport,
+  createPageTransport: () => PageFetchTransport = createTauriPageTransport,
 ): SearchPort {
   // Built once per port. `createTauriJobTransport` is cheap, but a new one per
   // search would be a new object identity in every dependency array above.
@@ -180,21 +229,23 @@ export function createDbSearchPort(
         if (!existing.ok) return existing;
 
         if (existing.value !== null) {
-          const applications = await listApplications();
-          if (!applications.ok) return applications;
+          const stored = existing.value;
+          const chasing = await applicationFor(stored.id);
+          if (!chasing.ok) return chasing;
 
-          const already = applications.value.some(
-            (application) => application.job_id === existing.value?.id,
-          );
-          if (already) return ok('already-saved');
+          if (chasing.value !== null) {
+            return ok({ outcome: 'already-saved', job: stored, applicationId: chasing.value });
+          }
 
           // The advert is in the database but on nobody's board — an import,
           // usually. Chase the EXISTING row: writing the fresh id from this
           // search is exactly what trips the unique index.
           const created = await upsertApplication(
-            newApplication(existing.value.id, ids.applicationId, now),
+            newApplication(stored.id, ids.applicationId, now),
           );
-          return created.ok ? ok('saved') : created;
+          return created.ok
+            ? ok({ outcome: 'saved', job: stored, applicationId: ids.applicationId })
+            : created;
         }
       }
 
@@ -204,13 +255,41 @@ export function createDbSearchPort(
       const written = await upsertJob(job);
       if (!written.ok) {
         // The backstop, and ONLY for the duplicate. Another window inserted the
-        // same advert between our lookup and this write.
-        if (written.error.code === 'CONSTRAINT_VIOLATION') return ok('already-saved');
+        // same advert between our lookup and this write — so look up the row it
+        // wrote, and hand THAT back (L-190). If it cannot be found, the write's
+        // own failure is reported: the fresh id is not in the database, and
+        // handing it on would attach an analysis to a job that does not exist.
+        if (written.error.code === 'CONSTRAINT_VIOLATION' && job.external_id !== null) {
+          const raced = await findJobByExternalId(job.source, job.external_id);
+          if (!raced.ok) return raced;
+          if (raced.value === null) return written;
+
+          const chasing = await applicationFor(raced.value.id);
+          if (!chasing.ok) return chasing;
+          return ok({ outcome: 'already-saved', job: raced.value, applicationId: chasing.value });
+        }
         return written;
       }
 
       const created = await upsertApplication(newApplication(job.id, ids.applicationId, now));
-      return created.ok ? ok('saved') : created;
+      return created.ok ? ok({ outcome: 'saved', job, applicationId: ids.applicationId }) : created;
+    },
+
+    async readFullAdvert(job) {
+      const full = await fetchFullAdvert(job, createPageTransport);
+      if (full.text === (job.description ?? '')) return { job, note: full.note };
+
+      // The tracker keeps the whole advert too, so the next visit — and the
+      // tailor screen — read it rather than the preview.
+      //
+      // A failed write FALLS BACK rather than failing the analysis: the whole
+      // advert is still handed on, and is on screen in the advert box where
+      // the user can read it. What is lost is only the tracker's copy, which
+      // keeps the preview it already had — and the next Analyse reads the
+      // page again, because the stored text still looks like a preview.
+      const better: Job = { ...job, description: full.text };
+      await upsertJob(better);
+      return { job: better, note: full.note };
     },
   };
 }

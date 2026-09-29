@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   checkFabrication,
@@ -42,6 +42,7 @@ import {
   providerOptions,
   type ProviderOption,
 } from '../analysis/providers';
+import { type TailorHandoff } from '../flow/handoff';
 
 import { lineDiff } from './diff';
 import { buildCoverLetterDocx, buildCvDocx } from './docx';
@@ -144,6 +145,17 @@ export interface TailorProps {
    * button is drawn: a button that goes nowhere is worse than none.
    */
   readonly onOpenSettings?: (() => void) | undefined;
+  /**
+   * A job, CV and option handed over from Analysis or the tracker (L-190).
+   *
+   * Applied ONCE, when the CVs, the saved jobs and this machine's options
+   * have all been read — each field is checked against them, so a CV deleted
+   * since, a job not on the board, or an option this screen cannot use falls
+   * back to the ordinary default rather than to a select pointing at nothing.
+   * Owned by the shell, which clears it when `onHandoffHandled` is called.
+   */
+  readonly handoff?: TailorHandoff | null | undefined;
+  readonly onHandoffHandled?: (() => void) | undefined;
 }
 
 function consentKindFor(kind: ProviderOption['kind']): ConsentProviderKind | null {
@@ -164,6 +176,8 @@ export function Tailor({
   consentPort,
   now,
   onOpenSettings,
+  handoff,
+  onHandoffHandled,
 }: TailorProps = {}) {
   const tailorPort = useMemo(() => port ?? createDbTailorPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
@@ -172,6 +186,8 @@ export function Tailor({
   const [cvs, setCvs] = useState<readonly Cv[]>([]);
   const [cvsLoaded, setCvsLoaded] = useState(false);
   const [jobs, setJobs] = useState<readonly Job[]>([]);
+  /** False until the saved-jobs read has come back, either way. A handoff waits for it. */
+  const [jobsLoaded, setJobsLoaded] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [selectedCvId, setSelectedCvId] = useState<string | null>(null);
   const [jobText, setJobText] = useState('');
@@ -237,8 +253,12 @@ export function Tailor({
     });
 
     void tailorPort.loadJobs().then((loaded) => {
+      if (cancelled) return;
+      // Set on both branches: a failed read is a finished read, and a handoff
+      // waiting on it still has an advert worth putting in the box.
+      setJobsLoaded(true);
       // Not surfaced: the tracked-job shortcut is a convenience.
-      if (!cancelled && loaded.ok) setJobs(loaded.value);
+      if (loaded.ok) setJobs(loaded.value);
     });
 
     void tailorPort.profile().then((loaded) => {
@@ -286,6 +306,44 @@ export function Tailor({
       cancelled = true;
     };
   }, [tailorPort, selectedJobId]);
+
+  /**
+   * Apply a handoff (L-190) once everything it is checked against has loaded.
+   *
+   * WAITS for the options too, and applies after them, so the availability
+   * read — which sets the default option — cannot land later and overwrite
+   * the one handed over. The ref makes it once-only even if the shell never
+   * clears it: re-applying on the next render would undo the user's edits.
+   */
+  const appliedHandoff = useRef<TailorHandoff | null>(null);
+  useEffect(() => {
+    if (handoff === undefined || handoff === null || appliedHandoff.current === handoff) return;
+    if (!cvsLoaded || !jobsLoaded || !availabilityRead) return;
+    appliedHandoff.current = handoff;
+
+    if (handoff.cvId !== null && cvs.some((candidate) => candidate.id === handoff.cvId)) {
+      setSelectedCvId(handoff.cvId);
+    }
+    setJobText(handoff.jobText);
+    // Selecting the job is what loads its applications and picks the first,
+    // so "Save to an application" works on the record the flow started from.
+    // A job that is not on the board leaves the advert as a paste.
+    setSelectedJobId(
+      handoff.jobId !== null && jobs.some((candidate) => candidate.id === handoff.jobId)
+        ? handoff.jobId
+        : null,
+    );
+    // Only an option THIS screen offers. The basic match is never one — it
+    // cannot write a paragraph — so a check run with it lands on the default.
+    if (handoff.optionKey !== null && optionByKey(options, handoff.optionKey) !== null) {
+      setOptionKey(handoff.optionKey);
+    }
+    setResult(null);
+    setReview(null);
+    setLetter(null);
+    setSaveMessage(null);
+    onHandoffHandled?.();
+  }, [availabilityRead, cvs, cvsLoaded, handoff, jobs, jobsLoaded, onHandoffHandled, options]);
 
   const selectedOption = optionByKey(options, optionKey);
   const running = phase !== 'idle';

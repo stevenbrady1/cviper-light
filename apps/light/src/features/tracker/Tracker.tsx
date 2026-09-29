@@ -106,6 +106,17 @@ export interface TrackerProps {
   readonly consentPort?: ConsentPort | undefined;
   /** Injected by tests: the real one opens the user's browser at the advert. */
   readonly browser?: BrowserPort | undefined;
+  /**
+   * "Analyse this job" and "Tailor my CV" on an application (L-190). The shell
+   * owns which view is showing, so the entry goes back to it — the same
+   * arrangement as `onOpenSettings`. Left undefined, no button is drawn.
+   *
+   * No page is fetched from here, unlike from a search result: a job on the
+   * board holds the advert the user pasted or saved, and the pane already has
+   * the route to fix a thin one — open the advert and paste it on Analysis.
+   */
+  readonly onAnalyse?: ((entry: TrackerEntry) => void) | undefined;
+  readonly onTailor?: ((entry: TrackerEntry) => void) | undefined;
 }
 
 /**
@@ -132,6 +143,8 @@ export function Tracker({
   readAvailability,
   browser,
   consentPort,
+  onAnalyse,
+  onTailor,
 }: TrackerProps) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke.
@@ -555,6 +568,8 @@ export function Tracker({
               readAvailability={readAvailability}
               createTransport={createTransport}
               consentPort={consentPort}
+              onAnalyse={onAnalyse === undefined ? undefined : () => onAnalyse(selected)}
+              onTailor={onTailor === undefined ? undefined : () => onTailor(selected)}
             />
           </DetailPane>
         )}

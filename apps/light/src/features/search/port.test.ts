@@ -123,7 +123,7 @@ describe('saving an advert that is new', () => {
   it('writes the job FIRST, then the application', async () => {
     const saved = await createDbSearchPort().saveToTracker(JOB, { applicationId: 'app-new' }, NOW);
 
-    expect(saved).toEqual(ok('saved'));
+    expect(saved.ok && saved.value.outcome).toBe('saved');
     // `applications.job_id` has a foreign key onto `jobs.id` and foreign keys
     // are enforced, so the other order is a guaranteed constraint violation.
     expect(db.upsertJob.mock.invocationCallOrder[0]).toBeLessThan(
@@ -175,7 +175,7 @@ describe('saving the same advert twice', () => {
     const saved = await createDbSearchPort().saveToTracker(JOB, { applicationId: 'a' }, NOW);
 
     // Not an error. Not a duplicate row. Not a raw SQLite message on screen.
-    expect(saved).toEqual(ok('already-saved'));
+    expect(saved.ok && saved.value.outcome).toBe('already-saved');
     expect(db.upsertJob).not.toHaveBeenCalled();
     expect(db.upsertApplication).not.toHaveBeenCalled();
   });
@@ -187,7 +187,7 @@ describe('saving the same advert twice', () => {
 
     const saved = await createDbSearchPort().saveToTracker(JOB, { applicationId: 'a' }, NOW);
 
-    expect(saved).toEqual(ok('saved'));
+    expect(saved.ok && saved.value.outcome).toBe('saved');
     // The EXISTING job's id, not the fresh one from this search — writing the
     // fresh one is exactly what trips the unique index.
     expect(db.upsertJob).not.toHaveBeenCalled();
@@ -199,11 +199,13 @@ describe('saving the same advert twice', () => {
   it('negative: a constraint violation is still handled, for the race the lookup cannot close', async () => {
     // Two windows saving the same advert between the SELECT and the INSERT.
     // The index is the backstop, and the user must never see its message.
+    // L-190: the row the other window wrote is looked up, so it can be handed back.
+    db.findJobByExternalId.mockResolvedValueOnce(ok(null)).mockResolvedValueOnce(ok(ALREADY_SAVED));
     db.upsertJob.mockResolvedValue(err(duplicate));
 
     const saved = await createDbSearchPort().saveToTracker(JOB, { applicationId: 'a' }, NOW);
 
-    expect(saved).toEqual(ok('already-saved'));
+    expect(saved.ok && saved.value.outcome).toBe('already-saved');
     expect(db.upsertApplication).not.toHaveBeenCalled();
   });
 
@@ -236,7 +238,7 @@ describe('an advert with no provider identity', () => {
 
     const saved = await createDbSearchPort().saveToTracker(anonymous, { applicationId: 'a' }, NOW);
 
-    expect(saved).toEqual(ok('saved'));
+    expect(saved.ok && saved.value.outcome).toBe('saved');
     expect(db.findJobByExternalId).not.toHaveBeenCalled();
     expect(db.upsertJob).toHaveBeenCalledWith(anonymous);
   });
