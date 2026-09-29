@@ -1,0 +1,70 @@
+name: Release admin
+
+# ============================================================================
+# TIDYING RELEASES, NEVER PUBLISHING THEM (L-178)
+# ============================================================================
+# Run by hand (Actions -> Release admin -> Run workflow). Three actions:
+#
+#   set-prerelease    on a published light-vX.Y.Z release
+#   clear-prerelease  on a published release; also makes it Latest, refused
+#                     while a newer full release exists
+#   delete-draft      on a draft only; the git tag is kept
+#
+# Publishing a draft is deliberately NOT an action. It stays a human step,
+# because reviewing the draft is what catches missing notes before users see
+# them. The rules live in apps/light/src/release/releaseAdmin.ts and are
+# unit-tested; release-admin.contract.test.ts keeps this file honest.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do to the release.
+        type: choice
+        required: true
+        options:
+          - set-prerelease
+          - clear-prerelease
+          - delete-draft
+      tag:
+        description: The release's tag, exactly, e.g. light-v0.3.0.
+        type: string
+        required: true
+
+permissions: {}
+
+# Two tidy-ups racing over the same release list would each plan against a
+# listing the other is about to change.
+concurrency:
+  group: release-admin
+  cancel-in-progress: false
+
+jobs:
+  tidy:
+    runs-on: ubuntu-latest
+
+    # `contents: write` is what editing and deleting a release needs, and it
+    # includes the read the checkout needs.
+    permissions:
+      contents: write
+
+    env:
+      # Without a repository to resolve, `gh` dies with "failed to determine
+      # base repo".
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Inputs reach the script through the environment, never through a
+      # `${{ }}` inside `run:`, so a typed tag is data and never shell.
+      ADMIN_ACTION: ${{ inputs.action }}
+      ADMIN_TAG: ${{ inputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # No `pnpm install`: the script imports nothing but Node builtins and
+      # its own planner.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Tidy the release
+        run: node apps/light/src/release/runReleaseAdmin.ts

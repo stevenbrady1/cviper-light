@@ -177,6 +177,9 @@ export const WORKFLOW_SCOPE: Readonly<Record<string, string>> = {
     '(L-88). CLAUDE.md HARD RULE 1 forbids an agent running `tauri build`, so this cannot be ' +
     'part of a local loop.',
   'release.yml': 'out of scope — bundles and signs a release; needs the signing secrets.',
+  'release-admin.yml':
+    'out of scope — hand-run release tidying (L-178); needs a token that can edit releases. ' +
+    'Its planner is unit-tested in the loop by `pnpm test`.',
   'ios.yml': 'out of scope — needs a Mac runner and an Apple toolchain.',
   'msix.yml':
     'out of scope — packages the Microsoft Store flavour (L-93). It runs `tauri build`, which ' +

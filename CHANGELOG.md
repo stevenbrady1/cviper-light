@@ -14,6 +14,10 @@ All notable changes to CViper Light are recorded here. The format follows
   four speak the OpenAI chat-completions dialect, so one adapter serves them;
   OpenRouter's key is tested against its key endpoint because its model list
   is public (L-177).
+- A hand-run Release admin workflow for tidying releases (L-178): set or clear
+  a published release's pre-release flag, or delete a draft. It never
+  publishes a draft, never deletes a published release or a git tag, and never
+  touches the `updater` release.
 
 ### Changed
 
