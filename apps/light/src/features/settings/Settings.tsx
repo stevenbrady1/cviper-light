@@ -498,12 +498,17 @@ export function Settings({
               </span>
             </label>
 
-            <p className="mt-1 text-xs text-ink-faint">
+            {/*
+              The update check is named only where the updater is in the
+              binary — the same rule as the Updates section above. A Store or
+              phone build claiming a request it cannot make was a false
+              privacy statement (L-181).
+            */}
+            <p data-testid="settings-requests-note" className="mt-1 text-xs text-ink-faint">
               There is no analytics library in this application, no crash reporter and no account.
-              The only requests it ever makes are ones you start or switched on: a job search, a CV
-              check against a provider you chose, a job advert you ask it to fetch, and an update
-              check — when you press the button, and once at startup unless you switch that off
-              under Updates.
+              {mobileOs === null && distribution !== MICROSOFT_STORE
+                ? ' The only requests it ever makes are ones you start or switched on: a job search, a CV check against a provider you chose, a job advert you ask it to fetch, and an update check — when you press the button, and once at startup unless you switch that off under Updates.'
+                : ' The only requests it ever makes are ones you start or switched on: a job search, a CV check against a provider you chose, and a job advert you ask it to fetch. It never checks for updates itself — those come from the store you installed it from.'}
             </p>
 
             <PrivacyNotice />

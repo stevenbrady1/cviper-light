@@ -158,8 +158,15 @@ export function AnalysisResult({
         ) : null}
       </p>
 
-      <div className="flex items-start justify-between gap-4">
-        <BandScale score={analysis.match_score} verdict={analysis.verdict} />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        {/*
+          flex-1 so the scale takes the row, not just the width of its numeral;
+          min-w-72 so on a narrow card the badge wraps below rather than
+          squeezing the scale until its labels collide (L-181).
+        */}
+        <div className="min-w-72 flex-1">
+          <BandScale score={analysis.match_score} verdict={analysis.verdict} />
+        </div>
         <span
           data-testid="analysis-verdict"
           className={`rounded-pill px-2.5 py-1 font-medium ${VERDICT_TONE[analysis.verdict]}`}
