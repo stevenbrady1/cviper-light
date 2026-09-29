@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type Result } from '@cviper/core-types';
 
 import { Analysis, type AnalysisProps } from '../features/analysis/Analysis';
+import { createAnalysisSession } from '../features/analysis/session';
 import { Welcome } from '../features/onboarding/Welcome';
 import { Profile, type ProfileProps } from '../features/profile/Profile';
 import { forgetWelcome, hasSeenWelcome, markWelcomeSeen } from '../features/onboarding/store';
@@ -40,7 +41,8 @@ import { DEFAULT_VIEW, viewForShortcut, type ViewId } from './views';
  * rail above Tailwind's `md`, the bottom bar below it — never both, because
  * they share `data-testid`s). It does not own selection, editing, or any view's data —
  * a shell that reaches into a feature is a shell that has to change every time
- * the feature does.
+ * the feature does. The one exception is the analysis session (L-187), which
+ * has to outlive its view; the shell holds it opaquely and never reads it.
  *
  * In particular the detail pane is NOT owned here. It is a component
  * (`DetailPane`) that a view mounts beside its own content, because what is in
@@ -97,6 +99,8 @@ export interface AppProps {
   readonly createTransport?: AnalysisProps['createTransport'];
   /** Injected by tests, for the same reason as `trackerPort`. */
   readonly backupPort?: SettingsProps['port'];
+  /** Injected by tests: the real one wipes the database, keychain and preferences. */
+  readonly erasePort?: SettingsProps['erasePort'];
   /** Injected by tests: the real one reads and writes the OS credential store. */
   readonly keyPort?: SettingsProps['keyPort'];
   /** Injected by tests: the real one opens the user's browser. */
@@ -138,6 +142,7 @@ export default function App({
   openedCv,
   createTransport,
   backupPort,
+  erasePort,
   keyPort,
   browser,
   boardsPort,
@@ -153,6 +158,14 @@ export default function App({
   const [welcomeOpen, setWelcomeOpen] = useState(() => !hasSeenWelcome());
   const [incomingCv, setIncomingCv] = useState<Result<PickedCv, FileError> | null>(null);
   const viewport = useViewportClass();
+  /**
+   * The last analysis, owned HERE because the analysis view is unmounted
+   * whenever another view is showing (L-187) — see `analysis/session.ts`.
+   * Memory only, for the life of the app: a CV is not written to disk unasked.
+   * This is the one piece of a view's data the shell holds, and it holds it
+   * opaquely: it creates it, hands it down and resets it, and never reads it.
+   */
+  const [analysisSession] = useState(createAnalysisSession);
 
   /**
    * The update offered by the check on launch, or `null` for the usual case.
@@ -308,7 +321,10 @@ export default function App({
     setActiveView(DEFAULT_VIEW);
     setStatus(null);
     setWelcomeOpen(true);
-  }, []);
+    // The CV and advert on the analysis screen were in the database that just
+    // went; the screen must not be the one place they survive.
+    analysisSession.reset();
+  }, [analysisSession]);
 
   const narrow = viewport === 'narrow';
   // The phone's insets — notch, corners, home indicator — kept off the content
@@ -388,6 +404,7 @@ export default function App({
             now,
             incomingCv,
             onIncomingCvHandled,
+            session: analysisSession,
           },
           tailor: {
             port: tailorPort,
@@ -400,6 +417,7 @@ export default function App({
           },
           settings: {
             port: backupPort,
+            erasePort,
             filePort,
             keyPort,
             browser,

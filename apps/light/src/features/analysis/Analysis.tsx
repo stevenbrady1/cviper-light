@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 
 import { extractText } from '@cviper/cv-parsing';
 import {
   type Analysis as AnalysisRow,
   type Cv,
-  type CvAnalysis,
   type Job,
   type Profile,
   type Result,
@@ -50,7 +49,6 @@ import {
 } from './model';
 import { createDbAnalysisPort, type AnalysisPort } from './port';
 import {
-  KEYWORD_KEY,
   defaultOptionKey,
   ollamaHint,
   optionByKey,
@@ -58,6 +56,7 @@ import {
   type ProviderOption,
 } from './providers';
 import { runAnalysis } from './runAnalysis';
+import { createAnalysisSession, type AnalysisSession } from './session';
 import { type ChatTransport } from '@cviper/ai-providers';
 
 /**
@@ -93,13 +92,6 @@ import { type ChatTransport } from '@cviper/ai-providers';
 
 /** How often the elapsed counter ticks while a model is thinking. */
 const TICK_MS = 1000;
-
-interface RunResult {
-  readonly analysis: CvAnalysis;
-  readonly provider: string;
-  readonly model: string;
-  readonly retried: boolean;
-}
 
 export interface AnalysisProps {
   /**
@@ -138,6 +130,14 @@ export interface AnalysisProps {
    * this is the only reason the analysis view knows the profile exists.
    */
   readonly profilePort?: ProfilePort | undefined;
+  /**
+   * The last analysis — inputs, result, whether one is running — owned by the
+   * shell so it survives this view being unmounted by a view switch (L-187).
+   * See `session.ts`. Left undefined, the view keeps a private one that lasts
+   * exactly as long as it is mounted, which is what a test of the view alone
+   * wants.
+   */
+  readonly session?: AnalysisSession | undefined;
 }
 
 /**
@@ -160,6 +160,7 @@ export function Analysis({
   onIncomingCvHandled,
   consentPort,
   profilePort,
+  session: sessionProp,
 }: AnalysisProps = {}) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke in the advert box.
@@ -167,6 +168,17 @@ export function Analysis({
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
   const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
   const profiles = useMemo(() => profilePort ?? createDbProfilePort(), [profilePort]);
+  const session = useMemo(() => sessionProp ?? createAnalysisSession(), [sessionProp]);
+  const {
+    selectedCvId,
+    jobText,
+    optionKey: pickedOptionKey,
+    result,
+    checkedAdvert,
+    runError,
+    warnings,
+    running,
+  } = useSyncExternalStore(session.watch, session.get);
 
   const [cvs, setCvs] = useState<readonly Cv[]>([]);
   /**
@@ -178,12 +190,9 @@ export function Analysis({
    */
   const [cvsLoaded, setCvsLoaded] = useState(false);
   const [jobs, setJobs] = useState<readonly Job[]>([]);
-  const [selectedCvId, setSelectedCvId] = useState<string | null>(null);
   /** "Saved to …" after a JSON Resume export (L-20b). */
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [jobText, setJobText] = useState('');
-  const [optionKey, setOptionKey] = useState<string>(KEYWORD_KEY);
   const [options, setOptions] = useState(() =>
     providerOptions({
       ollamaRunning: false,
@@ -199,24 +208,13 @@ export function Analysis({
    * there is exactly one place — `ollamaHint` — that decides when it is said.
    */
   const [localModelHint, setLocalModelHint] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [result, setResult] = useState<RunResult | null>(null);
-  /**
-   * The advert the LAST run was scored against, for the gates (L-156).
-   *
-   * Not `jobText`: the user can edit the box after a run, and the gates must
-   * quote the advert the result on screen was computed from. Only read while
-   * `result` is non-null, so it is never cleared separately.
-   */
-  const [checkedAdvert, setCheckedAdvert] = useState<string | null>(null);
   /** The saved profile, or `null` — never saved, or could not be read. */
   const [profile, setProfile] = useState<Profile | null>(null);
   const [history, setHistory] = useState<readonly AnalysisRow[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadProblem, setUploadProblem] = useState<string | null>(null);
-  const [warnings, setWarnings] = useState<readonly string[]>([]);
   /** Per-provider agreement to send a CV to a named cloud AI (Apple 5.1.2(i)). */
   const [consent, setConsent] = useState<ConsentState>(NO_CONSENT);
   /**
@@ -287,7 +285,11 @@ export function Analysis({
         return;
       }
       setCvs(loaded.value);
-      setSelectedCvId((current) => current ?? loaded.value[0]?.id ?? null);
+      // Only when nothing is selected: coming back to this view (L-187) keeps
+      // the CV the user was working on.
+      session.update((current) => ({
+        selectedCvId: current.selectedCvId ?? loaded.value[0]?.id ?? null,
+      }));
     });
 
     void analysisPort.loadJobs().then((loaded) => {
@@ -300,16 +302,14 @@ export function Analysis({
     return () => {
       cancelled = true;
     };
-  }, [analysisPort]);
+  }, [analysisPort, session]);
 
   useEffect(() => {
     let cancelled = false;
 
     void readAvailability().then((availability) => {
       if (cancelled) return;
-      const next = providerOptions(availability);
-      setOptions(next);
-      setOptionKey(defaultOptionKey(next));
+      setOptions(providerOptions(availability));
       setLocalModelHint(ollamaHint(availability));
     });
 
@@ -334,6 +334,16 @@ export function Analysis({
     };
   }, [analysisPort, selectedCvId]);
 
+  /**
+   * What the picker shows: the user's pick while this machine still offers it,
+   * otherwise the default. Derived rather than stored, so the options being
+   * re-read on every visit can never overwrite a choice the user made — and a
+   * remembered model that has since been removed is not offered back to them.
+   */
+  const optionKey =
+    pickedOptionKey !== null && optionByKey(options, pickedOptionKey) !== null
+      ? pickedOptionKey
+      : defaultOptionKey(options);
   const selectedOption = optionByKey(options, optionKey);
 
   // The elapsed counter. Only for the paths that actually take time — the
@@ -365,7 +375,7 @@ export function Analysis({
         // "could not read file" throws away the only useful thing on the
         // screen.
         setUploadProblem(extracted.error.message);
-        setWarnings([]);
+        session.update({ warnings: [] });
         return;
       }
 
@@ -387,15 +397,20 @@ export function Analysis({
       }
 
       setCvs((current) => [cv, ...current]);
-      setSelectedCvId(cv.id);
-      setResult(null);
+      // A run still in flight was for the previous CV: its answer is dropped.
+      session.supersede();
+      session.update({
+        selectedCvId: cv.id,
+        result: null,
+        runError: null,
+        // Warnings ride along with a SUCCESSFUL extraction — some pages were
+        // images and their contents are missing from the text. The user has to
+        // be told, because the analysis below is about to be run on a partial CV.
+        warnings: extracted.value.warnings,
+      });
       setExportMessage(null);
-      // Warnings ride along with a SUCCESSFUL extraction — some pages were
-      // images and their contents are missing from the text. The user has to
-      // be told, because the analysis below is about to be run on a partial CV.
-      setWarnings(extracted.value.warnings);
     },
-    [analysisPort, now],
+    [analysisPort, now, session],
   );
 
   /**
@@ -462,7 +477,7 @@ export function Analysis({
     void (async () => {
       if (!incomingCv.ok) {
         setUploadProblem(incomingCv.error.message);
-        setWarnings([]);
+        session.update({ warnings: [] });
       } else {
         await ingest(incomingCv.value);
       }
@@ -472,7 +487,7 @@ export function Analysis({
     return () => {
       cancelled = true;
     };
-  }, [incomingCv, ingest, onIncomingCvHandled]);
+  }, [incomingCv, ingest, onIncomingCvHandled, session]);
 
   /**
    * Run one option that has ALREADY cleared the consent question — either it
@@ -481,7 +496,10 @@ export function Analysis({
   const performRun = useCallback(
     async (option: ProviderOption, cv: Cv) => {
       setError(null);
-      setRunning(true);
+      // The ticket, and every write below going to `session` rather than to
+      // this component: the user may leave the view while this is awaited, and
+      // the answer must still be there when they come back (L-187).
+      const ticket = session.beginRun();
       setElapsed(0);
 
       const run = await runAnalysis(
@@ -498,16 +516,18 @@ export function Analysis({
         (kind) => consentStore.read().then((result) => result.ok && result.value[kind]),
       );
 
-      setRunning(false);
+      // Superseded — another CV was picked, or everything was deleted — while
+      // this was in flight. Dropped whole, history included: it answers a
+      // question nobody is asking any more, and after "Delete everything" a
+      // saved row would put data back into a database the user just emptied.
+      if (!session.isCurrent(ticket)) return;
 
       if (!run.ok) {
-        setResult(null);
-        setError(run.error.message);
+        session.update({ running: false, result: null, runError: run.error.message });
         return;
       }
 
-      setResult(run.value);
-      setCheckedAdvert(jobText);
+      session.update({ running: false, result: run.value, checkedAdvert: jobText });
 
       const record = newAnalysisRecord({
         id: crypto.randomUUID(),
@@ -532,7 +552,7 @@ export function Analysis({
 
       setHistory((current) => [record, ...current]);
     },
-    [analysisPort, consentStore, createTransport, jobText, now],
+    [analysisPort, consentStore, createTransport, jobText, now, session],
   );
 
   const onRun = useCallback(async () => {
@@ -607,6 +627,10 @@ export function Analysis({
     [checkedAdvert, profile],
   );
 
+  // This visit's own problem first; otherwise why the last run failed, which
+  // may have happened while the user was on another view.
+  const shownError = error ?? runError;
+
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-analysis">
       {/*
@@ -617,13 +641,13 @@ export function Analysis({
       */}
       <ViewHeader title={view.label} summary={view.summary} />
 
-      {error === null ? null : (
+      {shownError === null ? null : (
         <p
           role="alert"
           data-testid="analysis-error"
           className="border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
         >
-          {error}
+          {shownError}
         </p>
       )}
 
@@ -642,9 +666,14 @@ export function Analysis({
                 disabled={cvs.length === 0 || !cvsLoaded}
                 onChange={(event) => {
                   const id = event.currentTarget.value;
-                  setSelectedCvId(id === '' ? null : id);
-                  setResult(null);
-                  setWarnings([]);
+                  // A run still in flight was for the CV being left: dropped.
+                  session.supersede();
+                  session.update({
+                    selectedCvId: id === '' ? null : id,
+                    result: null,
+                    runError: null,
+                    warnings: [],
+                  });
                   setUploadProblem(null);
                   setExportMessage(null);
                 }}
@@ -739,7 +768,7 @@ export function Analysis({
               rows={7}
               value={jobText}
               placeholder="Paste the whole advert, including the requirements list."
-              onChange={(event) => setJobText(event.currentTarget.value)}
+              onChange={(event) => session.update({ jobText: event.currentTarget.value })}
               className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
             />
 
@@ -756,7 +785,7 @@ export function Analysis({
                     const job = jobs.find(
                       (candidate) => candidate.id === event.currentTarget.value,
                     );
-                    if (job !== undefined) setJobText(jobAdvertText(job));
+                    if (job !== undefined) session.update({ jobText: jobAdvertText(job) });
                   }}
                   className="min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 py-1 text-ink"
                 >
@@ -780,7 +809,7 @@ export function Analysis({
               id="analysis-provider"
               data-testid="analysis-provider"
               value={optionKey}
-              onChange={(event) => setOptionKey(event.currentTarget.value)}
+              onChange={(event) => session.update({ optionKey: event.currentTarget.value })}
               className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
             >
               {options.map((option) => (

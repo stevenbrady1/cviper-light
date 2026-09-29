@@ -40,6 +40,11 @@ All notable changes to CViper Light are recorded here. The format follows
   used to say only that the page could not be read, which looked like a fault
   in the app. The same message is shown for any site that answers 401, 403 or
   999 (L-188).
+- The Analysis screen keeps your CV, the advert, the chosen option and the
+  last result when you go to another screen and come back, for as long as the
+  app is open. They are held in memory only, never written to disk, and
+  Delete everything clears them. A check still running when you leave shows
+  its result when you return (L-187).
 
 ## [0.4.0] — 2026-09-29
 
