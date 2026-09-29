@@ -94,3 +94,46 @@ describe('rendering', () => {
     expect(screen.getByTestId('band-scale-tick').className).toContain('cviper-tick-in');
   });
 });
+
+describe('layout — the labels can never run into each other (L-181)', () => {
+  // The bug this guards: in the Store build (and every other) the scale was
+  // exactly as wide as "65 out of 100", about 147px, so the "possible" band was
+  // about 22px wide and the word POSSIBLE, about 66px, ran into STRONG on every
+  // result. jsdom lays nothing out, so these tests pin the STRUCTURE that makes
+  // an overlap impossible; the measured before/after, in a real browser at
+  // 1600, 900 and 343px, is recorded in the pull request.
+
+  it('fills the width it is given instead of shrinking to the numeral above it', () => {
+    render(<BandScale score={65} verdict="possible" />);
+    expect(screen.getByTestId('band-scale').className).toContain('w-full');
+  });
+
+  it('pins "weak" to the left edge and "strong" to the right edge', () => {
+    render(<BandScale score={65} verdict="possible" />);
+    expect(screen.getByTestId('band-scale-label-weak').style.left).toBe('0%');
+    expect(screen.getByTestId('band-scale-label-strong').style.right).toBe('0%');
+  });
+
+  it('centres "possible" on the middle of its own band', () => {
+    render(<BandScale score={65} verdict="possible" />);
+    const possible = screen.getByTestId('band-scale-label-possible');
+    // The band runs 60 to 74, so its middle is 67.5% of the way along.
+    expect(possible.style.left).toBe('67.5%');
+    expect(possible.style.transform).toBe('translateX(-50%)');
+  });
+
+  it('never wraps a label onto a second line', () => {
+    render(<BandScale score={65} verdict="possible" />);
+    for (const verdict of ['weak', 'possible', 'strong'] as const) {
+      expect(screen.getByTestId(`band-scale-label-${verdict}`).className).toContain(
+        'whitespace-nowrap',
+      );
+    }
+  });
+
+  it('still colours the band the score landed in', () => {
+    render(<BandScale score={80} verdict="strong" />);
+    expect(screen.getByTestId('band-scale-label-strong').className).toContain('text-teal');
+    expect(screen.getByTestId('band-scale-label-possible').className).toContain('text-ink-faint');
+  });
+});

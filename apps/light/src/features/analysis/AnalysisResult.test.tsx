@@ -229,3 +229,24 @@ describe('the sections', () => {
     expect(screen.getByTestId('analysis-verdict').textContent).toBe('Weak match');
   });
 });
+
+describe('layout (L-181)', () => {
+  it('lets the score scale grow beside the verdict badge instead of shrinking to its numeral', () => {
+    render(
+      <AnalysisResult analysis={keywordAnalysis()} provider="ollama" model="qwen" aiAvailable />,
+    );
+    const holder = screen.getByTestId('band-scale').parentElement;
+    expect(holder?.className).toContain('flex-1');
+  });
+
+  it('drops the verdict badge below the scale when the row is too narrow for both', () => {
+    render(
+      <AnalysisResult analysis={keywordAnalysis()} provider="ollama" model="qwen" aiAvailable />,
+    );
+    const holder = screen.getByTestId('band-scale').parentElement;
+    // 18rem (288px) is the narrowest scale whose three labels stay apart:
+    // measured, they need about 256px. Below that the row wraps instead.
+    expect(holder?.className).toContain('min-w-72');
+    expect(holder?.parentElement?.className).toContain('flex-wrap');
+  });
+});
