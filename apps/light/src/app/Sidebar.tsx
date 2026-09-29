@@ -1,5 +1,6 @@
 import { type EnvironmentStatus } from '../status/environment';
 
+import { CViperMark } from './CViperMark';
 import { StatusStrip } from './StatusStrip';
 import { PINNED_VIEWS, SEQUENCE_VIEWS, type ViewDefinition, type ViewId } from './views';
 
@@ -73,11 +74,15 @@ export function Sidebar({ activeView, onSelect, status }: SidebarProps) {
       data-testid="sidebar"
       className="flex w-60 shrink-0 flex-col bg-navy text-ink-inverse"
     >
-      <div className="px-4 pt-5 pb-4">
-        <p className="text-base font-semibold tracking-tight">CViper</p>
-        <p className="font-mono text-[10px] font-medium tracking-[0.18em] text-ink-inverse-muted uppercase">
-          Light
-        </p>
+      {/* The CViper mark beside the wordmark: one logo across CViper and Light (L-184). */}
+      <div className="flex items-center gap-3 px-4 pt-5 pb-4">
+        <CViperMark size={32} />
+        <div>
+          <p className="text-base font-semibold tracking-tight">CViper</p>
+          <p className="font-mono text-[10px] font-medium tracking-[0.18em] text-ink-inverse-muted uppercase">
+            Light
+          </p>
+        </div>
       </div>
 
       <ul className="flex-1 space-y-0.5 px-2">
