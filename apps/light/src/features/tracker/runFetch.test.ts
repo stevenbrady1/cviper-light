@@ -15,12 +15,14 @@
  *    things to a developer and one thing to somebody trying to record a job:
  *    the page did not come, open it yourself. A raw error, a status code or a
  *    kind string reaching the user would be six different dead ends instead.
+ *    The one exception (L-188) is a site we KNOW refuses apps — blocklisted,
+ *    or a 401, 403 or 999 — which is told so, with the same route forward.
  */
 import { describe, expect, it, vi } from 'vitest';
 
 import { err, ok, type Result } from '@cviper/core-types';
 
-import { FETCH_FALLBACK_NOTE, runFetch } from './runFetch';
+import { FETCH_FALLBACK_NOTE, FETCH_SITE_REFUSES_NOTE, runFetch } from './runFetch';
 import type { FetchedPage, PageFetchError, PageFetchTransport } from './pageFetch';
 
 /** A page long enough to be a real advert. */
@@ -92,7 +94,8 @@ describe('a domain on the blocklist', () => {
     const outcome = await runFetch('https://uk.indeed.com/viewjob?jk=abc', forbiddenTransport);
 
     expect(outcome.available).toBe(false);
-    expect(outcome.reason).toBe(FETCH_FALLBACK_NOTE);
+    // L-188: a blocklisted site is told as what it is — see the next block.
+    expect(outcome.reason).toBe(FETCH_SITE_REFUSES_NOTE);
   });
 
   it('covers subdomains, because that is where the adverts actually live', async () => {
@@ -115,6 +118,94 @@ describe('a domain on the blocklist', () => {
     await expect(runFetch('https://jobs.example.com/advert/1', forbiddenTransport)).rejects.toThrow(
       /must never reach it/,
     );
+  });
+});
+
+describe('a site that refuses apps (L-188)', () => {
+  // The address from the bug report, tracking query and all. A LinkedIn job
+  // link with a long query is the most common thing anyone pastes into Fetch.
+  const REPORTED =
+    'https://www.linkedin.com/jobs/view/4445438506/?alternateChannel=search' +
+    '&eBP=CwEAAAGd8yKZaqfXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' +
+    '&refId=abcdEFGH%3D%3D&trackingId=ijklMNOP%3D%3D';
+
+  it('the reported LinkedIn link makes no request and says the site blocks apps', async () => {
+    const outcome = await runFetch(REPORTED, forbiddenTransport);
+
+    expect(outcome.available).toBe(false);
+    expect(outcome.text).toBe('');
+    expect(outcome.reason).toBe(FETCH_SITE_REFUSES_NOTE);
+  });
+
+  it('every blocklisted address gets the same site-refuses sentence', async () => {
+    for (const address of [
+      'https://www.linkedin.com/jobs/view/4012345678/',
+      'https://gb.linkedin.com/jobs/view/1/',
+      'https://www.linkedin.com/jobs/search/?currentJobId=4445438506',
+      'https://www.indeed.com/viewjob?jk=abc',
+    ]) {
+      const outcome = await runFetch(address, forbiddenTransport);
+      expect(outcome.reason, address).toBe(FETCH_SITE_REFUSES_NOTE);
+    }
+  });
+
+  it('a site that answers 401, 403 or 999 is refusing apps, and is told so', async () => {
+    // 999 is LinkedIn's own non-standard "not for bots" status; 401 and 403
+    // are the standard ways a site says "not to you".
+    for (const status of [401, 403, 999]) {
+      const outcome = await runFetch('https://jobs.example.com/1', () =>
+        transportFor(ok({ status, body: ADVERT_PAGE })),
+      );
+      expect(outcome.available, String(status)).toBe(false);
+      expect(outcome.reason, String(status)).toBe(FETCH_SITE_REFUSES_NOTE);
+    }
+  });
+
+  it('boundary: the statuses either side of those are not a refusal', async () => {
+    for (const status of [400, 402, 404, 998, 1000]) {
+      const outcome = await runFetch('https://jobs.example.com/1', () =>
+        transportFor(ok({ status, body: ADVERT_PAGE })),
+      );
+      expect(outcome.available, String(status)).toBe(false);
+      expect(outcome.reason, String(status)).toBe(FETCH_FALLBACK_NOTE);
+    }
+  });
+
+  it('negative: a lookalike domain is not blocklisted, so it is asked, and a plain failure stays plain', async () => {
+    for (const address of [
+      'https://notlinkedin.com/jobs/view/1/',
+      'https://linkedin.com.example.test/jobs/view/1/',
+    ]) {
+      const transport = transportFor(err({ kind: 'network', message: 'unreachable' }));
+      const outcome = await runFetch(address, () => transport);
+      expect(transport.calls, address).toBe(1);
+      expect(outcome.reason, address).toBe(FETCH_FALLBACK_NOTE);
+    }
+  });
+
+  it('negative: a Rust "blocked" refusal is about OUR rules, not the site, and keeps the plain note', async () => {
+    // A private address or a redirect off the site is this app refusing, and
+    // "this site blocks apps" would be a false thing to say about it.
+    const outcome = await runFetch('https://jobs.example.com/1', () =>
+      transportFor(
+        err({ kind: 'blocked', message: 'That address is not one this app will open.' }),
+      ),
+    );
+
+    expect(outcome.reason).toBe(FETCH_FALLBACK_NOTE);
+  });
+
+  it('the sentence says the site blocks apps, that pasting works, and nothing else', () => {
+    expect(FETCH_SITE_REFUSES_NOTE).toMatch(/blocks apps from reading its pages/i);
+    expect(FETCH_SITE_REFUSES_NOTE).toMatch(/paste/i);
+    expect(FETCH_SITE_REFUSES_NOTE).toMatch(/works/i);
+    expect(FETCH_SITE_REFUSES_NOTE).toMatch(/browser/i);
+    // Never a status code, and never a claim that the advert is gone — it is
+    // there, the site just will not hand it to an app.
+    expect(FETCH_SITE_REFUSES_NOTE).not.toMatch(/[0-9]/);
+    for (const untrue of ['not exist', 'not found', 'no longer', 'removed', 'expired', 'error']) {
+      expect(FETCH_SITE_REFUSES_NOTE.toLowerCase(), untrue).not.toContain(untrue);
+    }
   });
 });
 
