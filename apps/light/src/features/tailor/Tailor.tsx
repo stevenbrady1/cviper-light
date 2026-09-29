@@ -20,7 +20,7 @@ import {
   type TailoredCv,
 } from '@cviper/core-types';
 
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
@@ -209,6 +209,11 @@ export function Tailor({
   const [error, setError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /**
+   * Whether the chosen CV's text is shown (L-192). Starts open, and is NOT
+   * reset when the CV changes: a user who folded it away did so on purpose.
+   */
+  const [cvPreviewOpen, setCvPreviewOpen] = useState(true);
 
   const [consent, setConsent] = useState<ConsentState>(NO_CONSENT);
   const [pendingConsent, setPendingConsent] = useState<{
@@ -704,6 +709,62 @@ export function Tailor({
             The CVs you have uploaded on the Analysis screen. The rewrite uses only what is written
             in the one you choose.
           </p>
+
+          {/*
+           * The chosen CV, as the rewrite will read it (L-192): the stored
+           * `extracted_text` — the same `cvText` every run is sent — not the
+           * file, so anything the parser dropped is visible BEFORE the run.
+           * Read-only on purpose; editing belongs on Analysis, where the CV
+           * is uploaded. No CV at all draws nothing: the picker says so.
+           */}
+          {selectedCv === null ? null : (
+            <div className="mt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p id="tailor-cv-preview-heading" className="text-xs font-medium text-ink-muted">
+                  Your CV as the rewrite reads it
+                </p>
+                <button
+                  type="button"
+                  data-testid="tailor-cv-preview-toggle"
+                  aria-expanded={cvPreviewOpen}
+                  aria-controls="tailor-cv-preview"
+                  onClick={() => setCvPreviewOpen((open) => !open)}
+                  className={QUIET_BUTTON}
+                >
+                  {cvPreviewOpen ? 'Hide CV' : 'Show CV'}
+                </button>
+              </div>
+              <section
+                id="tailor-cv-preview"
+                data-testid="tailor-cv-preview"
+                aria-labelledby="tailor-cv-preview-heading"
+                hidden={!cvPreviewOpen}
+                className="mt-1"
+              >
+                {cvText.trim() === '' ? (
+                  <p data-testid="tailor-cv-preview-empty" className="text-xs text-ink-faint">
+                    No text could be read from this CV, so there is nothing for the rewrite to work
+                    from.
+                  </p>
+                ) : (
+                  <>
+                    {/* Focusable, so a keyboard alone can scroll a long CV. */}
+                    <pre
+                      data-testid="tailor-cv-preview-text"
+                      tabIndex={0}
+                      className="max-h-72 overflow-y-auto rounded-card border border-line bg-card px-4 py-3 font-sans text-ink whitespace-pre-wrap"
+                    >
+                      {cvText}
+                    </pre>
+                    <p data-testid="tailor-cv-preview-meta" className="mt-1 text-xs text-ink-faint">
+                      {selectedCv.name} ·{' '}
+                      <span className="font-mono tabular-nums">{wordCount(cvText)}</span> words
+                    </p>
+                  </>
+                )}
+              </section>
+            </div>
+          )}
         </div>
 
         {/* ── 2. The advert ───────────────────────────────────────────── */}

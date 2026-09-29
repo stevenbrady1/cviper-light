@@ -21,6 +21,10 @@ All notable changes to CViper Light are recorded here. The format follows
 - Fetching an advert from its link now reads the job details the page publishes
   for search engines when it has them, so the advert comes in without the menus,
   cookie banners and "similar jobs" around it (L-190).
+- The Tailor screen shows the CV you choose right under the picker, as the
+  text the rewrite will work from, so you can check it without opening the
+  file. It changes as soon as you pick another CV, and "Hide CV" folds it away
+  (L-192).
 
 ## [0.5.0] — 2026-09-29
 
