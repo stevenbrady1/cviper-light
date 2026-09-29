@@ -254,6 +254,129 @@ export function htmlToText(html: string): string {
 }
 
 /**
+ * Every `<script type="application/ld+json">` body on the page (L-190).
+ *
+ * Quoted, single-quoted or bare attribute values all occur in the wild, and the
+ * attribute can sit anywhere in the tag. Read from the RAW page, before
+ * `htmlToText` runs, because step 2 of that function drops every `<script>`
+ * with its content — which is right for JavaScript and would throw this away.
+ */
+const JSON_LD_BLOCK =
+  /<script\b[^>]*\btype\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script\s*>/gi;
+
+/**
+ * How deep the structured-data walk goes before it gives up.
+ *
+ * A real page nests a posting two or three levels down (`@graph` → array →
+ * object). The limit exists so a hostile page with a ten-thousand-deep array
+ * costs a few microseconds rather than the call stack.
+ */
+const MAX_JSON_LD_DEPTH = 8;
+
+/** Escaped markup — `&lt;p&gt;` — in a description that has no real tags at all. */
+const ESCAPED_TAG = /&lt;\/?[a-z]/i;
+const REAL_TAG = /<\/?[a-z][^>]*>/i;
+
+function isJobPostingType(type: unknown): boolean {
+  const named = (value: unknown): boolean =>
+    typeof value === 'string' &&
+    (value === 'JobPosting' || value.endsWith('/JobPosting') || value.endsWith(':JobPosting'));
+  return Array.isArray(type) ? type.some(named) : named(type);
+}
+
+/** The first JobPosting object in a parsed block, looking through arrays and `@graph`. */
+function findJobPosting(node: unknown, depth: number): Record<string, unknown> | null {
+  if (depth > MAX_JSON_LD_DEPTH || typeof node !== 'object' || node === null) return null;
+
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findJobPosting(item, depth + 1);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+
+  const record = node as Record<string, unknown>;
+  if (isJobPostingType(record['@type'])) return record;
+  return findJobPosting(record['@graph'], depth + 1);
+}
+
+/** The employer's name, whether it is published as an object or a bare string. */
+function organisationName(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    const name = (value as Record<string, unknown>)['name'];
+    if (typeof name === 'string') return name;
+  }
+  return '';
+}
+
+/**
+ * The advert out of the page's `JobPosting` structured data, or `null`.
+ *
+ * ============================================================================
+ * WHY THIS COMES BEFORE THE WHOLE-PAGE READ (L-190)
+ * ============================================================================
+ * Most job boards publish the whole advert as schema.org `JobPosting` data so
+ * search engines can show it: the title, the employer and the full description,
+ * with none of the page around it. The page around it is exactly what
+ * `htmlToText` has to guess its way past — navigation, cookie banners, and the
+ * "similar jobs" rail that is a DIFFERENT job at a different company. When the
+ * structured data is there, it is the advert the site itself says it is.
+ *
+ * Returns `null`, never a partial answer, when there is no posting or it has no
+ * description: a title on its own is not an advert, and the caller's fallback
+ * (the whole page) is the better guess then.
+ *
+ * ============================================================================
+ * STILL UNTRUSTED, STILL SANITISED
+ * ============================================================================
+ * Structured data came from the same somebody-else's server as the page, and
+ * goes into the same prompt. The pieces are assembled into a small HTML
+ * fragment and sent through `htmlToText` ONCE — so a script smuggled into the
+ * description is dropped with its content, and `sanitizeForPrompt` sees the
+ * whole text in one pass rather than three separately-cleaned pieces glued
+ * together afterwards.
+ *
+ * A description whose markup arrived ESCAPED (`&lt;p&gt;…`, common in the wild)
+ * is unescaped once first, and only when it has no real tags of its own.
+ * `htmlToText` deliberately decodes entities once, after tags are gone, so
+ * escaped markup would otherwise reach the model as literal `<p>` text. Doing
+ * it here does "manufacture markup", which that function's comment warns about
+ * — but the markup it makes is then stripped by the same pass, which is the
+ * point: schema.org defines `description` as HTML.
+ */
+export function jobPostingText(html: string): string | null {
+  for (const match of html.matchAll(JSON_LD_BLOCK)) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(match[1] ?? '');
+    } catch {
+      // A malformed block is one site's bug, not a reason to stop looking —
+      // pages often carry several blocks and only one of them is the posting.
+      continue;
+    }
+
+    const posting = findJobPosting(parsed, 0);
+    if (posting === null) continue;
+
+    const raw = posting['description'];
+    if (typeof raw !== 'string' || raw.trim() === '') continue;
+
+    const description =
+      !REAL_TAG.test(raw) && ESCAPED_TAG.test(raw)
+        ? raw.replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+        : raw;
+    const title = typeof posting['title'] === 'string' ? posting['title'] : '';
+    const employer = organisationName(posting['hiringOrganization']);
+
+    const text = htmlToText(`<p>${title}</p><p>${employer}</p><div>${description}</div>`);
+    if (text !== '') return text;
+  }
+  return null;
+}
+
+/**
  * Was there actually an advert on that page?
  *
  * Length after trimming, because a page of nothing but layout whitespace is a

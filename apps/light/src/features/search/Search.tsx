@@ -19,6 +19,8 @@ import { PRIMARY_BUTTON, QUIET_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { SHIPPED_BOARDS } from '../boards/defaults';
+import { ANALYSE_DISCLOSURE, isPreviewAdvert } from '../flow/advert';
+import { type AnalyseHandoff } from '../flow/handoff';
 import { NO_PREFERENCES, mergeBoards, type Board } from '../boards/model';
 import { createTauriBoardPreferencesPort, type BoardPreferencesPort } from '../boards/port';
 import { readQuota, writeQuota } from '../../jobs/quotaStore';
@@ -116,6 +118,12 @@ export interface SearchProps {
   readonly newId?: (() => string) | undefined;
   /** Take the user to the key wizard. Owned by the shell, which owns the view. */
   readonly onOpenSettings?: (() => void) | undefined;
+  /**
+   * Take a saved job to the Analysis screen (L-190). The shell owns which view
+   * is showing, so the job goes back to it. Left undefined, the cards draw no
+   * Analyse button.
+   */
+  readonly onAnalyse?: ((handoff: AnalyseHandoff) => void) | undefined;
 }
 
 export function Search({
@@ -126,6 +134,7 @@ export function Search({
   now,
   newId,
   onOpenSettings,
+  onAnalyse,
 }: SearchProps = {}) {
   // Built once. A new port every render would restart the load effects on every
   // keystroke in the search box.
@@ -439,7 +448,7 @@ export function Search({
       setNotes((current) => ({
         ...current,
         [jobId]:
-          saved.value === 'already-saved'
+          saved.value.outcome === 'already-saved'
             ? // NOT an error. The same advert reached the user twice, which is
               // exactly what cross-posting looks like, and the database already
               // has it. Nothing is duplicated and nothing has gone wrong.
@@ -448,6 +457,64 @@ export function Search({
       }));
     },
     [clock, newId, results, searchPort],
+  );
+
+  /**
+   * "Analyse this job" (L-190): save it, make the advert whole, hand it on.
+   *
+   * SAVED FIRST, so the analysis, the tailored CV and the letter all attach to
+   * one tracker record — and the STORED job is what goes on, because an advert
+   * saved last week has a different id from this search's copy of it.
+   *
+   * A PREVIEW has its full advert read from its own page next: one page, on
+   * this press, through the fetch rules the tracker already uses. The card
+   * says so while it happens, because a page can take a few seconds and a
+   * button that does nothing visible for that long reads as broken. Whatever
+   * the page gave, the job goes on — with a note when all there is is the
+   * preview, which the Analysis screen shows above the advert.
+   */
+  const onAnalyseJob = useCallback(
+    async (jobId: string) => {
+      if (onAnalyse === undefined) return;
+      const entry = results.jobs.find((candidate) => candidate.job.id === jobId);
+      if (entry === undefined) return;
+
+      setSavingId(jobId);
+      setProblems((current) => ({ ...current, [jobId]: '' }));
+      setNotes((current) => ({ ...current, [jobId]: '' }));
+
+      const saved = await searchPort.saveToTracker(
+        entry.job,
+        { applicationId: (newId ?? (() => crypto.randomUUID()))() },
+        clock.toISOString(),
+      );
+
+      if (!saved.ok) {
+        setSavingId(null);
+        setProblems((current) => ({
+          ...current,
+          [jobId]: `That advert could not be saved. ${saved.error.message}`,
+        }));
+        return;
+      }
+
+      const key = externalKey(entry.job.source, entry.job.external_id);
+      if (key !== null) setTracked((current) => new Set(current).add(key));
+
+      let job = saved.value.job;
+      let note: string | null = null;
+      if (isPreviewAdvert(job)) {
+        setNotes((current) => ({ ...current, [jobId]: 'Reading the full advert…' }));
+        const read = await searchPort.readFullAdvert(job);
+        job = read.job;
+        note = read.note;
+      }
+
+      setSavingId(null);
+      setNotes((current) => ({ ...current, [jobId]: '' }));
+      onAnalyse({ job, applicationId: saved.value.applicationId, note });
+    },
+    [clock, newId, onAnalyse, results, searchPort],
   );
 
   const onOpen = useCallback(
@@ -798,6 +865,17 @@ export function Search({
                 </p>
               ) : null}
 
+              {/*
+                Once, above the list, not on every card: "Analyse this job" can
+                open the advert's own page (L-190), and that request is said
+                out loud before it is made — see `ANALYSE_DISCLOSURE`.
+              */}
+              {onAnalyse === undefined || results.jobs.length === 0 ? null : (
+                <p data-testid="search-analyse-disclosure" className="text-xs text-ink-faint">
+                  {ANALYSE_DISCLOSURE}
+                </p>
+              )}
+
               {results.jobs.length === 0 &&
               failures.length === 0 &&
               keylessFailures.length === 0 &&
@@ -827,6 +905,9 @@ export function Search({
                       dealBreakers={dealBreakersIn(dealBreakers, entry.job)}
                       onSave={() => void onSave(entry.job.id)}
                       onOpen={() => onOpen(entry.job.url)}
+                      onAnalyse={
+                        onAnalyse === undefined ? undefined : () => void onAnalyseJob(entry.job.id)
+                      }
                     />
                   );
                 })}

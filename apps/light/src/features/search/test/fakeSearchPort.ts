@@ -12,8 +12,10 @@ import {
 } from '@cviper/job-apis';
 
 import { type DbError } from '../../../db';
+import { fetchFullAdvert } from '../../flow/advert';
+import { type PageFetchTransport } from '../../tracker/pageFetch';
 import { externalKey } from '../model';
-import { type SaveOutcome, type SearchPort } from '../port';
+import { type FullAdvertRead, type SavedToTracker, type SearchPort } from '../port';
 
 /**
  * An in-memory `SearchPort`, for driving the screen in a test.
@@ -47,7 +49,13 @@ export interface FakeSearchPort extends SearchPort {
   /** Make the next call to the named method fail. */
   readonly failNext: (method: FailableMethod) => void;
   readonly calls: Record<
-    'search' | 'browseKeyless' | 'loadTracked' | 'saveToTracker' | 'latestCvText' | 'dealBreakers',
+    | 'search'
+    | 'browseKeyless'
+    | 'loadTracked'
+    | 'saveToTracker'
+    | 'latestCvText'
+    | 'dealBreakers'
+    | 'readFullAdvert',
     number
   >;
 }
@@ -100,6 +108,19 @@ export function outcomeOf(
 }
 
 /**
+ * The page transport a fake uses when a test gives it none: every page read
+ * fails as a network failure would. A search-screen test that is not about
+ * reading adverts then gets the honest "could not be read" path, and no test
+ * can reach a socket by accident.
+ */
+function unreachablePages(): PageFetchTransport {
+  return {
+    fetchPage: () =>
+      Promise.resolve({ ok: false, error: { kind: 'network', message: 'no pages in this test' } }),
+  };
+}
+
+/**
  * An in-memory `SearchPort`.
  *
  * ============================================================================
@@ -120,8 +141,11 @@ export function outcomeOf(
 export function createFakeSearchPort(
   initial: readonly Job[] = [],
   keylessTransport?: KeylessFetchTransport,
+  createPageTransport: () => PageFetchTransport = unreachablePages,
 ): FakeSearchPort {
   let stored: Job[] = [...initial];
+  /** job id → the application chasing it, for adverts saved through this fake. */
+  const chasing = new Map<string, string>();
   const sent: JobSearchRequest[] = [];
   const browsed: KeylessBrowseRequest[] = [];
   const failing = new Set<FailableMethod>();
@@ -132,6 +156,7 @@ export function createFakeSearchPort(
     saveToTracker: 0,
     latestCvText: 0,
     dealBreakers: 0,
+    readFullAdvert: 0,
   };
 
   let outcome: JobSearchOutcome | null = null;
@@ -199,22 +224,42 @@ export function createFakeSearchPort(
       return ok([...dealBreakers]);
     },
 
-    async saveToTracker(job): Promise<Result<SaveOutcome, DbError>> {
+    async saveToTracker(job, ids): Promise<Result<SavedToTracker, DbError>> {
       calls.saveToTracker += 1;
       if (refuses('saveToTracker')) return { ok: false, error: FAILURE };
 
       // The partial unique index, in eight lines. The same advert can only be
-      // stored once, whatever id this search happened to give it.
+      // stored once, whatever id this search happened to give it — and what
+      // comes back is the STORED row, as the real port hands back (L-190).
       const key = externalKey(job.source, job.external_id);
       if (key !== null) {
-        const already = stored.some(
+        const already = stored.find(
           (candidate) => externalKey(candidate.source, candidate.external_id) === key,
         );
-        if (already) return ok('already-saved');
+        if (already !== undefined) {
+          return ok({
+            outcome: 'already-saved',
+            job: already,
+            applicationId: chasing.get(already.id) ?? null,
+          });
+        }
       }
 
       stored = [...stored, job];
-      return ok('saved');
+      chasing.set(job.id, ids.applicationId);
+      return ok({ outcome: 'saved', job, applicationId: ids.applicationId });
+    },
+
+    async readFullAdvert(job): Promise<FullAdvertRead> {
+      calls.readFullAdvert += 1;
+      // The SHIPPED decision about when to read a page and what to say, over
+      // whatever page the test serves — only the storage is pretend.
+      const full = await fetchFullAdvert(job, createPageTransport);
+      if (full.text === (job.description ?? '')) return { job, note: full.note };
+
+      const better: Job = { ...job, description: full.text };
+      stored = stored.map((candidate) => (candidate.id === job.id ? better : candidate));
+      return { job: better, note: full.note };
     },
   };
 }

@@ -57,6 +57,7 @@ import {
 } from './providers';
 import { runAnalysis } from './runAnalysis';
 import { createAnalysisSession, type AnalysisSession } from './session';
+import { type TailorHandoff } from '../flow/handoff';
 import { type ChatTransport } from '@cviper/ai-providers';
 
 /**
@@ -138,6 +139,13 @@ export interface AnalysisProps {
    * wants.
    */
   readonly session?: AnalysisSession | undefined;
+  /**
+   * "Tailor my CV for this job" (L-190): the job, the advert, the CV and the
+   * option, handed to the shell, which owns which view is showing. Left
+   * undefined, no button is drawn — a button that goes nowhere is worse than
+   * none.
+   */
+  readonly onTailor?: ((handoff: TailorHandoff) => void) | undefined;
 }
 
 /**
@@ -161,6 +169,7 @@ export function Analysis({
   consentPort,
   profilePort,
   session: sessionProp,
+  onTailor,
 }: AnalysisProps = {}) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke in the advert box.
@@ -172,6 +181,8 @@ export function Analysis({
   const {
     selectedCvId,
     jobText,
+    jobId,
+    jobNote,
     optionKey: pickedOptionKey,
     result,
     checkedAdvert,
@@ -500,6 +511,10 @@ export function Analysis({
       // this component: the user may leave the view while this is awaited, and
       // the answer must still be there when they come back (L-187).
       const ticket = session.beginRun();
+      // Read at the START, like the advert: the check belongs to the job the
+      // advert on screen belonged to when it was pressed, not to whatever the
+      // box holds by the time a slow model answers.
+      const checkedJobId = session.get().jobId;
       setElapsed(0);
 
       const run = await runAnalysis(
@@ -532,10 +547,12 @@ export function Analysis({
       const record = newAnalysisRecord({
         id: crypto.randomUUID(),
         cvId: cv.id,
-        // Not wired to a specific job yet: the advert is free text, and guessing
-        // which tracked job it came from would attach the result to the wrong
-        // advert. `job_id` is nullable precisely for this.
-        jobId: null,
+        // The job the advert came from — handed over from Search or the
+        // tracker, or picked from the saved jobs (L-190) — so the check sits on
+        // the same record as the tailored CV and the letter. A paste is `null`,
+        // never a guess: matching free text to a tracked job would attach the
+        // result to the wrong advert.
+        jobId: checkedJobId,
         provider: run.value.provider,
         model: run.value.model,
         analysis: run.value.analysis,
@@ -759,6 +776,21 @@ export function Analysis({
 
           {/* ── 2. The advert ─────────────────────────────────────────── */}
           <div>
+            {/*
+              What came with a job handed over from Search (L-190) — usually
+              that only a preview of the advert arrived. ABOVE the box, because
+              it is about what is in the box and has to be read first; gold,
+              because it is something to act on, not a failure.
+            */}
+            {jobNote === null ? null : (
+              <p
+                role="status"
+                data-testid="analysis-job-note"
+                className="mb-2 rounded-control bg-gold/10 px-3 py-2 text-gold"
+              >
+                {jobNote}
+              </p>
+            )}
             <label htmlFor="analysis-job-text" className="block text-xs font-medium text-ink-muted">
               The job advert
             </label>
@@ -768,7 +800,15 @@ export function Analysis({
               rows={7}
               value={jobText}
               placeholder="Paste the whole advert, including the requirements list."
-              onChange={(event) => session.update({ jobText: event.currentTarget.value })}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                // Still that job while there is an advert in the box — pasting
+                // the full advert over a preview is the edit the note asks for.
+                // An empty box belongs to nothing.
+                session.update(
+                  value === '' ? { jobText: '', jobId: null, jobNote: null } : { jobText: value },
+                );
+              }}
               className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
             />
 
@@ -785,7 +825,9 @@ export function Analysis({
                     const job = jobs.find(
                       (candidate) => candidate.id === event.currentTarget.value,
                     );
-                    if (job !== undefined) session.update({ jobText: jobAdvertText(job) });
+                    if (job !== undefined) {
+                      session.update({ jobText: jobAdvertText(job), jobId: job.id, jobNote: null });
+                    }
                   }}
                   className="min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 py-1 text-ink"
                 >
@@ -926,6 +968,22 @@ export function Analysis({
                 retried={result.retried}
                 aiAvailable={aiAvailable}
               />
+              {/*
+                The next step of the flow (L-190), after the result it follows
+                from. Secondary: the view's one blue button is the check.
+              */}
+              {onTailor === undefined ? null : (
+                <div>
+                  <button
+                    type="button"
+                    data-testid="analysis-to-tailor"
+                    onClick={() => onTailor({ jobId, jobText, cvId: selectedCvId, optionKey })}
+                    className={SECONDARY_BUTTON}
+                  >
+                    Tailor my CV for this job
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

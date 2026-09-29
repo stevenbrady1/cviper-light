@@ -37,7 +37,7 @@
  * and the person is owed that one fact, as `URL_ONLY_BLOCKED_NOTE` already
  * gives it. Still no status or kind on screen, and still the same route: paste.
  */
-import { htmlToText, isPlausiblyReadable } from './htmlToText';
+import { htmlToText, isPlausiblyReadable, jobPostingText } from './htmlToText';
 import { isBlockedUrl } from './fetchBlocklist';
 import { createTauriPageTransport, type PageFetchTransport } from './pageFetch';
 
@@ -196,7 +196,12 @@ export async function runFetch(
   if (SITE_REFUSES_STATUSES.has(status)) return SITE_REFUSES;
   if (status < 200 || status > 299) return UNAVAILABLE;
 
-  const text = htmlToText(body);
+  // The page's own `JobPosting` structured data first, when it is a readable
+  // advert (L-190): it is the advert the site says it is, with none of the
+  // chrome — or the "similar jobs" rail — around it. Too thin, missing or
+  // malformed, and the whole page is read exactly as it always was.
+  const posting = jobPostingText(body);
+  const text = posting !== null && isPlausiblyReadable(posting) ? posting : htmlToText(body);
 
   // A login wall and a JavaScript-only shell both arrive with a 200 and look
   // like successes to anything watching the network. They are failures.

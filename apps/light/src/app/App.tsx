@@ -3,7 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type Result } from '@cviper/core-types';
 
 import { Analysis, type AnalysisProps } from '../features/analysis/Analysis';
+import { jobAdvertText } from '../features/analysis/model';
 import { createAnalysisSession } from '../features/analysis/session';
+import {
+  loadJobIntoAnalysis,
+  type AnalyseHandoff,
+  type TailorHandoff,
+} from '../features/flow/handoff';
 import { Welcome } from '../features/onboarding/Welcome';
 import { Profile, type ProfileProps } from '../features/profile/Profile';
 import { forgetWelcome, hasSeenWelcome, markWelcomeSeen } from '../features/onboarding/store';
@@ -11,6 +17,7 @@ import { Search, type SearchProps } from '../features/search/Search';
 import { Settings, type SettingsProps } from '../features/settings/Settings';
 import { Tailor, type TailorProps } from '../features/tailor/Tailor';
 import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
+import { type TrackerEntry } from '../features/tracker/model';
 import {
   createTauriOpenedCvPort,
   type FileError,
@@ -42,7 +49,10 @@ import { DEFAULT_VIEW, viewForShortcut, type ViewId } from './views';
  * they share `data-testid`s). It does not own selection, editing, or any view's data —
  * a shell that reaches into a feature is a shell that has to change every time
  * the feature does. The one exception is the analysis session (L-187), which
- * has to outlive its view; the shell holds it opaquely and never reads it.
+ * has to outlive its view. Since L-190 the shell also CARRIES a job between
+ * views — Search or the tracker to Analysis, Analysis or the tracker to Tailor
+ * — because only the shell outlives the switch; it does that through
+ * `flow/handoff.ts` and reads the session only to pass its CV and option on.
  *
  * In particular the detail pane is NOT owned here. It is a component
  * (`DetailPane`) that a view mounts beside its own content, because what is in
@@ -166,6 +176,12 @@ export default function App({
    * opaquely: it creates it, hands it down and resets it, and never reads it.
    */
   const [analysisSession] = useState(createAnalysisSession);
+  /**
+   * A job on its way to the Tailor screen (L-190), or `null`. Held here until
+   * Tailor has loaded what it needs to apply it and says so; memory only, and
+   * cleared by "Delete everything" along with the analysis session.
+   */
+  const [tailorHandoff, setTailorHandoff] = useState<TailorHandoff | null>(null);
 
   /**
    * The update offered by the check on launch, or `null` for the usual case.
@@ -291,6 +307,48 @@ export default function App({
 
   const onSelect = useCallback((id: ViewId) => setActiveView(id), []);
 
+  // ── Find Job → Analyse → Tailor CV (L-190) ──────────────────────────────
+
+  /** A job from Search or the tracker, loaded into Analysis — and shown. */
+  const onAnalyseJob = useCallback(
+    (handoff: AnalyseHandoff) => {
+      loadJobIntoAnalysis(analysisSession, handoff);
+      setActiveView('analysis');
+    },
+    [analysisSession],
+  );
+
+  /** A job, CV and option from Analysis or the tracker, handed to Tailor. */
+  const onTailorJob = useCallback((handoff: TailorHandoff) => {
+    setTailorHandoff(handoff);
+    setActiveView('tailor');
+  }, []);
+
+  const onTailorHandoffHandled = useCallback(() => setTailorHandoff(null), []);
+
+  // The tracker's two buttons. Its job holds the advert as saved, so nothing
+  // is fetched and there is no note: the pane has its own "Open the advert"
+  // for a thin one. Tailor gets the CV and option last used on Analysis —
+  // the user's choice, if they have made one; Tailor falls back if not.
+  const onTrackerAnalyse = useCallback(
+    (entry: TrackerEntry) =>
+      onAnalyseJob({ job: entry.job, applicationId: entry.application.id, note: null }),
+    [onAnalyseJob],
+  );
+
+  const onTrackerTailor = useCallback(
+    (entry: TrackerEntry) => {
+      const { selectedCvId, optionKey } = analysisSession.get();
+      onTailorJob({
+        jobId: entry.job.id,
+        jobText: jobAdvertText(entry.job),
+        cvId: selectedCvId,
+        optionKey,
+      });
+    },
+    [analysisSession, onTailorJob],
+  );
+
   /**
    * Close the introduction.
    *
@@ -322,8 +380,10 @@ export default function App({
     setStatus(null);
     setWelcomeOpen(true);
     // The CV and advert on the analysis screen were in the database that just
-    // went; the screen must not be the one place they survive.
+    // went; the screen must not be the one place they survive. The same goes
+    // for a job still on its way to Tailor (L-190).
     analysisSession.reset();
+    setTailorHandoff(null);
   }, [analysisSession]);
 
   const narrow = viewport === 'narrow';
@@ -384,6 +444,7 @@ export default function App({
             // showing, so "no Adzuna key — open Settings" has to come back here
             // to be acted on.
             onOpenSettings: () => setActiveView('settings'),
+            onAnalyse: onAnalyseJob,
           },
           tracker: {
             port: trackerPort,
@@ -393,6 +454,8 @@ export default function App({
             // Same arrangement as the search screen: the shell owns which view
             // is showing, so "no AI provider — open Settings" comes back here.
             onOpenSettings: () => setActiveView('settings'),
+            onAnalyse: onTrackerAnalyse,
+            onTailor: onTrackerTailor,
           },
           analysis: {
             port: analysisPort,
@@ -405,6 +468,7 @@ export default function App({
             incomingCv,
             onIncomingCvHandled,
             session: analysisSession,
+            onTailor: onTailorJob,
           },
           tailor: {
             port: tailorPort,
@@ -414,6 +478,8 @@ export default function App({
             // Same arrangement as Search and the tracker (L-175): no model or
             // key means "set one up in Settings", and the shell does the going.
             onOpenSettings: () => setActiveView('settings'),
+            handoff: tailorHandoff,
+            onHandoffHandled: onTailorHandoffHandled,
           },
           settings: {
             port: backupPort,

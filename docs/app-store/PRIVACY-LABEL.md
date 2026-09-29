@@ -89,9 +89,10 @@ tell Apple the app tracks.
 
 Every question **None** / **No**: no violence, no mature themes, no gambling,
 no user-generated content shared with others. **Unrestricted web access** is
-also **No** — links open in the user's own browser, and the one exception,
-Fetch, only reads a single job-advert page the user pastes and asks for. It
-carries no cookies, no sign-in and no key, cannot reach the user's saved keys,
+also **No** — links open in the user's own browser, and the one exception
+reads a single job-advert page the user asks for: Fetch, on a link they paste,
+or Analyse this job, on a search result that carries only a preview of the
+advert (L-190). It carries no cookies, no sign-in and no key, cannot reach the user's saved keys,
 follows no links, and refuses addresses on the user's own computer or home
 network. The site sees the user's IP address, exactly as it would if they had
 clicked the link themselves (see the `fetched-advert` entry in
