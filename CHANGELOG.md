@@ -11,6 +11,10 @@ All notable changes to CViper Light are recorded here. The format follows
 - The sidebar's Set up list shows which AI providers have a key: each one with
   a saved key by name, gold if its key cannot be read, and one quiet "AI keys"
   dot when there are none (L-182).
+- Each AI key card in Settings has a Model list: three to five models for that
+  provider, starting with the one the app has always used. The choice is kept
+  on this computer and used by everything that provider does in the app —
+  analysis, tailoring, pasted adverts, follow-ups and interview packs (L-183).
 
 ## [0.4.0] — 2026-09-29
 
