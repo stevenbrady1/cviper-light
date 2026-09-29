@@ -6,8 +6,14 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-29
+
+Release contents for `light-v0.4.0`.
+
 ### Added
 
+- Job applications can record salary amounts with a period and keep the
+  recruitment agency separate from the employer (PR #137).
 - Four more bring-your-own-key AI providers: Google Gemini, Mistral, xAI Grok
   and OpenRouter, each with its own key card (tested before it is saved), its
   own consent dialog, and its own entry in the generated privacy policy. All
@@ -21,15 +27,17 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Changed
 
+- The tracker has quick search and a retry action after a load failure (PR #137).
+- Tracker review and recovery make editing and restoring applications clearer
+  (PR #137).
 - Settings leads with the AI provider keys. The free Adzuna and Reed keys move
   into an Advanced section that starts closed (L-176).
 - The key box hint no longer says every key has a prefix; some providers'
   keys do not (L-177).
 
-## [0.3.0] — not yet published
+## [0.3.0] — 2026-09-28
 
-The version the Microsoft Store submission and the next download are built
-from (L-174). The date is set when `light-v0.3.0` is tagged.
+Published 2026-09-28 from `light-v0.3.0` (tagged 2026-09-27).
 
 ### Added
 
@@ -171,6 +179,7 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.3.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.4.0...main
+[0.4.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.3.0...light-v0.4.0
 [0.3.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.2.0...light-v0.3.0
 [0.2.0]: https://github.com/stevenbrady1/cviper-light/releases/tag/light-v0.2.0
