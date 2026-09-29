@@ -33,6 +33,7 @@ import {
   type ProviderError,
 } from '../types';
 import {
+  REASONING_TRUNCATED_MESSAGE,
   TRUNCATED_MESSAGE,
   decodeJsonBody,
   detailUnlessAuth,
@@ -40,6 +41,7 @@ import {
   readArray,
   readObject,
   readString,
+  wireOutputCap,
 } from './shared';
 
 const PROVIDER = 'anthropic' as const;
@@ -84,7 +86,8 @@ export function createAnthropicProvider(transport: ChatTransport): AiProvider {
     async chatJson(request: ChatJsonRequest): Promise<Result<string, ProviderError>> {
       const body = JSON.stringify({
         model: request.model,
-        max_tokens: request.maxOutputTokens,
+        // Budget plus room to think (L-185); see `wireOutputCap`.
+        max_tokens: wireOutputCap(request.maxOutputTokens),
         temperature: request.temperature,
         // Top-level, not a message. Anthropic has no "system" message role.
         system: request.system,
@@ -133,7 +136,20 @@ export function createAnthropicProvider(transport: ChatTransport): AiProvider {
       }
 
       if (readString(decoded.value, 'stop_reason') === STOP_REASON_MAX_TOKENS) {
-        return err(providerError(PROVIDER, 'truncated', TRUNCATED_MESSAGE));
+        // A thinking block ahead of the answer says where the allowance went.
+        const thought = content.some(
+          (block) =>
+            typeof block === 'object' &&
+            block !== null &&
+            (block as Record<string, unknown>)['type'] === 'thinking',
+        );
+        return err(
+          providerError(
+            PROVIDER,
+            'truncated',
+            thought ? REASONING_TRUNCATED_MESSAGE : TRUNCATED_MESSAGE,
+          ),
+        );
       }
 
       return ok(text);

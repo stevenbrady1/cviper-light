@@ -12,6 +12,16 @@ All notable changes to CViper Light are recorded here. The format follows
   a saved key by name, gold if its key cannot be read, and one quiet "AI keys"
   dot when there are none (L-182).
 
+### Fixed
+
+- Google Gemini no longer fails every analysis with "the model ran out of
+  room". Thinking models spend part of the answer allowance reasoning, and
+  each job's allowance was sized for the answer alone; every cloud provider
+  now gets room to think on top of it, so Grok, OpenAI's reasoning models and
+  thinking models on OpenRouter are covered too. When a model still runs out,
+  the message says the thinking used it up, and it no longer tells you to
+  raise an output limit the app does not have (L-185).
+
 ## [0.4.0] — 2026-09-29
 
 More AI providers, a Settings page that leads with them, and a tracker that is

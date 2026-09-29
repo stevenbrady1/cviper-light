@@ -126,14 +126,75 @@ export function readArray(source: Record<string, unknown>, key: string): unknown
 /**
  * The message shown when a model stops mid-answer at its output cap.
  *
- * Shared so all three providers give the same advice for the same symptom, and
- * so it matches what `extract-json.ts` says when it detects the same thing from
- * the text alone.
+ * Shared so every adapter gives the same advice for the same symptom, and so
+ * `extract-json.ts` says the same when it detects the same thing from the text
+ * alone.
+ *
+ * It used to end "…or raise the output limit for this model". The app has no
+ * such setting, so that was advice nobody could follow (L-185).
  */
 export const TRUNCATED_MESSAGE =
   'The model ran out of room and its answer was cut off part-way through. ' +
-  'Try again with a shorter CV or job description, or raise the output limit ' +
-  'for this model.';
+  'Try again with a shorter CV or job description.';
+
+/**
+ * The same symptom when the model is known to have been THINKING (L-185).
+ *
+ * A shorter CV barely helps here — the reasoning, not the answer, is what
+ * filled the allowance — so the advice is the one that does: another model.
+ */
+export const REASONING_TRUNCATED_MESSAGE =
+  'The model ran out of room: it spent its answer allowance thinking and was ' +
+  'cut off before it finished. Try again, and if it keeps happening, choose a ' +
+  'different model for this provider.';
+
+/**
+ * Room to think, added on top of every job's answer budget (L-185).
+ *
+ * ============================================================================
+ * WHY THE CAP ON THE WIRE IS NOT THE ANSWER BUDGET
+ * ============================================================================
+ * Each job sizes its budget for the JSON it expects: 2048 tokens for the
+ * analysis, 512 for a follow-up. A thinking model — Gemini 2.5 and later,
+ * Grok 4, OpenAI's o-series and gpt-5, Magistral, much of OpenRouter — counts
+ * its hidden reasoning against the SAME cap, and routinely thinks for longer
+ * than that. In 0.4.0 Gemini 3.5 Flash therefore failed every analysis: the
+ * reasoning spent the budget and the JSON stopped half-way.
+ *
+ * The cap is a ceiling, not a request: a model that does not think stops when
+ * its answer is done and is billed for what it wrote, so the headroom costs it
+ * nothing. It is added in every cloud adapter rather than for Gemini alone,
+ * because any of them can be pointed at a thinking model.
+ *
+ * Ollama does not get it: its cap has to fit inside the context window it is
+ * given (`OLLAMA_DEFAULT_NUM_CTX`), and a local thinking model that runs out
+ * is told so by `REASONING_TRUNCATED_MESSAGE` instead.
+ */
+export const REASONING_HEADROOM_TOKENS = 8192;
+
+/**
+ * The most any cloud request asks for.
+ *
+ * A cap above a model's own output limit is a 400, not a clamp, on OpenAI's
+ * API (gpt-4o and gpt-4o-mini stop at 16,384). That is the smallest limit
+ * among the default models, so a default request is never refused for asking
+ * too much.
+ */
+export const MAX_WIRE_OUTPUT_TOKENS = 16_384;
+
+/**
+ * The cap a cloud adapter sends for a job's answer budget.
+ *
+ * The budget plus the headroom, held to the ceiling — but never below the
+ * budget itself: a caller that deliberately asked for more than the ceiling
+ * keeps what it asked for.
+ */
+export function wireOutputCap(answerBudget: number): number {
+  return Math.max(
+    answerBudget,
+    Math.min(answerBudget + REASONING_HEADROOM_TOKENS, MAX_WIRE_OUTPUT_TOKENS),
+  );
+}
 
 /** Build the error for a non-2xx response whose envelope has been read. */
 export function httpError(
