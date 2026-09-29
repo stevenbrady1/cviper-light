@@ -12,6 +12,14 @@ All notable changes to CViper Light are recorded here. The format follows
   a saved key by name, gold if its key cannot be read, and one quiet "AI keys"
   dot when there are none (L-182).
 
+### Fixed
+
+- Fetching a LinkedIn job link says what is really happening: LinkedIn blocks
+  apps from reading its pages, so the advert has to be pasted as text. It
+  used to say only that the page could not be read, which looked like a fault
+  in the app. The same message is shown for any site that answers 401, 403 or
+  999 (L-188).
+
 ## [0.4.0] — 2026-09-29
 
 More AI providers, a Settings page that leads with them, and a tracker that is
