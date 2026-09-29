@@ -1,3 +1,5 @@
+import { type CSSProperties } from 'react';
+
 import { type Verdict } from '@cviper/core-types';
 
 /**
@@ -102,6 +104,16 @@ function clampScore(score: number): number {
   return Math.min(100, Math.max(0, Math.round(score)));
 }
 
+/**
+ * Where a band's label sits: the first band at the left edge, the last at the
+ * right edge, anything between centred on its own band.
+ */
+function labelPosition(band: Band): CSSProperties {
+  if (band.from === 0) return { left: '0%' };
+  if (band.to === 100) return { right: '0%' };
+  return { left: `${(band.from + band.to + 1) / 2}%`, transform: 'translateX(-50%)' };
+}
+
 interface BandScaleProps {
   readonly score: number;
   readonly verdict: Verdict;
@@ -113,6 +125,7 @@ export function BandScale({ score, verdict }: BandScaleProps) {
   return (
     <div
       data-testid="band-scale"
+      className="w-full"
       data-score={value}
       data-verdict={verdict}
       role="img"
@@ -164,12 +177,20 @@ export function BandScale({ score, verdict }: BandScaleProps) {
           style={{ left: `${value}%`, transform: 'translateX(-50%)' }}
         />
 
-        <div className="mt-1.5 flex">
+        {/*
+          The labels are ANCHORED, not given their band's width (L-181). Sized
+          to their bands, "possible" got 15% of the scale — about 22px once the
+          scale had shrunk to its numeral — and the word ran into "strong" on
+          every result. Anchored, "weak" sits at the left edge, "strong" at the
+          right and "possible" centred on its band, and none of them can wrap.
+        */}
+        <div className="relative mt-1.5 h-4">
           {BANDS.map((band) => (
             <span
               key={band.verdict}
-              style={{ width: `${bandWidth(band)}%` }}
-              className={`font-mono text-[11px] tracking-[0.14em] uppercase ${
+              data-testid={`band-scale-label-${band.verdict}`}
+              style={labelPosition(band)}
+              className={`absolute top-0 font-mono text-[11px] tracking-[0.14em] whitespace-nowrap uppercase ${
                 band.verdict === verdict ? VERDICT_INK[verdict] : 'text-ink-faint'
               }`}
             >

@@ -38,6 +38,16 @@ is published.
 - The key box hint no longer says every key has a prefix; some providers'
   keys do not (L-177).
 
+### Fixed
+
+- The match score's WEAK / POSSIBLE / STRONG labels no longer print on top of
+  each other. The scale had shrunk to the width of "65 out of 100", so every
+  result showed the overlap; it now spans the row, the labels are anchored
+  apart, and on a narrow window the verdict badge moves below it (L-181).
+- Settings → Privacy no longer tells Microsoft Store or phone users the app
+  checks for updates at startup. Those builds have no update check; their
+  updates come from the store (L-181).
+
 ## [0.3.0] — 2026-09-28
 
 The version the Microsoft Store submission and the next download are built
