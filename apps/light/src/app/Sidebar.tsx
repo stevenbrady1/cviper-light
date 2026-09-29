@@ -101,7 +101,7 @@ export function Sidebar({ activeView, onSelect, status }: SidebarProps) {
         ))}
       </ul>
 
-      <StatusStrip status={status} />
+      <StatusStrip status={status} onOpenSettings={() => onSelect('settings')} />
     </nav>
   );
 }

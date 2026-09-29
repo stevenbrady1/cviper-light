@@ -10,21 +10,24 @@ import {
  * The permanent answer to "what is set up on this machine".
  *
  * ============================================================================
- * WHY THIS IS ALWAYS ON SCREEN
+ * IT LISTS WHAT IS THERE, NOT WHAT IS NOT (L-191)
  * ============================================================================
- * This app works with nothing configured, which is a real promise and also a
- * real risk: a user who has not entered any keys cannot otherwise tell whether
- * a feature is missing, broken, or simply switched off. Three small rows in the
- * rail make that permanently answerable without anybody going looking.
+ * This strip used to draw every row whatever its state — a machine with
+ * nothing configured showed three quiet grey dots, on the argument that "not
+ * set up" is the normal state and deserves to be seen as such. The owner
+ * reversed that: a list of absences is clutter, and the rail answers faster
+ * when it names only what is present.
  *
- * It is DELIBERATELY NOT AN ALERT. A machine with no keys and no Ollama is the
- * default state, not a fault, so the empty case is three quiet grey dots and
- * not a row of warnings. Gold appears only where something genuinely needs the
- * user: a half-entered Adzuna, or a credential store that would not answer.
+ * Two things still show although nothing works yet, because they need the
+ * user rather than describe an absence: a half-entered Adzuna (incomplete) and
+ * a key the credential store will not read (unreadable). Both are gold.
+ * Hiding them would hide a fault the user can fix.
  *
- * The dots follow the app's colour grammar exactly — teal is present, gold is
- * attention, and nothing here is ever red, because none of these states is
- * destructive or a rejection.
+ * And the list is never left empty. With nothing to show, one quiet line says
+ * so and offers the way to Settings — a new user sees a route, not a blank.
+ *
+ * It is still DELIBERATELY NOT AN ALERT. Nothing configured is a fine way to
+ * use this app, so that line is plain text, and nothing here is ever red.
  */
 
 /** Teal = present. Gold = needs you. Faint = simply not set up, which is fine. */
@@ -78,21 +81,31 @@ function Dot({ testId, label, state, tone, description }: DotProps) {
 interface StatusStripProps {
   /** `null` while the first read is still in flight. */
   readonly status: EnvironmentStatus | null;
+  /** Opens Settings from the "Nothing set up yet" line. Absent: no link drawn. */
+  readonly onOpenSettings?: (() => void) | undefined;
 }
 
-export function StatusStrip({ status }: StatusStripProps) {
-  // Before the first answer arrives, show the shape of the strip with
-  // everything faint rather than a spinner. The read is three local IPC calls
-  // and finishes in milliseconds; a spinner would flash and be gone.
+/** A key state worth a row: present, or needing the user. `missing` is neither. */
+function shows(state: KeyState): boolean {
+  return state !== 'missing';
+}
+
+export function StatusStrip({ status, onOpenSettings }: StatusStripProps) {
+  // Before the first answer arrives nothing is drawn but the counter: the read
+  // is a few local calls and finishes in milliseconds, and flashing "Nothing
+  // set up yet" at a machine that has everything set up would be a lie.
   const ollama: OllamaState = status?.ollama ?? 'absent';
   const adzuna: KeyState = status?.adzuna ?? 'missing';
   const reed: KeyState = status?.reed ?? 'missing';
   const ai = status?.ai ?? NO_AI_KEYS;
   const requests = status?.requestsToday ?? 0;
 
-  // Only the providers that have something to say: a saved key (teal) or one
-  // the store cannot read (gold). Six grey names would bury the answer.
-  const aiShown = AI_STATUS_PROVIDERS.filter((provider) => ai[provider.id] !== 'missing');
+  const showOllama = ollama === 'running';
+  const showAdzuna = shows(adzuna);
+  const showReed = shows(reed);
+  const aiShown = AI_STATUS_PROVIDERS.filter((provider) => shows(ai[provider.id]));
+  const nothingSetUp =
+    status !== null && !showOllama && !showAdzuna && !showReed && aiShown.length === 0;
 
   return (
     <section
@@ -103,49 +116,47 @@ export function StatusStrip({ status }: StatusStripProps) {
       <h2 className="mb-2 font-mono text-[10px] font-medium tracking-[0.14em] uppercase">Set up</h2>
 
       <ul className="space-y-1.5">
-        <li>
-          <Dot
-            testId="status-ollama"
-            label="Ollama"
-            state={ollama}
-            tone={DOT_BY_OLLAMA_STATE[ollama]}
-            description={DESCRIPTION_BY_OLLAMA_STATE[ollama]}
-          />
-        </li>
-
-        <li className="flex items-center gap-2">
-          <Dot
-            testId="status-adzuna"
-            label="Adzuna"
-            state={adzuna}
-            tone={DOT_BY_KEY_STATE[adzuna]}
-            description={DESCRIPTION_BY_KEY_STATE[adzuna]}
-          />
-          <span aria-hidden="true">·</span>
-          <Dot
-            testId="status-reed"
-            label="Reed"
-            state={reed}
-            tone={DOT_BY_KEY_STATE[reed]}
-            description={DESCRIPTION_BY_KEY_STATE[reed]}
-          />
-        </li>
-
-        {/*
-          The AI row (L-182). With no key saved it is one quiet dot, like the
-          others: no AI key is a fine way to use this app, not a fault.
-        */}
-        <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          {aiShown.length === 0 ? (
+        {showOllama ? (
+          <li>
             <Dot
-              testId="status-ai-none"
-              label="AI keys"
-              state="missing"
-              tone={DOT_BY_KEY_STATE.missing}
-              description="no AI key saved"
+              testId="status-ollama"
+              label="Ollama"
+              state={ollama}
+              tone={DOT_BY_OLLAMA_STATE[ollama]}
+              description={DESCRIPTION_BY_OLLAMA_STATE[ollama]}
             />
-          ) : (
-            aiShown.map((provider) => (
+          </li>
+        ) : null}
+
+        {showAdzuna || showReed ? (
+          <li className="flex items-center gap-2">
+            {showAdzuna ? (
+              <Dot
+                testId="status-adzuna"
+                label="Adzuna"
+                state={adzuna}
+                tone={DOT_BY_KEY_STATE[adzuna]}
+                description={DESCRIPTION_BY_KEY_STATE[adzuna]}
+              />
+            ) : null}
+            {/* The separator only between two names, never beside one. */}
+            {showAdzuna && showReed ? <span aria-hidden="true">·</span> : null}
+            {showReed ? (
+              <Dot
+                testId="status-reed"
+                label="Reed"
+                state={reed}
+                tone={DOT_BY_KEY_STATE[reed]}
+                description={DESCRIPTION_BY_KEY_STATE[reed]}
+              />
+            ) : null}
+          </li>
+        ) : null}
+
+        {/* The AI row (L-182): only providers with a key saved, or one unreadable. */}
+        {aiShown.length > 0 ? (
+          <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {aiShown.map((provider) => (
               <Dot
                 key={provider.id}
                 testId={`status-ai-${provider.id}`}
@@ -154,9 +165,28 @@ export function StatusStrip({ status }: StatusStripProps) {
                 tone={DOT_BY_KEY_STATE[ai[provider.id]]}
                 description={DESCRIPTION_BY_KEY_STATE[ai[provider.id]]}
               />
-            ))
-          )}
-        </li>
+            ))}
+          </li>
+        ) : null}
+
+        {nothingSetUp ? (
+          <li data-testid="status-none">
+            Nothing set up yet
+            {onOpenSettings === undefined ? null : (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  data-testid="status-none-settings"
+                  onClick={onOpenSettings}
+                  className="underline underline-offset-2 hover:text-ink-inverse"
+                >
+                  Settings
+                </button>
+              </>
+            )}
+          </li>
+        ) : null}
 
         <li className="flex items-center justify-between" data-testid="status-requests">
           <span>Requests today</span>
