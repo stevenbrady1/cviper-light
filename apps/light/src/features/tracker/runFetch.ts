@@ -29,6 +29,13 @@
  *
  * A status code or a kind string on screen would be eight dead ends instead of
  * one route forward, and none of the eight is anything the user did wrong.
+ *
+ * ONE EXCEPTION, SAME ROUTE (L-188): when we KNOW the site turns apps away —
+ * it is on the blocklist, or it answered 401, 403 or LinkedIn's 999 — the user
+ * gets `FETCH_SITE_REFUSES_NOTE`, which says so. "Could not be read from here"
+ * about LinkedIn read as a bug in the app (issue #154); it is a site's policy,
+ * and the person is owed that one fact, as `URL_ONLY_BLOCKED_NOTE` already
+ * gives it. Still no status or kind on screen, and still the same route: paste.
  */
 import { htmlToText, isPlausiblyReadable } from './htmlToText';
 import { isBlockedUrl } from './fetchBlocklist';
@@ -50,6 +57,19 @@ import { createTauriPageTransport, type PageFetchTransport } from './pageFetch';
 export const FETCH_FALLBACK_NOTE =
   'That page could not be read from here. Open it in your browser, copy the advert text, ' +
   'and paste it in the box below — the link stays in the box above and is saved with the job.';
+
+/**
+ * What a fetch says when the SITE turned the app away (L-188).
+ *
+ * Only for a site we know refuses — a blocklisted domain, or a 401, 403 or 999
+ * reply — never for this app's own refusals (a private address, a redirect off
+ * the site), because "this site blocks apps" would then be untrue. It says the
+ * advert is fine and the route that works, and never that the page is missing.
+ */
+export const FETCH_SITE_REFUSES_NOTE =
+  'This site blocks apps from reading its pages, so Fetch cannot bring the advert in. ' +
+  'Pasting the text works instead: open the page in your browser, copy the advert, and ' +
+  'paste it in the box below — the link stays in the box above and is saved with the job.';
 
 /**
  * What the user is told BEFORE they can press Fetch.
@@ -105,6 +125,22 @@ const UNAVAILABLE: PageFetchOutcome = {
   reason: FETCH_FALLBACK_NOTE,
 };
 
+/** The same fail-open shape, for a site that refuses apps. */
+const SITE_REFUSES: PageFetchOutcome = {
+  available: false,
+  text: '',
+  reason: FETCH_SITE_REFUSES_NOTE,
+};
+
+/**
+ * Replies that mean "not to you" rather than "not here".
+ *
+ * 401 and 403 are the standard ones. 999 is LinkedIn's own status for a client
+ * it has decided is not a signed-in browser. A 404, a 429 or a 5xx is not in
+ * here: none of them says the site refuses apps, so none of them may claim it.
+ */
+const SITE_REFUSES_STATUSES = new Set([401, 403, 999]);
+
 /**
  * Is this an address we will attempt at all?
  *
@@ -148,7 +184,7 @@ export async function runFetch(
   // 3. A site we already know answers a fetcher with a wall. No request is
   //    attempted — see `fetchBlocklist.ts` for why this is about the user's
   //    fifteen seconds and not about security.
-  if (isBlockedUrl(address)) return UNAVAILABLE;
+  if (isBlockedUrl(address)) return SITE_REFUSES;
 
   const result = await createTransport().fetchPage(address);
   if (!result.ok) return UNAVAILABLE;
@@ -157,6 +193,7 @@ export async function runFetch(
   // transport is right to call it a success; this is the layer that decides
   // what it was worth.
   const { status, body } = result.value;
+  if (SITE_REFUSES_STATUSES.has(status)) return SITE_REFUSES;
   if (status < 200 || status > 299) return UNAVAILABLE;
 
   const text = htmlToText(body);

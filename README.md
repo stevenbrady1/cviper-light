@@ -140,6 +140,8 @@ only happens when you press the button.
 
 If a fetch does not work, for any reason, you get the same short message asking
 you to open the page and paste the text, and your link stays where you typed it.
+When the site is one that blocks apps from reading its pages, the message says
+so plainly, so it does not look like something is wrong with the app.
 
 ## What it does
 

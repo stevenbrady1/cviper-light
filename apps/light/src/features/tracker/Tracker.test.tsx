@@ -621,6 +621,65 @@ describe('moving a card by dragging it', () => {
 
     expect(port.calls.saveApplication).toBe(0);
   });
+
+  it('carries the card from dragstart to drop through one DataTransfer (L-186)', async () => {
+    // `dragCardTo` fakes the payload, so on its own it never proved the card
+    // PUTS its id on the drag. This drives both halves the way the browser
+    // does: one DataTransfer, written by the card and read by the column.
+    const store = new Map<string, string>();
+    const dataTransfer = {
+      get types() {
+        return [...store.keys()];
+      },
+      setData: (type: string, value: string) => void store.set(type, value),
+      getData: (type: string) => store.get(type) ?? '',
+      dropEffect: 'none',
+      effectAllowed: 'uninitialized',
+    };
+    const { port } = await renderBoard([entry('a')]);
+
+    fireEvent.dragStart(screen.getByTestId('tracker-card-a'), { dataTransfer });
+    const column = screen.getByTestId('tracker-column-offer');
+    // `fireEvent` returns false when `preventDefault` was called — which is
+    // what makes the column a drop target at all.
+    expect(fireEvent.dragOver(column, { dataTransfer })).toBe(false);
+    expect(dataTransfer.dropEffect).toBe('move');
+    fireEvent.drop(column, { dataTransfer });
+
+    await vi.waitFor(() => {
+      expect(port.entries()[0]?.application.status).toBe('offer');
+    });
+    expect(port.calls.saveApplication).toBe(1);
+  });
+
+  it('boundary: moves between the first and the last column, both ways', async () => {
+    const { port } = await renderBoard([entry('a')]);
+
+    dragCardTo('a', 'rejected');
+    await vi.waitFor(() => {
+      expect(port.entries()[0]?.application.status).toBe('rejected');
+    });
+
+    dragCardTo('a', 'saved');
+    await vi.waitFor(() => {
+      expect(port.entries()[0]?.application.status).toBe('saved');
+    });
+    const column = screen.getByTestId('tracker-column-saved');
+    expect(within(column).getByTestId('tracker-card-a')).toBeTruthy();
+  });
+
+  it('negative: a column does not offer itself as a target for a dragged file', async () => {
+    const { port } = await renderBoard([entry('a')]);
+
+    const column = screen.getByTestId('tracker-column-offer');
+    const accepted = !fireEvent.dragOver(column, {
+      dataTransfer: { types: ['Files'], getData: () => '', setData: () => {} },
+    });
+
+    expect(accepted).toBe(false);
+    expect(column.dataset['dropTarget']).toBe('idle');
+    expect(port.calls.saveApplication).toBe(0);
+  });
 });
 
 describe('the detail pane', () => {
@@ -671,6 +730,23 @@ describe('the detail pane', () => {
     await vi.waitFor(() => {
       expect(port.entries()[0]?.application.status).toBe('rejected');
     });
+  });
+
+  it('boundary: the keyboard route moves a card from the last column back to the first', async () => {
+    // The non-drag route (L-186) must reach every column, the ends included,
+    // and land the card in its new column on the board — not only in storage.
+    const user = userEvent.setup();
+    const { port } = await renderBoard([entry('a', { status: 'rejected' })]);
+
+    await user.click(screen.getByTestId('tracker-card-a'));
+    await user.selectOptions(screen.getByTestId('detail-status'), 'saved');
+
+    await vi.waitFor(() => {
+      expect(port.entries()[0]?.application.status).toBe('saved');
+    });
+    expect(port.calls.saveApplication).toBe(1);
+    const column = screen.getByTestId('tracker-column-saved');
+    expect(within(column).getByTestId('tracker-card-a')).toBeTruthy();
   });
 
   it('sets a next action and a due date', async () => {

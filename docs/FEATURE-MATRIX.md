@@ -245,7 +245,10 @@ product that exists (L-114).
   open the page and paste the text, with their link left where they typed it and
   the paste box still working. Eight things to a developer; one thing, with one
   route forward, to somebody trying to record a job. No status code, error kind
-  or raw message ever reaches the screen, and a test asserts it.
+  or raw message ever reaches the screen, and a test asserts it. One exception
+  (L-188): a site known to refuse apps — blocklisted, or answering 401, 403 or
+  LinkedIn's 999 — gets a sentence saying the site blocks apps and that pasting
+  the text works, because "could not be read" about LinkedIn read as a bug.
 
 - **`fetch-blocklist.json` is a courtesy list, not a security control, and says
   so.** LinkedIn and Indeed ship in it because they answer anything that is not

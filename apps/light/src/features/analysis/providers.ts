@@ -25,16 +25,15 @@
  * always explains itself — see `model.ts`. A control the user is looking for
  * must not move; a control they have no use for should not exist.
  */
-import {
-  ANTHROPIC_DEFAULT_MODEL,
-  GOOGLE_DEFAULT_MODEL,
-  GROK_DEFAULT_MODEL,
-  MISTRAL_DEFAULT_MODEL,
-  OPENROUTER_DEFAULT_MODEL,
-  type ModelInfo,
-} from '@cviper/ai-providers';
+import type { ModelInfo } from '@cviper/ai-providers';
 
+import type { AiKeyProviderId } from '../settings/keys/aiKeyModel';
 import { AI_KEY_PROVIDER_IDS } from '../settings/keys/aiKeyProviders';
+import { readModelChoices } from './modelChoice';
+
+// Where it has lived since L-183, beside the list it now heads. Re-exported so
+// the files that have always imported it from here keep doing so.
+export { OPENAI_DEFAULT_MODEL } from './modelChoice';
 
 /** Which family an option belongs to. */
 export type ProviderKind =
@@ -42,26 +41,6 @@ export type ProviderKind =
 
 /** The key of the always-available option. */
 export const KEYWORD_KEY = 'keyword';
-
-/**
- * The OpenAI model used when the user has an OpenAI key.
- *
- * ============================================================================
- * A FIXED DEFAULT, NOT A CHOICE, AND DELIBERATELY A CONSERVATIVE ONE.
- * ============================================================================
- * Ollama publishes exactly which models are installed, so its options are real.
- * OpenAI's `/v1/models` returns everything the key can reach in no useful
- * order, with no capability field and no indication of which is any good at
- * this task — picking "the first one" would be arbitrary, and it would cost a
- * metered request on every visit to this screen just to build a dropdown.
- *
- * So one model is named here. `gpt-4o` is chosen for longevity rather than
- * ambition: it has been generally available and stable for a long time, which
- * is the property that matters for a desktop app a user may not update for a
- * year. A per-provider model picker is future work, and when it arrives this
- * constant becomes the fallback rather than the answer.
- */
-export const OPENAI_DEFAULT_MODEL = 'gpt-4o';
 
 export interface ProviderOption {
   /** Unique, and what the picker's `<option value>` carries. */
@@ -162,7 +141,15 @@ function canBeSetUp(kind: ProviderKind): boolean {
   return CLOUD_PROVIDERS_WITH_A_KEY_CARD.has(kind);
 }
 
-export function providerOptions(availability: Availability): ProviderOption[] {
+/**
+ * `models` is which model each cloud runs (L-183). It defaults to what the user
+ * chose in Settings, read afresh on every call, so a choice made there reaches
+ * the next screen that builds options without anything else being told.
+ */
+export function providerOptions(
+  availability: Availability,
+  models: Readonly<Record<AiKeyProviderId, string>> = readModelChoices(),
+): ProviderOption[] {
   const options: ProviderOption[] = [KEYWORD_OPTION];
 
   for (const model of availability.ollamaModels) {
@@ -192,12 +179,12 @@ export function providerOptions(availability: Availability): ProviderOption[] {
     options.push({
       key: 'anthropic',
       kind: 'anthropic',
-      label: `Anthropic · ${ANTHROPIC_DEFAULT_MODEL}`,
+      label: `Anthropic · ${models.anthropic}`,
       // Said plainly, every time. This is the only option that sends the user's
       // CV to someone else, and burying that would be the one dishonest line in
       // an app whose whole pitch is that it does not.
       note: 'A full reading. Your CV and the advert are sent to Anthropic.',
-      model: ANTHROPIC_DEFAULT_MODEL,
+      model: models.anthropic,
       local: false,
       needsKey: true,
     });
@@ -211,9 +198,9 @@ export function providerOptions(availability: Availability): ProviderOption[] {
     options.push({
       key: 'openai',
       kind: 'openai',
-      label: `OpenAI · ${OPENAI_DEFAULT_MODEL}`,
+      label: `OpenAI · ${models.openai}`,
       note: 'A full reading. Your CV and the advert are sent to OpenAI.',
-      model: OPENAI_DEFAULT_MODEL,
+      model: models.openai,
       local: false,
       needsKey: true,
     });
@@ -227,9 +214,9 @@ export function providerOptions(availability: Availability): ProviderOption[] {
       options.push({
         key: cloud.kind,
         kind: cloud.kind,
-        label: `${cloud.label} · ${cloud.model}`,
+        label: `${cloud.label} · ${models[cloud.kind]}`,
         note: cloud.note,
-        model: cloud.model,
+        model: models[cloud.kind],
         local: false,
         needsKey: true,
       });
@@ -244,7 +231,6 @@ interface MoreCloud {
   readonly kind: 'google' | 'mistral' | 'grok' | 'openrouter';
   readonly flag: 'googleKey' | 'mistralKey' | 'grokKey' | 'openrouterKey';
   readonly label: string;
-  readonly model: string;
   readonly note: string;
 }
 
@@ -253,28 +239,24 @@ const MORE_CLOUDS: readonly MoreCloud[] = [
     kind: 'google',
     flag: 'googleKey',
     label: 'Google Gemini',
-    model: GOOGLE_DEFAULT_MODEL,
     note: 'A full reading. Your CV and the advert are sent to Google.',
   },
   {
     kind: 'mistral',
     flag: 'mistralKey',
     label: 'Mistral',
-    model: MISTRAL_DEFAULT_MODEL,
     note: 'A full reading. Your CV and the advert are sent to Mistral.',
   },
   {
     kind: 'grok',
     flag: 'grokKey',
     label: 'xAI Grok',
-    model: GROK_DEFAULT_MODEL,
     note: 'A full reading. Your CV and the advert are sent to xAI.',
   },
   {
     kind: 'openrouter',
     flag: 'openrouterKey',
     label: 'OpenRouter',
-    model: OPENROUTER_DEFAULT_MODEL,
     note:
       'A full reading. Your CV and the advert are sent to OpenRouter, which passes them to ' +
       'the company that runs the model.',
