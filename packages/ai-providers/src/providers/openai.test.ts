@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { fakeTransport, sentBody } from '../test/fake-transport';
 import { createOpenAiProvider } from './openai';
+import { wireOutputCap } from './shared';
 
 const REQUEST = {
   model: 'gpt-5',
@@ -79,7 +80,7 @@ describe('openai chatJson — the request it builds', () => {
     void createOpenAiProvider(transport).chatJson(REQUEST);
 
     const body = sentBody(transport);
-    expect(body).toMatchObject({ temperature: 0, max_completion_tokens: 2048 });
+    expect(body).toMatchObject({ temperature: 0, max_completion_tokens: wireOutputCap(2048) });
     expect(body).not.toHaveProperty('max_tokens');
   });
 });

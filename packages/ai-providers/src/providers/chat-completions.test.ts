@@ -10,6 +10,7 @@ import {
   createChatCompletionsProvider,
   type ChatCompletionsProviderId,
 } from './chat-completions';
+import { wireOutputCap } from './shared';
 
 /**
  * The four providers L-177 added, driven through the one adapter they share.
@@ -74,7 +75,7 @@ describe.each(NEW_PROVIDERS.map((id) => [id] as const))('%s — the request it b
     void createChatCompletionsProvider(id, transport).chatJson(REQUEST);
 
     const body = sentBody(transport);
-    expect(body).toMatchObject({ temperature: 0, max_tokens: 2048 });
+    expect(body).toMatchObject({ temperature: 0, max_tokens: wireOutputCap(2048) });
     expect(body).not.toHaveProperty('max_completion_tokens');
   });
 
