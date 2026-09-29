@@ -12,6 +12,13 @@ All notable changes to CViper Light are recorded here. The format follows
   a saved key by name, gold if its key cannot be read, and one quiet "AI keys"
   dot when there are none (L-182).
 
+### Fixed
+
+- Tracker cards can now be dragged between columns on Windows. Tauri’s own
+  file-drop handler was swallowing every in-page drag in WebView2; it is
+  switched off, and a file or link dropped on the window is refused rather
+  than opened in place of the app (L-186).
+
 ## [0.4.0] — 2026-09-29
 
 More AI providers, a Settings page that leads with them, and a tracker that is
