@@ -163,18 +163,28 @@ describe('keyboard shortcuts', () => {
 });
 
 describe('the status strip on a machine with nothing set up', () => {
-  it('reports Ollama absent and both search providers missing, with no error', async () => {
+  it('lists nothing, and says "Nothing set up yet" rather than an error (L-191)', async () => {
     await renderApp();
 
     await vi.waitFor(() => {
-      expect(screen.getByTestId('status-ollama').getAttribute('data-state')).toBe('absent');
+      expect(screen.getByTestId('status-none').textContent).toContain('Nothing set up yet');
     });
-    expect(screen.getByTestId('status-adzuna').getAttribute('data-state')).toBe('missing');
-    expect(screen.getByTestId('status-reed').getAttribute('data-state')).toBe('missing');
+    // L-191: absences are no longer drawn as grey dots.
+    expect(screen.queryByTestId('status-ollama')).toBeNull();
+    expect(screen.queryByTestId('status-adzuna')).toBeNull();
+    expect(screen.queryByTestId('status-reed')).toBeNull();
 
     // Nothing about an unconfigured machine is an error, so nothing may
     // announce itself as one.
     expect(screen.queryAllByRole('alert')).toEqual([]);
+  });
+
+  it('the "Settings" link in that line opens Settings (L-191)', async () => {
+    const user = userEvent.setup();
+    await renderApp();
+
+    await user.click(await screen.findByTestId('status-none-settings'));
+    expect(await screen.findByTestId('view-settings')).toBeTruthy();
   });
 
   it('shows zero requests today', async () => {
