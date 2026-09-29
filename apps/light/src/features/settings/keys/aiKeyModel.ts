@@ -316,9 +316,13 @@ function buildAiKeyProvider(copy: AiKeyProviderCopy): AiKeyProvider {
     label,
     secret,
     unlocks:
-      `Adds “${label} · ${defaultModel}” to the analysis screen as a way of reading your CV. ` +
-      'It is a full reading available without installing anything, and it is the one option ' +
-      `that sends your CV and the advert to ${label}.`,
+      // No model in the quoted name since L-183: the card's own Model select
+      // decides it, and a sentence naming the default would be wrong the
+      // moment somebody chose another.
+      `Adds ${label} to the analysis screen as a way of reading your CV, running the model ` +
+      `chosen below (${defaultModel} unless you change it). It is a full reading available ` +
+      'without installing anything, and it is the one option that sends your CV and the advert ' +
+      `to ${label}.`,
     billing,
     signupUrl,
     // Named per provider (W8, coordinator review of PR #96), mirroring

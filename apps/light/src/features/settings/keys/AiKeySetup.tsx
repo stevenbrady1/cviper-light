@@ -3,6 +3,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
 import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 import { combineKeyState, type KeyState } from '../../../status/environment';
+import {
+  AI_MODEL_CHOICES,
+  chooseModel,
+  chosenModel,
+  defaultModelFor,
+} from '../../analysis/modelChoice';
 
 import {
   AI_KEY_PROVIDERS,
@@ -359,7 +365,53 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
         </p>
       )}
 
+      <ModelPicker providerId={provider.id} />
+
       <p className="mt-3 text-xs text-ink-faint">{provider.privacyNote}</p>
     </article>
+  );
+}
+
+/**
+ * Which model this provider runs (L-183): its curated list, default first.
+ *
+ * Enabled whether or not a key is saved — choosing first and pasting second is
+ * a perfectly good order — and saved the moment it changes, like every other
+ * preference in Settings. Every AI feature reads the choice through
+ * `providerOptions`, so there is nothing else to press.
+ */
+function ModelPicker({ providerId }: { readonly providerId: AiKeyProviderId }) {
+  const [model, setModel] = useState(() => chosenModel(providerId));
+  const selectId = `ai-model-${providerId}`;
+  const fallback = defaultModelFor(providerId);
+
+  return (
+    <div className="mt-3">
+      <label htmlFor={selectId} className="block text-xs font-medium text-ink-muted">
+        Model
+      </label>
+      <select
+        id={selectId}
+        data-testid={selectId}
+        value={model}
+        onChange={(event) => {
+          const next = event.currentTarget.value;
+          // Shown only once it is kept: a selection that silently fails to
+          // save would run a different model from the one on screen.
+          if (chooseModel(providerId, next)) setModel(next);
+        }}
+        className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+      >
+        {AI_MODEL_CHOICES[providerId].map((choice) => (
+          <option key={choice.id} value={choice.id}>
+            {choice.id === fallback ? `${choice.id} (default)` : choice.id}
+          </option>
+        ))}
+      </select>
+      <p className="mt-1 text-xs text-ink-faint">
+        Used for everything this provider does here: analysis, tailoring, pasted adverts, follow-ups
+        and interview packs.
+      </p>
+    </div>
   );
 }
