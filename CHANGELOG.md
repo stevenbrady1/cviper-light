@@ -6,6 +6,11 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-09-29
+
+One flow from finding a job to tailoring your CV for it, a tidier Set up
+list, and your CV shown on the Tailor screen (L-195).
+
 ### Added
 
 - Find a job, check your CV against it and tailor your CV for it, without
@@ -265,7 +270,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.5.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.6.0...main
+[0.6.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.5.0...light-v0.6.0
 [0.5.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.4.0...light-v0.5.0
 [0.4.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.3.0...light-v0.4.0
 [0.3.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.2.0...light-v0.3.0
