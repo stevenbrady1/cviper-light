@@ -82,7 +82,7 @@ jobs:
           echo ''
           echo '  1. To build a new release: push a light-v* tag. The bundle job builds the'
           echo '     installers into a DRAFT release named after that tag. Review it, then'
-          echo '     publish it as a pre-release.'
+          echo '     publish it.'
           echo '  2. To point existing installs at a release you have already published: run'
           echo '     this workflow with promote_tag set to that tag.'
           echo ''
@@ -363,9 +363,11 @@ jobs:
   #      DRAFT release. Nothing is public and no installed copy can see it.
   #   2. REVIEW THE DRAFT. Download the installer, run it, check the version.
   #      This is the step the draft gate exists to make possible.
-  #   3. PUBLISH THE DRAFT AS A PRE-RELEASE. Pre-release, not latest, because
-  #      the direct-download installers are unsigned and SmartScreen warns
-  #      about them — they are not a headline download.
+  #   3. PUBLISH THE DRAFT as a full release, so it takes GitHub's Latest
+  #      badge. 0.2.0 and 0.3.0 both shipped this way. The updater never reads
+  #      Latest (it reads the fixed `updater` release), so the flag only
+  #      decides which release the releases page offers first — and a
+  #      pre-release would leave that on an older version.
   #   4. Run this workflow by hand (Actions -> Release -> Run workflow) with
   #      `promote_tag` set to the tag you just published. THAT is the moment
   #      existing installs start seeing the update.
@@ -445,7 +447,7 @@ jobs:
           draft=$(gh release view "$TAG" --json isDraft --jq .isDraft)
           echo "$TAG isDraft=$draft"
           if [ "$draft" != "false" ]; then
-            echo "::error title=That release is still a draft::$TAG has not been published. A draft's assets are not downloadable by users, so the manifest would point at URLs that 404 for everyone. Publish it as a pre-release first."
+            echo "::error title=That release is still a draft::$TAG has not been published. A draft's assets are not downloadable by users, so the manifest would point at URLs that 404 for everyone. Publish it first."
             exit 1
           fi
 

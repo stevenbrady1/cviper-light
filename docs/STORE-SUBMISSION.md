@@ -140,6 +140,13 @@ upload.
 Actions → **MSIX (Microsoft Store)** → **Run workflow**, leaving
 _Run the Windows App Certification Kit_ on.
 
+**Build from a published tag, not from `main`.** In _Use workflow from_, pick
+**Tags → the `light-v*` you are submitting**. `main` can already carry hosts the
+published privacy policy (Step 8) does not list yet: on 2026-09-29 `main` had the
+four providers from L-177 and `https://cviper.ai/privacy/` did not, while every
+host in `light-v0.3.0` was on it. A package that contacts a host its policy never
+mentions is the exact claim the policy exists to rule out (L-179).
+
 It builds the Store flavour of the app, packs it as an `.msix`, runs the
 certification kit over it, and uploads everything as the run artefact
 `cviper-light-msix`. Download that artefact; the `.msix` inside is the file
