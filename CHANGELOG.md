@@ -6,6 +6,12 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- CViper Light now uses the CViper logo — the navy badge with three teal bars —
+  in the sidebar and as its app icon on the taskbar, Start menu, installer and
+  Microsoft Store tiles (L-184).
+
 ## [0.4.0] — not yet published
 
 More AI providers, a Settings page that leads with them, and a tracker that is
