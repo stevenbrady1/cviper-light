@@ -201,6 +201,7 @@ function normaliseItem(item: Element, context: NormaliseContext): SearchResultJo
     external_id: jobIdFromLink(url),
     title,
     company,
+    agency: null,
     location: locationFrom(lines),
     ...salaryFields(stated),
     description: normaliseDescription(description),

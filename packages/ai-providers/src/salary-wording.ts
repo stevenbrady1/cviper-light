@@ -22,27 +22,16 @@
  * to decide when those numbers must be OVERRULED and forced to null. It reads
  * the advert; it never reads the model's answer.
  *
- * There are three reasons a number is wrong even when it is present:
+ * There are reasons a number is wrong even when it is present:
  *
- *   1. The advert quotes a DAY RATE. `JobExtraction` has no salary-period
- *      field, so a day rate has nowhere truthful to live. The source multiplies
- *      it by 230 working days and stores an annual figure — this project has
- *      already fixed that class of bug once (`SalaryPeriod` in `entities.ts`
- *      exists because Reed's period-less figures made a good contract look like
- *      an insulting permanent salary), so we will not reintroduce it. Day rate
- *      means null.
- *      TODO(salary_period): adding a `salary_period` field to `JobExtraction`
- *      would let a day rate, an hourly rate and a pro-rata figure all be
- *      captured properly instead of discarded. That is a schema change and a
- *      review-form change, and it is deliberately out of scope here. Until then
- *      the raw wording is preserved in `description` so nothing is lost.
- *   2. The advert quotes an HOURLY rate — same argument, same answer.
- *   3. The advert says PRO RATA. `£45,000 pro rata` is not a £45,000 salary; it
+ *   1. The advert says PRO RATA. `£45,000 pro rata` is not a £45,000 salary; it
  *      is a full-time-equivalent figure for a part-time job, and the actual pay
  *      depends on days worked. THE SOURCE HAS ZERO COVERAGE FOR THIS — grepped
  *      across backend, frontend and e2e, `pro rata` appears nowhere, and
  *      `normalize_salary("£45,000 pro rata")` returns 45000 as a full annual
  *      salary. Built here rather than inherited.
+ *   2. The advert quotes an unsupported unit such as a weekly rate. The shared
+ *      job model has no matching period, so the amount stays null.
  *
  * And one reason a number is wrong when it is ABSENT: the advert describes pay
  * in words ("Competitive", "DOE") and the model, asked for an integer, invents
@@ -77,6 +66,9 @@
 
 /** Pay quoted in a unit that is not a year. */
 export type NonAnnualSalaryWording = 'hourly' | 'daily' | 'pro-rata';
+
+const UNSUPPORTED_PERIOD_PATTERN =
+  /(?:(?:[£$€]\s*|\b(?:GBP|USD|EUR|AUD|NZD|CAD)\s*)\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s*k?)\s*(?:per\s+week|\/\s?week\b|\bp\/w\b)|\bweekly\s+(?:rate|pay|salary)\b/i;
 
 /** One documented pattern: what it looks for, and an example of what it means. */
 export interface SalaryPattern {
@@ -225,6 +217,11 @@ export function nonAnnualSalaryWording(text: string): NonAnnualSalaryWording | n
     if (entry.pattern.test(text)) return entry.wording;
   }
   return null;
+}
+
+/** Does the advert state a pay unit the shared job model cannot represent? */
+export function hasUnsupportedSalaryPeriod(text: string): boolean {
+  return text.length > 0 && UNSUPPORTED_PERIOD_PATTERN.test(text);
 }
 
 /** The blank-value phrase this advert uses, or `null`. */

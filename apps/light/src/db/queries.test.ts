@@ -63,6 +63,7 @@ const JOB: Job = {
   external_id: '55512345',
   title: 'Senior Credit Risk Analyst',
   company: 'Barclays',
+  agency: null,
   location: 'London, EC2',
   salary_min: 457,
   salary_max: 550,
@@ -123,7 +124,7 @@ describe('statement builders', () => {
 
     expect(selectFrom('jobs')).toBe(
       'SELECT id, source, external_id, title, company, location, salary_min, salary_max, ' +
-        'salary_currency, salary_period, description, url, posted_date, created_at FROM jobs',
+        'salary_currency, salary_period, description, url, posted_date, created_at, agency FROM jobs',
     );
   });
 
@@ -132,14 +133,15 @@ describe('statement builders', () => {
 
     expect(upsertInto('jobs')).toBe(
       'INSERT INTO jobs (id, source, external_id, title, company, location, salary_min, ' +
-        'salary_max, salary_currency, salary_period, description, url, posted_date, created_at) ' +
-        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ' +
+        'salary_max, salary_currency, salary_period, description, url, posted_date, created_at, agency) ' +
+        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ' +
         'ON CONFLICT (id) DO UPDATE SET source = excluded.source, ' +
         'external_id = excluded.external_id, title = excluded.title, company = excluded.company, ' +
         'location = excluded.location, salary_min = excluded.salary_min, ' +
         'salary_max = excluded.salary_max, salary_currency = excluded.salary_currency, ' +
         'salary_period = excluded.salary_period, description = excluded.description, ' +
-        'url = excluded.url, posted_date = excluded.posted_date, created_at = excluded.created_at',
+        'url = excluded.url, posted_date = excluded.posted_date, created_at = excluded.created_at, ' +
+        'agency = excluded.agency',
     );
   });
 

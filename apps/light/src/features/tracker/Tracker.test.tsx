@@ -40,6 +40,7 @@ function entry(
       external_id: null,
       title: `Role ${id}`,
       company: 'Acme',
+      agency: null,
       location: 'London',
       salary_min: null,
       salary_max: null,
@@ -93,6 +94,92 @@ afterEach(() => {
 });
 
 describe('the empty board', () => {
+  it('shows a retry on load failure, without inviting new work', async () => {
+    const port = createFakeTrackerPort([entry('stored')]);
+    port.failNext('load');
+
+    render(<Tracker port={port} now={NOW} />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('database is locked');
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    expect(screen.queryByTestId('tracker-empty')).toBeNull();
+    expect(screen.queryByTestId('tracker-empty-add')).toBeNull();
+    expect(screen.queryByTestId('tracker-add')).toBeNull();
+    expect(screen.queryByTestId('tracker-paste')).toBeNull();
+  });
+
+  it('retries the read and shows the returned cards without writing', async () => {
+    const user = userEvent.setup();
+    const port = createFakeTrackerPort([entry('stored')]);
+    port.failNext('load');
+
+    render(<Tracker port={port} now={NOW} />);
+
+    await screen.findByRole('alert');
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByTestId('tracker-column-saved')).toBeTruthy();
+    expect(screen.getByTestId('tracker-card-stored')).toBeTruthy();
+    expect(port.calls.load).toBe(2);
+    expect(port.calls.create).toBe(0);
+    expect(port.calls.saveApplication).toBe(0);
+    expect(port.calls.remove).toBe(0);
+    expect(port.calls.saveDocument).toBe(0);
+  });
+
+  it('disables retry while its read is in flight', async () => {
+    const user = userEvent.setup();
+    const port = createFakeTrackerPort([entry('stored')]);
+    port.failNext('load');
+
+    render(<Tracker port={port} now={NOW} />);
+
+    await screen.findByRole('alert');
+    let finishLoad!: (result: Awaited<ReturnType<typeof port.load>>) => void;
+    const load = vi.spyOn(port, 'load').mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishLoad = resolve;
+        }),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    const retry = screen.getByRole('button', { name: 'Retrying…' }) as HTMLButtonElement;
+    expect(retry.disabled).toBe(true);
+    await user.click(retry);
+    expect(load).toHaveBeenCalledTimes(1);
+
+    finishLoad(await createFakeTrackerPort([entry('stored')]).load());
+    expect(await screen.findByTestId('tracker-card-stored')).toBeTruthy();
+  });
+
+  it('keeps retry available after a retry failure and does not write', async () => {
+    const user = userEvent.setup();
+    const port = createFakeTrackerPort([entry('stored')]);
+    port.failNext('load');
+
+    render(<Tracker port={port} now={NOW} />);
+
+    await screen.findByRole('alert');
+    port.failNext('load');
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('database is locked');
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Retry' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    expect(screen.queryByTestId('tracker-empty')).toBeNull();
+    expect(port.calls.load).toBe(2);
+    expect(port.calls.create).toBe(0);
+    expect(port.calls.saveApplication).toBe(0);
+    expect(port.calls.remove).toBe(0);
+    expect(port.calls.saveDocument).toBe(0);
+  });
+
   it('invites the user to act instead of apologising', async () => {
     await renderBoard();
 
@@ -287,6 +374,17 @@ describe('the staleness edge', () => {
       'Last changed 30 days ago',
     );
   });
+
+  it('shows the named agency as recruiter context without replacing the company', async () => {
+    await renderBoard([
+      entry('agency', {}, { company: 'Lloyds Banking Group', agency: 'Harrington Search' }),
+    ]);
+
+    const card = screen.getByTestId('tracker-card-agency');
+    expect(card.textContent).toContain('Lloyds Banking Group');
+    expect(card.textContent).toContain('via Harrington Search');
+    expect(card.textContent).toContain('London');
+  });
 });
 
 describe('the next action chip', () => {
@@ -372,6 +470,82 @@ describe('the column headers', () => {
     for (const status of ['saved', 'applied', 'interviewing', 'offer', 'rejected']) {
       expect(screen.getByTestId(`tracker-column-${status}`)).toBeTruthy();
     }
+  });
+});
+
+describe('quick search', () => {
+  it('matches the job title, company, agency, and location', async () => {
+    const user = userEvent.setup();
+    await renderBoard([
+      entry('title', {}, { title: 'Platform Engineer', company: 'Aster' }),
+      entry('company', {}, { title: 'Product Designer', company: 'Northstar' }),
+      entry('agency', {}, { title: 'Data Analyst', company: 'Harbor', agency: 'BrightHire' }),
+      entry('location', {}, { title: 'Researcher', company: 'Elm', location: 'Manchester' }),
+    ]);
+    const search = screen.getByRole('searchbox', { name: 'Search applications' });
+
+    for (const [query, match] of [
+      ['Platform', 'title'],
+      ['Northstar', 'company'],
+      ['BrightHire', 'agency'],
+      ['Manchester', 'location'],
+    ] as const) {
+      await user.clear(search);
+      await user.type(search, query);
+      expect(screen.getByTestId(`tracker-card-${match}`)).toBeTruthy();
+      for (const id of ['title', 'company', 'agency', 'location']) {
+        if (id !== match) expect(screen.queryByTestId(`tracker-card-${id}`)).toBeNull();
+      }
+    }
+  });
+
+  it('ignores query letter case and trims leading and trailing spaces', async () => {
+    const user = userEvent.setup();
+    await renderBoard([entry('match', {}, { company: 'Northstar' }), entry('other')]);
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search applications' }),
+      '  NORTHSTAR  ',
+    );
+
+    expect(screen.getByTestId('tracker-card-match')).toBeTruthy();
+    expect(screen.queryByTestId('tracker-card-other')).toBeNull();
+  });
+
+  it('shows no results while retaining all five empty columns', async () => {
+    const user = userEvent.setup();
+    await renderBoard([entry('a')]);
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search applications' }), 'not found');
+
+    expect(screen.getByTestId('tracker-search-no-results').textContent).toContain(
+      'No applications match',
+    );
+    for (const status of ['saved', 'applied', 'interviewing', 'offer', 'rejected']) {
+      expect(screen.getByTestId(`tracker-column-${status}`)).toBeTruthy();
+      expect(screen.getByTestId(`tracker-count-${status}`).textContent).toBe('0');
+    }
+    expect(screen.queryByTestId('tracker-card-a')).toBeNull();
+  });
+
+  it('clears the query, restores cards, and does not write to storage', async () => {
+    const user = userEvent.setup();
+    const { port } = await renderBoard([
+      entry('match', {}, { title: 'Platform Engineer' }),
+      entry('other', {}, { title: 'Product Designer' }),
+    ]);
+    const search = screen.getByRole('searchbox', { name: 'Search applications' });
+    await user.type(search, 'Platform');
+    expect(screen.queryByTestId('tracker-card-other')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Clear search' }));
+
+    expect((search as HTMLInputElement).value).toBe('');
+    expect(screen.getByTestId('tracker-card-match')).toBeTruthy();
+    expect(screen.getByTestId('tracker-card-other')).toBeTruthy();
+    expect(port.calls.create).toBe(0);
+    expect(port.calls.saveApplication).toBe(0);
+    expect(port.calls.remove).toBe(0);
   });
 });
 

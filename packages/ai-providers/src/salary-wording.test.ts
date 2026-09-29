@@ -4,6 +4,7 @@ import {
   BLANK_VALUE_PATTERNS,
   NON_ANNUAL_PATTERNS,
   blankValueSalaryWording,
+  hasUnsupportedSalaryPeriod,
   hasMoneyFigure,
   nonAnnualSalaryWording,
   salaryWordingSnippet,
@@ -142,6 +143,22 @@ describe('hasMoneyFigure — is there a number that could be pay at all', () => 
 
   it('boundary: empty text has no figure', () => {
     expect(hasMoneyFigure('')).toBe(false);
+  });
+});
+
+describe('hasUnsupportedSalaryPeriod — only pay units count', () => {
+  it('recognises an explicit weekly pay unit', () => {
+    expect(hasUnsupportedSalaryPeriod('Salary £1,000 per week.')).toBe(true);
+  });
+
+  it('does not mistake a work schedule for a weekly salary', () => {
+    expect(
+      hasUnsupportedSalaryPeriod('Annual salary £85,000. The role is on site 3 days per week.'),
+    ).toBe(false);
+  });
+
+  it('boundary: weekly planning is not a pay period', () => {
+    expect(hasUnsupportedSalaryPeriod('£85,000 per year. Weekly planning meetings.')).toBe(false);
   });
 });
 

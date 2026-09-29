@@ -71,6 +71,12 @@ pub fn migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/0004_documents.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "jobs.agency: preserve the recruitment agency separately",
+            sql: include_str!("../migrations/0005_job_agency.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -192,6 +198,20 @@ mod tests {
         );
         for forbidden in ["ALTER TABLE", "DROP", "RENAME", "UPDATE", "DELETE FROM"] {
             assert!(!sql.contains(forbidden), "0004 must only create; found `{forbidden}`");
+        }
+    }
+
+    #[test]
+    fn the_fifth_migration_only_adds_nullable_agency_to_jobs() {
+        let migration = &migrations()[4];
+        assert_eq!(migration.version, 5);
+        let sql = executable_sql(migration.sql);
+        assert!(
+            sql.contains("ALTER TABLE jobs ADD COLUMN agency TEXT"),
+            "0005 must add nullable jobs.agency without rewriting existing records"
+        );
+        for forbidden in ["CREATE TABLE", "DROP", "RENAME", "UPDATE", "DELETE"] {
+            assert!(!sql.contains(forbidden), "0005 must be additive; found `{forbidden}`");
         }
     }
 

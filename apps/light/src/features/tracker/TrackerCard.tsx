@@ -65,7 +65,7 @@ export function TrackerCard({ entry, today, now, selected, settling, onSelect }:
     today,
   );
 
-  const where = [job.company, job.location]
+  const where = [job.company, job.agency === null ? null : `via ${job.agency}`, job.location]
     .filter((part) => part !== null && part !== '')
     .join(' · ');
 

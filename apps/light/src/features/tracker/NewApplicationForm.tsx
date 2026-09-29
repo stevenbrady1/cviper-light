@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 
-import { type ApplicationStatus } from '@cviper/core-types';
+import { type ApplicationStatus, type SalaryPeriod } from '@cviper/core-types';
 
 import { PRIMARY_BUTTON } from '../../app/buttons';
 
@@ -188,6 +188,14 @@ export function NewApplicationForm({ onCreate, onCancel, initial }: NewApplicati
         onChange={(company) => setDraft((current) => ({ ...current, company }))}
       />
       <Field
+        id="new-agency"
+        label="Agency"
+        optional
+        value={draft.agency}
+        error={visible.agency}
+        onChange={(agency) => setDraft((current) => ({ ...current, agency }))}
+      />
+      <Field
         id="new-location"
         label="Location"
         optional
@@ -269,16 +277,44 @@ export function NewApplicationForm({ onCreate, onCancel, initial }: NewApplicati
             onChange={(salaryCurrency) => setDraft((current) => ({ ...current, salaryCurrency }))}
           />
         </div>
+        <div>
+          <label htmlFor="new-salary-period" className="block text-xs font-medium text-ink-muted">
+            Pay period
+          </label>
+          <select
+            id="new-salary-period"
+            value={draft.salaryPeriod}
+            aria-invalid={visible.salaryPeriod === undefined ? undefined : true}
+            aria-describedby={
+              visible.salaryPeriod === undefined ? undefined : 'new-salary-period-error'
+            }
+            onChange={(event) => {
+              const salaryPeriod = event.currentTarget.value as SalaryPeriod | '';
+              setDraft((current) => ({ ...current, salaryPeriod }));
+            }}
+            className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
+              visible.salaryPeriod === undefined ? 'border-line' : 'border-danger'
+            }`}
+          >
+            <option value="">Not stated</option>
+            <option value="year">Year</option>
+            <option value="day">Day</option>
+            <option value="hour">Hour</option>
+          </select>
+          {visible.salaryPeriod === undefined ? null : (
+            <p id="new-salary-period-error" className="mt-1 text-xs text-danger">
+              {visible.salaryPeriod}
+            </p>
+          )}
+        </div>
         {/*
-          Said once, under the boxes, rather than in three labels. A day rate,
-          an hourly rate and pro-rata pay are all deliberately left blank by the
-          extraction — the advert's own wording is in the description above —
-          and a user who sees an empty salary box on a £650-a-day contract
-          deserves to know that was a decision rather than a miss.
+          Said once, under the boxes, rather than in three labels. Pro-rata and
+          unsupported pay periods stay blank, with the advert's wording kept in
+          the description above.
         */}
         <p className="text-xs text-ink-faint">
-          Yearly figures. Day rates, hourly rates and pro-rata pay are left blank on purpose — the
-          advert&rsquo;s own wording is kept in the description.
+          Figures use the selected period. Pro-rata and unsupported pay periods are left blank on
+          purpose — the advert&rsquo;s own wording is kept in the description.
         </p>
 
         <Field

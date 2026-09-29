@@ -95,6 +95,7 @@ export interface Job {
   external_id: string | null;
   title: string;
   company: string;
+  agency: string | null;
   location: string | null;
   salary_min: number | null;
   salary_max: number | null;
@@ -288,6 +289,8 @@ export const JobSchema = z.object({
   external_id: z.string().nullable(),
   title: z.string(),
   company: z.string(),
+  // Added in v1 backups and SQLite v5. Older records have no agency.
+  agency: z.string().nullable().default(null),
   location: z.string().nullable(),
   salary_min: z.number().nullable(),
   salary_max: z.number().nullable(),

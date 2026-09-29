@@ -26,6 +26,7 @@ export function job(overrides: Partial<Job> = {}): Job {
     external_id: '55512345',
     title: 'Credit Risk Analyst',
     company: 'Barclays',
+    agency: null,
     location: 'London',
     salary_min: null,
     salary_max: null,

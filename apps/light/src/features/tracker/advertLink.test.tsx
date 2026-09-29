@@ -86,6 +86,7 @@ function entry(id: string, job: Partial<Job> = {}): TrackerEntry {
       external_id: null,
       title: `Role ${id}`,
       company: 'Acme',
+      agency: null,
       location: 'London',
       salary_min: null,
       salary_max: null,

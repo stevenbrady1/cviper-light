@@ -37,6 +37,7 @@ const JOB: Job = {
   external_id: null,
   title: 'Credit Risk Analyst',
   company: 'Lloyds',
+  agency: null,
   location: 'London',
   salary_min: 65000,
   salary_max: 80000,

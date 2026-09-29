@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { type ApplicationStatus } from '@cviper/core-types';
 
@@ -141,8 +141,12 @@ export function Tracker({
   const today = todayIsoDate(clock);
 
   const [entries, setEntries] = useState<readonly TrackerEntry[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const loadInProgress = useRef(false);
+  const loadRequest = useRef(0);
   const [pane, setPane] = useState<Pane>({ kind: 'closed' });
   const [settlingId, setSettlingId] = useState<string | null>(null);
   /**
@@ -164,22 +168,44 @@ export function Tracker({
     };
   }, [availability, pane.kind, probe]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadEntries = useCallback(async () => {
+    if (loadInProgress.current) return;
+    loadInProgress.current = true;
+    const request = ++loadRequest.current;
+    setLoading(true);
 
-    void trackerPort.load().then((loaded) => {
-      if (cancelled) return;
-      setLoading(false);
-      if (loaded.ok) setEntries(loaded.value);
-      // Never swallowed. A board that silently shows nothing when the database
-      // will not open is indistinguishable from a board with nothing on it.
-      else setError(`${loaded.error.message} Your data is still on this machine.`);
-    });
+    try {
+      const loaded = await trackerPort.load();
+      if (request !== loadRequest.current) return;
 
-    return () => {
-      cancelled = true;
-    };
+      if (loaded.ok) {
+        setEntries(loaded.value);
+        setLoadFailed(false);
+        setError(null);
+      } else {
+        setLoadFailed(true);
+        setError(`${loaded.error.message} Your data is still on this machine.`);
+      }
+    } catch (loadError) {
+      if (request !== loadRequest.current) return;
+      const message = loadError instanceof Error ? loadError.message : String(loadError);
+      setLoadFailed(true);
+      setError(`${message} Your data is still on this machine.`);
+    } finally {
+      if (request === loadRequest.current) {
+        loadInProgress.current = false;
+        setLoading(false);
+      }
+    }
   }, [trackerPort]);
+
+  useEffect(() => {
+    void loadEntries();
+    return () => {
+      loadInProgress.current = false;
+      loadRequest.current += 1;
+    };
+  }, [loadEntries]);
 
   const replace = useCallback((next: TrackerEntry) => {
     setEntries((current) =>
@@ -285,14 +311,24 @@ export function Tracker({
     [trackerPort],
   );
 
-  const grouped = useMemo(() => groupByStatus(entries), [entries]);
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const visibleEntries = useMemo(() => {
+    if (normalizedQuery === '') return entries;
+    return entries.filter(({ job }) =>
+      [job.title, job.company, job.agency, job.location].some(
+        (value) => value?.toLowerCase().includes(normalizedQuery) ?? false,
+      ),
+    );
+  }, [entries, normalizedQuery]);
+  const grouped = useMemo(() => groupByStatus(visibleEntries), [visibleEntries]);
   const selected =
     pane.kind === 'entry'
       ? (entries.find((entry) => entry.application.id === pane.applicationId) ?? null)
       : null;
 
   const view = viewById('tracker');
-  const boardIsEmpty = !loading && entries.length === 0;
+  const boardIsReady = !loading && !loadFailed;
+  const boardIsEmpty = boardIsReady && entries.length === 0;
   /**
    * Is a "start a new card" pane already open?
    *
@@ -316,7 +352,7 @@ export function Tracker({
          * control does not move about as the user works.
          */
         action={
-          boardIsEmpty ? null : (
+          !boardIsReady || boardIsEmpty ? null : (
             <div className="flex items-center gap-2">
               <PasteJobButton
                 testId="tracker-paste"
@@ -341,19 +377,31 @@ export function Tracker({
       {loading || boardIsEmpty ? null : <FunnelStrip entries={entries} />}
 
       {error === null ? null : (
-        <p
+        <div
           role="alert"
           data-testid="tracker-error"
-          className="border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
+          className="flex items-center justify-between gap-3 border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
         >
-          {error}
-        </p>
+          <span>{error}</span>
+          {!loadFailed ? null : (
+            <button
+              type="button"
+              className={SECONDARY_BUTTON}
+              disabled={loading}
+              onClick={() => void loadEntries()}
+            >
+              {loading ? 'Retrying…' : 'Retry'}
+            </button>
+          )}
+        </div>
       )}
 
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden p-2 md:p-4">
           {loading ? (
             <p className="text-ink-muted">Reading your applications…</p>
+          ) : loadFailed ? (
+            <p className="text-ink-muted">Your applications could not be loaded.</p>
           ) : boardIsEmpty ? (
             <EmptyBoard
               onAdd={() => setPane({ kind: 'new' })}
@@ -369,23 +417,57 @@ export function Tracker({
              * five used to share ~630px and every title shrank to "Senior
              * Pr…"; now the board scrolls sideways instead of crushing.
              */
-            <div
-              data-testid="tracker-board"
-              className="flex h-full min-h-0 snap-x snap-mandatory gap-2 overflow-x-auto md:snap-none"
-            >
-              {TRACKER_COLUMNS.map((status) => (
-                <TrackerColumn
-                  key={status}
-                  status={status}
-                  entries={grouped[status]}
-                  today={today}
-                  now={clock}
-                  selectedId={selected?.application.id ?? null}
-                  settlingId={settlingId}
-                  onSelect={(applicationId) => setPane({ kind: 'entry', applicationId })}
-                  onDropCard={onStatusChange}
+            <div className="flex h-full min-h-0 flex-col gap-2">
+              <div className="flex shrink-0 items-center gap-2">
+                <label className="sr-only" htmlFor="tracker-search">
+                  Search applications
+                </label>
+                <input
+                  id="tracker-search"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search applications"
+                  className="min-h-11 min-w-0 flex-1 rounded-control border border-line bg-card px-3 py-2 text-ink placeholder:text-ink-faint focus:border-blue focus:outline-none md:min-h-0"
                 />
-              ))}
+                {searchQuery.trim() === '' ? null : (
+                  <button
+                    type="button"
+                    aria-label="Clear search"
+                    onClick={() => setSearchQuery('')}
+                    className={SECONDARY_BUTTON}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {normalizedQuery !== '' && visibleEntries.length === 0 ? (
+                <p
+                  role="status"
+                  data-testid="tracker-search-no-results"
+                  className="shrink-0 text-sm text-ink-muted"
+                >
+                  No applications match “{searchQuery.trim()}”.
+                </p>
+              ) : null}
+              <div
+                data-testid="tracker-board"
+                className="flex min-h-0 flex-1 snap-x snap-mandatory gap-2 overflow-x-auto md:snap-none"
+              >
+                {TRACKER_COLUMNS.map((status) => (
+                  <TrackerColumn
+                    key={status}
+                    status={status}
+                    entries={grouped[status]}
+                    today={today}
+                    now={clock}
+                    selectedId={selected?.application.id ?? null}
+                    settlingId={settlingId}
+                    onSelect={(applicationId) => setPane({ kind: 'entry', applicationId })}
+                    onDropCard={onStatusChange}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>

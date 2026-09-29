@@ -108,7 +108,7 @@ describe('buildExtractionPrompt — every rule this feature promises', () => {
    */
   const fieldRules = user.slice(user.indexOf('Field rules'));
 
-  it('names all nine fields, in schema order, where it enumerates them', () => {
+  it('names all eleven fields, in schema order, where it enumerates them', () => {
     const order = JOB_EXTRACTION_JSON_SCHEMA.required;
     const positions = order.map((field) => fieldRules.indexOf(field));
     for (const [index, position] of positions.entries()) {
@@ -123,10 +123,6 @@ describe('buildExtractionPrompt — every rule this feature promises', () => {
     // The source's seventeen-field prompt would invite a 3B model to emit keys
     // our closed schema rejects. Every one of these is deliberately absent.
     //
-    // `agency` is checked in FIELD-NAME FORM only. The prompt has to say the
-    // English words "recruitment agency" to explain the rule that an agency
-    // posting is recorded in `company`, and banning the word would ban the
-    // rule. What must never appear is `agency` presented as a key.
     for (const absent of [
       'recruiter_name',
       'recruiter_email',
@@ -138,15 +134,11 @@ describe('buildExtractionPrompt — every rule this feature promises', () => {
       'essential_skills',
       'desirable_skills',
       'estimated_salary',
-      'salary_period',
     ]) {
       expect(user, `the prompt must not name \`${absent}\``).not.toContain(absent);
     }
 
-    for (const shape of ['`agency`', '"agency"', 'agency:']) {
-      expect(user, `the prompt must not present ${shape} as a field`).not.toContain(shape);
-    }
-    expect(fieldRules).not.toContain('agency');
+    expect(fieldRules).toContain('- agency:');
   });
 
   it('spells out the blank-value rule using the source’s own vocabulary', () => {
@@ -161,10 +153,11 @@ describe('buildExtractionPrompt — every rule this feature promises', () => {
     expect(user).toContain('GBP');
   });
 
-  it('tells the model to null a day rate, an hourly rate and pro rata', () => {
-    expect(user).toMatch(/day rate/i);
-    expect(user).toMatch(/hourly/i);
-    expect(user).toMatch(/pro rata/i);
+  it('keeps supported hourly and daily amounts, but nulls pro rata and unsupported periods', () => {
+    expect(user).toMatch(/period day/i);
+    expect(user).toMatch(/period hour/i);
+    expect(user).toMatch(/pro rata[^\n]*null/i);
+    expect(user).toMatch(/unsupported units/i);
   });
 
   it('tells the model where the raw pay wording goes instead', () => {
@@ -185,9 +178,19 @@ describe('buildExtractionPrompt — every rule this feature promises', () => {
     expect(locationRule).toMatch(/word for word|verbatim|exactly as written/i);
   });
 
-  it('tells the model to record a recruitment agency AS the company', () => {
-    expect(user).toMatch(/recruitment agency/i);
-    expect(user).toMatch(/recruit[\s\S]{0,300}`company`/i);
+  it('keeps a named hiring client separate from the recruitment agency', () => {
+    const companyRule = fieldRules.slice(
+      fieldRules.indexOf('- company:'),
+      fieldRules.indexOf('- agency:'),
+    );
+    const agencyRule = fieldRules.slice(
+      fieldRules.indexOf('- agency:'),
+      fieldRules.indexOf('- location:'),
+    );
+    expect(companyRule).toMatch(/client|hiring company/i);
+    expect(agencyRule).toMatch(/recruitment agency/i);
+    expect(user).toMatch(/no client[\s\S]{0,180}company[\s\S]{0,180}agency/i);
+    expect(agencyRule).toMatch(/null for a direct employer/i);
   });
 
   it('asks for JSON only', () => {

@@ -120,7 +120,7 @@ export const COMPETITIVE: AdvertFixture = {
   descriptionContains: ['Competitive'],
 };
 
-/** `test_hourly_rate` — £50/hour, annualised upstream, null here. */
+/** `test_hourly_rate` — £50/hour, kept as an hourly amount here. */
 export const HOURLY: AdvertFixture = {
   name: 'an hourly rate',
   text: ['Temporary Reconciliations Clerk', 'Canary Wharf', 'Paying £50/hour for six weeks.'].join(
@@ -132,11 +132,15 @@ export const HOURLY: AdvertFixture = {
     location: 'Canary Wharf',
     description: 'Short-term reconciliations cover.',
     salary_currency: 'GBP',
-    // 50 × 1840 working hours — what `normalize_salary` would store.
-    salary_min: 92000,
-    salary_max: 92000,
+    salary_min: 50,
+    salary_max: 50,
   },
-  expected: { salary_min: null, salary_max: null, salary_currency: null },
+  expected: {
+    salary_min: 50,
+    salary_max: 50,
+    salary_currency: 'GBP',
+    salary_period: 'hour',
+  },
   descriptionContains: ['£50/hour'],
 };
 
@@ -198,7 +202,7 @@ export const PRO_RATA: AdvertFixture = {
   descriptionContains: ['£45,000 pro rata'],
 };
 
-/** GAP 2. A day rate is the London contractor norm and has no yearly meaning. */
+/** A day rate is the London contractor norm and keeps its stated unit. */
 export const DAY_RATE: AdvertFixture = {
   name: 'a contract day rate',
   text: [
@@ -212,11 +216,15 @@ export const DAY_RATE: AdvertFixture = {
     location: 'Canary Wharf',
     description: 'Six-month regulatory reporting contract.',
     salary_currency: 'GBP',
-    // 650 × 230 working days — what `normalize_salary` would store.
-    salary_min: 149500,
-    salary_max: 149500,
+    salary_min: 650,
+    salary_max: 650,
   },
-  expected: { salary_min: null, salary_max: null, salary_currency: null },
+  expected: {
+    salary_min: 650,
+    salary_max: 650,
+    salary_currency: 'GBP',
+    salary_period: 'day',
+  },
   descriptionContains: ['£650 per day'],
 };
 

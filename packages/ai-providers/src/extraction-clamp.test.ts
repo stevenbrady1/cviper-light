@@ -9,6 +9,7 @@ function goodReply(): Record<string, unknown> {
   return {
     title: 'Credit Risk Analyst',
     company: 'Lloyds Banking Group',
+    agency: null,
     location: 'City of London',
     url: 'https://example.invalid/1',
     description: 'Second-line credit risk.',
@@ -16,6 +17,7 @@ function goodReply(): Record<string, unknown> {
     salary_currency: 'GBP',
     salary_min: 45000,
     salary_max: 55000,
+    salary_period: 'year',
   };
 }
 
@@ -46,6 +48,34 @@ describe('clampExtraction — filling in what a small model left out', () => {
   it('trims a field the model padded', () => {
     const { value } = clamped({ ...goodReply(), title: '  Analyst  ' }, 'x');
     expect(value['title']).toBe('Analyst');
+  });
+
+  it('keeps a named agency separate from the named hiring company', () => {
+    const { value } = clamped(
+      { ...goodReply(), company: 'Lloyds Banking Group', agency: 'Harrington Search' },
+      'Harrington Search is recruiting for Lloyds Banking Group.',
+    );
+    expect(value['company']).toBe('Lloyds Banking Group');
+    expect(value['agency']).toBe('Harrington Search');
+  });
+
+  it('uses the named agency as company when the advert gives no client', () => {
+    const { value, applied } = clamped(
+      { ...goodReply(), company: null, agency: 'Harrington Search' },
+      'Harrington Search has a Credit Risk Analyst role.',
+    );
+    expect(value['company']).toBe('Harrington Search');
+    expect(value['agency']).toBe('Harrington Search');
+    expect(applied).toContain('company:agency-fallback');
+  });
+
+  it('keeps agency null for a direct employer advert', () => {
+    const { value } = clamped(
+      { ...goodReply(), company: 'Lloyds Banking Group', agency: null },
+      'Lloyds Banking Group is hiring a Credit Risk Analyst.',
+    );
+    expect(value['company']).toBe('Lloyds Banking Group');
+    expect(value['agency']).toBeNull();
   });
 
   it('produces something the schema accepts, from almost nothing', () => {
@@ -174,26 +204,25 @@ describe('GAP 1 — pro rata: salary fields null, raw wording preserved', () => 
   });
 });
 
-describe('GAP 2 — day rates: salary fields null, raw wording preserved', () => {
+describe('day rates: period and amount preserved, raw wording kept', () => {
   const ADVERT = 'Contract role. The rate is £750 per day, outside IR35. Canary Wharf.';
 
-  it('nulls the salary rather than multiplying a day rate into a year', () => {
-    // The source multiplies by 230 working days. `SalaryPeriod` in
-    // `entities.ts` exists because this project already shipped that bug once.
+  it('keeps the day rate rather than multiplying it into a year', () => {
     const { value, applied } = clamped(
       { ...goodReply(), salary_min: 750, salary_max: 750 },
       ADVERT,
     );
-    expect(value['salary_min']).toBeNull();
-    expect(value['salary_max']).toBeNull();
-    expect(value['salary_currency']).toBeNull();
-    expect(applied).toContain('salary:daily-to-null');
+    expect(value['salary_min']).toBe(750);
+    expect(value['salary_max']).toBe(750);
+    expect(value['salary_currency']).toBe('GBP');
+    expect(value['salary_period']).toBe('day');
+    expect(applied).toContain('salary_period:advert-daily');
   });
 
-  it('never produces 172,500 — the annualised figure the source would store', () => {
-    const { value } = clamped({ ...goodReply(), salary_min: 172500, salary_max: 172500 }, ADVERT);
+  it('never changes the stated amount into an annualised figure', () => {
+    const { value } = clamped({ ...goodReply(), salary_min: 750, salary_max: 750 }, ADVERT);
     expect(value['salary_min']).not.toBe(172500);
-    expect(value['salary_min']).toBeNull();
+    expect(value['salary_min']).toBe(750);
   });
 
   it('preserves the raw wording in the description', () => {
@@ -202,13 +231,40 @@ describe('GAP 2 — day rates: salary fields null, raw wording preserved', () =>
   });
 });
 
-describe('hourly rates — the same rule, ported rather than built', () => {
-  it('nulls the salary and keeps the wording', () => {
+describe('hourly rates: period and amount preserved', () => {
+  it('keeps the hourly amount and corrects a model period mismatch', () => {
     const advert = 'Temporary cover at £50/hour for six weeks.';
     const { value, applied } = clamped({ ...goodReply(), salary_min: 50 }, advert);
-    expect(value['salary_min']).toBeNull();
-    expect(applied).toContain('salary:hourly-to-null');
+    expect(value['salary_min']).toBe(50);
+    expect(value['salary_period']).toBe('hour');
+    expect(applied).toContain('salary_period:advert-hourly');
     expect(String(value['description'])).toContain('£50/hour');
+  });
+});
+
+describe('unsupported salary periods', () => {
+  it('negative: clears a weekly amount instead of treating it as yearly', () => {
+    const advert = 'Contract role. Salary £1,000 per week.';
+    const { value, applied } = clamped(
+      { ...goodReply(), salary_min: 1000, salary_max: 1000 },
+      advert,
+    );
+    expect(value['salary_min']).toBeNull();
+    expect(value['salary_max']).toBeNull();
+    expect(value['salary_currency']).toBeNull();
+    expect(value['salary_period']).toBeNull();
+    expect(applied).toContain('salary:unsupported-to-null');
+  });
+
+  it('keeps annual pay when per-week wording only describes the work schedule', () => {
+    const advert = 'Annual salary £85,000. The role is on site 3 days per week.';
+    const { value } = clamped(
+      { ...goodReply(), salary_min: 85000, salary_max: 85000, salary_period: 'year' },
+      advert,
+    );
+    expect(value['salary_min']).toBe(85000);
+    expect(value['salary_max']).toBe(85000);
+    expect(value['salary_period']).toBe('year');
   });
 });
 
