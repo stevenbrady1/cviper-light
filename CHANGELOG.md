@@ -6,8 +6,20 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] — not yet published
+
+More AI providers, a Settings page that leads with them, and a tracker that is
+easier to search and to recover (L-180). The date is set when `light-v0.4.0`
+is published.
+
 ### Added
 
+- The tracker has a search box, and a Retry button when applications fail to
+  load, instead of leaving the board empty (#137).
+- A pasted advert's salary keeps its period — per year, per day or per hour —
+  and is never converted to another unit. A recruitment agency is recorded
+  separately from the hiring company, in a new `agency` column that existing
+  applications leave empty (#137).
 - Four more bring-your-own-key AI providers: Google Gemini, Mistral, xAI Grok
   and OpenRouter, each with its own key card (tested before it is saved), its
   own consent dialog, and its own entry in the generated privacy policy. All
@@ -181,6 +193,7 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.3.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.4.0...main
+[0.4.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.3.0...light-v0.4.0
 [0.3.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.2.0...light-v0.3.0
 [0.2.0]: https://github.com/stevenbrady1/cviper-light/releases/tag/light-v0.2.0
