@@ -31,6 +31,10 @@ All notable changes to CViper Light are recorded here. The format follows
   thinking models on OpenRouter are covered too. When a model still runs out,
   the message says the thinking used it up, and it no longer tells you to
   raise an output limit the app does not have (L-185).
+- Tracker cards can now be dragged between columns on Windows. Tauri’s own
+  file-drop handler was swallowing every in-page drag in WebView2; it is
+  switched off, and a file or link dropped on the window is refused rather
+  than opened in place of the app (L-186).
 
 ## [0.4.0] — 2026-09-29
 
