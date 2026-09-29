@@ -6,11 +6,11 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
-## [0.5.0] — not yet published
+## [0.5.0] — 2026-09-29
 
 The CViper logo, a Gemini that finishes its answers, a choice of model per
 provider, and fixes to the tracker, the Analysis screen and link fetching
-(L-189). The date is set when `light-v0.5.0` is published.
+(L-189).
 
 ### Added
 
