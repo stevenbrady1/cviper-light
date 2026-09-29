@@ -321,6 +321,20 @@ export function Tailor({
    * clears it: re-applying on the next render would undo the user's edits.
    */
   const appliedHandoff = useRef<TailorHandoff | null>(null);
+  /**
+   * The handoff just applied, until the render that shows it has committed.
+   *
+   * The shell is told "handled" from the NEXT effect, not from inside the one
+   * that sets the CV, job and option: those updates are only queued there, so
+   * a caller acting on "handled" — a test reading the pickers, or the shell
+   * re-rendering — could otherwise see the screen before it matches.
+   */
+  const [handedOff, setHandedOff] = useState<TailorHandoff | null>(null);
+  useEffect(() => {
+    if (handedOff === null) return;
+    setHandedOff(null);
+    onHandoffHandled?.();
+  }, [handedOff, onHandoffHandled]);
   useEffect(() => {
     if (handoff === undefined || handoff === null || appliedHandoff.current === handoff) return;
     if (!cvsLoaded || !jobsLoaded || !availabilityRead) return;
@@ -347,8 +361,8 @@ export function Tailor({
     setReview(null);
     setLetter(null);
     setSaveMessage(null);
-    onHandoffHandled?.();
-  }, [availabilityRead, cvs, cvsLoaded, handoff, jobs, jobsLoaded, onHandoffHandled, options]);
+    setHandedOff(handoff);
+  }, [availabilityRead, cvs, cvsLoaded, handoff, jobs, jobsLoaded, options]);
 
   const selectedOption = optionByKey(options, optionKey);
   const running = phase !== 'idle';
