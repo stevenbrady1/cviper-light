@@ -60,11 +60,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # No `pnpm install`: the script imports nothing but Node builtins and
-      # its own planner.
+      # No pnpm at all: the script imports nothing but Node builtins and its
+      # own planner. `package-manager-cache: false` because setup-node v5
+      # otherwise reads `packageManager` from package.json and fails looking
+      # for a pnpm this job never installs — which is how the first run died.
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          package-manager-cache: false
 
       - name: Tidy the release
         run: node apps/light/src/release/runReleaseAdmin.ts
