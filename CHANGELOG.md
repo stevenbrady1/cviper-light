@@ -22,6 +22,13 @@ All notable changes to CViper Light are recorded here. The format follows
   for search engines when it has them, so the advert comes in without the menus,
   cookie banners and "similar jobs" around it (L-190).
 
+### Changed
+
+- The sidebar's Set up list shows only what is set up. Missing keys and a
+  stopped Ollama are no longer listed; a half-entered Adzuna or a key that
+  cannot be read still shows, in gold, because it needs you. With nothing set
+  up, one line says so and links to Settings (L-191).
+
 ## [0.5.0] — 2026-09-29
 
 The CViper logo, a Gemini that finishes its answers, a choice of model per

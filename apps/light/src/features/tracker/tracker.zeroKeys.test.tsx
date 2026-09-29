@@ -188,12 +188,14 @@ describe('the rail on the same machine', () => {
     render(<App trackerPort={createFakeTrackerPort()} now={NOW} />);
 
     await screen.findByTestId('status-strip');
+    // L-191: nothing configured is one quiet line, not three grey dots.
     await vi.waitFor(() => {
-      expect(screen.getByTestId('status-ollama').getAttribute('data-state')).toBe('absent');
+      expect(screen.getByTestId('status-none').textContent).toContain('Nothing set up yet');
     });
 
-    expect(screen.getByTestId('status-adzuna').getAttribute('data-state')).toBe('missing');
-    expect(screen.getByTestId('status-reed').getAttribute('data-state')).toBe('missing');
+    expect(screen.queryByTestId('status-ollama')).toBeNull();
+    expect(screen.queryByTestId('status-adzuna')).toBeNull();
+    expect(screen.queryByTestId('status-reed')).toBeNull();
     expect(screen.getByTestId('status-requests').textContent).toContain('0');
 
     // Nothing anywhere on screen claims something has gone wrong.

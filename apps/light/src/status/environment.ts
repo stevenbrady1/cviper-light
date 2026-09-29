@@ -12,8 +12,9 @@
  *
  * So the answer lives in the rail, always, rather than behind a Settings tab
  * that only tells you once you go looking. Nothing here is an error state. A
- * machine with no keys and no Ollama is not misconfigured — it is the default,
- * and it is honest to show it as three quiet dots rather than to hide it.
+ * machine with no keys and no Ollama is not misconfigured — it is the default.
+ * Since L-191 the rail names only what is set up (or needs the user) and says
+ * "Nothing set up yet" when that is nothing; see `app/StatusStrip.tsx`.
  *
  * ============================================================================
  * FOUR KEY STATES, NOT TWO
