@@ -11,9 +11,30 @@ All notable changes to CViper Light are recorded here. The format follows
 - The sidebar's Set up list shows which AI providers have a key: each one with
   a saved key by name, gold if its key cannot be read, and one quiet "AI keys"
   dot when there are none (L-182).
+- Each AI key card in Settings has a Model list: three to five models for that
+  provider, starting with the one the app has always used. The choice is kept
+  on this computer and used by everything that provider does in the app —
+  analysis, tailoring, pasted adverts, follow-ups and interview packs (L-183).
+
+### Changed
+
+- CViper Light now uses the CViper logo — the navy badge with three teal bars —
+  in the sidebar and as its app icon on the taskbar, Start menu, installer and
+  Microsoft Store tiles (L-184).
 
 ### Fixed
 
+- Google Gemini no longer fails every analysis with "the model ran out of
+  room". Thinking models spend part of the answer allowance reasoning, and
+  each job's allowance was sized for the answer alone; every cloud provider
+  now gets room to think on top of it, so Grok, OpenAI's reasoning models and
+  thinking models on OpenRouter are covered too. When a model still runs out,
+  the message says the thinking used it up, and it no longer tells you to
+  raise an output limit the app does not have (L-185).
+- Tracker cards can now be dragged between columns on Windows. Tauri’s own
+  file-drop handler was swallowing every in-page drag in WebView2; it is
+  switched off, and a file or link dropped on the window is refused rather
+  than opened in place of the app (L-186).
 - Fetching a LinkedIn job link says what is really happening: LinkedIn blocks
   apps from reading its pages, so the advert has to be pasted as text. It
   used to say only that the page could not be read, which looked like a fault

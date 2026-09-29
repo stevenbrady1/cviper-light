@@ -31,6 +31,7 @@
  * NOT CHANGED: the order of repair steps, the regexes' semantics, and the fact
  * that rung 2 re-strips trailing commas on the extracted snippet.
  */
+import { TRUNCATED_MESSAGE } from './providers/shared';
 
 /** Which repair rung produced the value — useful for eval telemetry. */
 export type RepairStrategy =
@@ -276,10 +277,8 @@ export function safeParseJson<T = Record<string, unknown>>(text: string): JsonPa
     return {
       ok: false,
       failure: 'truncated',
-      message:
-        'The model ran out of room and its answer was cut off part-way ' +
-        'through. Try again with a shorter CV or job description, or raise the ' +
-        'output limit for this model.',
+      // The adapters' wording, word for word: same symptom, same advice.
+      message: TRUNCATED_MESSAGE,
       preview: previewOf(stripped),
       rawLength: raw.length,
     };
