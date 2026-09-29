@@ -34,6 +34,7 @@ import {
   type ProviderId,
 } from '../types';
 import {
+  REASONING_TRUNCATED_MESSAGE,
   TRUNCATED_MESSAGE,
   decodeJsonBody,
   detailUnlessAuth,
@@ -41,6 +42,7 @@ import {
   readArray,
   readObject,
   readString,
+  wireOutputCap,
 } from './shared';
 
 /** The providers this adapter serves. Anthropic and Ollama have their own. */
@@ -111,6 +113,19 @@ function maxTokensField(
   return provider === 'openai' ? 'max_completion_tokens' : 'max_tokens';
 }
 
+/**
+ * `usage.completion_tokens_details.reasoning_tokens`, or 0 when not reported.
+ *
+ * OpenAI, xAI and OpenRouter report it; a provider that does not is simply
+ * treated as not having thought, which only chooses the plainer message.
+ */
+function reasoningTokens(body: Record<string, unknown>): number {
+  const usage = readObject(body, 'usage');
+  const details = usage === null ? null : readObject(usage, 'completion_tokens_details');
+  const count = details === null ? undefined : details['reasoning_tokens'];
+  return typeof count === 'number' ? count : 0;
+}
+
 /** Pull the provider's own explanation out of `{"error": {"message": …}}`. */
 function errorDetail(body: Record<string, unknown>): string | null {
   const error = readObject(body, 'error');
@@ -132,7 +147,8 @@ export function createChatCompletionsProvider(
     async chatJson(request: ChatJsonRequest): Promise<Result<string, ProviderError>> {
       const body = JSON.stringify({
         model: request.model,
-        [maxTokensField(provider)]: request.maxOutputTokens,
+        // Budget plus room to think (L-185); see `wireOutputCap`.
+        [maxTokensField(provider)]: wireOutputCap(request.maxOutputTokens),
         temperature: request.temperature,
         messages: [
           { role: 'system', content: request.system },
@@ -189,14 +205,26 @@ export function createChatCompletionsProvider(
       }
 
       const content = message === null ? null : readString(message, 'content');
+
+      // Checked BEFORE the missing-content case (L-185): a model that thought
+      // until the cap and wrote nothing replies with no content at all, and
+      // "replied without any content" would hide the one useful fact.
+      if (readString(choice, 'finish_reason') === FINISH_REASON_LENGTH) {
+        const thought =
+          content === null || content.trim().length === 0 || reasoningTokens(decoded.value) > 0;
+        return err(
+          providerError(
+            provider,
+            'truncated',
+            thought ? REASONING_TRUNCATED_MESSAGE : TRUNCATED_MESSAGE,
+          ),
+        );
+      }
+
       if (content === null) {
         return err(
           providerError(provider, 'bad-response', 'The provider replied without any content.'),
         );
-      }
-
-      if (readString(choice, 'finish_reason') === FINISH_REASON_LENGTH) {
-        return err(providerError(provider, 'truncated', TRUNCATED_MESSAGE));
       }
 
       return ok(content);
