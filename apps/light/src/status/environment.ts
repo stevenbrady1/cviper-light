@@ -71,28 +71,57 @@ export const SECRET_KEYS = [
 
 export type SecretKeyName = (typeof SECRET_KEYS)[number];
 
+export type KeyState = 'configured' | 'incomplete' | 'missing' | 'unreadable';
+
 /**
- * The credentials the status strip actually asks about.
+ * The cloud AI providers the strip reports on (L-182), in the order Settings
+ * lists them, each with the short name the narrow rail has room for.
+ */
+export const AI_STATUS_PROVIDERS = [
+  { id: 'openai', label: 'OpenAI', key: OPENAI_SECRET_KEY },
+  { id: 'anthropic', label: 'Anthropic', key: ANTHROPIC_SECRET_KEY },
+  { id: 'google', label: 'Gemini', key: GOOGLE_SECRET_KEY },
+  { id: 'mistral', label: 'Mistral', key: MISTRAL_SECRET_KEY },
+  { id: 'grok', label: 'Grok', key: GROK_SECRET_KEY },
+  { id: 'openrouter', label: 'OpenRouter', key: OPENROUTER_SECRET_KEY },
+] as const;
+
+export type AiStatusId = (typeof AI_STATUS_PROVIDERS)[number]['id'];
+
+/** Every AI provider without a key: the first-run state, and the shape before the first read. */
+export const NO_AI_KEYS: Readonly<Record<AiStatusId, KeyState>> = {
+  openai: 'missing',
+  anthropic: 'missing',
+  google: 'missing',
+  mistral: 'missing',
+  grok: 'missing',
+  openrouter: 'missing',
+};
+
+/**
+ * The credentials the status strip asks about: the search credentials and,
+ * since L-182, every AI key too.
  *
- * A strict subset of `SECRET_KEYS`, and deliberately not all of it. The strip
- * answers "can I search for jobs", so it reads the search credentials; the two
- * AI keys belong to the analysis view's own indicator, and reading them here
- * would be two IPC round trips per refresh for a dot nobody draws.
+ * It used to leave the AI keys out to save six IPC round trips per refresh, on
+ * the grounds that the analysis view had its own indicator. The owner asked
+ * for them in the rail, so a user can see which AI providers are set up
+ * without opening Settings. The reads are local and concurrent.
  */
 export const QUERIED_SECRET_KEYS = [
   'adzuna_app_id',
   'adzuna_app_key',
   'reed_api_key',
+  ...AI_STATUS_PROVIDERS.map((provider) => provider.key),
 ] as const satisfies readonly SecretKeyName[];
 
 export type OllamaState = 'running' | 'absent';
-
-export type KeyState = 'configured' | 'incomplete' | 'missing' | 'unreadable';
 
 export interface EnvironmentStatus {
   readonly ollama: OllamaState;
   readonly adzuna: KeyState;
   readonly reed: KeyState;
+  /** Each cloud AI provider's key (L-182). */
+  readonly ai: Readonly<Record<AiStatusId, KeyState>>;
   readonly requestsToday: number;
 }
 
@@ -159,17 +188,24 @@ export async function readJobKeyStates(): Promise<Record<'adzuna' | 'reed', KeyS
  * the caller gets a complete answer or a complete answer, never an exception.
  */
 export async function readEnvironmentStatus(now: Date = new Date()): Promise<EnvironmentStatus> {
-  const [tags, adzunaAppId, adzunaAppKey, reedApiKey] = await Promise.all([
+  const [tags, adzunaAppId, adzunaAppKey, reedApiKey, ...aiAnswers] = await Promise.all([
     probeOllama(),
     secretStatus('adzuna_app_id'),
     secretStatus('adzuna_app_key'),
     secretStatus('reed_api_key'),
+    ...AI_STATUS_PROVIDERS.map((provider) => secretStatus(provider.key)),
   ]);
+
+  const ai = { ...NO_AI_KEYS };
+  AI_STATUS_PROVIDERS.forEach((provider, index) => {
+    ai[provider.id] = combineKeyState([aiAnswers[index] ?? null]);
+  });
 
   return {
     ollama: tags === null ? 'absent' : 'running',
     adzuna: combineKeyState([adzunaAppId, adzunaAppKey]),
     reed: combineKeyState([reedApiKey]),
+    ai,
     requestsToday: requestsToday(now),
   };
 }

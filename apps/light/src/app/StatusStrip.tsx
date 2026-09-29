@@ -1,4 +1,10 @@
-import { type EnvironmentStatus, type KeyState, type OllamaState } from '../status/environment';
+import {
+  AI_STATUS_PROVIDERS,
+  type EnvironmentStatus,
+  type KeyState,
+  NO_AI_KEYS,
+  type OllamaState,
+} from '../status/environment';
 
 /**
  * The permanent answer to "what is set up on this machine".
@@ -81,7 +87,12 @@ export function StatusStrip({ status }: StatusStripProps) {
   const ollama: OllamaState = status?.ollama ?? 'absent';
   const adzuna: KeyState = status?.adzuna ?? 'missing';
   const reed: KeyState = status?.reed ?? 'missing';
+  const ai = status?.ai ?? NO_AI_KEYS;
   const requests = status?.requestsToday ?? 0;
+
+  // Only the providers that have something to say: a saved key (teal) or one
+  // the store cannot read (gold). Six grey names would bury the answer.
+  const aiShown = AI_STATUS_PROVIDERS.filter((provider) => ai[provider.id] !== 'missing');
 
   return (
     <section
@@ -118,6 +129,33 @@ export function StatusStrip({ status }: StatusStripProps) {
             tone={DOT_BY_KEY_STATE[reed]}
             description={DESCRIPTION_BY_KEY_STATE[reed]}
           />
+        </li>
+
+        {/*
+          The AI row (L-182). With no key saved it is one quiet dot, like the
+          others: no AI key is a fine way to use this app, not a fault.
+        */}
+        <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          {aiShown.length === 0 ? (
+            <Dot
+              testId="status-ai-none"
+              label="AI keys"
+              state="missing"
+              tone={DOT_BY_KEY_STATE.missing}
+              description="no AI key saved"
+            />
+          ) : (
+            aiShown.map((provider) => (
+              <Dot
+                key={provider.id}
+                testId={`status-ai-${provider.id}`}
+                label={provider.label}
+                state={ai[provider.id]}
+                tone={DOT_BY_KEY_STATE[ai[provider.id]]}
+                description={DESCRIPTION_BY_KEY_STATE[ai[provider.id]]}
+              />
+            ))
+          )}
         </li>
 
         <li className="flex items-center justify-between" data-testid="status-requests">

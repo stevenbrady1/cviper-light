@@ -12,7 +12,7 @@ const tauri = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 
-const { QUERIED_SECRET_KEYS, readEnvironmentStatus, readJobKeyStates, SECRET_KEYS } =
+const { NO_AI_KEYS, QUERIED_SECRET_KEYS, readEnvironmentStatus, readJobKeyStates, SECRET_KEYS } =
   await import('./environment');
 
 const NOW = new Date(2026, 7, 19, 9, 0, 0);
@@ -45,6 +45,7 @@ describe('readEnvironmentStatus — the zero-configuration machine', () => {
       ollama: 'absent',
       adzuna: 'missing',
       reed: 'missing',
+      ai: NO_AI_KEYS,
       requestsToday: 0,
     });
   });
@@ -135,6 +136,7 @@ describe('readEnvironmentStatus — provider keys', () => {
       ollama: 'running',
       adzuna: 'configured',
       reed: 'unreadable',
+      ai: NO_AI_KEYS,
       requestsToday: 0,
     });
   });
@@ -178,5 +180,44 @@ describe('readJobKeyStates — what the search screen asks', () => {
       adzuna: 'unreadable',
       reed: 'unreadable',
     });
+  });
+});
+
+describe('readEnvironmentStatus — AI provider keys (L-182)', () => {
+  it('reports each AI provider whose key is saved', async () => {
+    respond({ keys: { google_api_key: true, openrouter_api_key: true } });
+
+    const status = await readEnvironmentStatus(NOW);
+    expect(status.ai.google).toBe('configured');
+    expect(status.ai.openrouter).toBe('configured');
+    expect(status.ai.openai).toBe('missing');
+  });
+
+  it('asks about all six AI keys as well as the search ones', async () => {
+    respond({});
+
+    await readEnvironmentStatus(NOW);
+
+    const asked = tauri.invoke.mock.calls
+      .filter(([command]) => command === 'secret_status')
+      .map(([, args]) => String((args ?? {})['key']));
+    for (const key of [
+      'openai_api_key',
+      'anthropic_api_key',
+      'google_api_key',
+      'mistral_api_key',
+      'grok_api_key',
+      'openrouter_api_key',
+    ]) {
+      expect(asked).toContain(key);
+    }
+  });
+
+  it('negative: an AI key the store cannot read is unreadable, and the rest still load', async () => {
+    respond({ keys: { anthropic_api_key: new Error('locked'), mistral_api_key: true } });
+
+    const status = await readEnvironmentStatus(NOW);
+    expect(status.ai.anthropic).toBe('unreadable');
+    expect(status.ai.mistral).toBe('configured');
   });
 });
