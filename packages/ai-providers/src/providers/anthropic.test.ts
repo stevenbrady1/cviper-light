@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import { fakeTransport, sentBody } from '../test/fake-transport';
 import { ANTHROPIC_DEFAULT_MODEL, createAnthropicProvider } from './anthropic';
+import { wireOutputCap } from './shared';
 
 const REQUEST = {
   model: ANTHROPIC_DEFAULT_MODEL,
@@ -123,7 +124,7 @@ describe('anthropic chatJson — the request it builds', () => {
     const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
     void createAnthropicProvider(transport).chatJson(REQUEST);
 
-    expect(sentBody(transport)).toMatchObject({ temperature: 0, max_tokens: 2048 });
+    expect(sentBody(transport)).toMatchObject({ temperature: 0, max_tokens: wireOutputCap(2048) });
   });
 
   it('defaults to claude-opus-5', () => {

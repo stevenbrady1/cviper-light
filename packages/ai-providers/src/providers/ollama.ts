@@ -23,6 +23,7 @@ import {
   type ProviderError,
 } from '../types';
 import {
+  REASONING_TRUNCATED_MESSAGE,
   TRUNCATED_MESSAGE,
   decodeJsonBody,
   httpError,
@@ -209,7 +210,17 @@ export function createOllamaProvider(
       // partial answer, and reporting it as truncated is what stops the repair
       // ladder mislabelling it as "the model wrote prose".
       if (readString(decoded.value, 'done_reason') === DONE_REASON_LENGTH) {
-        return err(providerError(PROVIDER, 'truncated', TRUNCATED_MESSAGE));
+        // A local thinking model (qwen3, deepseek-r1, gpt-oss) returns its
+        // reasoning in `message.thinking`, spent from the same `num_predict`.
+        const thinking = message === null ? null : readString(message, 'thinking');
+        const thought = thinking !== null && thinking.trim().length > 0;
+        return err(
+          providerError(
+            PROVIDER,
+            'truncated',
+            thought ? REASONING_TRUNCATED_MESSAGE : TRUNCATED_MESSAGE,
+          ),
+        );
       }
 
       return ok(content);
