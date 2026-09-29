@@ -315,8 +315,9 @@ export function PasteJobForm({
   /**
    * Go and get the page, and put its text in the box.
    *
-   * Everything that could go wrong comes back as one sentence from `runFetch`,
-   * so there is no branching on failure here and nothing to forget: a blocked
+   * Everything that could go wrong comes back as a ready sentence from
+   * `runFetch` (L-188: a site that refuses apps gets its own), so there is no
+   * branching on failure here and nothing to forget: a blocked
    * domain, a timeout, a 404 and a login wall all land in the same `else`.
    *
    * The advert box is only written on SUCCESS. Somebody who pasted an advert

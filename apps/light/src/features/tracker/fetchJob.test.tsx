@@ -32,7 +32,7 @@ import {
 import { type Availability } from '../analysis/providers';
 
 import { Tracker } from './Tracker';
-import { FETCH_FALLBACK_NOTE } from './runFetch';
+import { FETCH_FALLBACK_NOTE, FETCH_SITE_REFUSES_NOTE } from './runFetch';
 import type { FetchedPage, PageFetchError, PageFetchTransport } from './pageFetch';
 import { createFakeTrackerPort, type FakeTrackerPort } from './test/fakePort';
 
@@ -279,7 +279,28 @@ describe('a domain on the blocklist', () => {
     await user.click(screen.getByTestId('paste-job-fetch'));
 
     const note = await screen.findByTestId('paste-job-fetch-note');
-    expect(note.textContent).toBe(FETCH_FALLBACK_NOTE);
+    // L-188: told that the site blocks apps, not that the page is unreadable.
+    expect(note.textContent).toBe(FETCH_SITE_REFUSES_NOTE);
+  });
+
+  it('L-188: the reported LinkedIn link says the site blocks apps and that pasting works', async () => {
+    const reported =
+      'https://www.linkedin.com/jobs/view/4445438506/?alternateChannel=search' +
+      '&eBP=CwEAAAGd8yKZaqf&trackingId=ijklMNOP%3D%3D';
+    const user = userEvent.setup();
+    renderBoard({ createPageTransport: forbiddenPageTransport });
+
+    await openPaste(user);
+    await user.click(screen.getByTestId('paste-job-url'));
+    await user.paste(reported);
+    await user.click(screen.getByTestId('paste-job-fetch'));
+
+    const note = await screen.findByTestId('paste-job-fetch-note');
+    expect(note.textContent).toBe(FETCH_SITE_REFUSES_NOTE);
+    expect(note.textContent).not.toBe(FETCH_FALLBACK_NOTE);
+    // A status, not an alert: nothing is broken, the site said no.
+    expect(screen.queryAllByRole('alert')).toEqual([]);
+    expect((screen.getByTestId('paste-job-url') as HTMLInputElement).value).toBe(reported);
   });
 
   it('leaves the address exactly where the user typed it', async () => {

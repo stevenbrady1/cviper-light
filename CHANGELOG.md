@@ -35,6 +35,11 @@ All notable changes to CViper Light are recorded here. The format follows
   file-drop handler was swallowing every in-page drag in WebView2; it is
   switched off, and a file or link dropped on the window is refused rather
   than opened in place of the app (L-186).
+- Fetching a LinkedIn job link says what is really happening: LinkedIn blocks
+  apps from reading its pages, so the advert has to be pasted as text. It
+  used to say only that the page could not be read, which looked like a fault
+  in the app. The same message is shown for any site that answers 401, 403 or
+  999 (L-188).
 
 ## [0.4.0] — 2026-09-29
 
