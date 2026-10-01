@@ -207,6 +207,38 @@ function buildAtsNotes(ats: AtsResult): string[] {
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
+/** The shared input guard: the refusal for text there is nothing to measure. */
+function refuseUnscorable(cv: string, advert: string): ScoringError | null {
+  const cvLength = cv.trim().length;
+  if (cvLength === 0) return emptyCvError();
+
+  const advertLength = advert.trim().length;
+  if (advertLength === 0) return emptyJobDescriptionError();
+
+  if (cvLength < MIN_SCORABLE_CHARS) return cvTooShortError(cvLength, MIN_SCORABLE_CHARS);
+  if (advertLength < MIN_SCORABLE_CHARS) {
+    return jobDescriptionTooShortError(advertLength, MIN_SCORABLE_CHARS);
+  }
+  return null;
+}
+
+/**
+ * The ATS keyword number on its own (L-196), for callers whose analysis did not
+ * come from this scorer. An AI run's prompt forbids an ATS number, so the screen
+ * gets it from here — same guard, same hygiene, so the figure is identical to
+ * the one a keyword run reports. An error for empty input, never a zero.
+ */
+export function atsKeywordScore(
+  cvText: string,
+  jobDescription: string,
+): Result<number, ScoringError> {
+  const cv = prepare(cvText);
+  const advert = prepare(jobDescription);
+  const refusal = refuseUnscorable(cv, advert);
+  if (refusal !== null) return err(refusal);
+  return ok(atsScore(cv, advert).score);
+}
+
 /**
  * Score one CV against one job advert using keywords alone.
  *
@@ -220,16 +252,8 @@ export function scoreByKeywords(
   const cv = prepare(cvText);
   const advert = prepare(jobDescription);
 
-  const cvLength = cv.trim().length;
-  if (cvLength === 0) return err(emptyCvError());
-
-  const advertLength = advert.trim().length;
-  if (advertLength === 0) return err(emptyJobDescriptionError());
-
-  if (cvLength < MIN_SCORABLE_CHARS) return err(cvTooShortError(cvLength, MIN_SCORABLE_CHARS));
-  if (advertLength < MIN_SCORABLE_CHARS) {
-    return err(jobDescriptionTooShortError(advertLength, MIN_SCORABLE_CHARS));
-  }
+  const refusal = refuseUnscorable(cv, advert);
+  if (refusal !== null) return err(refusal);
 
   const profile = buildCvProfile(cv);
   const job = buildJobPosting(advert);

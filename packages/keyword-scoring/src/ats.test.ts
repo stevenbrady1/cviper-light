@@ -3,7 +3,7 @@
  * `_cv_covers_term` (line 949) and `_ATS_STOPWORDS` (line 940).
  */
 import { describe, expect, it } from 'vitest';
-import { ATS_STOPWORDS, atsScore, cvCoversTerm } from './ats';
+import { ATS_STOPWORDS, atsBand, atsScore, cvCoversTerm } from './ats';
 
 const ADVERT = [
   'Senior Business Analyst — Markets Technology',
@@ -151,5 +151,26 @@ describe('atsScore', () => {
 
   it('is deterministic', () => {
     expect(atsScore('Strong SQL', ADVERT)).toEqual(atsScore('Strong SQL', ADVERT));
+  });
+});
+
+describe('atsBand — the advice tiers, named (L-196)', () => {
+  it.each([
+    [0, 'low'],
+    [59, 'low'],
+    [60, 'fair'],
+    [79, 'fair'],
+    [80, 'good'],
+    [100, 'good'],
+  ] as const)('puts %i in the %s tier', (score, band) => {
+    expect(atsBand(score)).toBe(band);
+  });
+
+  it('agrees with the advice atsScore itself gives at each tier', () => {
+    // The band and the advice text must never disagree: low gets the "add
+    // keywords" line, fair does not, good gets no header advice either.
+    const low = atsScore('zzz', ADVERT);
+    expect(atsBand(low.score)).toBe('low');
+    expect(low.suggestions.join(' ')).toContain('Add more keywords');
   });
 });

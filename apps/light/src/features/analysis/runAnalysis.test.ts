@@ -203,3 +203,36 @@ describe('runAnalysis — a local model', () => {
     expect(createTransport).not.toHaveBeenCalled();
   });
 });
+
+describe('runAnalysis — the ATS keyword number (L-196)', () => {
+  it('attaches the keyword number on a keyword run, equal to the note in the result', async () => {
+    const run = await runAnalysis({ option: BASIC, cvText: CV, jobText: ADVERT }, vi.fn());
+
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    expect(run.value.atsKeywordScore).toBeGreaterThanOrEqual(0);
+    expect(run.value.atsKeywordScore).toBeLessThanOrEqual(100);
+    expect(run.value.analysis.ats_notes[0]).toContain(
+      `keyword score: ${run.value.atsKeywordScore} out of 100`,
+    );
+  });
+
+  it('attaches the same number on an AI run, computed locally rather than by the model', async () => {
+    const basic = await runAnalysis({ option: BASIC, cvText: CV, jobText: ADVERT }, vi.fn());
+    const ai = await runAnalysis({ option: OLLAMA, cvText: CV, jobText: ADVERT }, () =>
+      fakeTransport(() => ok(ollamaEnvelope(modelReply()))),
+    );
+
+    expect(ai.ok && basic.ok).toBe(true);
+    if (!ai.ok || !basic.ok) return;
+    expect(ai.value.atsKeywordScore).toBe(basic.value.atsKeywordScore);
+  });
+
+  it('negative: an empty CV is an error on both paths, never a zero score', async () => {
+    const basic = await runAnalysis({ option: BASIC, cvText: '', jobText: ADVERT }, vi.fn());
+    const ai = await runAnalysis({ option: OLLAMA, cvText: '', jobText: ADVERT }, vi.fn());
+
+    expect(basic.ok).toBe(false);
+    expect(ai.ok).toBe(false);
+  });
+});

@@ -45,7 +45,7 @@ import {
   type ChatTransport,
 } from '@cviper/ai-providers';
 import { err, ok, type CvAnalysis, type Result } from '@cviper/core-types';
-import { KEYWORD_SCORING_VERSION, scoreByKeywords } from '@cviper/keyword-scoring';
+import { KEYWORD_SCORING_VERSION, atsKeywordScore, scoreByKeywords } from '@cviper/keyword-scoring';
 
 import { createTauriTransport } from '../../ai/transport';
 
@@ -67,6 +67,12 @@ export interface RunSuccess {
   readonly model: string;
   /** True when the model's first answer was unusable and the repair turn saved it. */
   readonly retried: boolean;
+  /**
+   * The ATS keyword estimate, 0-100 (L-196). Always from the local keyword
+   * scorer, on every path: the AI prompt is told not to output one. Never
+   * averaged into `match_score`.
+   */
+  readonly atsKeywordScore: number;
 }
 
 export interface RunFailure {
@@ -131,21 +137,25 @@ export async function runAnalysis(
   // 30-second model call was never going to work.
   const scored = scoreByKeywords(request.cvText, request.jobText);
 
-  if (request.option.kind === 'keyword') {
-    return scored.ok
-      ? ok({
-          analysis: scored.value,
-          provider: 'keyword',
-          model: KEYWORD_MODEL,
-          retried: false,
-        })
-      : err({ message: scored.error.message });
+  if (!scored.ok) {
+    // The same refusal on every path, before a single token is generated or a
+    // single request is billed. See above.
+    return err({ message: scored.error.message });
   }
 
-  if (!scored.ok) {
-    // The same refusal, before a single token is generated or a single request
-    // is billed. See above.
-    return err({ message: scored.error.message });
+  // Same guard, same hygiene, so it cannot fail where `scored` succeeded; the
+  // branch is a refusal rather than a zero if that ever stops being true.
+  const ats = atsKeywordScore(request.cvText, request.jobText);
+  if (!ats.ok) return err({ message: ats.error.message });
+
+  if (request.option.kind === 'keyword') {
+    return ok({
+      analysis: scored.value,
+      provider: 'keyword',
+      model: KEYWORD_MODEL,
+      retried: false,
+      atsKeywordScore: ats.value,
+    });
   }
 
   // ── The consent gate (Apple 5.1.2(i)) ────────────────────────────────────
@@ -196,5 +206,6 @@ export async function runAnalysis(
     provider: request.option.kind,
     model,
     retried: analysed.value.meta.retryCount > 0,
+    atsKeywordScore: ats.value,
   });
 }
