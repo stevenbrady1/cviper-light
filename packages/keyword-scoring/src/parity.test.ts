@@ -20,6 +20,7 @@
  * here and re-measure. This file is the pattern the other ports should follow.
  */
 import { describe, expect, it } from 'vitest';
+import { atsScore } from './ats';
 import { termInText } from './term';
 
 /** [term, text, what the Python returns] */
@@ -119,5 +120,101 @@ describe('known upstream limitation: a trailing full stop hides a skill', () => 
     expect(termInText(term, text)).toBe(false);
     // ...and matches the moment the full stop is not immediately adjacent.
     expect(termInText(term, text.replace(/\.$/, ' too'))).toBe(true);
+  });
+});
+
+/**
+ * L-197 — the ATS missing-keyword ranking.
+ *
+ * Python tests `w not in skill_word_index`, a set of SINGLE words, against the
+ * WHOLE term. A multi-word skill such as "machine learning" is therefore never
+ * in the set and ranks with the prose words, ordered by how often the advert
+ * says its first word. Single-word skills rank ahead of everything.
+ *
+ * Expected arrays were produced by running
+ * `FallbackService(KeywordService()).ats_score(cv, job)["missing_keywords"]`
+ * in the CViper repo (backend/ai/fallbacks.py), not by reasoning about it.
+ */
+describe('atsScore missing-keyword ranking parity (L-197)', () => {
+  const CV = 'pastry chef';
+
+  it('ranks a multi-word skill gap with the prose tier, not the skill tier', () => {
+    const job =
+      'We need machine learning, data pipeline and stakeholder management expertise. ' +
+      'Python and sql and sql and sql. Delivery delivery delivery delivery delivery. ' +
+      'Reporting reporting reporting. Governance governance. Compliance. Mentoring. ' +
+      'Machine machine machine.';
+    expect(atsScore(CV, job).missingKeywords).toEqual([
+      'sql',
+      'python',
+      'delivery',
+      'machine learning',
+      'reporting',
+      'governance',
+      'stakeholder management',
+      'data',
+      'pipeline',
+      'expertise',
+      'compliance',
+      'mentoring',
+    ]);
+  });
+
+  // BOUNDARY: 18 competing gaps, so the top-15 cut decides who is shown.
+  it('lets the 15-item cut drop a low-frequency multi-word skill gap', () => {
+    const words = [
+      'alpha',
+      'bravo',
+      'charlie',
+      'delta',
+      'echoes',
+      'foxtrot',
+      'golfing',
+      'hotels',
+      'indigo',
+      'juliet',
+      'kilogram',
+      'lemons',
+      'mangos',
+      'nectar',
+      'orange',
+      'pepper',
+      'quince',
+    ];
+    const job = 'Machine learning wanted. ' + words.map((w, i) => `${w} `.repeat(i + 1)).join(' ');
+    const missing = atsScore(CV, job).missingKeywords;
+    expect(missing).toHaveLength(15);
+    expect(missing).not.toContain('machine learning');
+    expect(missing).toEqual([
+      'quince',
+      'pepper',
+      'orange',
+      'nectar',
+      'mangos',
+      'lemons',
+      'kilogram',
+      'juliet',
+      'indigo',
+      'hotels',
+      'golfing',
+      'foxtrot',
+      'echoes',
+      'delta',
+      'charlie',
+    ]);
+  });
+
+  // REGRESSION: with no multi-word gaps the old and new rules agree.
+  it('is unchanged when no gap is a multi-word skill', () => {
+    const job =
+      'We need python and sql and java. Delivery delivery delivery. Reporting reporting. Governance.';
+    expect(atsScore(CV, job).missingKeywords).toEqual([
+      'python',
+      'sql',
+      'delivery',
+      'reporting',
+      'java',
+      'governance',
+    ]);
   });
 });
