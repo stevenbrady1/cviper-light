@@ -43,6 +43,8 @@ export interface RunResult {
   readonly provider: string;
   readonly model: string;
   readonly retried: boolean;
+  /** The ATS keyword estimate (L-196). Absent on a result without one. */
+  readonly atsKeywordScore?: number;
 }
 
 export interface AnalysisSessionState {

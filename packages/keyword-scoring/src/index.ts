@@ -21,7 +21,7 @@ export const KEYWORD_SCORING_PACKAGE = '@cviper/keyword-scoring' as const;
 
 // ── The public entry point ───────────────────────────────────────────────────
 
-export { MIN_SCORABLE_CHARS, scoreByKeywords } from './score';
+export { MIN_SCORABLE_CHARS, atsKeywordScore, scoreByKeywords } from './score';
 
 export type { ScoringError, ScoringErrorCode } from './errors';
 
@@ -54,7 +54,14 @@ export {
   type TitleMatchStrength,
 } from './match';
 
-export { ATS_STOPWORDS, atsScore, cvCoversTerm, type AtsResult } from './ats';
+export {
+  ATS_STOPWORDS,
+  atsBand,
+  atsScore,
+  cvCoversTerm,
+  type AtsBand,
+  type AtsResult,
+} from './ats';
 
 // ── Text primitives ──────────────────────────────────────────────────────────
 

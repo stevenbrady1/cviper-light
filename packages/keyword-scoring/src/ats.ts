@@ -118,6 +118,19 @@ function countOccurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
 }
 
+/**
+ * The three advice tiers, named (L-196). Under 60 is a real problem, 60-79 is
+ * improvable, 80+ is fine. `atsScore` below gives its advice from this, and the
+ * screen names the band from this, so the two can never disagree.
+ */
+export type AtsBand = 'low' | 'fair' | 'good';
+
+export function atsBand(score: number): AtsBand {
+  if (score < 60) return 'low';
+  if (score < 80) return 'fair';
+  return 'good';
+}
+
 /** Keyword-based ATS scoring. Pure, synchronous and deterministic. */
 export function atsScore(cvText: string, jobDescription: string): AtsResult {
   const cvLower = (cvText || '').slice(0, MAX_TEXT_LENGTH).toLowerCase();
@@ -183,8 +196,9 @@ export function atsScore(cvText: string, jobDescription: string): AtsResult {
 
   // Advice tiers: under 60 is a real problem, 60-80 is improvable, 80+ is fine.
   const suggestions: string[] = [];
-  if (score < 60) suggestions.push('Add more keywords from the job description to your CV');
-  if (score < 80) {
+  const band = atsBand(score);
+  if (band === 'low') suggestions.push('Add more keywords from the job description to your CV');
+  if (band !== 'good') {
     suggestions.push(
       'Ensure section headers match standard ATS formats (Experience, Education, Skills)',
     );
