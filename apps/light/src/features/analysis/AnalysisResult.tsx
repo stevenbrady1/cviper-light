@@ -237,8 +237,8 @@ export function AnalysisResult({
           </div>
           <p data-testid="analysis-ats-source" className="mt-1.5 text-ink-muted">
             {isKeyword
-              ? 'A keyword estimate: how many of the advert2019s words appear on your CV. It is a word count, not a judgement of your CV, and it is separate from your match score.'
-              : 'This number comes from the keyword check on your computer, not from the AI. It counts how many of the advert2019s words appear on your CV, and it is separate from your match score.'}
+              ? 'A keyword estimate: how many of the advert’s words appear on your CV. It is a word count, not a judgement of your CV, and it is separate from your match score.'
+              : 'This number comes from the keyword check on your computer, not from the AI. It counts how many of the advert’s words appear on your CV, and it is separate from your match score.'}
           </p>
         </div>
       )}

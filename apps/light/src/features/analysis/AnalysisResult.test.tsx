@@ -284,6 +284,8 @@ describe('the ATS keyword number (L-196)', () => {
 
     const source = screen.getByTestId('analysis-ats-source').textContent ?? '';
     expect(source).toContain('keyword estimate');
+    expect(source).toContain('advert’s words');
+    expect(source).not.toMatch(/\d{4}s words/);
     expect(source).not.toContain('Claude');
   });
 
@@ -302,6 +304,8 @@ describe('the ATS keyword number (L-196)', () => {
     const source = screen.getByTestId('analysis-ats-source').textContent ?? '';
     expect(source).toContain('keyword check');
     expect(source).toContain('not from the AI');
+    expect(source).toContain('advert’s words');
+    expect(source).not.toMatch(/\d{4}s words/);
     // The AI's own match score is shown as the AI gave it.
     expect(screen.getByTestId('band-scale-score').textContent).toBe('81');
   });
