@@ -170,11 +170,13 @@ export function atsScore(cvText: string, jobDescription: string): AtsResult {
   const rawScore = totalWeight > 0 ? pythonRound((matchedWeight / totalWeight) * 100) : 0;
   const score = Math.max(0, Math.min(rawScore, 100));
 
-  // Skill phrases first (they carry weight), then by how often the advert says
-  // it. A stable sort keeps the order deterministic inside a frequency tier.
+  // Single-word skills first (they carry weight), then by how often the advert says
+  // it. The tier test is on the WHOLE term, as in Python: a multi-word skill is
+  // never in the single-word index, so it ranks with the prose words (L-197).
+  // A stable sort keeps the order deterministic inside a frequency tier.
   const missingSorted = [...missingKeywords].sort((a, b) => {
-    const aIsSkill = skillWordIndex.has(a.split(/\s+/)[0] ?? a);
-    const bIsSkill = skillWordIndex.has(b.split(/\s+/)[0] ?? b);
+    const aIsSkill = skillWordIndex.has(a);
+    const bIsSkill = skillWordIndex.has(b);
     if (aIsSkill !== bIsSkill) return aIsSkill ? -1 : 1;
     const aCount = countOccurrences(jobLower, a.split(/\s+/)[0] ?? a);
     const bCount = countOccurrences(jobLower, b.split(/\s+/)[0] ?? b);
