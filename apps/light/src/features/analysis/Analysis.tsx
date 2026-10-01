@@ -967,6 +967,7 @@ export function Analysis({
                 model={result.model}
                 retried={result.retried}
                 aiAvailable={aiAvailable}
+                atsKeywordScore={result.atsKeywordScore}
               />
               {/*
                 The next step of the flow (L-190), after the result it follows

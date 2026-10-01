@@ -250,3 +250,127 @@ describe('layout (L-181)', () => {
     expect(holder?.parentElement?.className).toContain('flex-wrap');
   });
 });
+
+describe('the ATS keyword number (L-196)', () => {
+  it('shows the number and its band beside the match score on a keyword run', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        atsKeywordScore={54}
+      />,
+    );
+
+    const ats = screen.getByTestId('analysis-ats-score');
+    expect(ats.getAttribute('data-band')).toBe('low');
+    expect(screen.getByTestId('analysis-ats-score-value').textContent).toBe('54');
+    expect(screen.getByTestId('analysis-ats-band').textContent).toBe('Needs work');
+    // The match score is still there, untouched and unaveraged.
+    expect(screen.getByTestId('band-scale-score').textContent).toBe('62');
+  });
+
+  it('calls it a keyword estimate, not an AI judgement, on a keyword run', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        atsKeywordScore={54}
+      />,
+    );
+
+    const source = screen.getByTestId('analysis-ats-source').textContent ?? '';
+    expect(source).toContain('keyword estimate');
+    expect(source).not.toContain('Claude');
+  });
+
+  it('on an AI run, says the number comes from the keyword check and not the AI', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis({ match_score: 81, verdict: 'strong' })}
+        provider="ollama"
+        model="qwen"
+        aiAvailable
+        atsKeywordScore={83}
+      />,
+    );
+
+    expect(screen.getByTestId('analysis-ats-score-value').textContent).toBe('83');
+    const source = screen.getByTestId('analysis-ats-source').textContent ?? '';
+    expect(source).toContain('keyword check');
+    expect(source).toContain('not from the AI');
+    // The AI's own match score is shown as the AI gave it.
+    expect(screen.getByTestId('band-scale-score').textContent).toBe('81');
+  });
+
+  it.each([
+    [0, 'low', 'Needs work'],
+    [59, 'low', 'Needs work'],
+    [60, 'fair', 'Getting there'],
+    [79, 'fair', 'Getting there'],
+    [80, 'good', 'Reads well'],
+    [100, 'good', 'Reads well'],
+  ] as const)('boundary: %i falls in the %s band', (score, band, word) => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        atsKeywordScore={score}
+      />,
+    );
+
+    expect(screen.getByTestId('analysis-ats-score').getAttribute('data-band')).toBe(band);
+    expect(screen.getByTestId('analysis-ats-band').textContent).toBe(word);
+  });
+
+  it('old result with no stored number: renders everything else and hides the ATS block', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v2"
+        aiAvailable
+      />,
+    );
+
+    expect(screen.queryByTestId('analysis-ats-score')).toBeNull();
+    expect(screen.getByTestId('analysis-result')).toBeTruthy();
+    expect(screen.getByTestId('analysis-ats-notes')).toBeTruthy();
+  });
+
+  it('negative: a number outside 0-100 or not finite is not drawn', () => {
+    for (const bad of [Number.NaN, -1, 101]) {
+      const { unmount } = render(
+        <AnalysisResult
+          analysis={keywordAnalysis()}
+          provider="keyword"
+          model="keyword-v3"
+          aiAvailable
+          atsKeywordScore={bad}
+        />,
+      );
+      expect(screen.queryByTestId('analysis-ats-score')).toBeNull();
+      unmount();
+    }
+  });
+
+  it('keeps the block free of rigid widths so it stacks on a phone', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        atsKeywordScore={70}
+      />,
+    );
+    const block = screen.getByTestId('analysis-ats-score');
+    expect(block.className).not.toMatch(/\b(w|min-w)-\d/);
+    expect(block.getAttribute('style')).toBeNull();
+  });
+});

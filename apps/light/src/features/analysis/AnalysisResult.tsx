@@ -1,4 +1,5 @@
 import { type CvAnalysis, type SuggestionPriority, type Verdict } from '@cviper/core-types';
+import { atsBand, type AtsBand } from '@cviper/keyword-scoring';
 
 import { displayTerms } from './acronyms';
 import { BandScale } from './BandScale';
@@ -54,6 +55,23 @@ const PRIORITY_TONE: Record<SuggestionPriority, string> = {
 };
 
 const PRIORITY_ORDER: readonly SuggestionPriority[] = ['high', 'medium', 'low'];
+
+/**
+ * The ATS keyword number's band words (L-196). The tiers are `atsBand`'s - the
+ * same 60 and 80 the advice text uses - so the word and the advice agree. Same
+ * colour grammar as the match score: nothing is red.
+ */
+const ATS_BAND_WORD: Record<AtsBand, string> = {
+  low: 'Needs work',
+  fair: 'Getting there',
+  good: 'Reads well',
+};
+
+const ATS_BAND_TONE: Record<AtsBand, string> = {
+  low: 'text-ink-muted',
+  fair: 'text-gold',
+  good: 'text-teal',
+};
 
 /** A section heading, in the app's eyebrow style. */
 function Eyebrow({ children }: { children: React.ReactNode }) {
@@ -117,6 +135,13 @@ interface AnalysisResultProps {
    * makes the app look like it is not paying attention.
    */
   readonly aiAvailable: boolean;
+  /**
+   * The ATS keyword estimate, 0-100 (L-196), from the local keyword check on
+   * EVERY run - the AI prompt is told not to produce one. Optional so a result
+   * with no number (an older one) still renders; the block is then left out,
+   * because inventing a figure for it would be worse than showing none.
+   */
+  readonly atsKeywordScore?: number | undefined;
 }
 
 export function AnalysisResult({
@@ -125,8 +150,16 @@ export function AnalysisResult({
   model,
   retried = false,
   aiAvailable,
+  atsKeywordScore,
 }: AnalysisResultProps) {
   const isKeyword = provider === 'keyword';
+  const ats =
+    atsKeywordScore !== undefined &&
+    Number.isFinite(atsKeywordScore) &&
+    atsKeywordScore >= 0 &&
+    atsKeywordScore <= 100
+      ? { score: Math.round(atsKeywordScore), band: atsBand(atsKeywordScore) }
+      : null;
 
   const provenance = isKeyword
     ? aiAvailable
@@ -174,6 +207,41 @@ export function AnalysisResult({
           {VERDICT_LABEL[analysis.verdict]}
         </span>
       </div>
+
+      {/*
+        Its own block, never folded into the match score or the eligibility
+        gates (L-196): "can they do the job" and "will a scanner find the words"
+        are different questions, and an average of them answers neither.
+      */}
+      {ats === null ? null : (
+        <div
+          data-testid="analysis-ats-score"
+          data-band={ats.band}
+          className="rounded-card border border-line bg-card p-3"
+        >
+          <Eyebrow>Screening-software keyword check</Eyebrow>
+          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span
+              data-testid="analysis-ats-score-value"
+              className={`font-display text-3xl leading-none font-normal lining-nums tabular-nums ${ATS_BAND_TONE[ats.band]}`}
+            >
+              {ats.score}
+            </span>
+            <span className="text-ink-faint">out of 100</span>
+            <span
+              data-testid="analysis-ats-band"
+              className={`font-medium ${ATS_BAND_TONE[ats.band]}`}
+            >
+              {ATS_BAND_WORD[ats.band]}
+            </span>
+          </div>
+          <p data-testid="analysis-ats-source" className="mt-1.5 text-ink-muted">
+            {isKeyword
+              ? 'A keyword estimate: how many of the advert2019s words appear on your CV. It is a word count, not a judgement of your CV, and it is separate from your match score.'
+              : 'This number comes from the keyword check on your computer, not from the AI. It counts how many of the advert2019s words appear on your CV, and it is separate from your match score.'}
+          </p>
+        </div>
+      )}
 
       <p data-testid="analysis-summary" className="text-ink">
         {analysis.summary}

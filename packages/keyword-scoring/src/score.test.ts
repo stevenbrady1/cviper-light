@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { CvAnalysisSchema, deriveVerdict, isErr, isOk } from '@cviper/core-types';
-import { MIN_SCORABLE_CHARS, scoreByKeywords } from './score';
+import { MIN_SCORABLE_CHARS, atsKeywordScore, scoreByKeywords } from './score';
 
 // ── Realistic fixtures ───────────────────────────────────────────────────────
 
@@ -437,5 +437,32 @@ describe('determinism', () => {
   it('is not fooled by a soft hyphen hiding inside a word', () => {
     const analysis = analyse(`${CV}\nJava\u00adScript everywhere`, 'Role\n\nWe need java here now');
     expect(analysis.matched_keywords.map((k) => k.toLowerCase())).not.toContain('java');
+  });
+});
+
+describe('atsKeywordScore — the number on its own (L-196)', () => {
+  const CV_TEXT = 'Credit risk analyst. SQL, Python, Basel III, stress testing, IFRS 9 models.';
+  const ADVERT_TEXT = 'Credit Risk Analyst. SQL models, stress tests, Python essential.';
+
+  it('returns the same number the keyword run reports in its ATS note', () => {
+    const scored = scoreByKeywords(CV_TEXT, ADVERT_TEXT);
+    const ats = atsKeywordScore(CV_TEXT, ADVERT_TEXT);
+    expect(scored.ok && ats.ok).toBe(true);
+    if (!scored.ok || !ats.ok) return;
+    expect(scored.value.ats_notes[0]).toContain(`keyword score: ${ats.value} out of 100`);
+  });
+
+  it('is an error for an empty CV, never a zero', () => {
+    const ats = atsKeywordScore('   ', ADVERT_TEXT);
+    expect(ats.ok).toBe(false);
+  });
+
+  it('is an error for an empty advert', () => {
+    expect(atsKeywordScore(CV_TEXT, '').ok).toBe(false);
+  });
+
+  it('refuses a CV one character under the scorable minimum and accepts it at the minimum', () => {
+    expect(atsKeywordScore('a'.repeat(MIN_SCORABLE_CHARS - 1), ADVERT_TEXT).ok).toBe(false);
+    expect(atsKeywordScore('a'.repeat(MIN_SCORABLE_CHARS), ADVERT_TEXT).ok).toBe(true);
   });
 });
