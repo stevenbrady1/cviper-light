@@ -1,7 +1,8 @@
 import { type CvAnalysis, type SuggestionPriority, type Verdict } from '@cviper/core-types';
-import { atsBand, type AtsBand } from '@cviper/keyword-scoring';
+import { atsBand } from '@cviper/keyword-scoring';
 
 import { displayTerms } from './acronyms';
+import { ATS_BAND_TONE, ATS_BAND_WORD } from './atsBandWords';
 import { BandScale } from './BandScale';
 import { providerLabel } from './model';
 
@@ -55,23 +56,6 @@ const PRIORITY_TONE: Record<SuggestionPriority, string> = {
 };
 
 const PRIORITY_ORDER: readonly SuggestionPriority[] = ['high', 'medium', 'low'];
-
-/**
- * The ATS keyword number's band words (L-196). The tiers are `atsBand`'s - the
- * same 60 and 80 the advice text uses - so the word and the advice agree. Same
- * colour grammar as the match score: nothing is red.
- */
-const ATS_BAND_WORD: Record<AtsBand, string> = {
-  low: 'Needs work',
-  fair: 'Getting there',
-  good: 'Reads well',
-};
-
-const ATS_BAND_TONE: Record<AtsBand, string> = {
-  low: 'text-ink-muted',
-  fair: 'text-gold',
-  good: 'text-teal',
-};
 
 /** A section heading, in the app's eyebrow style. */
 function Eyebrow({ children }: { children: React.ReactNode }) {
