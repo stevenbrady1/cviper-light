@@ -8,6 +8,7 @@ import { createAnalysisSession } from '../features/analysis/session';
 import {
   loadJobIntoAnalysis,
   type AnalyseHandoff,
+  gapsFromSession,
   type TailorHandoff,
 } from '../features/flow/handoff';
 import { Welcome } from '../features/onboarding/Welcome';
@@ -338,12 +339,15 @@ export default function App({
 
   const onTrackerTailor = useCallback(
     (entry: TrackerEntry) => {
-      const { selectedCvId, optionKey } = analysisSession.get();
+      const state = analysisSession.get();
       onTailorJob({
         jobId: entry.job.id,
         jobText: jobAdvertText(entry.job),
-        cvId: selectedCvId,
-        optionKey,
+        cvId: state.selectedCvId,
+        optionKey: state.optionKey,
+        // Only used by Tailor if the last analysis was of this job's advert
+        // and this CV (L-202) — `gapsForTailor` checks both.
+        keywordGaps: gapsFromSession(state),
       });
     },
     [analysisSession, onTailorJob],

@@ -207,7 +207,10 @@ describe('on to Tailor', () => {
       jobText: advert().value,
       cvId: 'cv-1',
       optionKey: 'keyword',
+      // L-202: the result's keyword gaps, tied to this CV and the advert checked.
+      keywordGaps: { cvId: 'cv-1', advert: advert().value, gaps: expect.any(Array) },
     });
+    expect(onTailor.mock.calls[0]?.[0].keywordGaps?.gaps.length).toBeGreaterThan(0);
   });
 
   it('is offered only once there is a result, and never as a second primary button', async () => {

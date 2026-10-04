@@ -18,10 +18,10 @@
  * but the database the user already has. "Delete everything" clears what is in
  * flight as well, so the screens cannot outlive the data.
  */
-import { type Job } from '@cviper/core-types';
+import { type CvAnalysis, type Job } from '@cviper/core-types';
 
 import { jobAdvertText } from '../analysis/model';
-import { type AnalysisSession } from '../analysis/session';
+import { type AnalysisSession, type AnalysisSessionState } from '../analysis/session';
 
 /** A job on its way to the Analysis screen. */
 export interface AnalyseHandoff {
@@ -46,6 +46,69 @@ export interface TailorHandoff {
   readonly jobText: string;
   readonly cvId: string | null;
   readonly optionKey: string | null;
+  /**
+   * The Analysis result's keyword gaps (L-202), with the CV and advert they
+   * were found for, or `null` / absent when there was no analysis. Tailor
+   * uses them only while it is still tailoring THAT CV for THAT advert.
+   */
+  readonly keywordGaps?: HandedGaps | null | undefined;
+}
+
+/**
+ * Words in the advert that the CV does not use, and what they were found for.
+ *
+ * ============================================================================
+ * GAPS ONLY — NEVER MISSING SKILLS
+ * ============================================================================
+ * `keyword_gaps` is what the candidate did not WRITE; `missing_skills` is what
+ * they cannot DO. The Tailor prompt asks for the first kind where the CV backs
+ * it up, so a missing skill must never reach it. A word an AI analysis put in
+ * both lists has been called missing, and is dropped here.
+ */
+export interface HandedGaps {
+  readonly cvId: string;
+  /** The advert the analysis CHECKED — not whatever is in the box now. */
+  readonly advert: string;
+  readonly gaps: readonly string[];
+}
+
+function fold(word: string): string {
+  return word.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** The gaps worth handing over from one analysis, or `null` when there are none. */
+export function gapsFromAnalysis(
+  analysis: CvAnalysis,
+  cvId: string | null,
+  advert: string | null,
+): HandedGaps | null {
+  if (cvId === null || advert === null || advert.trim() === '') return null;
+  const missing = new Set(analysis.missing_skills.map(fold));
+  const gaps = analysis.keyword_gaps
+    .map((gap) => gap.trim())
+    .filter((gap) => gap !== '' && !missing.has(fold(gap)));
+  return gaps.length === 0 ? null : { cvId, advert, gaps };
+}
+
+/** The gaps from the result on the Analysis screen, if there is one. */
+export function gapsFromSession(state: AnalysisSessionState): HandedGaps | null {
+  if (state.result === null) return null;
+  return gapsFromAnalysis(state.result.analysis, state.selectedCvId, state.checkedAdvert);
+}
+
+/**
+ * The handed gaps, if they still describe what Tailor is about to send: the
+ * same CV and the same advert (surrounding whitespace aside). Another CV or
+ * an edited advert and they are about something else, so `null`.
+ */
+export function gapsForTailor(
+  handed: HandedGaps | null | undefined,
+  cvId: string | null,
+  advert: string,
+): readonly string[] | null {
+  if (handed === null || handed === undefined) return null;
+  if (cvId !== handed.cvId || advert.trim() !== handed.advert.trim()) return null;
+  return handed.gaps;
 }
 
 /**

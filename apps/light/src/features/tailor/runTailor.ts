@@ -32,6 +32,11 @@ export interface TailorRequest {
   readonly cvText: string;
   readonly jobText: string;
   readonly profileNotes: string | null;
+  /**
+   * The Analysis result's keyword gaps, when that analysis was of this CV and
+   * this advert (L-202). `null` otherwise — and then the prompt has none.
+   */
+  readonly keywordGaps?: readonly string[] | null | undefined;
 }
 
 export interface TailorRunSuccess {
@@ -76,6 +81,7 @@ export async function runTailor(
     cvText: request.cvText,
     jobText: request.jobText,
     profileNotes: request.profileNotes,
+    keywordGaps: request.keywordGaps,
   });
 
   if (!tailored.ok) {
