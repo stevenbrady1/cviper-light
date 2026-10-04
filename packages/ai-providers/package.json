@@ -17,6 +17,7 @@
     "@cviper/cv-parsing": "workspace:*"
   },
   "devDependencies": {
+    "@cviper/keyword-scoring": "workspace:*",
     "@types/node": "^26.2.0"
   }
 }

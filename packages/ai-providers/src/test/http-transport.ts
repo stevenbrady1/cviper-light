@@ -9,8 +9,9 @@
  * all of that and talks to a loopback address directly, which is only
  * acceptable because:
  *
- *   - it is reached exclusively by `ollama.integration.test.ts`, which is
- *     itself gated behind an environment variable, and
+ *   - it is reached exclusively by `ollama.integration.test.ts` and
+ *     `tailor-keyword-gaps.eval.test.ts`, each gated behind an environment
+ *     variable, and
  *   - it handles the ONE provider that has no API key to leak.
  *
  * It deliberately has no branch for Anthropic or OpenAI. Adding one would put a

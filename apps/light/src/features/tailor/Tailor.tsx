@@ -6,6 +6,7 @@ import {
   type ChatTransport,
   type FabricationFlag,
   type FabricationReport,
+  promptKeywordGaps,
 } from '@cviper/ai-providers';
 import {
   renderCoverLetter,
@@ -42,7 +43,7 @@ import {
   providerOptions,
   type ProviderOption,
 } from '../analysis/providers';
-import { type TailorHandoff } from '../flow/handoff';
+import { gapsForTailor, type HandedGaps, type TailorHandoff } from '../flow/handoff';
 
 import { lineDiff } from './diff';
 import { AtsStep } from './AtsStep';
@@ -197,6 +198,12 @@ export function Tailor({
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [applications, setApplications] = useState<readonly Application[]>([]);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
+  /**
+   * The Analysis result's keyword gaps, as handed over (L-202). Kept even when
+   * the user moves to another CV or edits the advert: `gapsForTailor` decides
+   * at each render whether they still apply, so going back brings them back.
+   */
+  const [handedGaps, setHandedGaps] = useState<HandedGaps | null>(null);
 
   const [options, setOptions] = useState<readonly ProviderOption[]>([]);
   const [optionKey, setOptionKey] = useState<string>('');
@@ -359,6 +366,7 @@ export function Tailor({
     if (handoff.optionKey !== null && optionByKey(options, handoff.optionKey) !== null) {
       setOptionKey(handoff.optionKey);
     }
+    setHandedGaps(handoff.keywordGaps ?? null);
     setResult(null);
     setReview(null);
     setLetter(null);
@@ -395,6 +403,15 @@ export function Tailor({
     [cvText, jobText, result],
   );
   const notes = profileNotes(profile);
+  /**
+   * The handed-over gaps, only while this is the CV and advert they were found
+   * for — cleaned and capped exactly as the prompt will carry them, so the
+   * note's count is the number the model sees. `null` when none are left.
+   */
+  const keywordGaps = useMemo(() => {
+    const sent = promptKeywordGaps(gapsForTailor(handedGaps, selectedCvId, jobText));
+    return sent.length === 0 ? null : sent;
+  }, [handedGaps, jobText, selectedCvId]);
   const jobTitle = selectedJob?.title ?? '';
 
   /** The fresh consent check every run module gets — the store, not a snapshot. */
@@ -410,7 +427,7 @@ export function Tailor({
       setPhase('tailoring');
 
       const run = await runTailor(
-        { option, cvText, jobText, profileNotes: notes },
+        { option, cvText, jobText, profileNotes: notes, keywordGaps },
         createTransport,
         hasConsent,
       );
@@ -436,7 +453,7 @@ export function Tailor({
       setReview(null);
       setLetter(null);
     },
-    [createTransport, cvText, hasConsent, jobText, notes],
+    [createTransport, cvText, hasConsent, jobText, keywordGaps, notes],
   );
 
   const performReview = useCallback(
@@ -840,6 +857,14 @@ export function Tailor({
                 ))}
               </select>
             </div>
+          )}
+
+          {keywordGaps === null ? null : (
+            <p data-testid="tailor-keyword-gaps-note" className="mt-1 text-xs text-ink-faint">
+              From your analysis: {keywordGaps.length} {keywordGaps.length === 1 ? 'word' : 'words'}{' '}
+              in the advert that your CV does not use yet. The draft uses them only where your CV
+              already shows the experience.
+            </p>
           )}
         </div>
 

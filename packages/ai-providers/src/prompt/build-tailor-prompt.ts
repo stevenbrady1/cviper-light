@@ -68,6 +68,19 @@ import {
  */
 export const MAX_PROFILE_NOTES_CHARS = 1500;
 
+/**
+ * How many of the Analysis result's keyword gaps reach the model (L-202).
+ *
+ * The same top-15 the keyword scorer already keeps (`ats.ts`). Fifteen short
+ * terms is a few hundred characters: the prompt still fits the 8k context a
+ * local model gets, with the 6,000 / 4,000 character CV and advert caps and
+ * the 4,096-token answer.
+ */
+export const MAX_PROMPT_KEYWORD_GAPS = 15;
+
+/** One gap is a word or a short phrase. Anything longer is a sentence, cut to size. */
+export const MAX_KEYWORD_GAP_CHARS = 60;
+
 export interface TailorPromptInput {
   readonly cvText: string;
   readonly jobText: string;
@@ -76,6 +89,15 @@ export interface TailorPromptInput {
    * `Profile.writing_style` and the like. `null` when the profile is empty.
    */
   readonly profileNotes: string | null;
+  /**
+   * The Analysis result's `keyword_gaps` (L-202): words in the advert that the
+   * CV does not use. Absent, `null` or empty when there is no analysis for
+   * this CV and this advert — and then the prompt has no section for them.
+   *
+   * NEVER `missing_skills`. Those are things the candidate cannot do; a
+   * prompt that listed them as words to use would be asking for fabrication.
+   */
+  readonly keywordGaps?: readonly string[] | null | undefined;
 }
 
 export interface TailorPrompt {
@@ -190,8 +212,72 @@ function notesFence(notes: string | null): string | null {
   return `=== CANDIDATE NOTES (how they write, what to emphasise) ===\n${cleaned}\n=== END CANDIDATE NOTES ===`;
 }
 
+/**
+ * A plain cut to `MAX_KEYWORD_GAP_CHARS`. Not `truncateForPrompt`: its
+ * "[truncated]" marker starts a new line, which inside this list would read
+ * as one more advert word. Never splits a surrogate pair.
+ */
+function cutGap(gap: string): string {
+  if (gap.length <= MAX_KEYWORD_GAP_CHARS) return gap;
+  let cut = MAX_KEYWORD_GAP_CHARS;
+  const last = gap.charCodeAt(cut - 1);
+  if (last >= 0xd800 && last <= 0xdbff) cut -= 1;
+  return gap.slice(0, cut).trim();
+}
+
+/**
+ * The gaps as they go into the prompt: one line each, cleaned, de-duplicated
+ * ignoring case, at most `MAX_PROMPT_KEYWORD_GAPS` of them, in the order given
+ * (the scorer's, most important first).
+ *
+ * Runs of `=` are removed as well as the sanitiser's patterns: a gap is one
+ * line inside our fence, and no word an advert asks for contains `===`.
+ */
+export function promptKeywordGaps(gaps: readonly string[] | null | undefined): string[] {
+  const kept: string[] = [];
+  const seen = new Set<string>();
+  for (const gap of gaps ?? []) {
+    const cleaned = cutGap(
+      sanitizeForPrompt(gap.replace(/={3,}/g, ' ')).replace(/\s+/g, ' ').trim(),
+    );
+    const key = cleaned.toLowerCase();
+    if (cleaned === '' || seen.has(key)) continue;
+    seen.add(key);
+    kept.push(cleaned);
+    if (kept.length === MAX_PROMPT_KEYWORD_GAPS) break;
+  }
+  return kept;
+}
+
+/**
+ * The gaps section, or `null` when there are none — an empty fence is an
+ * invitation for a small model to fill it in.
+ *
+ * ============================================================================
+ * "USE THE WORD WHERE IT IS TRUE" — NEVER "ADD THE SKILL"
+ * ============================================================================
+ * This is rule 11 (terminology alignment) with the advert's words picked out
+ * for the model, nothing more. The list is the scorer's view of what the CV
+ * does not SAY, not a judgement of what the candidate can DO, so the wording
+ * says outright that it is not evidence. Rule 3 still forbids importing an
+ * advert skill the CV does not show, and the fabrication check still runs on
+ * the answer.
+ */
+function keywordGapsSection(gaps: readonly string[] | null | undefined): string | null {
+  const kept = promptKeywordGaps(gaps);
+  if (kept.length === 0) return null;
+  return [
+    '=== ADVERT WORDS THE BASE CV DOES NOT USE (use one ONLY where the base CV already shows it) ===',
+    ...kept.map((gap) => `- ${gap}`),
+    '=== END ADVERT WORDS ===',
+    '',
+    'KEYWORD GAPS: the words above appear in the advert, and screening software will look for them, but the base CV does not use them. Apply rule 11 to each one: use the word ONLY where the base CV already shows the same experience in other words. Where it does not, leave the word out. This list is NOT evidence that the candidate has any of it — never add a skill, tool or qualification because it is listed.',
+  ].join('\n');
+}
+
 export function buildTailorPrompt(input: TailorPromptInput): TailorPrompt {
   const notes = notesFence(input.profileNotes);
+  const gaps = keywordGapsSection(input.keywordGaps);
 
   const user = [
     CRITICAL,
@@ -203,6 +289,7 @@ export function buildTailorPrompt(input: TailorPromptInput): TailorPrompt {
       input.jobText,
       MAX_JOB_CHARS,
     ),
+    ...(gaps === null ? [] : ['', gaps]),
     ...(notes === null ? [] : ['', notes]),
     '',
     SENIORITY_LADDER,

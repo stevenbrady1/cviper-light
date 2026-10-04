@@ -156,8 +156,11 @@ export {
 } from './follow-up';
 
 export {
+  MAX_KEYWORD_GAP_CHARS,
   MAX_PROFILE_NOTES_CHARS,
+  MAX_PROMPT_KEYWORD_GAPS,
   buildTailorPrompt,
+  promptKeywordGaps,
   type TailorPrompt,
   type TailorPromptInput,
 } from './prompt/build-tailor-prompt';

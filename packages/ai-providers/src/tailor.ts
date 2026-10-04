@@ -55,6 +55,11 @@ export interface TailorCvOptions {
   readonly jobText: string;
   /** The candidate's own notes on how they write. `null` for none. */
   readonly profileNotes: string | null;
+  /**
+   * The Analysis result's keyword gaps for THIS CV and THIS advert (L-202), or
+   * `null` / absent when there is no such analysis. Never `missing_skills`.
+   */
+  readonly keywordGaps?: readonly string[] | null | undefined;
   readonly maxOutputTokens?: number;
 }
 
@@ -78,6 +83,7 @@ export async function tailorCv(
     cvText: options.cvText,
     jobText: options.jobText,
     profileNotes: options.profileNotes,
+    keywordGaps: options.keywordGaps,
   });
 
   const result = await runStructuredCall<TailoredCv>({

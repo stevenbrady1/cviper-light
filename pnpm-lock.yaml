@@ -159,6 +159,9 @@ importers:
         specifier: workspace:*
         version: link:../cv-parsing
     devDependencies:
+      '@cviper/keyword-scoring':
+        specifier: workspace:*
+        version: link:../keyword-scoring
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0

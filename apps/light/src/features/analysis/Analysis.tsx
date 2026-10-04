@@ -57,7 +57,7 @@ import {
 } from './providers';
 import { runAnalysis } from './runAnalysis';
 import { createAnalysisSession, type AnalysisSession } from './session';
-import { type TailorHandoff } from '../flow/handoff';
+import { gapsFromAnalysis, type TailorHandoff } from '../flow/handoff';
 import { type ChatTransport } from '@cviper/ai-providers';
 
 /**
@@ -978,7 +978,17 @@ export function Analysis({
                   <button
                     type="button"
                     data-testid="analysis-to-tailor"
-                    onClick={() => onTailor({ jobId, jobText, cvId: selectedCvId, optionKey })}
+                    onClick={() =>
+                      onTailor({
+                        jobId,
+                        jobText,
+                        cvId: selectedCvId,
+                        optionKey,
+                        // The gaps this result found, for the advert it CHECKED
+                        // (L-202). Never `missing_skills`: see `gapsFromAnalysis`.
+                        keywordGaps: gapsFromAnalysis(result.analysis, selectedCvId, checkedAdvert),
+                      })
+                    }
                     className={SECONDARY_BUTTON}
                   >
                     Tailor my CV for this job
