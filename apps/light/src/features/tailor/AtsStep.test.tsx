@@ -8,7 +8,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { AtsStep } from './AtsStep';
-import { type AtsComparison } from './atsStep';
+import { type AtsComparison } from './atsComparison';
 
 const BASE: AtsComparison = {
   keyword: { before: 54, after: 81, delta: 27, beforeReason: null, afterReason: null },

@@ -46,7 +46,7 @@ import { type TailorHandoff } from '../flow/handoff';
 
 import { lineDiff } from './diff';
 import { AtsStep } from './AtsStep';
-import { compareAts } from './atsStep';
+import { compareAts } from './atsComparison';
 import { buildCoverLetterDocx, buildCvDocx } from './docx';
 import {
   LETTER_WORD_LIMIT,
@@ -1028,7 +1028,7 @@ export function Tailor({
             {/*
               The ATS Score step (L-198): this draft re-scored against the same
               advert, before → after, so the last thing read before saving is
-              whether tailoring helped. Pure and offline — see `atsStep.ts`.
+              whether tailoring helped. Pure and offline — see `atsComparison.ts`.
             */}
             {atsComparison === null ? null : (
               <AtsStep

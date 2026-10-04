@@ -3,7 +3,7 @@ import { atsBand } from '@cviper/keyword-scoring';
 
 import { ATS_BAND_TONE, ATS_BAND_WORD } from '../analysis/atsBandWords';
 
-import { type AtsComparison } from './atsStep';
+import { type AtsComparison } from './atsComparison';
 
 /**
  * The ATS Score step (L-198): the tailored CV, re-scored, before → after.

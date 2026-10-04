@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { compareAts, STILL_MISSING_MAX } from './atsStep';
+import { compareAts, STILL_MISSING_MAX } from './atsComparison';
 
 const ADVERT = [
   'Senior Data Analyst — Acme Ltd, Leeds',
