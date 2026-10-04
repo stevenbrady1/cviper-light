@@ -83,19 +83,75 @@ describe('encodeBase64 (L-165)', () => {
     expect(decodeBase64(encoded)).toEqual(all);
   });
 
+  // The encoder works in chunks of 3 * 8192 bytes. Each size here sits on one
+  // side of a chunk edge, and Node's own encoder is the reference: a chunk
+  // that dropped, repeated or padded a byte shows up as a different string.
+  it.each([
+    ['one byte short of a chunk', 3 * 8192 - 1],
+    ['exactly one chunk', 3 * 8192],
+    ['one byte past a chunk', 3 * 8192 + 1],
+    ['exactly two chunks', 2 * 3 * 8192],
+  ])('boundary: %s (%i bytes) matches the reference encoder', (_label, size) => {
+    const bytes = patterned(size);
+
+    const encoded = encodeBase64(bytes);
+
+    expect(firstDifference(encoded, Buffer.from(bytes).toString('base64'))).toBe(-1);
+  });
+
   it('boundary: a payload longer than one call-stack of arguments still round-trips', () => {
     // `String.fromCharCode(...bytes)` throws "Maximum call stack size
-    // exceeded" somewhere past 100k arguments, which is smaller than a Word
-    // document. The encoder must chunk.
-    const big = new Uint8Array(1_000_003);
-    for (let index = 0; index < big.length; index += 1) big[index] = (index * 31) & 0xff;
+    // exceeded" somewhere past 100k arguments (about 125k on Node 24), which
+    // is smaller than a Word document. The encoder must chunk. A million
+    // bytes is eight times past that limit.
+    const big = patterned(1_000_003);
 
     const encoded = encodeBase64(big);
 
     expect(encoded.length % 4).toBe(0);
-    expect(decodeBase64(encoded)).toEqual(big);
+    expect(firstDifference(encoded, Buffer.from(big).toString('base64'))).toBe(-1);
+    // NOT `toEqual(big)`: Vitest's deep equality walks a typed array one
+    // element at a time through its generic matcher, which took about 1.5 s
+    // for these million bytes — 97% of this test — and timed out at 15 s on a
+    // loaded machine (L-203). The encode itself takes about 35 ms.
+    expect(firstDifference(decodeBase64(encoded) ?? [], big)).toBe(-1);
+  });
+
+  it('negative: the comparison those boundaries rely on can fail', () => {
+    // A loop that always returned -1 would make every test above pass, so
+    // prove it sees one changed byte, a truncation and an empty result.
+    const reference = patterned(3 * 8192 + 1);
+    const flipped = reference.slice();
+    flipped[3 * 8192] = (reference[3 * 8192] ?? 0) ^ 1;
+
+    expect(firstDifference(flipped, reference)).toBe(3 * 8192);
+    expect(firstDifference(reference.subarray(0, 3 * 8192), reference)).toBe(3 * 8192);
+    expect(firstDifference([], reference)).toBe(0);
+    expect(firstDifference('Zm9v', 'Zm9v')).toBe(-1);
   });
 });
+
+/** `size` bytes that cycle through every value, so no byte goes untested. */
+function patterned(size: number): Uint8Array {
+  const bytes = new Uint8Array(size);
+  for (let index = 0; index < size; index += 1) bytes[index] = (index * 31) & 0xff;
+  return bytes;
+}
+
+/**
+ * The first index where two sequences differ, or -1 if they are identical.
+ *
+ * A plain loop, for payloads too big for `toEqual`. A length mismatch is a
+ * difference at the shorter length, so a truncated result is caught. The
+ * index is the failure message: it says where the output went wrong.
+ */
+function firstDifference(actual: ArrayLike<unknown>, expected: ArrayLike<unknown>): number {
+  const shorter = Math.min(actual.length, expected.length);
+  for (let index = 0; index < shorter; index += 1) {
+    if (actual[index] !== expected[index]) return index;
+  }
+  return actual.length === expected.length ? -1 : shorter;
+}
 
 describe('pickCv', () => {
   it('asks Rust to run the dialog, and never names a file', async () => {
