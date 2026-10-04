@@ -45,6 +45,8 @@ import {
 import { type TailorHandoff } from '../flow/handoff';
 
 import { lineDiff } from './diff';
+import { AtsStep } from './AtsStep';
+import { compareAts } from './atsComparison';
 import { buildCoverLetterDocx, buildCvDocx } from './docx';
 import {
   LETTER_WORD_LIMIT,
@@ -380,6 +382,18 @@ export function Tailor({
   const selectedCv = cvs.find((cv) => cv.id === selectedCvId) ?? null;
   const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? null;
   const cvText = selectedCv?.extracted_text ?? '';
+
+  /**
+   * The ATS Score step's numbers (L-198): the draft against the advert on
+   * screen, beside the original CV against the same advert. Recomputed only
+   * when one of the three changes — the scorers are synchronous, but a
+   * keystroke in the advert box should not re-score twice per render.
+   */
+  const atsComparison = useMemo(
+    () =>
+      result === null ? null : compareAts({ originalCv: cvText, tailoredCv: result.text, jobText }),
+    [cvText, jobText, result],
+  );
   const notes = profileNotes(profile);
   const jobTitle = selectedJob?.title ?? '';
 
@@ -1010,6 +1024,18 @@ export function Tailor({
                 ))}
               </ol>
             </details>
+
+            {/*
+              The ATS Score step (L-198): this draft re-scored against the same
+              advert, before → after, so the last thing read before saving is
+              whether tailoring helped. Pure and offline — see `atsComparison.ts`.
+            */}
+            {atsComparison === null ? null : (
+              <AtsStep
+                comparison={atsComparison}
+                fabrication={{ clean: result.report.clean, flagged: result.report.flagged.length }}
+              />
+            )}
 
             <div className="flex flex-wrap items-center gap-2">
               <button

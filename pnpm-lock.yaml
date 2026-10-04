@@ -46,6 +46,9 @@ importers:
       '@cviper/ai-providers':
         specifier: workspace:*
         version: link:../../packages/ai-providers
+      '@cviper/ats-checks':
+        specifier: workspace:*
+        version: link:../../packages/ats-checks
       '@cviper/core-types':
         specifier: workspace:*
         version: link:../../packages/core-types
@@ -159,6 +162,12 @@ importers:
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
+
+  packages/ats-checks:
+    dependencies:
+      '@cviper/keyword-scoring':
+        specifier: workspace:*
+        version: link:../keyword-scoring
 
   packages/core-types:
     dependencies:

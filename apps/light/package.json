@@ -16,6 +16,7 @@
     "@cviper/core-types": "workspace:*",
     "@cviper/cv-parsing": "workspace:*",
     "@cviper/job-apis": "workspace:*",
+    "@cviper/ats-checks": "workspace:*",
     "@cviper/keyword-scoring": "workspace:*",
     "@cviper/resume-schema": "workspace:*",
     "@cviper/ui": "workspace:*",

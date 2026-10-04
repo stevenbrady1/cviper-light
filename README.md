@@ -389,6 +389,7 @@ place the build is allowed to happen — see the hard rules in
 | `packages/ai-providers`    | BYO-key and local Ollama adapters           |
 | `packages/job-apis`        | Adzuna / Reed clients, keyless feeds, links |
 | `packages/cv-parsing`      | CV ingestion and extraction                 |
+| `packages/ats-checks`      | Text-only ATS readiness checks (L-198)      |
 | `packages/keyword-scoring` | The no-AI CV match                          |
 | `packages/resume-schema`   | JSON Resume: read, flatten, write back      |
 | `packages/ui`              | Shared presentational components            |
