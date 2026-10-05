@@ -155,6 +155,7 @@ const APPLICATION: Application = {
   next_action: 'Send the case study back',
   next_action_date: '2026-08-21',
   updated_at: '2026-08-19T09:10:00.000Z',
+  interview_substage_id: null,
 };
 
 const CV: Cv = {
@@ -309,7 +310,7 @@ describe('the migration column parser', () => {
 describe('every migration column is mapped in rows.ts', () => {
   const parsed = columnsFromMigration(MIGRATION_SQL);
 
-  it('creates exactly the six tables rows.ts knows about', () => {
+  it('creates exactly the seven tables rows.ts knows about', () => {
     expect(Object.keys(parsed).sort()).toEqual(Object.keys(TABLE_COLUMNS).sort());
   });
 

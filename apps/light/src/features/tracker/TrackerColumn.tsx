@@ -1,7 +1,10 @@
 import { useState } from 'react';
 
-import { type ApplicationStatus } from '@cviper/core-types';
+import { type ApplicationStatus, type InterviewSubstage } from '@cviper/core-types';
 
+import { QUIET_BUTTON } from '../../app/buttons';
+
+import { substageName } from './interviewSubstages';
 import { CARD_DRAG_TYPE, TrackerCard } from './TrackerCard';
 import { STATUS_LABELS, type TrackerEntry } from './model';
 
@@ -34,6 +37,10 @@ interface TrackerColumnProps {
   readonly now: Date;
   readonly selectedId: string | null;
   readonly settlingId: string | null;
+  /** The user's interview sub-stages (L-205). Only the Interviewing column shows them. */
+  readonly substages?: readonly InterviewSubstage[] | undefined;
+  /** Open the sub-stage editor. Only the Interviewing column draws the button. */
+  readonly onEditSubstages?: ((trigger: HTMLElement) => void) | undefined;
   readonly onSelect: (applicationId: string) => void;
   readonly onDropCard: (applicationId: string, status: ApplicationStatus) => void;
 }
@@ -45,6 +52,8 @@ export function TrackerColumn({
   now,
   selectedId,
   settlingId,
+  substages = [],
+  onEditSubstages,
   onSelect,
   onDropCard,
 }: TrackerColumnProps) {
@@ -86,11 +95,24 @@ export function TrackerColumn({
         <h2 className="font-mono text-[11px] font-medium tracking-[0.12em] text-ink-muted uppercase">
           {STATUS_LABELS[status]}
         </h2>
-        <span
-          data-testid={`tracker-count-${status}`}
-          className="font-mono text-xs tabular-nums text-ink-faint"
-        >
-          {entries.length}
+        <span className="flex items-baseline gap-2">
+          {status !== 'interviewing' || onEditSubstages === undefined ? null : (
+            <button
+              type="button"
+              data-testid="tracker-edit-substages"
+              aria-label={substages.length === 0 ? undefined : 'Edit interview stages'}
+              onClick={(event) => onEditSubstages(event.currentTarget)}
+              className={`${QUIET_BUTTON} text-xs`}
+            >
+              {substages.length === 0 ? 'Edit stages' : 'Stages'}
+            </button>
+          )}
+          <span
+            data-testid={`tracker-count-${status}`}
+            className="font-mono text-xs tabular-nums text-ink-faint"
+          >
+            {entries.length}
+          </span>
         </span>
       </header>
 
@@ -103,6 +125,11 @@ export function TrackerColumn({
               now={now}
               selected={entry.application.id === selectedId}
               settling={entry.application.id === settlingId}
+              substage={
+                status === 'interviewing'
+                  ? substageName(substages, entry.application.interview_substage_id)
+                  : null
+              }
               onSelect={onSelect}
             />
           </li>

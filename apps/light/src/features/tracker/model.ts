@@ -8,6 +8,7 @@
 import {
   type Application,
   type ApplicationStatus,
+  type InterviewSubstage,
   type IsoTimestamp,
   type Job,
   type SalaryPeriod,
@@ -415,8 +416,37 @@ export function withStatus(
       status === 'applied' && application.applied_date === null
         ? (toLocalIsoDate(new Date(now)) ?? application.applied_date)
         : application.applied_date,
+    // A sub-stage only means something inside Interviewing (L-205). A card
+    // that leaves it — or arrives — starts without one, so a card in Offer can
+    // never still say "Panel Round". Re-selecting the current column keeps it.
+    interview_substage_id:
+      status === 'interviewing' && application.status === 'interviewing'
+        ? (application.interview_substage_id ?? null)
+        : null,
     updated_at: now,
   };
+}
+
+/**
+ * Put a card in one of the user's interview sub-stages, or take it out of all
+ * of them with `null`.
+ *
+ * Only an Interviewing card can carry one, and only one that is in `substages`:
+ * anything else falls back to none rather than writing a label the board
+ * cannot show (and the database would refuse).
+ */
+export function withSubstage(
+  application: Application,
+  substageId: string | null,
+  substages: readonly InterviewSubstage[],
+  now: IsoTimestamp,
+): Application {
+  const valid =
+    substageId !== null &&
+    application.status === 'interviewing' &&
+    substages.some((substage) => substage.id === substageId);
+
+  return { ...application, interview_substage_id: valid ? substageId : null, updated_at: now };
 }
 
 /**

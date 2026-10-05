@@ -57,6 +57,7 @@ const FULL = {
   profile: null,
   jobs: [JOB],
   applications: [APPLICATION],
+  interview_substages: [],
   documents: [],
   cvs: [CV],
   analyses: [],

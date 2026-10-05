@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { type ApplicationStatus } from '@cviper/core-types';
+import {
+  ok,
+  type ApplicationStatus,
+  type InterviewSubstage,
+  type Result,
+} from '@cviper/core-types';
 
 import { type ChatTransport } from '@cviper/ai-providers';
 
@@ -17,9 +22,11 @@ import { type Availability } from '../analysis/providers';
 
 import { ApplicationDetail } from './ApplicationDetail';
 import { FunnelStrip } from './FunnelStrip';
+import { addSubstage, moveSubstage, removeSubstage, renameSubstage } from './interviewSubstages';
 import { NewApplicationForm } from './NewApplicationForm';
 import { type PageFetchTransport } from './pageFetch';
 import { PasteJobForm } from './PasteJobForm';
+import { SubstageEditor } from './SubstageEditor';
 import { TrackerColumn } from './TrackerColumn';
 import {
   TRACKER_COLUMNS,
@@ -27,6 +34,7 @@ import {
   groupByStatus,
   withEdit,
   withStatus,
+  withSubstage,
   type ApplicationDraft,
   type TrackerEntry,
 } from './model';
@@ -132,6 +140,7 @@ type Pane =
   | { kind: 'closed' }
   | { kind: 'new'; initial?: ApplicationDraft; notice?: string; fromPaste?: true }
   | { kind: 'paste' }
+  | { kind: 'substages' }
   | { kind: 'entry'; applicationId: string };
 
 export function Tracker({
@@ -162,6 +171,21 @@ export function Tracker({
   const loadRequest = useRef(0);
   const [pane, setPane] = useState<Pane>({ kind: 'closed' });
   const [settlingId, setSettlingId] = useState<string | null>(null);
+  /**
+   * The user's interview sub-stages (L-205), and whether they were READ.
+   *
+   * The second matters more than it looks. Saving replaces the stored list with
+   * this one, so editing after a failed read would write an empty list over the
+   * real one. Until `substagesLoaded`, nothing that edits them is offered.
+   */
+  const [substages, setSubstages] = useState<readonly InterviewSubstage[]>([]);
+  const [substagesLoaded, setSubstagesLoaded] = useState(false);
+  /** Why the list could not be read, or null. */
+  const [substagesFailed, setSubstagesFailed] = useState<string | null>(null);
+  const substagesRef = useRef<readonly InterviewSubstage[]>([]);
+  /** One sub-stage save at a time. A ref as well as state: the check must be synchronous. */
+  const savingSubstagesRef = useRef(false);
+  const [savingSubstages, setSavingSubstages] = useState(false);
   /**
    * What this machine can offer the detail pane's AI panels. `null` until the
    * first card is opened: the probe (Ollama's port, the credential store) is
@@ -219,6 +243,54 @@ export function Tracker({
       loadRequest.current += 1;
     };
   }, [loadEntries]);
+
+  const loadSubstages = useCallback(async () => {
+    setSubstagesFailed(null);
+    let message: string;
+    try {
+      const read = await trackerPort.substages();
+      if (read.ok) {
+        substagesRef.current = read.value;
+        setSubstages(read.value);
+        setSubstagesLoaded(true);
+        return;
+      }
+      message = read.error.message;
+    } catch (cause) {
+      // A port that cannot answer is the same as one that said no.
+      message = cause instanceof Error ? cause.message : String(cause);
+    }
+    // The board still works without them; only the editing is withheld.
+    setSubstagesFailed(message);
+  }, [trackerPort]);
+
+  useEffect(() => {
+    void loadSubstages();
+  }, [loadSubstages]);
+
+  /** Where focus goes back to when the stage editor closes. */
+  const editorOpener = useRef<HTMLElement | null>(null);
+  const previousPane = useRef<Pane['kind']>('closed');
+
+  const openSubstageEditor = useCallback((trigger: HTMLElement | null) => {
+    editorOpener.current = trigger;
+    setPane({ kind: 'substages' });
+  }, []);
+
+  useEffect(() => {
+    const was = previousPane.current;
+    previousPane.current = pane.kind;
+    if (was !== 'substages' || pane.kind === 'substages') return;
+    // The opener may have been the detail pane's button, which is gone by now:
+    // the column's own button is the next best place to land.
+    const opener = editorOpener.current;
+    editorOpener.current = null;
+    const target =
+      opener !== null && opener.isConnected
+        ? opener
+        : document.querySelector<HTMLElement>('[data-testid="tracker-edit-substages"]');
+    target?.focus();
+  }, [pane.kind]);
 
   const replace = useCallback((next: TrackerEntry) => {
     setEntries((current) =>
@@ -280,6 +352,110 @@ export function Tracker({
       void save(previous, next);
     },
     [entries, save],
+  );
+
+  const onSubstageChange = useCallback(
+    (applicationId: string, substageId: string | null) => {
+      const previous = entries.find((entry) => entry.application.id === applicationId);
+      if (previous === undefined) return;
+      if ((previous.application.interview_substage_id ?? null) === substageId) return;
+
+      const next: TrackerEntry = {
+        ...previous,
+        application: withSubstage(
+          previous.application,
+          substageId,
+          substagesRef.current,
+          new Date().toISOString(),
+        ),
+      };
+
+      void save(previous, next);
+    },
+    [entries, save],
+  );
+
+  /**
+   * Save a changed sub-stage list, optimistically, and answer with the reason
+   * if it did not stick (`null` when it did).
+   *
+   * `removedId` is the one sub-stage being taken away, if any. The database
+   * unsets it on every card that used it (`ON DELETE SET NULL`); the board does
+   * the same in memory so it does not have to reload to agree. On a failed
+   * save both go back, so the screen never shows a state the database refused.
+   */
+  const applySubstages = useCallback(
+    async (
+      change: Result<InterviewSubstage[], string>,
+      removedId: string | null = null,
+    ): Promise<string | null> => {
+      if (!change.ok) return change.error;
+      // Serial, because the save REPLACES the stored list: a second one built
+      // on a list the first has not confirmed can delete real stages.
+      if (savingSubstagesRef.current) return 'Wait for the current save to finish.';
+      savingSubstagesRef.current = true;
+      setSavingSubstages(true);
+
+      try {
+        const affected = new Set(
+          entries
+            .filter(
+              (entry) =>
+                removedId !== null && entry.application.interview_substage_id === removedId,
+            )
+            .map((entry) => entry.application.id),
+        );
+
+        substagesRef.current = change.value;
+        setSubstages(change.value);
+        if (removedId !== null) {
+          setEntries((current) =>
+            current.map((entry) =>
+              affected.has(entry.application.id)
+                ? { ...entry, application: { ...entry.application, interview_substage_id: null } }
+                : entry,
+            ),
+          );
+        }
+
+        const written = await trackerPort.saveSubstages(change.value);
+        if (written.ok) return null;
+
+        // FAILED. Do not restore a snapshot: ask the database what it holds. The
+        // write may have half landed, and a stale snapshot is what the next
+        // edit would build its delete on.
+        const [reread, reloaded] = await Promise.all([trackerPort.substages(), trackerPort.load()]);
+        if (reread.ok) {
+          substagesRef.current = reread.value;
+          setSubstages(reread.value);
+        } else {
+          // Could not ask the database what it holds. Do NOT fall back to the
+          // list from before the edit: that is exactly the stale picture the
+          // next save would delete against. Block editing until Retry works.
+          setSubstagesLoaded(false);
+          setSubstagesFailed(reread.error.message);
+        }
+        if (reloaded.ok) {
+          setEntries(reloaded.value);
+        } else if (removedId !== null) {
+          setEntries((current) =>
+            current.map((entry) =>
+              affected.has(entry.application.id)
+                ? {
+                    ...entry,
+                    application: { ...entry.application, interview_substage_id: removedId },
+                  }
+                : entry,
+            ),
+          );
+        }
+        return `That change could not be saved: ${written.error.message} Try again.`;
+      } finally {
+        savingSubstagesRef.current = false;
+        setSavingSubstages(false);
+      }
+    },
+    [entries, trackerPort],
   );
 
   const onCreate = useCallback(
@@ -409,6 +585,21 @@ export function Tracker({
         </div>
       )}
 
+      {substagesFailed === null ? null : (
+        <div
+          role="alert"
+          data-testid="tracker-substages-error"
+          className="flex items-center justify-between gap-3 border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
+        >
+          <span>
+            {`Your interview stages could not be read: ${substagesFailed} The board is shown without them.`}
+          </span>
+          <button type="button" className={SECONDARY_BUTTON} onClick={() => void loadSubstages()}>
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden p-2 md:p-4">
           {loading ? (
@@ -476,6 +667,8 @@ export function Tracker({
                     now={clock}
                     selectedId={selected?.application.id ?? null}
                     settlingId={settlingId}
+                    substages={substages}
+                    onEditSubstages={substagesLoaded ? openSubstageEditor : undefined}
                     onSelect={(applicationId) => setPane({ kind: 'entry', applicationId })}
                     onDropCard={onStatusChange}
                   />
@@ -509,6 +702,46 @@ export function Tracker({
               readAvailability={readAvailability}
               consentPort={consentPort}
             />
+          </DetailPane>
+        ) : pane.kind === 'substages' ? (
+          <DetailPane
+            title="Interview stages"
+            subtitle="Your own stages inside Interviewing, such as HR Screen or Final."
+            onClose={() => setPane({ kind: 'closed' })}
+          >
+            {!substagesLoaded ? (
+              <div data-testid="substage-blocked" className="space-y-3 text-ink-muted">
+                <p>
+                  Your interview stages need to load again before you can edit them, so nothing you
+                  change here can overwrite what is saved.
+                </p>
+                <button
+                  type="button"
+                  className={SECONDARY_BUTTON}
+                  onClick={() => void loadSubstages()}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <SubstageEditor
+                substages={substages}
+                busy={savingSubstages}
+                usage={(id) =>
+                  entries.filter((entry) => entry.application.interview_substage_id === id).length
+                }
+                onAdd={(name) =>
+                  applySubstages(addSubstage(substagesRef.current, name, crypto.randomUUID()))
+                }
+                onRename={(id, name) =>
+                  applySubstages(renameSubstage(substagesRef.current, id, name))
+                }
+                onMove={(id, direction) =>
+                  applySubstages(ok(moveSubstage(substagesRef.current, id, direction)))
+                }
+                onRemove={(id) => applySubstages(ok(removeSubstage(substagesRef.current, id)), id)}
+              />
+            )}
           </DetailPane>
         ) : pane.kind === 'new' ? (
           <DetailPane
@@ -562,6 +795,15 @@ export function Tracker({
               browser={browserPort}
               onEdit={(changes) => onEdit(selected.application.id, changes)}
               onStatusChange={(status) => onStatusChange(selected.application.id, status)}
+              substages={substages}
+              onSubstageChange={
+                substagesLoaded
+                  ? (substageId) => onSubstageChange(selected.application.id, substageId)
+                  : undefined
+              }
+              onEditSubstages={substagesLoaded ? openSubstageEditor : undefined}
+              substagesFailed={substagesFailed !== null}
+              onRetrySubstages={() => void loadSubstages()}
               onDelete={() => void onDelete(selected)}
               port={trackerPort}
               availability={availability ?? undefined}

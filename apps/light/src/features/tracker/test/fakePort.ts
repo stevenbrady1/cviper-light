@@ -3,6 +3,7 @@ import {
   ok,
   type Application,
   type Document,
+  type InterviewSubstage,
   type Profile,
   type Result,
 } from '@cviper/core-types';
@@ -42,11 +43,15 @@ export interface FakeTrackerSeed {
   readonly profile?: Profile | null;
   /** What `latestCvText` answers. `null` is "no parsed CV on this machine". */
   readonly cvText?: string | null;
+  /** The user's interview sub-stages, in display order. */
+  readonly substages?: readonly InterviewSubstage[];
 }
 
 export interface FakeTrackerPort extends TrackerPort {
   /** Everything currently "stored". */
   readonly entries: () => readonly TrackerEntry[];
+  /** The interview sub-stages currently "stored". */
+  readonly substageList: () => readonly InterviewSubstage[];
   /** Every document archived so far, in the order they were saved. */
   readonly documents: () => readonly Document[];
   /** Make the next call to the named method fail. */
@@ -69,6 +74,7 @@ export function createFakeTrackerPort(
   let documents: Document[] = [...(seed.documents ?? [])];
   const profile = seed.profile ?? null;
   const cvText = seed.cvText ?? null;
+  let substages: InterviewSubstage[] = [...(seed.substages ?? [])];
   const failing = new Set<string>();
   const calls: Record<PortMethod, number> = {
     load: 0,
@@ -79,6 +85,8 @@ export function createFakeTrackerPort(
     saveDocument: 0,
     profile: 0,
     latestCvText: 0,
+    substages: 0,
+    saveSubstages: 0,
   };
 
   function checkFailure(method: string): Result<void, DbError> | null {
@@ -91,6 +99,7 @@ export function createFakeTrackerPort(
     calls,
     entries: () => stored,
     documents: () => documents,
+    substageList: () => substages,
     failNext: (method) => failing.add(method),
 
     async load() {
@@ -147,6 +156,29 @@ export function createFakeTrackerPort(
       const failure = checkFailure('profile');
       if (failure !== null) return err(FAILURE);
       return ok(profile);
+    },
+
+    async substages() {
+      calls.substages += 1;
+      const failure = checkFailure('substages');
+      if (failure !== null) return err(FAILURE);
+      return ok([...substages]);
+    },
+
+    async saveSubstages(next: readonly InterviewSubstage[]) {
+      calls.saveSubstages += 1;
+      const failure = checkFailure('saveSubstages');
+      if (failure !== null) return failure;
+      substages = [...next];
+      // What `ON DELETE SET NULL` does in the real database: a card whose
+      // sub-stage is no longer in the list loses the label and nothing else.
+      const known = new Set(next.map((substage) => substage.id));
+      stored = stored.map((entry) => {
+        const id = entry.application.interview_substage_id;
+        if (id === undefined || id === null || known.has(id)) return entry;
+        return { ...entry, application: { ...entry.application, interview_substage_id: null } };
+      });
+      return ok(undefined);
     },
 
     async latestCvText() {

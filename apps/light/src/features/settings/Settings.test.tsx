@@ -58,6 +58,7 @@ const APPLICATION: Application = {
   next_action: 'Chase the recruiter',
   next_action_date: '2026-08-21',
   updated_at: '2026-08-02T09:00:00.000Z',
+  interview_substage_id: null,
 };
 
 const CV: Cv = {
@@ -106,6 +107,7 @@ const FULL = {
   profile: null,
   jobs: [JOB],
   applications: [APPLICATION],
+  interview_substages: [],
   documents: [],
   cvs: [CV],
   analyses: [],
@@ -510,6 +512,7 @@ describe('the round trip', () => {
       profile: null,
       jobs: [other],
       applications: [],
+      interview_substages: [],
       documents: [],
       cvs: [],
       analyses: [],

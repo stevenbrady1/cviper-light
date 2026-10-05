@@ -21,6 +21,7 @@ export {
   APPLICATION_COLUMNS,
   CV_COLUMNS,
   DOCUMENT_COLUMNS,
+  INTERVIEW_SUBSTAGE_COLUMNS,
   JOB_COLUMNS,
   PROFILE_COLUMNS,
   TABLE_COLUMNS,
@@ -45,6 +46,7 @@ export {
   upsertAnalysis,
   deleteAnalysis,
 } from './analyses';
+export { listInterviewSubstages, replaceInterviewSubstages } from './interviewSubstages';
 export { getProfile, upsertProfile } from './profile';
 export {
   listDocuments,

@@ -21,6 +21,7 @@ import {
   type Application,
   type Cv,
   type Document,
+  type InterviewSubstage,
   type Job,
   type Profile,
   type Result,
@@ -37,6 +38,8 @@ import {
   cvToValues,
   documentFromRow,
   documentToValues,
+  interviewSubstageFromRow,
+  interviewSubstageToValues,
   jobFromRow,
   jobToValues,
   mapRows,
@@ -59,6 +62,7 @@ export interface DbSnapshot {
   profile: Profile | null;
   jobs: Job[];
   applications: Application[];
+  interview_substages: InterviewSubstage[];
   documents: Document[];
   cvs: Cv[];
   analyses: Analysis[];
@@ -72,6 +76,8 @@ const SELECT_CVS = `${selectFrom('cvs')} ORDER BY id`;
 const SELECT_APPLICATIONS = `${selectFrom('applications')} ORDER BY id`;
 const SELECT_ANALYSES = `${selectFrom('analyses')} ORDER BY id`;
 const SELECT_DOCUMENTS = `${selectFrom('documents')} ORDER BY id`;
+// Display order, not id order: the export sorts them by position itself.
+const SELECT_INTERVIEW_SUBSTAGES = `${selectFrom('interview_substages')} ORDER BY position, id`;
 // One row, by its fixed id. No ORDER BY: there is nothing to order.
 const SELECT_PROFILE = `${selectFrom('profile')} WHERE id = $1`;
 
@@ -79,6 +85,7 @@ const UPSERT_JOB = upsertInto('jobs');
 const UPSERT_CV = upsertInto('cvs');
 const UPSERT_APPLICATION = upsertInto('applications');
 const UPSERT_DOCUMENT = upsertInto('documents');
+const UPSERT_INTERVIEW_SUBSTAGE = upsertInto('interview_substages');
 const UPSERT_ANALYSIS = upsertInto('analyses');
 const UPSERT_PROFILE = upsertInto('profile');
 
@@ -89,12 +96,19 @@ const UPSERT_PROFILE = upsertInto('profile');
  * need CVs and may reference jobs. The profile has no parent and no children
  * and is written last, inside the same transaction — see `writeAll`.
  */
-const WRITE_ORDER = ['jobs', 'cvs', 'applications', 'documents', 'analyses'] as const;
+const WRITE_ORDER = [
+  'jobs',
+  'cvs',
+  'interview_substages',
+  'applications',
+  'documents',
+  'analyses',
+] as const;
 
 /**
  * Read the whole database.
  *
- * All six reads happen inside ONE `withDb` section, so nothing the app does
+ * All seven reads happen inside ONE `withDb` section, so nothing the app does
  * elsewhere can land between them and produce a snapshot containing an
  * application whose job is missing, or a document whose application is.
  */
@@ -106,6 +120,7 @@ export async function readAll(): Promise<Result<DbSnapshot, DbError>> {
     analyses: await db.select<unknown[]>(SELECT_ANALYSES),
     documents: await db.select<unknown[]>(SELECT_DOCUMENTS),
     profile: await db.select<unknown[]>(SELECT_PROFILE, [PROFILE_ID]),
+    interviewSubstages: await db.select<unknown[]>(SELECT_INTERVIEW_SUBSTAGES),
   }));
   if (!raw.ok) return raw;
 
@@ -127,10 +142,14 @@ export async function readAll(): Promise<Result<DbSnapshot, DbError>> {
   const profiles = mapRows(raw.value.profile, profileFromRow);
   if (!profiles.ok) return profiles;
 
+  const interviewSubstages = mapRows(raw.value.interviewSubstages, interviewSubstageFromRow);
+  if (!interviewSubstages.ok) return interviewSubstages;
+
   return ok({
     profile: profiles.value[0] ?? null,
     jobs: jobs.value,
     applications: applications.value,
+    interview_substages: interviewSubstages.value,
     documents: documents.value,
     cvs: cvs.value,
     analyses: analyses.value,
@@ -182,6 +201,10 @@ export async function writeAll(snapshot: DbSnapshot): Promise<Result<void, DbErr
     applications: {
       sql: UPSERT_APPLICATION,
       rows: snapshot.applications.map(applicationToValues),
+    },
+    interview_substages: {
+      sql: UPSERT_INTERVIEW_SUBSTAGE,
+      rows: snapshot.interview_substages.map(interviewSubstageToValues),
     },
     documents: { sql: UPSERT_DOCUMENT, rows: snapshot.documents.map(documentToValues) },
     analyses: { sql: UPSERT_ANALYSIS, rows: analyses },

@@ -32,6 +32,11 @@
  * `profile` (L-154) and `documents` (L-155) arrived after v1 shipped, as
  * `cvs.json_resume` did before them. Both are ADDITIVE: a file without the
  * keys imports as "no profile, no documents", so the version stays 1.
+ *
+ * `interview_substages` (a top-level list) and `applications[].interview_substage_id`
+ * (L-205) are the same kind of addition: optional, so a file without them
+ * imports as "no sub-stages" and the version stays 1. A reader that predates
+ * them keeps the unknown keys in `__extra` rather than refusing the file.
  */
 import { z } from './zod';
 
@@ -40,6 +45,8 @@ import {
   ApplicationSchema,
   CvSchema,
   DocumentSchema,
+  INTERVIEW_SUBSTAGES_IMPORT_MAX,
+  InterviewSubstageSchema,
   JobSchema,
   ProfileSchema,
   type Analysis,
@@ -47,6 +54,7 @@ import {
   type Cv,
   type Document,
   type ExtraFields,
+  type InterviewSubstage,
   type Job,
   type Profile,
 } from './entities';
@@ -91,6 +99,8 @@ export interface BackupPayload {
   profile: Profile | null;
   jobs: Job[];
   applications: Application[];
+  /** Empty when the file predates L-205. */
+  interview_substages?: InterviewSubstage[] | undefined;
   /** Empty when the file predates L-155. */
   documents: Document[];
   cvs: Cv[];
@@ -146,6 +156,7 @@ const TOP_LEVEL_FIELDS = [
   'profile',
   'jobs',
   'applications',
+  'interview_substages',
   'documents',
   'cvs',
   'analyses',
@@ -259,9 +270,26 @@ function emitApplication(application: Application): Record<string, unknown> {
       next_action: application.next_action,
       next_action_date: application.next_action_date,
       updated_at: application.updated_at,
+      interview_substage_id: application.interview_substage_id ?? null,
     },
     application.__extra,
   );
+}
+
+function emitInterviewSubstage(substage: InterviewSubstage): Record<string, unknown> {
+  return withExtras(
+    { id: substage.id, name: substage.name, position: substage.position },
+    substage.__extra,
+  );
+}
+
+/** By position, with `id` as the tie-break so equal positions export stably. */
+function byPosition(items: readonly InterviewSubstage[]): InterviewSubstage[] {
+  return [...items].sort((left, right) => {
+    if (left.position !== right.position) return left.position - right.position;
+    if (left.id < right.id) return -1;
+    return left.id > right.id ? 1 : 0;
+  });
 }
 
 function emitCv(cv: Cv): Record<string, unknown> {
@@ -372,6 +400,7 @@ export function exportBackup(payload: BackupPayload): string {
       profile: payload.profile === null ? null : emitProfile(payload.profile),
       jobs: byId(payload.jobs).map(emitJob),
       applications: byId(payload.applications).map(emitApplication),
+      interview_substages: byPosition(payload.interview_substages ?? []).map(emitInterviewSubstage),
       documents: byId(payload.documents).map(emitDocument),
       cvs: byId(payload.cvs).map(emitCv),
       analyses: byId(payload.analyses).map(emitAnalysis),
@@ -494,6 +523,68 @@ function readOptionalCollection<TSchema extends z.ZodObject>(
 }
 
 /**
+ * The user's interview sub-stages (L-205). Absent reads as none.
+ *
+ * Held to more than the plain collection check: at most `INTERVIEW_SUBSTAGES_IMPORT_MAX`
+ * of them (a sanity bound, NOT the editor's limit of 20: a merge import can
+ * leave the app with more, and anything the app can export must import), and no two sharing an id (the id is what cards point at, so a
+ * repeated one would make "which sub-stage" ambiguous). Two with the same NAME
+ * are allowed — they are distinguishable by id and harmless; only the editor
+ * refuses to create them.
+ */
+function readInterviewSubstages(
+  document: Record<string, unknown>,
+): Result<InterviewSubstage[], BackupError> {
+  const records = readOptionalCollection(document, 'interview_substages', InterviewSubstageSchema);
+  if (!records.ok) return records;
+
+  if (records.value.length > INTERVIEW_SUBSTAGES_IMPORT_MAX) {
+    return err({
+      code: 'INVALID_RECORD',
+      message: `A backup may hold at most ${INTERVIEW_SUBSTAGES_IMPORT_MAX} interview stages, but this file has ${records.value.length}.`,
+      path: 'interview_substages',
+    });
+  }
+
+  const seen = new Set<string>();
+  for (const [index, substage] of records.value.entries()) {
+    if (seen.has(substage.id)) {
+      return err({
+        code: 'INVALID_RECORD',
+        message: `interview_substages[${index}] repeats the id "${substage.id}". Every sub-stage needs its own id.`,
+        path: `interview_substages[${index}].id`,
+      });
+    }
+    seen.add(substage.id);
+  }
+
+  return ok(records.value);
+}
+
+/**
+ * Take a sub-stage off every card that cannot honestly carry one: a card that
+ * is not Interviewing, or one naming a sub-stage this file does not define.
+ *
+ * SANITISED, not rejected. Both can only come from a hand-edited file (the app
+ * never writes either), and refusing a whole backup over a dangling label would
+ * cost the user everything else in it. A dangling id would also fail the
+ * foreign key on write and roll the entire import back.
+ */
+function sanitiseSubstages(
+  applications: Application[],
+  substages: readonly InterviewSubstage[],
+): Application[] {
+  const known = new Set(substages.map((substage) => substage.id));
+
+  return applications.map((application) => {
+    const id = application.interview_substage_id;
+    if (id === undefined || id === null) return application;
+    if (application.status === 'interviewing' && known.has(id)) return application;
+    return { ...application, interview_substage_id: null };
+  });
+}
+
+/**
  * The single profile record, or `null`.
  *
  * Absent and `null` mean the same thing: no profile. A file written before
@@ -567,6 +658,9 @@ export function importBackup(raw: unknown): Result<BackupPayload, BackupError> {
   const applications = readCollection(document.value, 'applications', ApplicationSchema);
   if (!applications.ok) return err(applications.error);
 
+  const substages = readInterviewSubstages(document.value);
+  if (!substages.ok) return err(substages.error);
+
   const documents = readOptionalCollection(document.value, 'documents', DocumentSchema);
   if (!documents.ok) return err(documents.error);
 
@@ -585,7 +679,8 @@ export function importBackup(raw: unknown): Result<BackupPayload, BackupError> {
     app,
     profile: profile.value,
     jobs: jobs.value,
-    applications: applications.value,
+    applications: sanitiseSubstages(applications.value, substages.value),
+    interview_substages: substages.value,
     documents: documents.value,
     cvs: cvs.value,
     analyses: analyses.value,
