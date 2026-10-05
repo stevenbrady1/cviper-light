@@ -466,3 +466,26 @@ describe('atsKeywordScore — the number on its own (L-196)', () => {
     expect(atsKeywordScore('a'.repeat(MIN_SCORABLE_CHARS), ADVERT_TEXT).ok).toBe(true);
   });
 });
+
+describe('boilerplate in the advert (L-205)', () => {
+  const cv =
+    'Credit risk analyst, eight years in London banking. SQL, Python, Basel III, stress testing.';
+  const body =
+    'Credit Risk Analyst\n\nYou will build SQL models, run stress tests and use Python for Basel III reporting.\n\nRequirements\n- Five years in a UK bank\n- IFRS 9 impairment experience';
+  const eo =
+    'We are an equal opportunities employer and welcome applications from all suitable candidates regardless of age, gender, race, religion or disability.';
+  const cookie =
+    'We use cookies to improve your experience. Accept all cookies or manage your cookie settings.';
+
+  it('scores the same with or without a cookie banner and diversity footer', () => {
+    const clean = scoreByKeywords(cv, body);
+    const noisy = scoreByKeywords(cv, `${cookie}\n\n${body}\n\n${eo}`);
+    expect(clean.ok && noisy.ok).toBe(true);
+    if (!clean.ok || !noisy.ok) return;
+    expect(noisy.value).toEqual(clean.value);
+  });
+
+  it('gives the same ATS keyword score with or without boilerplate', () => {
+    expect(atsKeywordScore(cv, `${cookie}\n\n${body}\n\n${eo}`)).toEqual(atsKeywordScore(cv, body));
+  });
+});

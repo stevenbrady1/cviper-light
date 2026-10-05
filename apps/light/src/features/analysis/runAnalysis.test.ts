@@ -236,3 +236,57 @@ describe('runAnalysis — the ATS keyword number (L-196)', () => {
     expect(ai.ok).toBe(false);
   });
 });
+
+describe('runAnalysis - boilerplate is stripped from the advert before analysis (L-205)', () => {
+  const COOKIE =
+    'We use cookies to improve your experience. Accept all cookies or manage your cookie settings.';
+  const EO =
+    'We are an equal opportunities employer and welcome applications from all suitable candidates regardless of age, gender, race, religion or disability.';
+  const NOISY_ADVERT = `${COOKIE}\n\n${ADVERT}\n\nRequirements\n- Five years in a UK bank\n- Basel III knowledge\n\n${EO}`;
+
+  it('sends the model the advert without the cookie notice and diversity statement', async () => {
+    const bodies: string[] = [];
+    const run = await runAnalysis({ option: OLLAMA, cvText: CV, jobText: NOISY_ADVERT }, () =>
+      fakeTransport((body) => {
+        bodies.push(body);
+        return ok(ollamaEnvelope(modelReply()));
+      }),
+    );
+
+    expect(run.ok).toBe(true);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toContain('IFRS 9 impairment');
+    expect(bodies[0]).not.toContain('cookie');
+    expect(bodies[0]).not.toContain('equal opportunities');
+  });
+
+  it('negative: an advert with no boilerplate reaches the model untouched', async () => {
+    const bodies: string[] = [];
+    await runAnalysis({ option: OLLAMA, cvText: CV, jobText: ADVERT }, () =>
+      fakeTransport((body) => {
+        bodies.push(body);
+        return ok(ollamaEnvelope(modelReply()));
+      }),
+    );
+
+    expect(bodies[0]).toContain(ADVERT);
+  });
+
+  it('the basic match gives the same result with or without the boilerplate', async () => {
+    const clean = await runAnalysis({ option: BASIC, cvText: CV, jobText: ADVERT }, vi.fn());
+    const noisy = await runAnalysis({ option: BASIC, cvText: CV, jobText: NOISY_ADVERT }, vi.fn());
+    const plain = await runAnalysis(
+      {
+        option: BASIC,
+        cvText: CV,
+        jobText: `${ADVERT}\n\nRequirements\n- Five years in a UK bank\n- Basel III knowledge`,
+      },
+      vi.fn(),
+    );
+
+    expect(clean.ok && noisy.ok && plain.ok).toBe(true);
+    if (!noisy.ok || !plain.ok) return;
+    expect(noisy.value.analysis).toEqual(plain.value.analysis);
+    expect(noisy.value.atsKeywordScore).toBe(plain.value.atsKeywordScore);
+  });
+});

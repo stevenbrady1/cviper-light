@@ -183,3 +183,19 @@ describe('describeGaps', () => {
     );
   });
 });
+
+describe('skillGaps - boilerplate (L-205)', () => {
+  it('does not report a skill that only the diversity footer or agency footer names', () => {
+    const body =
+      'Credit Risk Analyst\n\nYou will build SQL models and run stress tests.\n\nRequirements\n- Five years in a UK bank\n- Python and Basel III\n\nBenefits\n25 days holiday and a pension.';
+    const footer =
+      'We are an equal opportunities employer. Acorn Search Ltd is acting as an employment agency. By applying you agree to our privacy policy and GDPR compliance terms. Registered in England No. 01234567.';
+    const plain = skillGaps({ cvText: 'Chef', jobs: [job('a', body)] });
+    const noisy = skillGaps({
+      cvText: 'Chef',
+      jobs: [job('a', `${[body, footer].join(String.fromCharCode(10, 10))}`)],
+    });
+    expect(noisy).toEqual(plain);
+    expect(noisy.map((gap) => gap.skill)).not.toContain('gdpr');
+  });
+});

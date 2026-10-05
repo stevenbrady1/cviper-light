@@ -31,7 +31,12 @@
  * exported so the panel's "3 of 7 adverts" uses the same 7.
  */
 import { type Job } from '@cviper/core-types';
-import { MAX_TEXT_LENGTH, buildJobPosting, cvCoversTerm } from '@cviper/keyword-scoring';
+import {
+  MAX_TEXT_LENGTH,
+  buildJobPosting,
+  cvCoversTerm,
+  stripJobBoilerplate,
+} from '@cviper/keyword-scoring';
 
 /**
  * How many rows the panel shows. Past this the list stops being a heatmap and
@@ -89,7 +94,7 @@ export function skillGaps({ cvText, jobs }: SkillGapsInput): SkillGap[] {
     // `keySkills` is already one entry per term, so an advert that repeats a
     // skill five times contributes one. The Set is belt and braces against a
     // future scanner that stops de-duplicating.
-    const named = new Set(buildJobPosting(job.description ?? '').keySkills);
+    const named = new Set(buildJobPosting(stripJobBoilerplate(job.description ?? '')).keySkills);
     for (const skill of named) {
       if (cvCovers(skill)) continue;
       wantedBy.set(skill, (wantedBy.get(skill) ?? 0) + 1);
