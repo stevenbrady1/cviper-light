@@ -110,12 +110,19 @@ function newMetrics(original: string, draft: string): string[] {
 /**
  * Check a tailored CV against the text it was supposed to come from.
  *
+ * `userSuppliedFacts` (L-205) are text the candidate typed and approved. Only
+ * their figures count as known; see the metrics step.
+ *
  * Boundary: an EMPTY original flags everything, because nothing can be
  * supported by nothing. That is the right answer — a tailored CV produced
  * from a CV with no readable text is invented from top to bottom — and the
  * view never gets that far, because the run button refuses a CV with no text.
  */
-export function checkFabrication(originalCvText: string, cv: TailoredCv): FabricationReport {
+export function checkFabrication(
+  originalCvText: string,
+  cv: TailoredCv,
+  userSuppliedFacts: readonly string[] = [],
+): FabricationReport {
   const original = normalise(originalCvText);
   const originalYears = yearsIn(originalCvText);
   const flagged: FabricationFlag[] = [];
@@ -155,7 +162,11 @@ export function checkFabrication(originalCvText: string, cv: TailoredCv): Fabric
   // Over the RENDERED text, so a number anywhere — summary, skills, a bullet,
   // an education line — is caught. A year already flagged as a date is not
   // repeated as a metric; it is one invention, not two.
-  for (const metric of newMetrics(originalCvText, renderTailoredCv(cv, null))) {
+  // Figures the candidate typed and approved (L-205) are theirs, so they are
+  // known to the METRIC check only. Employers, years and certifications above
+  // were compared with the CV alone: typing one cannot make it pass.
+  const metricSource = [originalCvText, ...userSuppliedFacts].join('\n');
+  for (const metric of newMetrics(metricSource, renderTailoredCv(cv, null))) {
     if (flaggedYears.has(metric)) continue;
     flagged.push({ kind: 'metric', text: metric });
   }

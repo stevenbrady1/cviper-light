@@ -81,6 +81,23 @@ export const MAX_PROMPT_KEYWORD_GAPS = 15;
 /** One gap is a word or a short phrase. Anything longer is a sentence, cut to size. */
 export const MAX_KEYWORD_GAP_CHARS = 60;
 
+/**
+ * How many user-supplied achievements reach the model (L-205), and how long
+ * each may be. Small on purpose: these are one-line metrics the candidate
+ * typed against a keyword gap, and the list is bounded by the gap cap anyway.
+ */
+export const MAX_USER_METRICS = MAX_PROMPT_KEYWORD_GAPS;
+export const MAX_USER_METRIC_CHARS = 300;
+
+/**
+ * One achievement the candidate typed for one keyword gap AND explicitly
+ * approved (L-205). Never generated, never pre-filled.
+ */
+export interface UserSuppliedMetric {
+  readonly skill: string;
+  readonly text: string;
+}
+
 export interface TailorPromptInput {
   readonly cvText: string;
   readonly jobText: string;
@@ -98,6 +115,12 @@ export interface TailorPromptInput {
    * prompt that listed them as words to use would be asking for fabrication.
    */
   readonly keywordGaps?: readonly string[] | null | undefined;
+  /**
+   * Achievements the candidate typed and approved (L-205). Absent, `null` or
+   * empty means no section. They are USER-SUPPLIED FACTS: the model may use
+   * them as written and may not embellish them.
+   */
+  readonly userMetrics?: readonly UserSuppliedMetric[] | null | undefined;
 }
 
 export interface TailorPrompt {
@@ -275,9 +298,70 @@ function keywordGapsSection(gaps: readonly string[] | null | undefined): string 
   ].join('\n');
 }
 
+/** One line of user text, cleaned: no fence-breaking runs, no newlines, capped. */
+function cleanOneLine(text: string, max: number): string {
+  const cleaned = sanitizeForPrompt(text.replace(/={3,}/g, ' ')).replace(/\s+/g, ' ').trim();
+  if (cleaned.length <= max) return cleaned;
+  let cut = max;
+  const last = cleaned.charCodeAt(cut - 1);
+  if (last >= 0xd800 && last <= 0xdbff) cut -= 1;
+  return cleaned.slice(0, cut).trim();
+}
+
+/**
+ * The approved achievements as they go into the prompt: cleaned to one line,
+ * blank entries dropped, one per skill (first wins, ignoring case), at most
+ * `MAX_USER_METRICS` of them.
+ */
+export function promptUserMetrics(
+  metrics: readonly UserSuppliedMetric[] | null | undefined,
+): UserSuppliedMetric[] {
+  const kept: UserSuppliedMetric[] = [];
+  const seen = new Set<string>();
+  for (const metric of metrics ?? []) {
+    const skill = cleanOneLine(metric.skill, MAX_KEYWORD_GAP_CHARS);
+    const text = cleanOneLine(metric.text, MAX_USER_METRIC_CHARS);
+    const key = skill.toLowerCase();
+    if (skill === '' || text === '' || seen.has(key)) continue;
+    seen.add(key);
+    kept.push({ skill, text });
+    if (kept.length === MAX_USER_METRICS) break;
+  }
+  return kept;
+}
+
+/**
+ * The user-supplied achievements section, or `null` when there are none.
+ *
+ * ============================================================================
+ * FACTS THE USER TYPED - USE THEM, NEVER GROW THEM
+ * ============================================================================
+ * Rule 1 and rule 12 say no number may be introduced that the base CV does not
+ * hold. This section is the one stated exception, and it is narrow: only the
+ * words and figures between the markers, only because the candidate typed and
+ * approved them, and nothing around them (employer, date, qualification, a
+ * rounder or bigger number) comes with them. The section is marked
+ * USER-SUPPLIED so the model, and anyone reading the payload, can tell them
+ * from the CV.
+ */
+function userMetricsSection(
+  metrics: readonly UserSuppliedMetric[] | null | undefined,
+): string | null {
+  const kept = promptUserMetrics(metrics);
+  if (kept.length === 0) return null;
+  return [
+    '=== CANDIDATE-SUPPLIED ACHIEVEMENTS (USER-SUPPLIED FACTS, approved by the candidate) ===',
+    ...kept.map((metric) => `- [${metric.skill}] ${metric.text}`),
+    '=== END CANDIDATE-SUPPLIED ACHIEVEMENTS ===',
+    '',
+    'USER-SUPPLIED FACTS: the lines above were typed by the candidate, each against one advert word, and approved for use. They are true statements about the candidate, though not part of the base CV. You MAY use one, exactly as given, in a bullet or the summary, where the base CV shows related work. Do not embellish them: do not change, round or enlarge a number, and do not add detail, scope, a result or a timeframe they do not state. Never add an employer, date, qualification or number that is not in the base CV or in these lines. If a line does not fit anywhere the base CV supports, leave it out.',
+  ].join('\n');
+}
+
 export function buildTailorPrompt(input: TailorPromptInput): TailorPrompt {
   const notes = notesFence(input.profileNotes);
   const gaps = keywordGapsSection(input.keywordGaps);
+  const userMetrics = userMetricsSection(input.userMetrics);
 
   const user = [
     CRITICAL,
@@ -290,6 +374,7 @@ export function buildTailorPrompt(input: TailorPromptInput): TailorPrompt {
       MAX_JOB_CHARS,
     ),
     ...(gaps === null ? [] : ['', gaps]),
+    ...(userMetrics === null ? [] : ['', userMetrics]),
     ...(notes === null ? [] : ['', notes]),
     '',
     SENIORITY_LADDER,

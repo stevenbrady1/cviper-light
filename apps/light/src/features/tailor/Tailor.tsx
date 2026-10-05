@@ -46,6 +46,13 @@ import {
 import { gapsForTailor, type HandedGaps, type TailorHandoff } from '../flow/handoff';
 
 import { lineDiff } from './diff';
+import { MetricPromptBoxes } from './MetricPromptBoxes';
+import {
+  EMPTY_METRIC_STATE,
+  approvedMetrics,
+  metricPromptsForGaps,
+  type MetricState,
+} from './metricPrompts';
 import { AtsStep } from './AtsStep';
 import { compareAts } from './atsComparison';
 import { buildCoverLetterDocx, buildCvDocx } from './docx';
@@ -204,6 +211,8 @@ export function Tailor({
    * at each render whether they still apply, so going back brings them back.
    */
   const [handedGaps, setHandedGaps] = useState<HandedGaps | null>(null);
+  /** What the user typed against each gap, and whether they approved it (L-205). */
+  const [metricState, setMetricState] = useState<MetricState>(EMPTY_METRIC_STATE);
 
   const [options, setOptions] = useState<readonly ProviderOption[]>([]);
   const [optionKey, setOptionKey] = useState<string>('');
@@ -367,6 +376,7 @@ export function Tailor({
       setOptionKey(handoff.optionKey);
     }
     setHandedGaps(handoff.keywordGaps ?? null);
+    setMetricState(EMPTY_METRIC_STATE);
     setResult(null);
     setReview(null);
     setLetter(null);
@@ -412,6 +422,13 @@ export function Tailor({
     const sent = promptKeywordGaps(gapsForTailor(handedGaps, selectedCvId, jobText));
     return sent.length === 0 ? null : sent;
   }, [handedGaps, jobText, selectedCvId]);
+  /** One question per gap on screen; the same words the prompt carries. */
+  const metricPrompts = useMemo(() => metricPromptsForGaps(keywordGaps), [keywordGaps]);
+  /** Approved only, and only for gaps still on screen. Typed text never gets here. */
+  const userMetrics = useMemo(
+    () => approvedMetrics(metricState, metricPrompts),
+    [metricPrompts, metricState],
+  );
   const jobTitle = selectedJob?.title ?? '';
 
   /** The fresh consent check every run module gets — the store, not a snapshot. */
@@ -427,7 +444,7 @@ export function Tailor({
       setPhase('tailoring');
 
       const run = await runTailor(
-        { option, cvText, jobText, profileNotes: notes, keywordGaps },
+        { option, cvText, jobText, profileNotes: notes, keywordGaps, userMetrics },
         createTransport,
         hasConsent,
       );
@@ -445,7 +462,13 @@ export function Tailor({
         cv: run.value.cv,
         text,
         // Deterministic, on the original text, before anything is shown.
-        report: checkFabrication(cvText, run.value.cv),
+        // The figures the user typed and approved are theirs (L-205); the
+        // employer, year and certification checks still use the CV alone.
+        report: checkFabrication(
+          cvText,
+          run.value.cv,
+          userMetrics.map((metric) => metric.text),
+        ),
         provider: run.value.provider,
         model: run.value.model,
         retried: run.value.retried,
@@ -453,7 +476,7 @@ export function Tailor({
       setReview(null);
       setLetter(null);
     },
-    [createTransport, cvText, hasConsent, jobText, keywordGaps, notes],
+    [createTransport, cvText, hasConsent, jobText, keywordGaps, notes, userMetrics],
   );
 
   const performReview = useCallback(
@@ -866,6 +889,11 @@ export function Tailor({
               already shows the experience.
             </p>
           )}
+          <MetricPromptBoxes
+            prompts={metricPrompts}
+            state={metricState}
+            onChange={setMetricState}
+          />
         </div>
 
         {/* ── 3. How to run it ────────────────────────────────────────── */}
