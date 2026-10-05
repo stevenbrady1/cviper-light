@@ -103,7 +103,7 @@ describe('the card', () => {
     expect(screen.queryByTestId('tracker-card-substage-two')).toBeNull();
     // Said in words for a screen reader too, not only drawn.
     expect(screen.getByTestId('tracker-card-one').getAttribute('aria-label')).toContain(
-      'Technical Test',
+      'Stage: Technical Test',
     );
   });
 
@@ -246,7 +246,7 @@ describe('the sub-stage editor', () => {
     expect(port.substageList()).toHaveLength(3);
   });
 
-  it('boundary: at the maximum, adding is refused with the reason', async () => {
+  it('boundary: at the maximum, Add is disabled and the reason is on screen', async () => {
     const user = userEvent.setup();
     const full = Array.from({ length: INTERVIEW_SUBSTAGES_MAX }, (_, index) => ({
       id: `s-${index}`,
@@ -258,7 +258,8 @@ describe('the sub-stage editor', () => {
 
     await user.type(within(editor).getByLabelText('New interview stage'), 'One more{Enter}');
 
-    expect((await screen.findByTestId('substage-error')).textContent).toContain(
+    expect((within(editor).getByTestId('substage-add') as HTMLButtonElement).disabled).toBe(true);
+    expect(within(editor).getByTestId('substage-limit').textContent).toContain(
       String(INTERVIEW_SUBSTAGES_MAX),
     );
     expect(port.substageList()).toHaveLength(INTERVIEW_SUBSTAGES_MAX);
@@ -277,7 +278,7 @@ describe('the sub-stage editor', () => {
     expect(screen.getByTestId('tracker-card-substage-one').textContent).toBe('Coding Exercise');
   });
 
-  it('refuses to rename to an empty name, and puts the old name back', async () => {
+  it('refuses an empty rename, keeps the draft with the reason on its row, and Escape reverts', async () => {
     const user = userEvent.setup();
     const port = await renderBoard([entry('one')]);
     const editor = await openEditor(user);
@@ -286,9 +287,17 @@ describe('the sub-stage editor', () => {
     await user.clear(input);
     await user.keyboard('{Enter}');
 
-    expect((await screen.findByTestId('substage-error')).textContent).toMatch(/name/i);
+    const reason = await screen.findByTestId('substage-row-error-sub-a');
+    expect(reason.textContent).toMatch(/name/i);
     expect(port.substageList()[0]?.name).toBe('HR Screen');
+    // The draft is kept, wired to its message for assistive technology.
+    expect((input as HTMLInputElement).value).toBe('');
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(input.getAttribute('aria-describedby')).toContain(reason.id);
+
+    await user.keyboard('{Escape}');
     expect((input as HTMLInputElement).value).toBe('HR Screen');
+    expect(screen.queryByTestId('substage-row-error-sub-a')).toBeNull();
   });
 
   it('reorders with real buttons, and the first cannot go up nor the last down', async () => {
@@ -322,6 +331,7 @@ describe('the sub-stage editor', () => {
     const editor = await openEditor(user);
 
     await user.click(within(editor).getByRole('button', { name: 'Remove Technical Test' }));
+    await user.click(await screen.findByTestId('substage-confirm-remove'));
 
     await waitFor(() => expect(port.substageList().map((s) => s.id)).toEqual(['sub-a', 'sub-c']));
     // The card is still there, still Interviewing, notes intact, label gone.

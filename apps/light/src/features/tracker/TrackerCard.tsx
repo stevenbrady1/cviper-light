@@ -87,7 +87,13 @@ export function TrackerCard({
       data-staleness={band}
       data-status={application.status}
       aria-pressed={selected}
-      aria-label={[job.title, where, substage, stalenessDescription(days), dueDescription]
+      aria-label={[
+        job.title,
+        where,
+        substage === null ? null : `Stage: ${substage}`,
+        stalenessDescription(days),
+        dueDescription,
+      ]
         .filter((part) => part !== null && part !== '')
         .join('. ')}
       onClick={() => onSelect(application.id)}
@@ -111,7 +117,7 @@ export function TrackerCard({
       {substage === null ? null : (
         <p
           data-testid={`tracker-card-substage-${application.id}`}
-          className="mt-1 truncate font-mono text-[11px] tracking-[0.04em] text-blue"
+          className="mt-1 truncate font-mono text-[11px] tracking-[0.04em] text-ink-muted"
         >
           {substage}
         </p>

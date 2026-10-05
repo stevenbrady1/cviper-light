@@ -180,6 +180,8 @@ export function Tracker({
    */
   const [substages, setSubstages] = useState<readonly InterviewSubstage[]>([]);
   const [substagesLoaded, setSubstagesLoaded] = useState(false);
+  /** Why the list could not be read, or null. */
+  const [substagesFailed, setSubstagesFailed] = useState<string | null>(null);
   const substagesRef = useRef<readonly InterviewSubstage[]>([]);
   /** One sub-stage save at a time. A ref as well as state: the check must be synchronous. */
   const savingSubstagesRef = useRef(false);
@@ -242,30 +244,53 @@ export function Tracker({
     };
   }, [loadEntries]);
 
-  useEffect(() => {
-    let cancelled = false;
-    void trackerPort
-      .substages()
-      .then((read) => {
-        if (cancelled) return;
-        if (read.ok) {
-          substagesRef.current = read.value;
-          setSubstages(read.value);
-          setSubstagesLoaded(true);
-        } else {
-          // The board still works without them; only the editing is withheld.
-          setError(
-            `Your interview stages could not be read: ${read.error.message} The board is shown without them.`,
-          );
-        }
-      })
-      .catch(() => {
-        // A port that cannot answer is the same as one that said no.
-      });
-    return () => {
-      cancelled = true;
-    };
+  const loadSubstages = useCallback(async () => {
+    setSubstagesFailed(null);
+    let message: string;
+    try {
+      const read = await trackerPort.substages();
+      if (read.ok) {
+        substagesRef.current = read.value;
+        setSubstages(read.value);
+        setSubstagesLoaded(true);
+        return;
+      }
+      message = read.error.message;
+    } catch (cause) {
+      // A port that cannot answer is the same as one that said no.
+      message = cause instanceof Error ? cause.message : String(cause);
+    }
+    // The board still works without them; only the editing is withheld.
+    setSubstagesFailed(message);
   }, [trackerPort]);
+
+  useEffect(() => {
+    void loadSubstages();
+  }, [loadSubstages]);
+
+  /** Where focus goes back to when the stage editor closes. */
+  const editorOpener = useRef<HTMLElement | null>(null);
+  const previousPane = useRef<Pane['kind']>('closed');
+
+  const openSubstageEditor = useCallback((trigger: HTMLElement | null) => {
+    editorOpener.current = trigger;
+    setPane({ kind: 'substages' });
+  }, []);
+
+  useEffect(() => {
+    const was = previousPane.current;
+    previousPane.current = pane.kind;
+    if (was !== 'substages' || pane.kind === 'substages') return;
+    // The opener may have been the detail pane's button, which is gone by now:
+    // the column's own button is the next best place to land.
+    const opener = editorOpener.current;
+    editorOpener.current = null;
+    const target =
+      opener !== null && opener.isConnected
+        ? opener
+        : document.querySelector<HTMLElement>('[data-testid="tracker-edit-substages"]');
+    target?.focus();
+  }, [pane.kind]);
 
   const replace = useCallback((next: TrackerEntry) => {
     setEntries((current) =>
@@ -554,6 +579,21 @@ export function Tracker({
         </div>
       )}
 
+      {substagesFailed === null ? null : (
+        <div
+          role="alert"
+          data-testid="tracker-substages-error"
+          className="flex items-center justify-between gap-3 border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
+        >
+          <span>
+            {`Your interview stages could not be read: ${substagesFailed} The board is shown without them.`}
+          </span>
+          <button type="button" className={SECONDARY_BUTTON} onClick={() => void loadSubstages()}>
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden p-2 md:p-4">
           {loading ? (
@@ -622,9 +662,7 @@ export function Tracker({
                     selectedId={selected?.application.id ?? null}
                     settlingId={settlingId}
                     substages={substages}
-                    onEditSubstages={
-                      substagesLoaded ? () => setPane({ kind: 'substages' }) : undefined
-                    }
+                    onEditSubstages={substagesLoaded ? openSubstageEditor : undefined}
                     onSelect={(applicationId) => setPane({ kind: 'entry', applicationId })}
                     onDropCard={onStatusChange}
                   />
@@ -662,12 +700,15 @@ export function Tracker({
         ) : pane.kind === 'substages' ? (
           <DetailPane
             title="Interview stages"
-            subtitle="Your own steps inside Interviewing, such as HR Screen or Final."
+            subtitle="Your own stages inside Interviewing, such as HR Screen or Final."
             onClose={() => setPane({ kind: 'closed' })}
           >
             <SubstageEditor
               substages={substages}
               busy={savingSubstages}
+              usage={(id) =>
+                entries.filter((entry) => entry.application.interview_substage_id === id).length
+              }
               onAdd={(name) =>
                 applySubstages(addSubstage(substagesRef.current, name, crypto.randomUUID()))
               }
@@ -738,7 +779,9 @@ export function Tracker({
                   ? (substageId) => onSubstageChange(selected.application.id, substageId)
                   : undefined
               }
-              onEditSubstages={substagesLoaded ? () => setPane({ kind: 'substages' }) : undefined}
+              onEditSubstages={substagesLoaded ? openSubstageEditor : undefined}
+              substagesFailed={substagesFailed !== null}
+              onRetrySubstages={() => void loadSubstages()}
               onDelete={() => void onDelete(selected)}
               port={trackerPort}
               availability={availability ?? undefined}

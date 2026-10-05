@@ -40,7 +40,7 @@ interface TrackerColumnProps {
   /** The user's interview sub-stages (L-205). Only the Interviewing column shows them. */
   readonly substages?: readonly InterviewSubstage[] | undefined;
   /** Open the sub-stage editor. Only the Interviewing column draws the button. */
-  readonly onEditSubstages?: (() => void) | undefined;
+  readonly onEditSubstages?: ((trigger: HTMLElement) => void) | undefined;
   readonly onSelect: (applicationId: string) => void;
   readonly onDropCard: (applicationId: string, status: ApplicationStatus) => void;
 }
@@ -100,10 +100,11 @@ export function TrackerColumn({
             <button
               type="button"
               data-testid="tracker-edit-substages"
-              onClick={onEditSubstages}
+              aria-label={substages.length === 0 ? undefined : 'Edit interview stages'}
+              onClick={(event) => onEditSubstages(event.currentTarget)}
               className={`${QUIET_BUTTON} text-xs`}
             >
-              Edit stages
+              {substages.length === 0 ? 'Edit stages' : 'Stages'}
             </button>
           )}
           <span

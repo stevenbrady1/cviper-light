@@ -69,7 +69,10 @@ interface ApplicationDetailProps {
   /** Put this card in a sub-stage, or `null` for none. */
   readonly onSubstageChange?: ((substageId: string | null) => void) | undefined;
   /** Open the sub-stage editor. Left undefined, no button is drawn. */
-  readonly onEditSubstages?: (() => void) | undefined;
+  readonly onEditSubstages?: ((trigger: HTMLElement) => void) | undefined;
+  /** The stages could not be read: say so here rather than hiding the control. */
+  readonly substagesFailed?: boolean | undefined;
+  readonly onRetrySubstages?: (() => void) | undefined;
   readonly onDelete: () => void;
   /**
    * The board's port, for the panels that read and archive documents. Optional
@@ -108,6 +111,8 @@ export function ApplicationDetail({
   substages = [],
   onSubstageChange,
   onEditSubstages,
+  substagesFailed = false,
+  onRetrySubstages,
   onDelete,
   port,
   availability,
@@ -284,6 +289,20 @@ export function ApplicationDetail({
         A card whose stored sub-stage is no longer in the list reads as "No
         stage" (value ''), the same fallback the board uses.
       */}
+      {application.status === 'interviewing' && substagesFailed ? (
+        <div
+          data-testid="detail-substages-failed"
+          className="flex flex-wrap items-center gap-2 text-ink-muted"
+        >
+          <p>Interview stages couldn't load.</p>
+          {onRetrySubstages === undefined ? null : (
+            <button type="button" onClick={onRetrySubstages} className={SECONDARY_BUTTON}>
+              Retry
+            </button>
+          )}
+        </div>
+      ) : null}
+
       {application.status !== 'interviewing' || onSubstageChange === undefined ? null : (
         <div>
           <label htmlFor="detail-substage" className="block text-xs font-medium text-ink-muted">
@@ -312,7 +331,7 @@ export function ApplicationDetail({
               <button
                 type="button"
                 data-testid="detail-edit-substages"
-                onClick={onEditSubstages}
+                onClick={(event) => onEditSubstages(event.currentTarget)}
                 className={SECONDARY_BUTTON}
               >
                 Edit stages
