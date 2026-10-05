@@ -77,6 +77,12 @@ pub fn migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/0005_job_agency.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "interview_substages and applications.interview_substage_id (L-205)",
+            sql: include_str!("../migrations/0006_interview_substages.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -212,6 +218,44 @@ mod tests {
         );
         for forbidden in ["CREATE TABLE", "DROP", "RENAME", "UPDATE", "DELETE"] {
             assert!(!sql.contains(forbidden), "0005 must be additive; found `{forbidden}`");
+        }
+    }
+
+    #[test]
+    fn the_sixth_migration_adds_interview_substages_without_touching_existing_rows() {
+        // L-205. One new table, plus one nullable column on `applications`.
+        // Additive only: an existing row keeps working with the column NULL, and
+        // removing a sub-stage sets it back to NULL rather than deleting the
+        // card (`ON DELETE SET NULL`). The SQL itself is run against a real
+        // SQLite, over a database that already holds data, by
+        // `src/db/migration.interviewSubstages.test.ts`.
+        let migration = &migrations()[5];
+        assert_eq!(migration.version, 6);
+        assert!(matches!(migration.kind, MigrationKind::Up));
+        let sql = executable_sql(migration.sql);
+        assert_eq!(
+            sql.matches("CREATE TABLE IF NOT EXISTS").count(),
+            1,
+            "0006 must create exactly one table"
+        );
+        assert!(
+            sql.contains("CREATE TABLE IF NOT EXISTS interview_substages ("),
+            "0006 must create `interview_substages`"
+        );
+        assert!(
+            sql.contains("ALTER TABLE applications ADD COLUMN interview_substage_id TEXT"),
+            "0006 must add nullable applications.interview_substage_id"
+        );
+        assert!(
+            sql.contains("REFERENCES interview_substages (id) ON DELETE SET NULL"),
+            "removing a sub-stage must unset the cards that use it, never delete them"
+        );
+        assert!(
+            !sql.contains("NOT NULL DEFAULT") && !sql.contains("interview_substage_id TEXT NOT NULL"),
+            "the new column must stay nullable so every existing row is valid"
+        );
+        for forbidden in ["DROP", "RENAME", "UPDATE ", "DELETE FROM", "INSERT"] {
+            assert!(!sql.contains(forbidden), "0006 must be additive; found `{forbidden}`");
         }
     }
 

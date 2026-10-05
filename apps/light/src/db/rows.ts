@@ -32,6 +32,7 @@ import {
   ApplicationSchema,
   CvSchema,
   DocumentSchema,
+  InterviewSubstageSchema,
   JobSchema,
   ProfileSchema,
   err,
@@ -41,6 +42,7 @@ import {
   type Cv,
   type Document,
   type Err,
+  type InterviewSubstage,
   type Job,
   type Profile,
   type Result,
@@ -93,7 +95,12 @@ export const APPLICATION_COLUMNS = [
   'next_action',
   'next_action_date',
   'updated_at',
+  // Last because 0006_interview_substages.sql appended it (L-205).
+  'interview_substage_id',
 ] as const;
+
+// 0006_interview_substages.sql (L-205).
+export const INTERVIEW_SUBSTAGE_COLUMNS = ['id', 'name', 'position'] as const;
 
 // `json_resume` is last because 0002_cv_json_resume.sql appended it (L-20b).
 export const CV_COLUMNS = [
@@ -150,6 +157,7 @@ export const TABLE_COLUMNS = {
   analyses: ANALYSIS_COLUMNS,
   profile: PROFILE_COLUMNS,
   documents: DOCUMENT_COLUMNS,
+  interview_substages: INTERVIEW_SUBSTAGE_COLUMNS,
 } as const;
 
 export type TableName = keyof typeof TABLE_COLUMNS;
@@ -286,6 +294,16 @@ export function applicationFromRow(raw: unknown): Result<Application, DbError> {
   return parsed.success ? ok(parsed.data) : malformed('applications', describeIssues(parsed.error));
 }
 
+export function interviewSubstageFromRow(raw: unknown): Result<InterviewSubstage, DbError> {
+  const row = normalise(raw, INTERVIEW_SUBSTAGE_COLUMNS, 'interview_substages');
+  if (!row.ok) return row;
+
+  const parsed = InterviewSubstageSchema.safeParse(row.value);
+  return parsed.success
+    ? ok(parsed.data)
+    : malformed('interview_substages', describeIssues(parsed.error));
+}
+
 export function cvFromRow(raw: unknown): Result<Cv, DbError> {
   const row = normalise(raw, CV_COLUMNS, 'cvs');
   if (!row.ok) return row;
@@ -377,8 +395,19 @@ export function applicationToValues(application: Application): SqlValue[] {
     next_action: application.next_action,
     next_action_date: application.next_action_date,
     updated_at: application.updated_at,
+    // Absent and null are the same answer: no sub-stage. NULL either way.
+    interview_substage_id: application.interview_substage_id ?? null,
   };
   return APPLICATION_COLUMNS.map((column) => row[column]);
+}
+
+export function interviewSubstageToValues(substage: InterviewSubstage): SqlValue[] {
+  const row: Record<(typeof INTERVIEW_SUBSTAGE_COLUMNS)[number], SqlValue> = {
+    id: substage.id,
+    name: substage.name,
+    position: substage.position,
+  };
+  return INTERVIEW_SUBSTAGE_COLUMNS.map((column) => row[column]);
 }
 
 export function cvToValues(cv: Cv): SqlValue[] {

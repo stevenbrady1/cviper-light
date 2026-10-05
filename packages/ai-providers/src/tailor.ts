@@ -27,6 +27,7 @@ import {
 } from '@cviper/core-types';
 
 import { buildTailorPrompt } from './prompt/build-tailor-prompt';
+import type { UserSuppliedMetric } from './prompt/user-metrics';
 import {
   runStructuredCall,
   type PipelineError,
@@ -60,6 +61,8 @@ export interface TailorCvOptions {
    * `null` / absent when there is no such analysis. Never `missing_skills`.
    */
   readonly keywordGaps?: readonly string[] | null | undefined;
+  /** Achievements the candidate typed and approved (L-205), or absent. */
+  readonly userMetrics?: readonly UserSuppliedMetric[] | null | undefined;
   readonly maxOutputTokens?: number;
 }
 
@@ -84,6 +87,7 @@ export async function tailorCv(
     jobText: options.jobText,
     profileNotes: options.profileNotes,
     keywordGaps: options.keywordGaps,
+    userMetrics: options.userMetrics,
   });
 
   const result = await runStructuredCall<TailoredCv>({

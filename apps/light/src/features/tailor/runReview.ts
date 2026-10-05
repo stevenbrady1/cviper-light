@@ -6,7 +6,12 @@
  * original to spot an unsupported claim — so the consent question is exactly
  * the one the other two paths ask.
  */
-import { reviewDraft, type ChatTransport, type ReviewKind } from '@cviper/ai-providers';
+import {
+  reviewDraft,
+  type ChatTransport,
+  type ReviewKind,
+  type UserSuppliedMetric,
+} from '@cviper/ai-providers';
 import { err, ok, type DraftReview, type Result } from '@cviper/core-types';
 
 import { createTauriTransport } from '../../ai/transport';
@@ -22,6 +27,8 @@ export interface ReviewRequest {
   readonly jobText: string;
   readonly cvText: string;
   readonly kind: ReviewKind;
+  /** Approved achievements the draft was written with (L-205), or absent. */
+  readonly userMetrics?: readonly UserSuppliedMetric[] | null | undefined;
 }
 
 export interface ReviewRunSuccess {
@@ -62,6 +69,7 @@ export async function runReview(
     jobText: request.jobText,
     cvText: request.cvText,
     kind: request.kind,
+    userMetrics: request.userMetrics,
   });
 
   if (!reviewed.ok) return err({ message: reviewed.error.message });

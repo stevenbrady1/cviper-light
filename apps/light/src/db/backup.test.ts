@@ -17,6 +17,7 @@ import {
   type Application,
   type Cv,
   type Document,
+  type InterviewSubstage,
   type Job,
   type Profile,
 } from '@cviper/core-types';
@@ -93,7 +94,10 @@ const APPLICATION: Application = {
   next_action: null,
   next_action_date: null,
   updated_at: '2026-08-19T09:02:00.000Z',
+  interview_substage_id: null,
 };
+
+const SUBSTAGE: InterviewSubstage = { id: 'sub-0001', name: 'HR Screen', position: 0 };
 
 const ANALYSIS: Analysis = {
   id: 'ana-0001',
@@ -131,11 +135,20 @@ const PROFILE: Profile = {
   languages: [{ name: 'French', level: 'B2' }],
 };
 
-const EMPTY = { profile: null, jobs: [], applications: [], documents: [], cvs: [], analyses: [] };
+const EMPTY = {
+  profile: null,
+  jobs: [],
+  applications: [],
+  interview_substages: [],
+  documents: [],
+  cvs: [],
+  analyses: [],
+};
 const FULL = {
   profile: PROFILE,
   jobs: [JOB],
   applications: [APPLICATION],
+  interview_substages: [SUBSTAGE],
   documents: [DOCUMENT],
   cvs: [CV],
   analyses: [ANALYSIS],
@@ -144,14 +157,14 @@ const FULL = {
 // --- readAll ----------------------------------------------------------------
 
 describe('readAll', () => {
-  it('reads all six tables in a fixed, deterministic order', async () => {
+  it('reads all seven tables in a fixed, deterministic order', async () => {
     const { readAll } = await import('./backup');
 
     const result = await readAll();
 
     expect(isOk(result)).toBe(true);
     const queries = sql.select.mock.calls.map((call) => call[0]);
-    expect(queries).toHaveLength(6);
+    expect(queries).toHaveLength(7);
     expect(queries[0]).toMatch(/FROM jobs ORDER BY id$/);
     expect(queries[1]).toMatch(/FROM cvs ORDER BY id$/);
     expect(queries[2]).toMatch(/FROM applications ORDER BY id$/);
@@ -160,6 +173,8 @@ describe('readAll', () => {
     // The one row, by its fixed id, bound rather than interpolated.
     expect(queries[5]).toMatch(/FROM profile WHERE id = \$1$/);
     expect(sql.select.mock.calls[5]?.[1]).toEqual(['me']);
+    // Display order, with `id` as the tie-break so equal positions read stably.
+    expect(queries[6]).toMatch(/FROM interview_substages ORDER BY position, id$/);
   });
 
   it('returns an empty snapshot when the database is empty', async () => {
@@ -188,7 +203,10 @@ describe('readAll', () => {
       ])
       .mockResolvedValueOnce([asRow(rows.ANALYSIS_COLUMNS, analysisValues.value)])
       .mockResolvedValueOnce([asRow(rows.DOCUMENT_COLUMNS, rows.documentToValues(DOCUMENT))])
-      .mockResolvedValueOnce([asRow(rows.PROFILE_COLUMNS, profileValues.value)]);
+      .mockResolvedValueOnce([asRow(rows.PROFILE_COLUMNS, profileValues.value)])
+      .mockResolvedValueOnce([
+        asRow(rows.INTERVIEW_SUBSTAGE_COLUMNS, rows.interviewSubstageToValues(SUBSTAGE)),
+      ]);
 
     const { readAll } = await import('./backup');
     const result = await readAll();
@@ -226,7 +244,7 @@ describe('readAll', () => {
     expect(isErr(result) && result.error.table).toBe('jobs');
   });
 
-  it('does not let another operation slip between its six reads', async () => {
+  it('does not let another operation slip between its seven reads', async () => {
     const order: string[] = [];
     sql.select.mockImplementation(async () => {
       order.push('read');
@@ -244,7 +262,7 @@ describe('readAll', () => {
     const write = upsertJob(JOB);
     await Promise.all([snapshot, write]);
 
-    expect(order).toEqual(['read', 'read', 'read', 'read', 'read', 'read', 'write']);
+    expect(order).toEqual(['read', 'read', 'read', 'read', 'read', 'read', 'read', 'write']);
   });
 
   it('reports a failed read as an error rather than an empty export', async () => {
@@ -272,6 +290,8 @@ describe('writeAll', () => {
   });
 
   it('writes parents before children so the foreign keys hold, then the profile', async () => {
+    // `interview_substages` is a parent of `applications` (a card points at one),
+    // so it goes first among the tables that have one.
     const { writeAll } = await import('./backup');
 
     await writeAll(FULL);
@@ -279,6 +299,7 @@ describe('writeAll', () => {
     expect(insertedTables()).toEqual([
       'jobs',
       'cvs',
+      'interview_substages',
       'applications',
       'documents',
       'analyses',

@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   BACKUP_SCHEMA_VERSION,
   exportBackup,
+  INTERVIEW_SUBSTAGES_IMPORT_MAX,
   importBackup,
   type BackupPayload,
 } from '@cviper/core-types';
@@ -248,10 +249,39 @@ export function Settings({
 
     setStage({ kind: 'busy', what: 'import' });
 
+    // An import MERGES, so the stages in the file are added to the ones already
+    // here. The app will export all of them, and a backup larger than the
+    // importer's bound could not be restored. Checked BEFORE anything is written.
+    const current = await backupPort.read();
+    if (!current.ok) {
+      setStage({ kind: 'idle' });
+      setProblem({
+        headline: 'Your data could not be checked, so nothing was imported.',
+        detail: `${current.error.message} Everything is still on this machine — nothing has been changed.`,
+      });
+      return;
+    }
+    const have = new Set(current.value.interview_substages.map((substage) => substage.id));
+    const incoming = payload.interview_substages ?? [];
+    const total = have.size + incoming.filter((substage) => !have.has(substage.id)).length;
+    if (total > INTERVIEW_SUBSTAGES_IMPORT_MAX) {
+      setStage({ kind: 'idle' });
+      setProblem({
+        headline:
+          'That backup would leave you with more interview stages than a backup can hold, so nothing was changed.',
+        detail: `You have ${have.size} interview stages and this file would add ${total - have.size} more, making ${total}. The most a backup can hold is ${INTERVIEW_SUBSTAGES_IMPORT_MAX}. Remove some stages in the tracker and try again.`,
+      });
+      return;
+    }
+
     const written = await backupPort.write({
       profile: payload.profile,
       jobs: payload.jobs,
       applications: payload.applications,
+      // Parents of `applications` (a card names one), so they must travel with
+      // it: a card written without its sub-stage would break the foreign key and
+      // roll the whole import back.
+      interview_substages: payload.interview_substages ?? [],
       documents: payload.documents,
       cvs: payload.cvs,
       analyses: payload.analyses,

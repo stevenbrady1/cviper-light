@@ -137,6 +137,7 @@ describe('a new export', () => {
       'profile',
       'jobs',
       'applications',
+      'interview_substages',
       'documents',
       'cvs',
       'analyses',

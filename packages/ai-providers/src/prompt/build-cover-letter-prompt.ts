@@ -58,6 +58,13 @@ import {
  */
 export const MAX_TAILORED_CONTEXT_CHARS = 2500;
 
+import {
+  USER_FACTS_CARVE_OUT,
+  carveOut,
+  userMetricsSection,
+  type UserSuppliedMetric,
+} from './user-metrics';
+
 export interface CoverLetterPromptInput {
   readonly cvText: string;
   readonly jobText: string;
@@ -65,6 +72,8 @@ export interface CoverLetterPromptInput {
   readonly tailoredCvText: string | null;
   /** The candidate's own words on how they write. `null` when the profile is empty. */
   readonly profileNotes: string | null;
+  /** Achievements the candidate typed and approved (L-205). Absent or empty: none. */
+  readonly userMetrics?: readonly UserSuppliedMetric[] | null | undefined;
 }
 
 export interface CoverLetterPrompt {
@@ -122,7 +131,21 @@ function optionalFence(label: string, body: string | null, maxChars: number): st
   return `=== ${label} ===\n${cleaned}\n=== END ${label} ===`;
 }
 
+function requirementsWithUserFacts(): string {
+  const critical = carveOut(
+    REQUIREMENTS,
+    "that appear in the candidate's CV.",
+    `that appear in the candidate's CV ${USER_FACTS_CARVE_OUT}.`,
+  );
+  return carveOut(
+    critical,
+    'achievements in the CV.',
+    `achievements in the CV ${USER_FACTS_CARVE_OUT}.`,
+  );
+}
+
 export function buildCoverLetterPrompt(input: CoverLetterPromptInput): CoverLetterPrompt {
+  const userMetrics = userMetricsSection(input.userMetrics);
   const tailored = optionalFence(
     'TAILORED CV (already written for this role — complement it, do not repeat it)',
     input.tailoredCvText,
@@ -141,9 +164,10 @@ export function buildCoverLetterPrompt(input: CoverLetterPromptInput): CoverLett
     '',
     fence('JOB ADVERT', input.jobText, MAX_JOB_CHARS),
     ...(tailored === null ? [] : ['', tailored]),
+    ...(userMetrics === null ? [] : ['', userMetrics]),
     ...(notes === null ? [] : ['', notes]),
     '',
-    REQUIREMENTS,
+    userMetrics === null ? REQUIREMENTS : requirementsWithUserFacts(),
     '',
     FAIRNESS_GUARDRAIL,
     '',
