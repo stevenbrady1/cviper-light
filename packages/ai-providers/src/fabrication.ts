@@ -93,14 +93,82 @@ function yearsIn(text: string): Set<string> {
   return new Set([...text.matchAll(YEAR_PATTERN)].map((match) => match[0]));
 }
 
+const NUM = String.raw`\d+(?:[.:-]\d+)*`;
+
+/**
+ * A number typed after one of these is a certification, level or stage
+ * identifier (ISO-27001, Series 7 and 63, NVQ 3, Year 5), not a figure the
+ * candidate achieved. A hyphen or dash may separate them, and numbers chained
+ * straight after with "and", a comma, a slash or "&" are identifiers too.
+ */
+const IDENTIFIER_NUMBER = new RegExp(
+  String.raw`\b(?:ISO(?:\/IEC)?|IEC|Series|Level|Part|Grade|Class|Module|Paper|NVQ|Tier|Band|Stage|Year)[\s\-–]*${NUM}(?:\s*(?:and|,|\/|&)\s*${NUM})*`,
+  'gi',
+);
+
+/** A two-digit year: '19, ’19. */
+const SHORT_YEAR = /['’]\d{2}\b/g;
+
+/** "years" or "yrs" straight after a number. */
+const YEARS_AFTER = /^\s*(?:years?|yrs?)\b/i;
+const YEARS_BEFORE_NUMBER = new RegExp(String.raw`(${NUM})\s*(?:years?|yrs?)\b`, 'gi');
+
+interface UserFigures {
+  /** Every figure the user typed. */
+  readonly figures: ReadonlySet<string>;
+  /** The figures the user themselves put next to "years". */
+  readonly yearNumbers: ReadonlySet<string>;
+}
+
+/**
+ * The FIGURES in what the candidate typed and approved (L-205): years,
+ * two-digit years and identifier numbers are removed first, so typing "in
+ * 2019", "'19" or "ISO 27001" cannot launder those numbers anywhere in the
+ * draft.
+ *
+ * Two guards beyond that:
+ *   * a figure known ONLY from the user's text is flagged if the draft puts
+ *     "years" straight after it and the user did not ("team of 12" does not
+ *     make "12 years" pass);
+ *   * everything else is a bag of numbers. Telling "12 clients" from "a team
+ *     of 12" needs language understanding, so that gap remains. The prompt
+ *     tells the model to use a line exactly as given; this check only stops
+ *     the figures nobody typed.
+ */
+function userFigures(facts: readonly string[]): UserFigures {
+  const figures = new Set<string>();
+  const yearNumbers = new Set<string>();
+  for (const fact of facts) {
+    const text = fact
+      .replace(IDENTIFIER_NUMBER, ' ')
+      .replace(SHORT_YEAR, ' ')
+      .replace(YEAR_PATTERN, ' ');
+    for (const metric of metricsIn(text)) figures.add(metric);
+    for (const match of text.matchAll(YEARS_BEFORE_NUMBER)) {
+      for (const metric of metricsIn(match[1] ?? '')) yearNumbers.add(metric);
+    }
+  }
+  return { figures, yearNumbers };
+}
+
 /** Metrics in `draft` that the original never mentions, in draft order. */
-function newMetrics(original: string, draft: string): string[] {
-  const known = metricsIn(original);
+function newMetrics(original: string, draft: string, user: UserFigures): string[] {
+  const originalKnown = metricsIn(original);
   const seen = new Set<string>();
   const flagged: string[] = [];
   for (const match of draft.matchAll(METRIC_PATTERN)) {
     const key = match[0].toLowerCase();
-    if (known.has(key) || seen.has(key)) continue;
+    let known = originalKnown.has(key) || user.figures.has(key);
+    const userOnly = !originalKnown.has(key) && user.figures.has(key);
+    if (
+      known &&
+      userOnly &&
+      !user.yearNumbers.has(key) &&
+      YEARS_AFTER.test(draft.slice((match.index ?? 0) + match[0].length))
+    ) {
+      known = false;
+    }
+    if (known || seen.has(key)) continue;
     seen.add(key);
     flagged.push(match[0]);
   }
@@ -110,12 +178,19 @@ function newMetrics(original: string, draft: string): string[] {
 /**
  * Check a tailored CV against the text it was supposed to come from.
  *
+ * `userSuppliedFacts` (L-205) are text the candidate typed and approved. Only
+ * their figures count as known; see the metrics step.
+ *
  * Boundary: an EMPTY original flags everything, because nothing can be
  * supported by nothing. That is the right answer — a tailored CV produced
  * from a CV with no readable text is invented from top to bottom — and the
  * view never gets that far, because the run button refuses a CV with no text.
  */
-export function checkFabrication(originalCvText: string, cv: TailoredCv): FabricationReport {
+export function checkFabrication(
+  originalCvText: string,
+  cv: TailoredCv,
+  userSuppliedFacts: readonly string[] = [],
+): FabricationReport {
   const original = normalise(originalCvText);
   const originalYears = yearsIn(originalCvText);
   const flagged: FabricationFlag[] = [];
@@ -155,7 +230,14 @@ export function checkFabrication(originalCvText: string, cv: TailoredCv): Fabric
   // Over the RENDERED text, so a number anywhere — summary, skills, a bullet,
   // an education line — is caught. A year already flagged as a date is not
   // repeated as a metric; it is one invention, not two.
-  for (const metric of newMetrics(originalCvText, renderTailoredCv(cv, null))) {
+  // Figures the candidate typed and approved (L-205) are theirs, so they are
+  // known to the METRIC check only. Employers, years and certifications above
+  // were compared with the CV alone: typing one cannot make it pass.
+  for (const metric of newMetrics(
+    originalCvText,
+    renderTailoredCv(cv, null),
+    userFigures(userSuppliedFacts),
+  )) {
     if (flaggedYears.has(metric)) continue;
     flagged.push({ kind: 'metric', text: metric });
   }
@@ -174,9 +256,12 @@ export function checkFabrication(originalCvText: string, cv: TailoredCv): Fabric
 export function checkLetterClaims(
   originalCvText: string,
   letter: CoverLetter,
+  userSuppliedFacts: readonly string[] = [],
 ): readonly FabricationFlag[] {
-  return newMetrics(originalCvText, renderCoverLetter(letter)).map((text) => ({
-    kind: 'metric' as const,
-    text,
-  }));
+  return newMetrics(originalCvText, renderCoverLetter(letter), userFigures(userSuppliedFacts)).map(
+    (text) => ({
+      kind: 'metric' as const,
+      text,
+    }),
+  );
 }

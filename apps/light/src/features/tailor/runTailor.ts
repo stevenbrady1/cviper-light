@@ -17,7 +17,7 @@
  * `ollama` is structurally exempt: `ConsentProviderKind` excludes it, so there
  * is no branch here for a local model to fall into.
  */
-import { tailorCv, type ChatTransport } from '@cviper/ai-providers';
+import { tailorCv, type ChatTransport, type UserSuppliedMetric } from '@cviper/ai-providers';
 import { err, ok, type Result, type TailoredCv } from '@cviper/core-types';
 
 import { createTauriTransport } from '../../ai/transport';
@@ -37,6 +37,11 @@ export interface TailorRequest {
    * this advert (L-202). `null` otherwise — and then the prompt has none.
    */
   readonly keywordGaps?: readonly string[] | null | undefined;
+  /**
+   * Achievements the user typed against a gap and explicitly approved (L-205).
+   * Only ever the output of `approvedMetrics`; absent or empty means none.
+   */
+  readonly userMetrics?: readonly UserSuppliedMetric[] | null | undefined;
 }
 
 export interface TailorRunSuccess {
@@ -82,6 +87,7 @@ export async function runTailor(
     jobText: request.jobText,
     profileNotes: request.profileNotes,
     keywordGaps: request.keywordGaps,
+    userMetrics: request.userMetrics,
   });
 
   if (!tailored.ok) {

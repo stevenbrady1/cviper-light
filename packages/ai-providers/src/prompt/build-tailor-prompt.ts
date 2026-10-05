@@ -52,6 +52,13 @@
 import { sanitizeForPrompt, truncateForPrompt } from '@cviper/cv-parsing';
 
 import { MAX_CV_CHARS, MAX_JOB_CHARS } from './build-prompt';
+import { cleanOneLine } from './clean-one-line';
+import {
+  USER_FACTS_CARVE_OUT,
+  carveOut,
+  userMetricsSection,
+  type UserSuppliedMetric,
+} from './user-metrics';
 import {
   FAIRNESS_GUARDRAIL,
   JSON_ONLY,
@@ -81,6 +88,13 @@ export const MAX_PROMPT_KEYWORD_GAPS = 15;
 /** One gap is a word or a short phrase. Anything longer is a sentence, cut to size. */
 export const MAX_KEYWORD_GAP_CHARS = 60;
 
+export {
+  MAX_USER_METRIC_CHARS,
+  MAX_USER_METRICS,
+  promptUserMetrics,
+  type UserSuppliedMetric,
+} from './user-metrics';
+
 export interface TailorPromptInput {
   readonly cvText: string;
   readonly jobText: string;
@@ -98,6 +112,12 @@ export interface TailorPromptInput {
    * prompt that listed them as words to use would be asking for fabrication.
    */
   readonly keywordGaps?: readonly string[] | null | undefined;
+  /**
+   * Achievements the candidate typed and approved (L-205). Absent, `null` or
+   * empty means no section. They are USER-SUPPLIED FACTS: the model may use
+   * them as written and may not embellish them.
+   */
+  readonly userMetrics?: readonly UserSuppliedMetric[] | null | undefined;
 }
 
 export interface TailorPrompt {
@@ -213,19 +233,6 @@ function notesFence(notes: string | null): string | null {
 }
 
 /**
- * A plain cut to `MAX_KEYWORD_GAP_CHARS`. Not `truncateForPrompt`: its
- * "[truncated]" marker starts a new line, which inside this list would read
- * as one more advert word. Never splits a surrogate pair.
- */
-function cutGap(gap: string): string {
-  if (gap.length <= MAX_KEYWORD_GAP_CHARS) return gap;
-  let cut = MAX_KEYWORD_GAP_CHARS;
-  const last = gap.charCodeAt(cut - 1);
-  if (last >= 0xd800 && last <= 0xdbff) cut -= 1;
-  return gap.slice(0, cut).trim();
-}
-
-/**
  * The gaps as they go into the prompt: one line each, cleaned, de-duplicated
  * ignoring case, at most `MAX_PROMPT_KEYWORD_GAPS` of them, in the order given
  * (the scorer's, most important first).
@@ -237,9 +244,7 @@ export function promptKeywordGaps(gaps: readonly string[] | null | undefined): s
   const kept: string[] = [];
   const seen = new Set<string>();
   for (const gap of gaps ?? []) {
-    const cleaned = cutGap(
-      sanitizeForPrompt(gap.replace(/={3,}/g, ' ')).replace(/\s+/g, ' ').trim(),
-    );
+    const cleaned = cleanOneLine(gap, MAX_KEYWORD_GAP_CHARS, { stripBrackets: true });
     const key = cleaned.toLowerCase();
     if (cleaned === '' || seen.has(key)) continue;
     seen.add(key);
@@ -275,12 +280,57 @@ function keywordGapsSection(gaps: readonly string[] | null | undefined): string 
   ].join('\n');
 }
 
+/**
+ * The same text with the carve-out added at every place that says "only the
+ * base CV" (review C3). A strict model reads the rules AFTER the section, so a
+ * rule that still says "base CV only" would make it drop the user's lines.
+ * Numbers only: rules 2 and 4 (facts, certifications) are deliberately left.
+ */
+function systemWithUserFacts(): string {
+  return carveOut(
+    SYSTEM,
+    'Every role from the base CV appears in the output.',
+    `Every role from the base CV appears in the output. Numbers may come from the base CV ${USER_FACTS_CARVE_OUT}.`,
+  );
+}
+
+function criticalWithUserFacts(): string {
+  return carveOut(
+    CRITICAL,
+    'MUST come from the base CV below.',
+    `MUST come from the base CV below. The only exception is a number, which may come from the base CV below ${USER_FACTS_CARVE_OUT}.`,
+  );
+}
+
+function rulesWithUserFacts(): string {
+  const rule1 = carveOut(
+    RULES,
+    '1. ALL content must come from the base CV above.',
+    `1. ALL content must come from the base CV above ${USER_FACTS_CARVE_OUT}.`,
+  );
+  return carveOut(
+    rule1,
+    'that is not in the base CV.',
+    `that is not in the base CV ${USER_FACTS_CARVE_OUT}.`,
+  );
+}
+
+function fieldRulesWithUserFacts(): string {
+  return carveOut(
+    FIELD_RULES,
+    'with numbers only where the base CV has them.',
+    `with numbers only where the base CV has them ${USER_FACTS_CARVE_OUT}.`,
+  );
+}
+
 export function buildTailorPrompt(input: TailorPromptInput): TailorPrompt {
   const notes = notesFence(input.profileNotes);
   const gaps = keywordGapsSection(input.keywordGaps);
+  const userMetrics = userMetricsSection(input.userMetrics);
+  const hasUserMetrics = userMetrics !== null;
 
   const user = [
-    CRITICAL,
+    hasUserMetrics ? criticalWithUserFacts() : CRITICAL,
     '',
     fence('BASE CV (the ONLY source of truth)', input.cvText, MAX_CV_CHARS),
     '',
@@ -290,16 +340,17 @@ export function buildTailorPrompt(input: TailorPromptInput): TailorPrompt {
       MAX_JOB_CHARS,
     ),
     ...(gaps === null ? [] : ['', gaps]),
+    ...(userMetrics === null ? [] : ['', userMetrics]),
     ...(notes === null ? [] : ['', notes]),
     '',
     SENIORITY_LADDER,
     '',
-    RULES,
+    hasUserMetrics ? rulesWithUserFacts() : RULES,
     '',
     FAIRNESS_GUARDRAIL,
     '',
-    FIELD_RULES,
+    hasUserMetrics ? fieldRulesWithUserFacts() : FIELD_RULES,
   ].join('\n');
 
-  return { system: SYSTEM, user };
+  return { system: hasUserMetrics ? systemWithUserFacts() : SYSTEM, user };
 }

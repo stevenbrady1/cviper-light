@@ -166,6 +166,14 @@ export {
 } from './prompt/build-tailor-prompt';
 
 export {
+  MAX_USER_METRIC_CHARS,
+  MAX_USER_METRICS,
+  promptUserMetrics,
+  type UserSuppliedMetric,
+} from './prompt/user-metrics';
+export { cleanOneLine, type CleanOneLineOptions } from './prompt/clean-one-line';
+
+export {
   MAX_TAILORED_CONTEXT_CHARS,
   buildCoverLetterPrompt,
   type CoverLetterPrompt,
