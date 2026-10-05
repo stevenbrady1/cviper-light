@@ -70,8 +70,8 @@ const BAND_FILL: Record<Verdict, string> = {
 /** The numeral and the tick take the verdict's own colour. */
 const VERDICT_INK: Record<Verdict, string> = {
   weak: 'text-ink-muted',
-  possible: 'text-gold',
-  strong: 'text-teal',
+  possible: 'text-gold-ink',
+  strong: 'text-teal-ink',
 };
 
 const TICK_FILL: Record<Verdict, string> = {

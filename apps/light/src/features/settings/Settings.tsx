@@ -371,7 +371,7 @@ export function Settings({
             <p
               role="status"
               data-testid="settings-message"
-              className="rounded-control bg-teal/10 px-3 py-2 break-all text-teal"
+              className="rounded-control bg-teal/10 px-3 py-2 break-all text-teal-ink"
             >
               {message}
             </p>

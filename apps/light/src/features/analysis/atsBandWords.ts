@@ -16,6 +16,6 @@ export const ATS_BAND_WORD: Record<AtsBand, string> = {
 
 export const ATS_BAND_TONE: Record<AtsBand, string> = {
   low: 'text-ink-muted',
-  fair: 'text-gold',
-  good: 'text-teal',
+  fair: 'text-gold-ink',
+  good: 'text-teal-ink',
 };

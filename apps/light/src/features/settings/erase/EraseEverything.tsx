@@ -155,7 +155,7 @@ export function EraseEverything({ port, backupPort, onErased }: EraseEverythingP
         <p
           role="status"
           data-testid="settings-erase-message"
-          className="mt-3 rounded-control bg-teal/10 px-3 py-2 text-teal"
+          className="mt-3 rounded-control bg-teal/10 px-3 py-2 text-teal-ink"
         >
           {summary.headline}
         </p>

@@ -254,7 +254,7 @@ function KeyCard({ provider, port, browser }: KeyCardProps) {
         // user is very likely mid-way through doing exactly that.
         <p
           data-testid={`key-missing-${provider.id}`}
-          className="mt-3 rounded-control bg-gold/10 px-3 py-2 text-gold"
+          className="mt-3 rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
         >
           {missing}
         </p>
@@ -336,7 +336,7 @@ function KeyCard({ provider, port, browser }: KeyCardProps) {
         <p
           role="status"
           data-testid={`key-result-${provider.id}`}
-          className="mt-3 rounded-control bg-teal/10 px-3 py-2 text-teal"
+          className="mt-3 rounded-control bg-teal/10 px-3 py-2 text-teal-ink"
         >
           {outcome.passed}
         </p>

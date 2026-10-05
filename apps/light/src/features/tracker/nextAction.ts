@@ -49,7 +49,7 @@ const SOON_WITHIN_DAYS = 3;
  */
 export const NEXT_ACTION_TONES: Record<Exclude<NextActionUrgency, 'none'>, string> = {
   later: 'font-mono tabular-nums text-ink-faint',
-  soon: 'font-mono tabular-nums text-gold',
+  soon: 'font-mono tabular-nums text-gold-ink',
   overdue: 'font-mono tabular-nums text-danger',
 };
 

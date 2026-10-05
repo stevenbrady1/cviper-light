@@ -37,8 +37,8 @@ const VERDICT_LABEL: Record<GateVerdict, string> = {
 };
 
 const VERDICT_TONE: Record<GateVerdict, string> = {
-  pass: 'bg-teal/10 text-teal',
-  flag: 'bg-gold/10 text-gold',
+  pass: 'bg-teal/10 text-teal-ink',
+  flag: 'bg-gold/10 text-gold-ink',
   fail: 'bg-danger/10 text-danger',
 };
 

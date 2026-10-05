@@ -96,7 +96,7 @@ describe('AtsStep', () => {
     renderStep({ ...BASE, keyword: { ...BASE.keyword, after: 50, delta: -4 } });
     const delta = screen.getByTestId('tailor-ats-keyword-delta');
     expect(delta.textContent).toBe('▼ -4');
-    expect(delta.querySelector('.text-gold')).not.toBeNull();
+    expect(delta.querySelector('.text-gold-ink')).not.toBeNull();
   });
 
   it('empty draft: a dash and the reason instead of a zero, and no bullet score', () => {

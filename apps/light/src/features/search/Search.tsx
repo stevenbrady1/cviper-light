@@ -747,7 +747,7 @@ export function Search({
               data-status={reedVerdict.status}
               className={
                 reedVerdict.status === 'blocked'
-                  ? 'rounded-control bg-gold/10 px-3 py-2 text-gold'
+                  ? 'rounded-control bg-gold/10 px-3 py-2 text-gold-ink'
                   : 'rounded-control bg-sunken px-3 py-2 text-ink-muted'
               }
             >
