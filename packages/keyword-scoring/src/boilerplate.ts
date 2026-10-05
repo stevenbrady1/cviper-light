@@ -17,8 +17,14 @@
  *  - A block must carry a STRONG signal ("accept all cookies", "equal
  *    opportunities employer", "acting as an employment agency"). The bare word
  *    "cookies" or "equal" never qualifies.
- *  - Only blocks near the top (cookie notices, navigation) or the bottom
- *    (everything else) are candidates. The middle of an advert is never touched.
+ *  - Only blocks at the very top or bottom are candidates. In an advert of six
+ *    or more blocks that is the first quarter and the last third (at least 2
+ *    and 3 blocks); in a shorter one it is the first block and the last block
+ *    only. Everything else is never touched, whatever it says.
+ *  - Equal-opportunity and agency blocks need TWO distinct signals, never one
+ *    ("we welcome applications from graduates ..." is a requirement).
+ *  - A cookie block needs a banner action ("accept all", "we use cookies") as
+ *    well as the noun; "own our cookie policy" is a job.
  *  - A block that also carries a content marker (a pound sign, "requirements",
  *    "you will", "salary" ...) is kept.
  *  - Long blocks are never candidates.
@@ -45,27 +51,27 @@ const MIN_REMAINING_SHARE = 0.15;
 /** Below this many paragraphs the paste is treated line by line. */
 const MIN_PARAGRAPHS_FOR_BLOCK_MODE = 3;
 
+/** Below this many blocks only the first and the last are candidates. */
+const SMALL_ADVERT_UNITS = 6;
+
 const HEADER_MIN_UNITS = 2;
 const HEADER_SHARE = 0.25;
 const FOOTER_MIN_UNITS = 3;
 const FOOTER_SHARE = 0.35;
 
-/** Cookie notices: needs the word AND a banner-shaped phrase. */
+/** Cookie notices: needs the word AND a banner ACTION. The noun alone is a job. */
 const COOKIE_WORD = 'cookie';
 const COOKIE_PHRASES: readonly string[] = [
   'accept all',
   'accept cookies',
+  'accept and close',
+  'accept & close',
+  'reject all',
+  'reject cookies',
   'we use cookies',
   'uses cookies',
   'use cookies to',
-  'cookie settings',
-  'cookie preferences',
-  'cookie policy',
-  'cookie notice',
-  'manage cookies',
-  'manage your cookie',
-  'reject all',
-  'reject cookies',
+  'use cookies and',
 ];
 
 /** Equal-opportunity and diversity statements. */
@@ -175,19 +181,48 @@ const CONTENT_MARKERS: readonly string[] = [
   'skills',
   'benefits',
   'location',
+  'degree',
+  '2:1',
+  'qualified',
+  'knowledge of',
+  'ability to',
+  'certif',
+  'registered with',
+  'based in',
+  'based at',
+  'hybrid',
+  'remote',
+  'graduate',
 ];
 
 const HEADING_MAX_CHARS = 50;
 
+/** The same invisible characters the scorer's own hygiene removes. */
+const INVISIBLE = /[\u00ad\u200b\u2060\ufeff]/g;
+
+function visible(text: string): string {
+  return text.replace(INVISIBLE, '');
+}
+
+function isBlank(line: string): boolean {
+  return visible(line).trim() === '';
+}
+
 function fold(block: string): string {
-  return block.toLowerCase().replace(/[‘’]/g, "'");
+  return visible(block).toLowerCase().replace(/[‘’]/g, "'");
 }
 
 function hasAny(text: string, phrases: readonly string[]): boolean {
+  return countDistinct(text, phrases) > 0;
+}
+
+/** How many of the phrases appear (each counted once). */
+function countDistinct(text: string, phrases: readonly string[]): number {
+  let found = 0;
   for (const phrase of phrases) {
-    if (text.includes(phrase)) return true;
+    if (text.includes(phrase)) found += 1;
   }
-  return false;
+  return found;
 }
 
 type Region = 'header' | 'footer' | 'both' | 'middle';
@@ -209,11 +244,10 @@ function isBoilerplate(block: string, region: Region): boolean {
   if (text.includes(COOKIE_WORD) && hasAny(text, COOKIE_PHRASES)) {
     return inHeader || inFooter;
   }
-  if (inFooter || inHeader) {
-    if (hasAny(text, EO_PHRASES)) return true;
-    if (inFooter && hasAny(text, AGENCY_PHRASES)) return true;
-  }
-  return false;
+  // Two distinct signals, never one. Agency wording counts only at the bottom.
+  const signals =
+    countDistinct(text, EO_PHRASES) + (inFooter ? countDistinct(text, AGENCY_PHRASES) : 0);
+  return signals >= 2;
 }
 
 function isHeading(block: string): boolean {
@@ -227,7 +261,7 @@ function paragraphsOf(lines: readonly string[]): string[] {
   const out: string[] = [];
   let current: string[] = [];
   for (const line of lines) {
-    if (line.trim() === '') {
+    if (isBlank(line)) {
       if (current.length > 0) out.push(current.join('\n'));
       current = [];
     } else {
@@ -239,6 +273,12 @@ function paragraphsOf(lines: readonly string[]): string[] {
 }
 
 function regionOf(index: number, count: number): Region {
+  if (count < SMALL_ADVERT_UNITS) {
+    const first = index === 0;
+    const last = index === count - 1;
+    if (first && last) return 'both';
+    return first ? 'header' : last ? 'footer' : 'middle';
+  }
   const headerSize = Math.max(HEADER_MIN_UNITS, Math.ceil(count * HEADER_SHARE));
   const footerSize = Math.max(FOOTER_MIN_UNITS, Math.ceil(count * FOOTER_SHARE));
   const inHeader = index < headerSize;
@@ -255,12 +295,12 @@ function regionOf(index: number, count: number): Region {
  * almost nothing.
  */
 export function stripJobBoilerplate(text: string): string {
-  if (typeof text !== 'string' || text.trim() === '') return text;
+  if (typeof text !== 'string' || isBlank(text)) return text;
 
   const lines = text.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
   const paragraphs = paragraphsOf(lines);
   const blockMode = paragraphs.length >= MIN_PARAGRAPHS_FOR_BLOCK_MODE;
-  const units = blockMode ? paragraphs : lines.filter((line) => line.trim() !== '');
+  const units = blockMode ? paragraphs : lines.filter((line) => !isBlank(line));
   if (units.length < 2) return text;
 
   const drop: boolean[] = units.map((unit, i) => isBoilerplate(unit, regionOf(i, units.length)));

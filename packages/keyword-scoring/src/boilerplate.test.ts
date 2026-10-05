@@ -135,12 +135,19 @@ describe('stripJobBoilerplate - boundaries', () => {
   });
 
   it('never returns empty for boilerplate-only input', () => {
-    const only = `${COOKIE_BANNER}\n\n${EO_FOOTER}\n\n${AGENCY_FOOTER}`;
+    const only = `${COOKIE_BANNER}\n\n${AGENCY_FOOTER}`;
     expect(stripJobBoilerplate(only)).toBe(only);
   });
 
   it('returns the original when stripping would leave almost nothing', () => {
-    const text = `Analyst wanted.\n\n${COOKIE_BANNER}\n\n${EO_FOOTER}\n\n${AGENCY_FOOTER}`;
+    const text = [
+      COOKIE_BANNER,
+      'This website uses cookies. Accept all cookies.',
+      'Analyst wanted.',
+      EO_FOOTER,
+      AGENCY_FOOTER,
+      EO_FOOTER,
+    ].join('\n\n');
     expect(stripJobBoilerplate(text)).toBe(text);
   });
 
