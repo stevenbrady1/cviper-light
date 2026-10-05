@@ -913,6 +913,7 @@ export function Tailor({
             prompts={metricPrompts}
             state={metricState}
             onChange={setMetricState}
+            disabled={running}
           />
         </div>
 

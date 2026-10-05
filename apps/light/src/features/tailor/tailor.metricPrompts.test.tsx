@@ -86,11 +86,13 @@ const FAITHFUL = {
  * Answers each chat with the next of `drafts` (the last one repeats), and keeps
  * every prompt it was sent.
  */
+let gate: Promise<void> | null = null;
+
 function recording(...drafts: readonly unknown[]) {
   const queue = drafts.length === 0 ? [FAITHFUL] : drafts;
   const prompts: string[] = [];
   const transport: ChatTransport = {
-    chat: (_provider, body) => {
+    chat: async (_provider, body) => {
       const parsed = JSON.parse(body) as { messages: { content: string }[] };
       prompts.push(parsed.messages.map((message) => message.content).join('\n'));
       const draft = queue[Math.min(prompts.length - 1, queue.length - 1)];
@@ -101,7 +103,8 @@ function recording(...drafts: readonly unknown[]) {
           done_reason: 'stop',
         }),
       });
-      return Promise.resolve(reply);
+      if (gate !== null) await gate;
+      return reply;
     },
     listModels: () => Promise.resolve(ok({ status: 200, body: TAGS })),
   };
@@ -119,7 +122,12 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  gate = null;
+  autoExpand = true;
 });
+
+/** Most tests want the boxes open; the collapsed-state tests turn this off. */
+let autoExpand = true;
 
 const HANDOFF: TailorHandoff = {
   jobId: null,
@@ -129,11 +137,12 @@ const HANDOFF: TailorHandoff = {
   keywordGaps: { cvId: 'cv-2', advert: ADVERT, gaps: ['Power BI', 'stakeholders'] },
 };
 
-async function renderWith(handoff: TailorHandoff | null, ...drafts: readonly unknown[]) {
-  const { prompts, transport } = recording(...drafts);
-  const onHandoffHandled = vi.fn();
-  const user = userEvent.setup();
-  render(
+function screenFor(
+  transport: ChatTransport,
+  handoff: TailorHandoff | null,
+  onHandoffHandled: () => void,
+) {
+  return (
     <Tailor
       port={createFakeTailorPort({ cvs: [cv('cv-1', 'CV.docx'), cv('cv-2', 'Banking CV.docx')] })}
       filePort={createFakeFilePort()}
@@ -142,11 +151,32 @@ async function renderWith(handoff: TailorHandoff | null, ...drafts: readonly unk
       now={new Date('2026-09-29T09:00:00.000Z')}
       handoff={handoff}
       onHandoffHandled={onHandoffHandled}
-    />,
+    />
   );
+}
+
+async function renderWith(handoff: TailorHandoff | null, ...drafts: readonly unknown[]) {
+  const { prompts, transport } = recording(...drafts);
+  const onHandoffHandled = vi.fn();
+  const user = userEvent.setup();
+  const view = render(screenFor(transport, handoff, onHandoffHandled));
   await screen.findByTestId('view-tailor');
   if (handoff !== null) await vi.waitFor(() => expect(onHandoffHandled).toHaveBeenCalled());
-  return { prompts, user };
+  if (autoExpand) await expandAll(user);
+  const rerenderWith = (next: TailorHandoff | null) => {
+    view.rerender(screenFor(transport, next, onHandoffHandled));
+  };
+  return { prompts, user, rerenderWith };
+}
+
+/** Open the list and every box, as a user who wants to type would. */
+async function expandAll(user: ReturnType<typeof userEvent.setup>) {
+  const details = screen.queryByTestId('tailor-metric-prompts')?.querySelector('details');
+  if (details === null || details === undefined) return;
+  details.open = true;
+  for (const button of screen.queryAllByRole('button', { name: /^Add a metric/ })) {
+    await user.click(button);
+  }
 }
 
 async function tailor(user: ReturnType<typeof userEvent.setup>, prompts: string[]) {
@@ -156,11 +186,11 @@ async function tailor(user: ReturnType<typeof userEvent.setup>, prompts: string[
   return prompts[0]!;
 }
 
-/** The box for one skill, found by its question. */
+/** The box for one skill. */
 function box(skill: string): HTMLElement {
   const found = screen
     .getAllByTestId('tailor-metric-prompt')
-    .find((element) => element.textContent?.includes(QUESTION(skill)));
+    .find((element) => element.getAttribute('data-skill') === skill);
   if (found === undefined) throw new Error(`no box for ${skill}`);
   return found;
 }
@@ -235,9 +265,11 @@ describe('metric prompts on the Tailor screen (L-205)', () => {
 
   it('negative: whitespace-only input cannot be approved', async () => {
     const { prompts, user } = await renderWith(HANDOFF);
-    expect(addButton('Power BI').disabled).toBe(true);
+    expect(addButton('Power BI').getAttribute('aria-disabled')).toBe('true');
     await user.type(input('Power BI'), '   ');
-    expect(addButton('Power BI').disabled).toBe(true);
+    expect(addButton('Power BI').getAttribute('aria-disabled')).toBe('true');
+    await user.click(addButton('Power BI'));
+    expect(box('Power BI').getAttribute('data-status')).toBe('editing');
     expect((await tailor(user, prompts)).includes(HEADING)).toBe(false);
   });
 
@@ -249,7 +281,7 @@ describe('metric prompts on the Tailor screen (L-205)', () => {
     expect(document.activeElement).toBe(addButton('Power BI'));
     await user.keyboard('{Enter}');
 
-    expect(within(box('Power BI')).getByText(/added to your rewrite/i)).toBeTruthy();
+    expect(within(box('Power BI')).getByText(/we.ll use this in your next rewrite/i)).toBeTruthy();
     expect(await tailor(user, prompts)).toContain('- [Power BI] Saved 3 hours a week');
   });
 
@@ -359,5 +391,214 @@ describe('metric prompts on the Tailor screen (L-205)', () => {
       expect(prompts[1]).not.toContain('CANDIDATE-SUPPLIED');
       expect(prompts[2]).not.toContain('CANDIDATE-SUPPLIED');
     });
+  });
+});
+
+describe('collapsible, accessible boxes (D1-D7)', () => {
+  beforeEach(() => {
+    autoExpand = false;
+  });
+
+  const list = () => screen.getByTestId('tailor-metric-prompts');
+  const details = () => list().querySelector('details') as HTMLDetailsElement;
+  const open = (skill: string) =>
+    within(box(skill)).getByRole('button', { name: `Add a metric, ${skill}` });
+
+  it('D5: one closed details with a count, an intro line, and every gap collapsed', async () => {
+    await renderWith(HANDOFF);
+    expect(details().open).toBe(false);
+    expect(within(list()).getByText(/Add a number or result for your gaps/).textContent).toBe(
+      'Add a number or result for your gaps (optional, 0 of 2 added)',
+    );
+    expect(
+      within(list()).getByText(
+        'Optional: if you have a real number or result for any of these, add it. Skip the rest.',
+      ),
+    ).toBeTruthy();
+    expect(list().querySelector('textarea')).toBeNull();
+    expect(box('Power BI').textContent).toContain('Power BI');
+    expect(box('Power BI').textContent).not.toContain('We found a keyword/skill gap');
+  });
+
+  it('D5: expanding shows the exact sentence; approving updates the count; skipping collapses to a line', async () => {
+    const { user } = await renderWith(HANDOFF);
+    details().open = true;
+    await user.click(open('Power BI'));
+    expect(box('Power BI').textContent).toContain(QUESTION('Power BI'));
+    await user.type(input('Power BI'), 'Saved 3 hours');
+    await user.click(addButton('Power BI'));
+    expect(within(list()).getByText(/optional, 1 of 2 added/)).toBeTruthy();
+
+    await user.click(open('stakeholders'));
+    await user.click(within(box('stakeholders')).getByRole('button', { name: /^Not now/ }));
+    expect(box('stakeholders').textContent).toContain('skipped');
+    expect(box('stakeholders').querySelector('textarea')).toBeNull();
+  });
+
+  it('D7: a list of groups, each named by its question when open and its skill when collapsed', async () => {
+    const { user } = await renderWith(HANDOFF);
+    details().open = true;
+    expect(list().querySelectorAll('ul > li')).toHaveLength(2);
+    expect(within(list()).getByRole('group', { name: 'Power BI' })).toBeTruthy();
+    await user.click(open('Power BI'));
+    expect(within(list()).getByRole('group', { name: QUESTION('Power BI') })).toBeTruthy();
+  });
+
+  it('D7: button names start with their visible text and name the skill', async () => {
+    const { user } = await renderWith(HANDOFF);
+    details().open = true;
+    await user.click(open('Power BI'));
+    const b = within(box('Power BI'));
+    expect(b.getByRole('button', { name: 'Add to rewrite, Power BI' }).textContent).toBe(
+      'Add to rewrite',
+    );
+    expect(b.getByRole('button', { name: 'Not now, Power BI' }).textContent).toBe('Not now');
+    await user.type(input('Power BI'), 'Saved 3 hours');
+    await user.click(addButton('Power BI'));
+    expect(b.getByRole('button', { name: 'Change, Power BI' }).textContent).toBe('Change');
+    const remove = b.getByRole('button', { name: 'Remove from rewrite, Power BI' });
+    expect(remove.textContent).toBe('Remove');
+    expect(remove.parentElement?.className).toContain('flex-wrap');
+  });
+
+  it('D1: focus follows the user through every state change', async () => {
+    const { user } = await renderWith(HANDOFF);
+    details().open = true;
+    await user.click(open('Power BI'));
+    expect(document.activeElement).toBe(input('Power BI'));
+
+    await user.type(input('Power BI'), 'Saved 3 hours');
+    await user.click(addButton('Power BI'));
+    const change = within(box('Power BI')).getByRole('button', { name: /^Change/ });
+    expect(document.activeElement).toBe(change);
+
+    await user.click(change);
+    expect(document.activeElement).toBe(input('Power BI'));
+
+    await user.click(within(box('Power BI')).getByRole('button', { name: /^Not now/ }));
+    expect(document.activeElement).toBe(open('Power BI'));
+
+    await user.click(open('Power BI'));
+    await user.click(addButton('Power BI'));
+    await user.click(within(box('Power BI')).getByRole('button', { name: /^Remove/ }));
+    expect(document.activeElement).toBe(open('Power BI'));
+  });
+
+  it('D2: one polite status announces additions, skips and removals', async () => {
+    const { user } = await renderWith(HANDOFF);
+    details().open = true;
+    const status = within(list()).getByRole('status');
+    expect(status.className).toContain('sr-only');
+
+    await user.click(open('Power BI'));
+    await user.type(input('Power BI'), 'Saved 3 hours');
+    await user.click(addButton('Power BI'));
+    expect(status.textContent).toBe('Added to rewrite for Power BI');
+
+    await user.click(open('stakeholders'));
+    await user.click(within(box('stakeholders')).getByRole('button', { name: /^Not now/ }));
+    expect(status.textContent).toBe('stakeholders skipped');
+  });
+
+  it('D3: the limit is enforced by the field and shown as a live counter', async () => {
+    const { user } = await renderWith(HANDOFF);
+    details().open = true;
+    await user.click(open('Power BI'));
+    expect(input('Power BI').maxLength).toBe(300);
+    expect(box('Power BI').textContent).toContain('0 / 300');
+    await user.type(input('Power BI'), 'abc');
+    expect(box('Power BI').textContent).toContain('3 / 300');
+  });
+
+  it('D4: the approved line is text-success with an icon, and the hint is not faint', async () => {
+    const { user } = await renderWith(HANDOFF);
+    details().open = true;
+    await user.click(open('Power BI'));
+    expect(box('Power BI').querySelector('.text-ink-faint')).toBeNull();
+    await user.type(input('Power BI'), 'Saved 3 hours');
+    await user.click(addButton('Power BI'));
+    const line = within(box('Power BI')).getByText(/We.ll use this in your next rewrite/);
+    expect(line.className).toContain('text-success');
+    expect(line.querySelector('svg')).not.toBeNull();
+    expect(line.textContent).toContain('Added.');
+  });
+
+  it('D6: an empty Add button stays focusable, says why, and does nothing when pressed', async () => {
+    const { user } = await renderWith(HANDOFF);
+    details().open = true;
+    await user.click(open('Power BI'));
+    const add = addButton('Power BI');
+    expect(add.getAttribute('aria-disabled')).toBe('true');
+    expect(add.hasAttribute('disabled')).toBe(false);
+    const hint = document.getElementById(add.getAttribute('aria-describedby') ?? '');
+    expect(hint?.textContent).toBe('Type something first');
+    await user.click(add);
+    expect(box('Power BI').getAttribute('data-status')).toBe('editing');
+    await user.type(input('Power BI'), 'x');
+    expect(addButton('Power BI').getAttribute('aria-disabled')).toBe('false');
+  });
+
+  it('boundary: a gap named constructor is an ordinary box', async () => {
+    const { user, prompts } = await renderWith({
+      ...HANDOFF,
+      keywordGaps: { cvId: 'cv-2', advert: ADVERT, gaps: ['constructor'] },
+    });
+    details().open = true;
+    await user.click(open('constructor'));
+    await user.type(input('constructor'), 'Saved 3 hours');
+    await user.click(addButton('constructor'));
+    expect(await tailor(user, prompts)).toContain('- [constructor] Saved 3 hours');
+  });
+});
+
+describe('state across edits and runs (C8)', () => {
+  it('Change, edit, then run without re-approving: nothing is sent for that gap', async () => {
+    const { prompts, user } = await renderWith(HANDOFF);
+    await user.type(input('Power BI'), 'Saved 3 hours');
+    await user.click(addButton('Power BI'));
+    await user.click(within(box('Power BI')).getByRole('button', { name: /^Change/ }));
+    await user.type(input('Power BI'), ' and then some');
+
+    const sent = await tailor(user, prompts);
+    expect(sent).not.toContain('Saved 3 hours');
+    expect(sent).not.toContain(HEADING);
+  });
+
+  it('a new handoff starts from a clean slate', async () => {
+    const { user, rerenderWith } = await renderWith(HANDOFF);
+    await user.type(input('Power BI'), 'Saved 3 hours');
+    await user.click(addButton('Power BI'));
+    expect(box('Power BI').getAttribute('data-status')).toBe('approved');
+
+    rerenderWith({
+      ...HANDOFF,
+      keywordGaps: { cvId: 'cv-2', advert: ADVERT, gaps: ['Power BI', 'stakeholders'] },
+    });
+    await vi.waitFor(() => {
+      expect(box('Power BI').getAttribute('data-status')).toBe('idle');
+    });
+  });
+
+  it('the boxes cannot be changed while a run is in progress', async () => {
+    const { prompts, user } = await renderWith(HANDOFF);
+    await user.type(input('Power BI'), 'Saved 3 hours');
+    let release: () => void = () => undefined;
+    gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    await user.click(screen.getByTestId('tailor-run'));
+    await vi.waitFor(() => {
+      expect(input('Power BI').disabled).toBe(true);
+    });
+    expect(
+      within(box('stakeholders')).getByRole<HTMLButtonElement>('button', { name: /^Not now/ })
+        .disabled,
+    ).toBe(true);
+
+    release();
+    await screen.findByTestId('tailor-result');
+    expect(prompts).toHaveLength(1);
+    expect(input('Power BI').disabled).toBe(false);
   });
 });
