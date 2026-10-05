@@ -139,6 +139,15 @@ describe('stripJobBoilerplate - boundaries', () => {
     expect(stripJobBoilerplate(only)).toBe(only);
   });
 
+  it('three boilerplate-only blocks are never emptied: the middle one survives', () => {
+    const only = `${COOKIE_BANNER}\n\n${EO_FOOTER}\n\n${AGENCY_FOOTER}`;
+    const out = stripJobBoilerplate(only);
+    expect(out).not.toBe('');
+    // Cookie (first) and agency (last) go; the middle block is never a
+    // candidate in a short advert, and it is long enough to be kept.
+    expect(out).toBe(EO_FOOTER);
+  });
+
   it('returns the original when stripping would leave almost nothing', () => {
     const text = [
       COOKIE_BANNER,

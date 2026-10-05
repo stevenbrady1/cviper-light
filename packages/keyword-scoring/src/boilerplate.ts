@@ -91,6 +91,11 @@ const EO_PHRASES: readonly string[] = [
   'celebrate diversity',
   'diverse and inclusive',
   'diversity and inclusion statement',
+  'all qualified applicants',
+  'without regard to',
+  'equality, diversity and inclusion',
+  'from all backgrounds',
+  'of all backgrounds',
   'welcome applications from',
   'welcomes applications from',
 ];
@@ -193,7 +198,37 @@ const CONTENT_MARKERS: readonly string[] = [
   'hybrid',
   'remote',
   'graduate',
+  'build',
+  'maintain',
+  'implement',
+  'own the',
+  'champion',
 ];
+
+/**
+ * Boilerplate idioms that happen to contain a content-marker word ("qualified",
+ * "ability to", "essential", "you have", "experience of"). They are blanked
+ * before the marker check so they cannot save the block. Each starts or ends
+ * on a word boundary a real duty would not share: " qualified candidates" has
+ * its leading space so "CIPP-qualified candidates" is still a requirement.
+ */
+const MARKER_IDIOMS: readonly string[] = [
+  'all qualified applicants',
+  'qualified applicants',
+  'suitably qualified',
+  ' qualified candidates',
+  'disability to',
+  'essential cookies',
+  'if you have not heard',
+  'assume you have',
+  'experience of our',
+];
+
+function withoutIdioms(text: string): string {
+  let out = text;
+  for (const idiom of MARKER_IDIOMS) out = out.split(idiom).join(' ');
+  return out;
+}
 
 const HEADING_MAX_CHARS = 50;
 
@@ -239,7 +274,7 @@ function isBoilerplate(block: string, region: Region): boolean {
 
   if (CHROME_LINES.has(text.replace(/[.:]+$/, ''))) return true;
 
-  if (hasAny(text, CONTENT_MARKERS)) return false;
+  if (hasAny(withoutIdioms(text), CONTENT_MARKERS)) return false;
 
   if (text.includes(COOKIE_WORD) && hasAny(text, COOKIE_PHRASES)) {
     return inHeader || inFooter;
