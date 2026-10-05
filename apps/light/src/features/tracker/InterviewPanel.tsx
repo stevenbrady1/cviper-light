@@ -447,7 +447,7 @@ export function InterviewPanel({
                 {pack.gaps_to_bridge.map((gap, index) => (
                   <li
                     key={`${index}-${gap}`}
-                    className="rounded-pill bg-gold/10 px-2 py-0.5 text-xs text-gold"
+                    className="rounded-pill bg-gold/10 px-2 py-0.5 text-xs text-gold-ink"
                   >
                     {gap}
                   </li>

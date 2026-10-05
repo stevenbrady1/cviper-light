@@ -38,8 +38,8 @@ const VERDICT_LABEL: Record<Verdict, string> = {
  * is entitled to deliver in the colour it uses for deleting things.
  */
 const VERDICT_TONE: Record<Verdict, string> = {
-  strong: 'bg-teal/10 text-teal',
-  possible: 'bg-gold/10 text-gold',
+  strong: 'bg-teal/10 text-teal-ink',
+  possible: 'bg-gold/10 text-gold-ink',
   weak: 'bg-sunken text-ink-muted',
 };
 
@@ -50,7 +50,7 @@ const PRIORITY_LABEL: Record<SuggestionPriority, string> = {
 };
 
 const PRIORITY_TONE: Record<SuggestionPriority, string> = {
-  high: 'bg-gold/10 text-gold',
+  high: 'bg-gold/10 text-gold-ink',
   medium: 'bg-sunken text-ink-muted',
   low: 'bg-sunken text-ink-faint',
 };
@@ -163,7 +163,7 @@ export function AnalysisResult({
         data-testid="analysis-provenance"
         data-provider={provider}
         className={`rounded-control px-3 py-2 ${
-          isKeyword ? 'bg-gold/10 text-gold' : 'bg-sunken text-ink-muted'
+          isKeyword ? 'bg-gold/10 text-gold-ink' : 'bg-sunken text-ink-muted'
         }`}
       >
         {provenance}
@@ -242,7 +242,7 @@ export function AnalysisResult({
           <Eyebrow>What you have</Eyebrow>
           <TermChips
             terms={analysis.matched_skills}
-            tone="bg-teal/10 text-teal"
+            tone="bg-teal/10 text-teal-ink"
             emptyText="None of the advert&rsquo;s skills were found on your CV."
             testId="analysis-matched-skills"
           />
@@ -251,7 +251,7 @@ export function AnalysisResult({
           <Eyebrow>What they asked for and could not find</Eyebrow>
           <TermChips
             terms={analysis.missing_skills}
-            tone="bg-gold/10 text-gold"
+            tone="bg-gold/10 text-gold-ink"
             emptyText="Nothing the advert asks for is missing."
             testId="analysis-missing-skills"
           />

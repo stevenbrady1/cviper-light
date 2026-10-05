@@ -28,18 +28,18 @@ const STATUS_WORD: Readonly<Record<CheckStatus, string>> = {
 };
 
 const STATUS_TONE: Readonly<Record<CheckStatus, string>> = {
-  pass: 'whitespace-nowrap text-teal',
-  warn: 'whitespace-nowrap text-gold',
-  fail: 'whitespace-nowrap font-medium text-gold',
+  pass: 'whitespace-nowrap text-teal-ink',
+  warn: 'whitespace-nowrap text-gold-ink',
+  fail: 'whitespace-nowrap font-medium text-gold-ink',
 };
 
 function Delta({ value }: { readonly value: number | null }) {
   if (value === null) return <span className="text-ink-faint">—</span>;
   if (value === 0) return <span className="whitespace-nowrap text-ink-faint">no change</span>;
   return value > 0 ? (
-    <span className="whitespace-nowrap text-teal">▲ +{value}</span>
+    <span className="whitespace-nowrap text-teal-ink">▲ +{value}</span>
   ) : (
-    <span className="whitespace-nowrap text-gold">▼ {value}</span>
+    <span className="whitespace-nowrap text-gold-ink">▼ {value}</span>
   );
 }
 
@@ -188,7 +188,7 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
       <p
         data-testid="tailor-ats-fabrication"
         data-clean={fabrication.clean ? 'true' : 'false'}
-        className={fabrication.clean ? 'text-xs text-teal' : 'text-xs text-gold'}
+        className={fabrication.clean ? 'text-xs text-teal-ink' : 'text-xs text-gold-ink'}
       >
         {fabrication.clean
           ? 'Fabrication check: every employer, year, certification and figure is in your original CV.'

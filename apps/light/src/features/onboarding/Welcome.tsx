@@ -152,8 +152,8 @@ export function Welcome({ onDismiss, detect }: WelcomeProps) {
               data-testid={`welcome-requirement-${card.id}`}
               className={
                 card.id === 'tracker'
-                  ? 'mt-1 rounded-pill bg-teal/10 px-2 py-0.5 text-xs font-medium text-teal'
-                  : 'mt-1 rounded-pill bg-gold/10 px-2 py-0.5 text-xs font-medium text-gold'
+                  ? 'mt-1 rounded-pill bg-teal/10 px-2 py-0.5 text-xs font-medium text-teal-ink'
+                  : 'mt-1 rounded-pill bg-gold/10 px-2 py-0.5 text-xs font-medium text-gold-ink'
               }
             >
               {card.requirement}

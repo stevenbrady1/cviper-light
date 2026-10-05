@@ -183,10 +183,10 @@ export const KEY_STATE_LABEL: Record<KeyState, string> = {
  * none of these four is either.
  */
 export const KEY_STATE_TONE: Record<KeyState, string> = {
-  configured: 'bg-teal/10 text-teal',
-  incomplete: 'bg-gold/10 text-gold',
+  configured: 'bg-teal/10 text-teal-ink',
+  incomplete: 'bg-gold/10 text-gold-ink',
   missing: 'bg-sunken text-ink-muted',
-  unreadable: 'bg-gold/10 text-gold',
+  unreadable: 'bg-gold/10 text-gold-ink',
 };
 
 /**

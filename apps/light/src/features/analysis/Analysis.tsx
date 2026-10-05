@@ -746,7 +746,7 @@ export function Analysis({
               <p
                 role="status"
                 data-testid="analysis-export-message"
-                className="mt-2 rounded-control bg-teal/10 px-3 py-2 break-all text-teal"
+                className="mt-2 rounded-control bg-teal/10 px-3 py-2 break-all text-teal-ink"
               >
                 {exportMessage}
               </p>
@@ -765,7 +765,7 @@ export function Analysis({
             {warnings.length === 0 ? null : (
               <ul
                 data-testid="analysis-cv-warnings"
-                className="mt-2 space-y-1 rounded-control bg-gold/10 px-3 py-2 text-gold"
+                className="mt-2 space-y-1 rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
               >
                 {warnings.map((warning) => (
                   <li key={warning}>{warning}</li>
@@ -786,7 +786,7 @@ export function Analysis({
               <p
                 role="status"
                 data-testid="analysis-job-note"
-                className="mb-2 rounded-control bg-gold/10 px-3 py-2 text-gold"
+                className="mb-2 rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
               >
                 {jobNote}
               </p>
@@ -873,7 +873,7 @@ export function Analysis({
             {localModelHint === null ? null : (
               <p
                 data-testid="analysis-ollama-hint"
-                className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold"
+                className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
               >
                 {localModelHint}
               </p>

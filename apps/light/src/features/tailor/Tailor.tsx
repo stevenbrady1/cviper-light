@@ -951,7 +951,7 @@ export function Tailor({
           {localModelHint === null ? null : (
             <p
               data-testid="tailor-ollama-hint"
-              className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold"
+              className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
             >
               {localModelHint}
             </p>
@@ -1013,7 +1013,7 @@ export function Tailor({
           <p
             role="status"
             data-testid="tailor-save-message"
-            className="rounded-control bg-teal/10 px-3 py-2 break-all text-teal"
+            className="rounded-control bg-teal/10 px-3 py-2 break-all text-teal-ink"
           >
             {saveMessage}
           </p>
@@ -1039,8 +1039,8 @@ export function Tailor({
               data-clean={result.report.clean ? 'true' : 'false'}
               className={
                 result.report.clean
-                  ? 'rounded-control bg-teal/10 px-3 py-2 text-teal'
-                  : 'rounded-control bg-gold/10 px-3 py-2 text-gold'
+                  ? 'rounded-control bg-teal/10 px-3 py-2 text-teal-ink'
+                  : 'rounded-control bg-gold/10 px-3 py-2 text-gold-ink'
               }
             >
               {result.report.clean ? (
@@ -1190,7 +1190,7 @@ export function Tailor({
                 {letter.claims.length === 0 ? null : (
                   <div
                     data-testid="tailor-letter-claims"
-                    className="rounded-control bg-gold/10 px-3 py-2 text-gold"
+                    className="rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
                   >
                     <p className="font-medium">
                       Check these figures — they are not in your original CV:
@@ -1216,7 +1216,7 @@ export function Tailor({
                 {letter.words > LETTER_WORD_LIMIT ? (
                   <p
                     data-testid="tailor-letter-long"
-                    className="rounded-control bg-gold/10 px-3 py-2 text-gold"
+                    className="rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
                   >
                     Over {LETTER_WORD_LIMIT} words. A letter this long is a second page most readers
                     skip — cut a paragraph.

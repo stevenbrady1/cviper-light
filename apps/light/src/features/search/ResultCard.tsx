@@ -60,8 +60,8 @@ import { describeSalary, formatSalary } from './salary';
 
 /** The verdict pill's tones — the same three the Analysis screen uses. */
 const RANK_TONE: Readonly<Record<Verdict, string>> = {
-  strong: 'bg-teal/10 text-teal',
-  possible: 'bg-gold/10 text-gold',
+  strong: 'bg-teal/10 text-teal-ink',
+  possible: 'bg-gold/10 text-gold-ink',
   weak: 'bg-sunken text-ink-muted',
 };
 
@@ -186,7 +186,7 @@ export function ResultCard({
             <span
               key={text}
               data-testid={`result-dealbreaker-${job.id}-${index}`}
-              className="rounded-pill bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold"
+              className="rounded-pill bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold-ink"
             >
               Deal-breaker: {text}
             </span>
@@ -197,7 +197,7 @@ export function ResultCard({
       {clusterSize === null ? null : (
         <p
           data-testid={`result-cluster-${job.id}`}
-          className="mt-2 rounded-control bg-gold/10 px-3 py-1.5 text-xs text-gold"
+          className="mt-2 rounded-control bg-gold/10 px-3 py-1.5 text-xs text-gold-ink"
         >
           {describeCluster(clusterSize)}. Every one is still listed, with its own apply link —
           CViper never removes an advert it thinks is a copy.
@@ -250,7 +250,11 @@ export function ResultCard({
       </div>
 
       {note === null ? null : (
-        <p role="status" data-testid={`result-note-${job.id}`} className="mt-2 text-xs text-teal">
+        <p
+          role="status"
+          data-testid={`result-note-${job.id}`}
+          className="mt-2 text-xs text-teal-ink"
+        >
           {note}
         </p>
       )}

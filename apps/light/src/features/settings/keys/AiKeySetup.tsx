@@ -349,7 +349,7 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
         <p
           role="status"
           data-testid={`ai-key-result-${provider.id}`}
-          className="mt-3 rounded-control bg-teal/10 px-3 py-2 text-teal"
+          className="mt-3 rounded-control bg-teal/10 px-3 py-2 text-teal-ink"
         >
           {outcome.passed}
         </p>

@@ -100,7 +100,9 @@ function Rate({
   return (
     <p data-testid={testId}>
       {label}{' '}
-      <span className={`font-mono tabular-nums ${rate === null ? 'text-ink-faint' : 'text-teal'}`}>
+      <span
+        className={`font-mono tabular-nums ${rate === null ? 'text-ink-faint' : 'text-teal-ink'}`}
+      >
         {formatRate(rate)}
       </span>
     </p>

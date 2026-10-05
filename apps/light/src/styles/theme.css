@@ -61,6 +61,18 @@
   --color-teal: #0e9f6e;
   --color-gold: #c27803;
 
+  /*
+   * Teal and gold AS TEXT (L-209). The brand teal and gold are fills and marks:
+   * on white they measure 3.4:1 and 3.5:1, and on their own 10% tint (the pill
+   * and notice backgrounds) about 2.7:1, under the 4.5:1 WCAG 2.1 AA asks of
+   * normal text. These are the same two hues, darkened until they clear 4.5:1 on
+   * every surface and tint the app uses. Use `text-teal-ink` / `text-gold-ink`
+   * for words; keep `bg-teal`, `border-teal` and the tints for the marks.
+   * `contrast.contract.test.ts` enforces it.
+   */
+  --color-teal-ink: #0a6c4b;
+  --color-gold-ink: #885402;
+
   /* --- Surfaces --------------------------------------------------------- */
   /* canvas is the page, sunken is a well cut into it, card sits on top. */
   --color-canvas: #f7f8fa;
@@ -71,7 +83,7 @@
   /* --- Ink -------------------------------------------------------------- */
   --color-ink: #0b1729;
   --color-ink-muted: #46536a;
-  --color-ink-faint: #6e7c93;
+  --color-ink-faint: #586376;
 
   /*
    * Ink ON navy. These are the SAME two values as `canvas` and `line` — no new
@@ -89,7 +101,7 @@
   /* --- State ------------------------------------------------------------ */
   --color-success: #0e7c5a;
   --color-warning: #b45309;
-  --color-danger: #c0362c;
+  --color-danger: #b5332a;
 
   /* --- Radii: EXACTLY THREE --------------------------------------------- */
   /*
