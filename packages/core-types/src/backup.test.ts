@@ -66,6 +66,7 @@ function makeFixture(): BackupPayload {
     app: { name: 'cviper-light', version: '0.1.0' },
     profile: null,
     documents: [],
+    interview_substages: [{ id: 'sub-001', name: 'Second round', position: 0 }],
     jobs: [
       {
         // Adzuna, every salary field populated. `salary_period: 'day'` is the
@@ -116,6 +117,7 @@ function makeFixture(): BackupPayload {
         next_action: 'Prepare STAR answers on risk governance',
         next_action_date: '2026-08-21',
         updated_at: '2026-08-14T16:45:00.000Z',
+        interview_substage_id: 'sub-001',
       },
       {
         id: 'app-002',
@@ -126,6 +128,7 @@ function makeFixture(): BackupPayload {
         next_action: null,
         next_action_date: null,
         updated_at: '2026-08-13T11:05:00.000Z',
+        interview_substage_id: null,
       },
     ],
     cvs: [
@@ -161,6 +164,7 @@ function makeEmptyFixture(): BackupPayload {
     app: { name: 'cviper-light', version: '0.1.0' },
     profile: null,
     documents: [],
+    interview_substages: [],
     jobs: [],
     applications: [],
     cvs: [],
@@ -392,6 +396,7 @@ describe('backup round-trip', () => {
       analyses: second.analyses,
       cvs: second.cvs,
       documents: second.documents,
+      interview_substages: second.interview_substages,
       applications: second.applications,
       jobs: second.jobs,
       profile: second.profile,

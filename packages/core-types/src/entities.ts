@@ -120,6 +120,39 @@ export interface Application {
   next_action: string | null;
   next_action_date: IsoDate | null;
   updated_at: IsoTimestamp;
+  /**
+   * The user's own sub-stage within `interviewing` (L-205), or none. Only ever
+   * set while `status` is `interviewing`; leaving that column clears it.
+   *
+   * OPTIONAL, and absent means "none": it arrived after v1 shipped, so every
+   * older record and every older export lacks it. Readers treat `undefined`
+   * and `null` identically; the database and the exporter always say `null`.
+   */
+  interview_substage_id?: string | null | undefined;
+  /** @internal forward-compatibility bag — see `ExtraFields`. */
+  __extra?: ExtraFields;
+}
+
+/** The most sub-stages a person may define. Generous; a card-sized board needs few. */
+export const INTERVIEW_SUBSTAGES_MAX = 20;
+
+/** The longest a sub-stage name may be, once trimmed. */
+export const INTERVIEW_SUBSTAGE_NAME_MAX = 40;
+
+/**
+ * One user-defined step inside the Interviewing column (L-205), e.g.
+ * "HR Screen", "Technical Test", "Panel Round", "Final".
+ *
+ * The five `ApplicationStatus` values are frozen by contract with the cloud
+ * app, so sub-stages are NOT new statuses: they are labels the user hangs on
+ * cards that are already `interviewing`. Deleting one never deletes a card — it
+ * only takes the label off (`ON DELETE SET NULL`).
+ */
+export interface InterviewSubstage {
+  id: string;
+  name: string;
+  /** Display order, ascending, from 0. */
+  position: number;
   /** @internal forward-compatibility bag — see `ExtraFields`. */
   __extra?: ExtraFields;
 }
@@ -311,6 +344,15 @@ export const ApplicationSchema = z.object({
   next_action: z.string().nullable(),
   next_action_date: isoDate.nullable(),
   updated_at: isoTimestamp,
+  // Added in L-205. Absent in every record written before it, which reads as
+  // "no sub-stage". Present-but-not-a-string is a broken file, not an old one.
+  interview_substage_id: z.string().nullable().optional(),
+});
+
+export const InterviewSubstageSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().trim().min(1).max(INTERVIEW_SUBSTAGE_NAME_MAX),
+  position: z.number().int().min(0),
 });
 
 export const CvSchema = z.object({
@@ -384,6 +426,14 @@ export type _ApplicationSchemaMatchesType = AssertAssignable<
 export type _ApplicationTypeMatchesSchema = AssertAssignable<
   Application,
   z.infer<typeof ApplicationSchema>
+>;
+export type _InterviewSubstageSchemaMatchesType = AssertAssignable<
+  z.infer<typeof InterviewSubstageSchema>,
+  InterviewSubstage
+>;
+export type _InterviewSubstageTypeMatchesSchema = AssertAssignable<
+  InterviewSubstage,
+  z.infer<typeof InterviewSubstageSchema>
 >;
 export type _CvSchemaMatchesType = AssertAssignable<z.infer<typeof CvSchema>, Cv>;
 export type _CvTypeMatchesSchema = AssertAssignable<Cv, z.infer<typeof CvSchema>>;

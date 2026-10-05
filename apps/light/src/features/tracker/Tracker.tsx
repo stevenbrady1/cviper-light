@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { type ApplicationStatus } from '@cviper/core-types';
+import {
+  ok,
+  type ApplicationStatus,
+  type InterviewSubstage,
+  type Result,
+} from '@cviper/core-types';
 
 import { type ChatTransport } from '@cviper/ai-providers';
 
@@ -17,9 +22,11 @@ import { type Availability } from '../analysis/providers';
 
 import { ApplicationDetail } from './ApplicationDetail';
 import { FunnelStrip } from './FunnelStrip';
+import { addSubstage, moveSubstage, removeSubstage, renameSubstage } from './interviewSubstages';
 import { NewApplicationForm } from './NewApplicationForm';
 import { type PageFetchTransport } from './pageFetch';
 import { PasteJobForm } from './PasteJobForm';
+import { SubstageEditor } from './SubstageEditor';
 import { TrackerColumn } from './TrackerColumn';
 import {
   TRACKER_COLUMNS,
@@ -27,6 +34,7 @@ import {
   groupByStatus,
   withEdit,
   withStatus,
+  withSubstage,
   type ApplicationDraft,
   type TrackerEntry,
 } from './model';
@@ -132,6 +140,7 @@ type Pane =
   | { kind: 'closed' }
   | { kind: 'new'; initial?: ApplicationDraft; notice?: string; fromPaste?: true }
   | { kind: 'paste' }
+  | { kind: 'substages' }
   | { kind: 'entry'; applicationId: string };
 
 export function Tracker({
@@ -162,6 +171,16 @@ export function Tracker({
   const loadRequest = useRef(0);
   const [pane, setPane] = useState<Pane>({ kind: 'closed' });
   const [settlingId, setSettlingId] = useState<string | null>(null);
+  /**
+   * The user's interview sub-stages (L-205), and whether they were READ.
+   *
+   * The second matters more than it looks. Saving replaces the stored list with
+   * this one, so editing after a failed read would write an empty list over the
+   * real one. Until `substagesLoaded`, nothing that edits them is offered.
+   */
+  const [substages, setSubstages] = useState<readonly InterviewSubstage[]>([]);
+  const [substagesLoaded, setSubstagesLoaded] = useState(false);
+  const substagesRef = useRef<readonly InterviewSubstage[]>([]);
   /**
    * What this machine can offer the detail pane's AI panels. `null` until the
    * first card is opened: the probe (Ollama's port, the credential store) is
@@ -219,6 +238,31 @@ export function Tracker({
       loadRequest.current += 1;
     };
   }, [loadEntries]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void trackerPort
+      .substages()
+      .then((read) => {
+        if (cancelled) return;
+        if (read.ok) {
+          substagesRef.current = read.value;
+          setSubstages(read.value);
+          setSubstagesLoaded(true);
+        } else {
+          // The board still works without them; only the editing is withheld.
+          setError(
+            `Your interview stages could not be read: ${read.error.message} The board is shown without them.`,
+          );
+        }
+      })
+      .catch(() => {
+        // A port that cannot answer is the same as one that said no.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [trackerPort]);
 
   const replace = useCallback((next: TrackerEntry) => {
     setEntries((current) =>
@@ -280,6 +324,86 @@ export function Tracker({
       void save(previous, next);
     },
     [entries, save],
+  );
+
+  const onSubstageChange = useCallback(
+    (applicationId: string, substageId: string | null) => {
+      const previous = entries.find((entry) => entry.application.id === applicationId);
+      if (previous === undefined) return;
+      if ((previous.application.interview_substage_id ?? null) === substageId) return;
+
+      const next: TrackerEntry = {
+        ...previous,
+        application: withSubstage(
+          previous.application,
+          substageId,
+          substagesRef.current,
+          new Date().toISOString(),
+        ),
+      };
+
+      void save(previous, next);
+    },
+    [entries, save],
+  );
+
+  /**
+   * Save a changed sub-stage list, optimistically, and answer with the reason
+   * if it did not stick (`null` when it did).
+   *
+   * `removedId` is the one sub-stage being taken away, if any. The database
+   * unsets it on every card that used it (`ON DELETE SET NULL`); the board does
+   * the same in memory so it does not have to reload to agree. On a failed
+   * save both go back, so the screen never shows a state the database refused.
+   */
+  const applySubstages = useCallback(
+    async (
+      change: Result<InterviewSubstage[], string>,
+      removedId: string | null = null,
+    ): Promise<string | null> => {
+      if (!change.ok) return change.error;
+
+      const previousList = substagesRef.current;
+      const affected = new Set(
+        entries
+          .filter(
+            (entry) => removedId !== null && entry.application.interview_substage_id === removedId,
+          )
+          .map((entry) => entry.application.id),
+      );
+
+      substagesRef.current = change.value;
+      setSubstages(change.value);
+      if (removedId !== null) {
+        setEntries((current) =>
+          current.map((entry) =>
+            affected.has(entry.application.id)
+              ? { ...entry, application: { ...entry.application, interview_substage_id: null } }
+              : entry,
+          ),
+        );
+      }
+
+      const written = await trackerPort.saveSubstages(change.value);
+      if (written.ok) return null;
+
+      substagesRef.current = previousList;
+      setSubstages(previousList);
+      if (removedId !== null) {
+        setEntries((current) =>
+          current.map((entry) =>
+            affected.has(entry.application.id)
+              ? {
+                  ...entry,
+                  application: { ...entry.application, interview_substage_id: removedId },
+                }
+              : entry,
+          ),
+        );
+      }
+      return `That change could not be saved: ${written.error.message} Try again.`;
+    },
+    [entries, trackerPort],
   );
 
   const onCreate = useCallback(
@@ -476,6 +600,10 @@ export function Tracker({
                     now={clock}
                     selectedId={selected?.application.id ?? null}
                     settlingId={settlingId}
+                    substages={substages}
+                    onEditSubstages={
+                      substagesLoaded ? () => setPane({ kind: 'substages' }) : undefined
+                    }
                     onSelect={(applicationId) => setPane({ kind: 'entry', applicationId })}
                     onDropCard={onStatusChange}
                   />
@@ -508,6 +636,26 @@ export function Tracker({
               createPageTransport={createPageTransport}
               readAvailability={readAvailability}
               consentPort={consentPort}
+            />
+          </DetailPane>
+        ) : pane.kind === 'substages' ? (
+          <DetailPane
+            title="Interview stages"
+            subtitle="Your own steps inside Interviewing, such as HR Screen or Final."
+            onClose={() => setPane({ kind: 'closed' })}
+          >
+            <SubstageEditor
+              substages={substages}
+              onAdd={(name) =>
+                applySubstages(addSubstage(substagesRef.current, name, crypto.randomUUID()))
+              }
+              onRename={(id, name) =>
+                applySubstages(renameSubstage(substagesRef.current, id, name))
+              }
+              onMove={(id, direction) =>
+                applySubstages(ok(moveSubstage(substagesRef.current, id, direction)))
+              }
+              onRemove={(id) => applySubstages(ok(removeSubstage(substagesRef.current, id)), id)}
             />
           </DetailPane>
         ) : pane.kind === 'new' ? (
@@ -562,6 +710,13 @@ export function Tracker({
               browser={browserPort}
               onEdit={(changes) => onEdit(selected.application.id, changes)}
               onStatusChange={(status) => onStatusChange(selected.application.id, status)}
+              substages={substages}
+              onSubstageChange={
+                substagesLoaded
+                  ? (substageId) => onSubstageChange(selected.application.id, substageId)
+                  : undefined
+              }
+              onEditSubstages={substagesLoaded ? () => setPane({ kind: 'substages' }) : undefined}
               onDelete={() => void onDelete(selected)}
               port={trackerPort}
               availability={availability ?? undefined}

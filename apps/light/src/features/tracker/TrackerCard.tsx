@@ -49,10 +49,20 @@ interface TrackerCardProps {
   readonly now: Date;
   readonly selected: boolean;
   readonly settling: boolean;
+  /** The name of the interview sub-stage this card is in (L-205), or null. */
+  readonly substage?: string | null | undefined;
   readonly onSelect: (applicationId: string) => void;
 }
 
-export function TrackerCard({ entry, today, now, selected, settling, onSelect }: TrackerCardProps) {
+export function TrackerCard({
+  entry,
+  today,
+  now,
+  selected,
+  settling,
+  substage = null,
+  onSelect,
+}: TrackerCardProps) {
   const { application, job } = entry;
 
   const days = daysSinceTimestamp(application.updated_at, now);
@@ -77,7 +87,7 @@ export function TrackerCard({ entry, today, now, selected, settling, onSelect }:
       data-staleness={band}
       data-status={application.status}
       aria-pressed={selected}
-      aria-label={[job.title, where, stalenessDescription(days), dueDescription]
+      aria-label={[job.title, where, substage, stalenessDescription(days), dueDescription]
         .filter((part) => part !== null && part !== '')
         .join('. ')}
       onClick={() => onSelect(application.id)}
@@ -97,6 +107,15 @@ export function TrackerCard({ entry, today, now, selected, settling, onSelect }:
     >
       <p className="truncate font-medium text-ink">{job.title}</p>
       <p className="truncate text-xs text-ink-muted">{where}</p>
+
+      {substage === null ? null : (
+        <p
+          data-testid={`tracker-card-substage-${application.id}`}
+          className="mt-1 truncate font-mono text-[11px] tracking-[0.04em] text-blue"
+        >
+          {substage}
+        </p>
+      )}
 
       {line === null || urgency === 'none' ? null : (
         <p

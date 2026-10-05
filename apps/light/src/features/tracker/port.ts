@@ -26,13 +26,22 @@ import {
   listApplications,
   listCvs,
   listDocumentsForApplication,
+  listInterviewSubstages,
   listJobs,
+  replaceInterviewSubstages,
   upsertApplication,
   upsertDocument,
   upsertJob,
   type DbError,
 } from '../../db';
-import { ok, type Application, type Document, type Profile, type Result } from '@cviper/core-types';
+import {
+  ok,
+  type Application,
+  type Document,
+  type InterviewSubstage,
+  type Profile,
+  type Result,
+} from '@cviper/core-types';
 
 import { joinEntries, type TrackerEntry } from './model';
 
@@ -57,6 +66,13 @@ export interface TrackerPort {
    * was archived against the application itself.
    */
   latestCvText(): Promise<Result<string | null, DbError>>;
+  /** The user's interview sub-stages (L-205), in display order. */
+  substages(): Promise<Result<InterviewSubstage[], DbError>>;
+  /**
+   * Make the stored sub-stages exactly this list. A card whose sub-stage is
+   * missing from it loses the label in the database (`ON DELETE SET NULL`).
+   */
+  saveSubstages(substages: readonly InterviewSubstage[]): Promise<Result<void, DbError>>;
 }
 
 export function createDbTrackerPort(): TrackerPort {
@@ -110,6 +126,14 @@ export function createDbTrackerPort(): TrackerPort {
 
     profile() {
       return getProfile();
+    },
+
+    substages() {
+      return listInterviewSubstages();
+    },
+
+    saveSubstages(substages) {
+      return replaceInterviewSubstages(substages);
     },
 
     async latestCvText() {

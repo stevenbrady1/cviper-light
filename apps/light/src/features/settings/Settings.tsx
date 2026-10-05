@@ -252,6 +252,10 @@ export function Settings({
       profile: payload.profile,
       jobs: payload.jobs,
       applications: payload.applications,
+      // Parents of `applications` (a card names one), so they must travel with
+      // it: a card written without its sub-stage would break the foreign key and
+      // roll the whole import back.
+      interview_substages: payload.interview_substages ?? [],
       documents: payload.documents,
       cvs: payload.cvs,
       analyses: payload.analyses,
