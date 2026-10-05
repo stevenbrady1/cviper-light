@@ -15,6 +15,7 @@ import {
 import { err, ok, type DraftReview, type Result } from '@cviper/core-types';
 
 import { createTauriTransport } from '../../ai/transport';
+import { advertForModel } from '../../lib/advertForModel';
 
 import { isCloudKind, readStoredConsent, type ConsentProviderKind } from '../analysis/consent';
 import { type ProviderOption } from '../analysis/providers';
@@ -66,7 +67,7 @@ export async function runReview(
     provider,
     model,
     draftText: request.draftText,
-    jobText: request.jobText,
+    jobText: advertForModel(request.jobText),
     cvText: request.cvText,
     kind: request.kind,
     userMetrics: request.userMetrics,
