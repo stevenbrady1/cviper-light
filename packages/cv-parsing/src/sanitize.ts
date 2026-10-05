@@ -27,6 +27,8 @@
  * punch in the text.
  */
 
+import { foldedText, removeMatches, removeRanges, type Unit } from './folded-text';
+
 /** One injection defence: the pattern, and what it blocks. */
 export interface InjectionPattern {
   readonly pattern: RegExp;
@@ -111,31 +113,275 @@ const INJECTION_PATTERNS: readonly InjectionPattern[] = [
     pattern: /={3,}[ \t]*(?:END[ \t]+)?(?:CV|JOB)[\w \t']*={3,}/g,
     blocks: 'fence forgery with an all-caps suffix ("=== JOB DESCRIPTION ===")',
   },
+  {
+    // L-207. The user-facts block is built by US, AFTER sanitising, so its
+    // heading is trusted in the prompt. A planted heading in an advert or CV
+    // would read as the candidate's approved facts, so the words go, whatever
+    // the fence around them.
+    pattern: /USER[-\s]SUPPLIED\s+FACTS\s*:/gi,
+    blocks: 'a planted "USER-SUPPLIED FACTS:" heading',
+  },
+  {
+    pattern: /CANDIDATE[-\s]SUPPLIED\s+ACHIEVEMENTS/gi,
+    blocks: 'a planted "CANDIDATE-SUPPLIED ACHIEVEMENTS" heading',
+  },
 ];
+
+/** Rounds of removal allowed before the fail-closed fallback. Honest text settles in 1-2. */
+export const MAX_SANITIZE_ROUNDS = 32;
+/** Times the fallback may drop offending lines and retry before giving up. */
+const MAX_LINE_DROPS = 4;
+
+/**
+ * The most text `sanitizeForPrompt` will look at by default: 4 x the largest
+ * per-field prompt cap (MAX_CV_CHARS, 6000, in @cviper/ai-providers), so text is
+ * still sanitised BEFORE it is truncated to the field's own budget, and the cost
+ * of an adversarial paste has a ceiling. A caller with a larger legitimate input
+ * (a scraped page stored up to 50,000 characters) passes its own bound.
+ */
+export const MAX_SANITIZE_INPUT_CHARS = 24_000;
+
+/** The longest label a fence span may hold: `=== <label> ===`. */
+const MAX_FENCE_LABEL = 200;
+
+const JOINERS = new Set([String.fromCharCode(0x200c), String.fromCharCode(0x200d)]);
+const NL = String.fromCharCode(10);
+const CR = String.fromCharCode(13);
+const TAB = String.fromCharCode(9);
+/**
+ * Read as a line break, so removing them never glues two words together:
+ * U+000B, U+000C, U+001C-U+001F, U+0085, U+2028, U+2029. Built from code points
+ * so none sits in this file.
+ */
+const LINE_SEPARATORS = new Set(
+  String.fromCharCode(0x0b, 0x0c, 0x1c, 0x1d, 0x1e, 0x1f, 0x85, 0x2028, 0x2029),
+);
+/** Box-drawing double line: NFKC leaves it alone, but it is read as `=`. */
+const BOX_DOUBLE = String.fromCharCode(0x2550);
+const NEWLINE_RUN = new RegExp(`${NL}{4,}`, 'g');
+const INVISIBLE = /[\p{Cc}\p{Cf}]/u;
+const FENCE_RUN = /={2,}/g;
+
+/**
+ * One stored character per unit. Line structure (newline, CR, tab) is kept and
+ * line separators become a newline. Controls and format characters stay as
+ * `invisible` units until the end of the round: they fold to nothing for one
+ * pass (so `==<ZWSP>=` is a fence) and to a space for another (so
+ * `ignore<ZWJ>previous` is a phrase). The joiners U+200C/U+200D are the one
+ * thing that is never removed: they are part of how Persian, Indic and emoji
+ * text is spelled.
+ */
+function toUnits(text: string): Unit[] {
+  const units: Unit[] = [];
+  for (const char of text) {
+    if (char === NL || char === CR || char === TAB) {
+      units.push({ shown: char, fold: char });
+    } else if (LINE_SEPARATORS.has(char)) {
+      units.push({ shown: NL, fold: NL });
+    } else if (INVISIBLE.test(char)) {
+      units.push({ shown: char, fold: '', invisible: true });
+    } else {
+      units.push({ shown: char, fold: char === BOX_DOUBLE ? '=' : char.normalize('NFKC') });
+    }
+  }
+  return units;
+}
+
+/** The same units with every invisible character folding to `fold`. */
+function withInvisiblesFolding(units: Unit[], fold: string): Unit[] {
+  return units.map((unit) => (unit.invisible === true ? { ...unit, fold } : unit));
+}
+
+function shownText(units: Unit[]): string {
+  return units.map((unit) => unit.shown).join('');
+}
+
+/**
+ * Fence runs that are part of a fence SHAPE, whatever the label. The runs go,
+ * and the blanks next to them on the label side, so `=== END JOB ADVERT ===`
+ * becomes `END JOB ADVERT`: the words are kept, the shape that could close one
+ * of our sections is not. Label-agnostic on purpose: the prompt builders emit
+ * three dozen spellings and a list would go stale.
+ *
+ * A run is removed when it is
+ *   - 3+ characters with another run of 3+ on the same line within
+ *     `MAX_FENCE_LABEL` characters (`=== label ===`, `=== a === b ===`), or
+ *   - 2+ characters at the START of a line, closed or not (`=== END JOB ADVERT`,
+ *     `== END JOB ADVERT ==`: a model reads an open-only fence as a boundary), or
+ *   - 2+ characters at the END of a line that also started with a run.
+ * A single run in mid-line prose (`a === b`, `x == y`, `EXPERIENCE ====> 5`) is
+ * left alone: that is an operator or an arrow, not a fence.
+ */
+function fenceShapeRanges(folded: string): [number, number][] {
+  const ranges: [number, number][] = [];
+  let lineStart = 0;
+  for (const line of folded.split(NL)) {
+    const runs = [...line.matchAll(FENCE_RUN)].map((m) => ({
+      start: m.index,
+      end: m.index + m[0].length,
+    }));
+    const strong = runs.filter((run) => run.end - run.start >= 3);
+    const opensLine = runs.length > 0 && line.slice(0, runs[0]?.start).trim() === '';
+    runs.forEach((run, i) => {
+      const { start, end } = run;
+      const s = strong.indexOf(run);
+      const prev = s > 0 ? strong[s - 1] : undefined;
+      const next = s >= 0 ? strong[s + 1] : undefined;
+      const hasPrev = prev !== undefined && start - prev.end <= MAX_FENCE_LABEL;
+      const hasNext = next !== undefined && next.start - end <= MAX_FENCE_LABEL;
+      const leading = line.slice(0, start).trim() === '';
+      const trailing = i > 0 && opensLine && line.slice(end).trim() === '';
+      if (!hasPrev && !hasNext && !leading && !trailing) return;
+      let from = start;
+      let to = end;
+      // Blanks on the label side go too, so the label comes out trimmed.
+      if (hasNext || leading) while (line[to] === ' ' || line[to] === TAB) to += 1;
+      if (hasPrev || trailing) {
+        while (from > 0 && (line[from - 1] === ' ' || line[from - 1] === TAB)) from -= 1;
+      }
+      ranges.push([lineStart + from, lineStart + to]);
+    });
+    lineStart += line.length + 1;
+  }
+  return ranges;
+}
+
+/** One removal pass over `units`, on whatever fold they currently carry. */
+function removePass(units: Unit[]): Unit[] {
+  let out = units;
+  for (const { pattern } of INJECTION_PATTERNS) out = removeMatches(out, pattern, '');
+  return removeRanges(out, fenceShapeRanges(foldedText(out)), '');
+}
+
+/** One removal round. Idempotent on text no pattern matches. */
+function round(text: string): string {
+  let units = toUnits(text);
+  // Pass 1: invisibles fold to nothing, so one dropped into a fence or a word
+  // does not hide it. Pass 2: they fold to a space, so one used AS the
+  // separator ("ignore<ZWJ>previous") does not hide a phrase.
+  units = removePass(withInvisiblesFolding(units, ''));
+  units = removePass(withInvisiblesFolding(units, ' '));
+  const kept = units.filter((unit) => unit.invisible !== true || JOINERS.has(unit.shown));
+  // gateway.py line 443 — collapse excessive whitespace. Four-or-more newlines
+  // become three; genuine paragraph breaks survive.
+  return shownText(kept).replace(NEWLINE_RUN, NL.repeat(3)).trim();
+}
+
+/** The text once it stops changing, or `null` if it has not by the round cap. */
+function settle(text: string, tally: { rounds: number }): string | null {
+  let current = text;
+  for (let i = 0; i < MAX_SANITIZE_ROUNDS; i += 1) {
+    tally.rounds += 1;
+    const next = round(current);
+    if (next === current) return current;
+    current = next;
+  }
+  return null;
+}
+
+/**
+ * Blank every line a trigger touches. Used only when the rounds did not settle.
+ * Lines are blanked, never joined, so no new phrase is made across them.
+ */
+function blankOffendingLines(text: string): string {
+  const units = withInvisiblesFolding(toUnits(text), ' ');
+  const folded = foldedText(units);
+  const lineOfUnit: number[] = [];
+  let line = 0;
+  for (const unit of units) {
+    lineOfUnit.push(line);
+    if (unit.shown === NL) line += 1;
+  }
+  const owner: number[] = [];
+  units.forEach((unit, index) => {
+    for (let i = 0; i < unit.fold.length; i += 1) owner.push(index);
+  });
+  const bad = new Set<number>();
+  const mark = (start: number, end: number): void => {
+    for (let i = start; i < end; i += 1) {
+      const index = owner[i];
+      if (index !== undefined) bad.add(lineOfUnit[index] ?? 0);
+    }
+  };
+  for (const { pattern } of INJECTION_PATTERNS) {
+    for (const match of folded.matchAll(new RegExp(pattern.source, pattern.flags))) {
+      if (match[0] !== '') mark(match.index, match.index + match[0].length);
+    }
+  }
+  for (const [start, end] of fenceShapeRanges(folded)) mark(start, end);
+  return shownText(units)
+    .split(NL)
+    .map((l, i) => (bad.has(i) ? '' : l))
+    .join(NL);
+}
+
+/** What happened while sanitising: for tests and for anyone tuning the bounds. */
+export interface SanitizeStats {
+  readonly text: string;
+  /** Removal rounds run, across every retry. */
+  readonly rounds: number;
+  /** Times the fail-closed fallback blanked offending lines. */
+  readonly lineDrops: number;
+  /** True when the input was longer than the bound and was cut first. */
+  readonly capped: boolean;
+}
+
+/** `sanitizeForPrompt`, returning its counters too. */
+export function sanitizeWithStats(
+  text: string | null | undefined,
+  maxInputChars: number = MAX_SANITIZE_INPUT_CHARS,
+): SanitizeStats {
+  if (!text) return { text: '', rounds: 0, lineDrops: 0, capped: false };
+
+  let current = text;
+  const capped = current.length > maxInputChars;
+  if (capped) {
+    let cut = maxInputChars;
+    const last = current.charCodeAt(cut - 1);
+    if (last >= 0xd800 && last <= 0xdbff) cut -= 1;
+    current = current.slice(0, cut);
+  }
+
+  const tally = { rounds: 0 };
+  for (let drops = 0; drops <= MAX_LINE_DROPS; drops += 1) {
+    const settled = settle(current, tally);
+    if (settled !== null) return { text: settled, rounds: tally.rounds, lineDrops: drops, capped };
+    current = blankOffendingLines(current);
+  }
+  return { text: '', rounds: tally.rounds, lineDrops: MAX_LINE_DROPS, capped };
+}
 
 /**
  * Strip known prompt-injection patterns from untrusted text (job descriptions,
  * scraped adverts, pasted postings) before embedding it in a prompt.
  *
- * Source: gateway.py `sanitize_for_prompt`, lines 422-444.
+ * Source: gateway.py `sanitize_for_prompt`, lines 422-444, extended in L-207:
+ *
+ * FIXPOINT. Removing a phrase can re-form one ("SysSystem:tem:" -> "System:"),
+ * so removal repeats until the text stops changing.
+ *
+ * FOLDED DETECTION. Patterns run on an NFKC-folded view, so fullwidth and
+ * box-drawing fences and `ＳＹＳＴＥＭ：` are caught; the text KEPT is the
+ * user's own (`10²`, `½`, `™` are never rewritten). Zero-width and other
+ * format characters are removed so they cannot split a fence or stand in for a
+ * space; the joiners U+200C/U+200D are kept.
+ *
+ * ANY FENCE SHAPE. A run of 3+ `=` (or lookalike) with another on the same line
+ * is not left standing whatever sits between: the runs go, the label stays.
+ *
+ * BOUNDED. Input is cut to `maxInputChars` first; see MAX_SANITIZE_INPUT_CHARS.
+ *
+ * FAIL CLOSED, BUT NOT WHOLE-ADVERT. If 32 rounds do not settle, nobody wrote
+ * that text honestly. Returning '' would throw away the whole advert and break
+ * analysis, so the lines the remaining triggers touch are blanked (newlines
+ * kept, so paragraph structure survives) and the rounds run again. Only if that
+ * also fails four times is '' returned. The result is always a true fixpoint.
  */
-export function sanitizeForPrompt(text: string | null | undefined): string {
-  // Source: `if not text: return ""`.
-  if (!text) return '';
-
-  let out = text;
-  for (const { pattern } of INJECTION_PATTERNS) {
-    out = out.replace(pattern, '');
-  }
-
-  // gateway.py line 443 — collapse excessive whitespace. Runs LAST, so the gaps
-  // left by the removals above are tidied. Four-or-more newlines become three;
-  // the source keeps three deliberately, so genuine paragraph breaks in a job
-  // advert survive.
-  out = out.replace(/\n{4,}/g, '\n\n\n');
-
-  // gateway.py line 444 — `return text.strip()`.
-  return out.trim();
+export function sanitizeForPrompt(
+  text: string | null | undefined,
+  maxInputChars: number = MAX_SANITIZE_INPUT_CHARS,
+): string {
+  return sanitizeWithStats(text, maxInputChars).text;
 }
 
 /**

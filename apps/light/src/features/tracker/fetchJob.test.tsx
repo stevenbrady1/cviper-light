@@ -264,6 +264,39 @@ describe('the whole link → fetch → review → save loop', () => {
     // A status, not an alert. Nothing is broken.
     expect(screen.queryAllByRole('alert')).toEqual([]);
   });
+
+  it('L-207: a page longer than a saved advert can be says only the start was kept', async () => {
+    const user = userEvent.setup();
+    const body = `<main><p>${'Credit risk analyst. '.repeat(4000)}</p></main>`;
+    renderBoard({ createPageTransport: () => pageTransport(ok({ status: 200, body })) });
+
+    await openPaste(user);
+    await user.click(screen.getByTestId('paste-job-url'));
+    await user.paste(ADVERT_URL);
+    await user.click(screen.getByTestId('paste-job-fetch'));
+
+    const note = await screen.findByTestId('paste-job-fetch-note');
+    expect(note.getAttribute('role')).toBe('status');
+    expect(note.textContent).toContain(
+      'This page was very long, so only the first 50,000 characters were kept. ' +
+        'Check the job details below.',
+    );
+  });
+
+  it('L-207: an ordinary page gets no length notice', async () => {
+    const user = userEvent.setup();
+    renderBoard({
+      createPageTransport: () => pageTransport(ok({ status: 200, body: ADVERT_PAGE })),
+    });
+
+    await openPaste(user);
+    await user.click(screen.getByTestId('paste-job-url'));
+    await user.paste(ADVERT_URL);
+    await user.click(screen.getByTestId('paste-job-fetch'));
+
+    const note = await screen.findByTestId('paste-job-fetch-note');
+    expect(note.textContent).not.toContain('very long');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -29,7 +29,7 @@
  *   honest achievement is nested that deep, and an empty entry cannot be
  *   approved.
  */
-import { injectionPatterns } from '@cviper/cv-parsing';
+import { injectionPatterns, removeMatches, type Unit } from '@cviper/cv-parsing';
 
 export interface CleanOneLineOptions {
   /** Remove `[` and `]`. For a skill, which is printed between brackets. */
@@ -46,12 +46,6 @@ const JOINERS = new Set([String.fromCharCode(0x200c), String.fromCharCode(0x200d
 /** Rounds allowed before giving up. A genuine entry settles in one or two. */
 export const MAX_ROUNDS = 12;
 
-/** One character of stored text and what it looks like once folded. */
-interface Unit {
-  readonly shown: string;
-  readonly fold: string;
-}
-
 function toUnits(text: string): Unit[] {
   const units: Unit[] = [];
   for (const char of text.normalize('NFC')) {
@@ -63,41 +57,6 @@ function toUnits(text: string): Unit[] {
     units.push({ shown: char, fold: char.normalize('NFKC') });
   }
   return units;
-}
-
-/** Remove every span `pattern` finds in the folded text; units touched go. */
-function removeMatches(units: Unit[], pattern: RegExp, replacement: string): Unit[] {
-  const folded = units.map((unit) => unit.fold).join('');
-  const owner: number[] = [];
-  units.forEach((unit, index) => {
-    for (let i = 0; i < unit.fold.length; i += 1) owner.push(index);
-  });
-
-  const doomed = new Set<number>();
-  const firstOfSpan = new Map<number, string>();
-  for (const match of folded.matchAll(new RegExp(pattern.source, pattern.flags))) {
-    if (match[0] === '') continue;
-    const start = match.index;
-    let first = true;
-    for (let i = start; i < start + match[0].length; i += 1) {
-      const index = owner[i];
-      if (index === undefined) continue;
-      if (first) {
-        firstOfSpan.set(index, replacement);
-        first = false;
-      }
-      doomed.add(index);
-    }
-  }
-  if (doomed.size === 0) return units;
-
-  const out: Unit[] = [];
-  units.forEach((unit, index) => {
-    const swap = firstOfSpan.get(index);
-    if (swap !== undefined && swap !== '') out.push({ shown: swap, fold: swap });
-    if (!doomed.has(index)) out.push(unit);
-  });
-  return out;
 }
 
 function round(text: string, stripBrackets: boolean): string {

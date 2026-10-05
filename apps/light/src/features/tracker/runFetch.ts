@@ -37,7 +37,7 @@
  * and the person is owed that one fact, as `URL_ONLY_BLOCKED_NOTE` already
  * gives it. Still no status or kind on screen, and still the same route: paste.
  */
-import { htmlToText, isPlausiblyReadable, jobPostingText } from './htmlToText';
+import { htmlToTextBounded, isPlausiblyReadable, jobPostingText } from './htmlToText';
 import { isBlockedUrl } from './fetchBlocklist';
 import { createTauriPageTransport, type PageFetchTransport } from './pageFetch';
 
@@ -106,6 +106,14 @@ export const FETCH_DISCLOSURE =
 export const FETCH_SUCCESS_NOTE =
   'The text from that page is in the advert box below. Check it looks right, then read the advert.';
 
+/**
+ * Added to the success note when the page was cut to what a saved description can
+ * hold (L-207), so a requirement past the cut is not missed in silence.
+ */
+export const FETCH_CAPPED_NOTE =
+  'This page was very long, so only the first 50,000 characters were kept. ' +
+  'Check the job details below.';
+
 /** The schemes a fetch is ever attempted for. Rust enforces this too. */
 const FETCHABLE_SCHEMES = new Set(['http:', 'https:']);
 
@@ -116,6 +124,8 @@ export interface PageFetchOutcome {
   readonly text: string;
   /** Safe to show verbatim. Non-null exactly when `available` is false. */
   readonly reason: string | null;
+  /** True when the page was longer than a saved advert can be and only its start is in `text`. */
+  readonly capped: boolean;
 }
 
 /** The fail-open shape, built here so every refusal below cannot drift. */
@@ -123,6 +133,7 @@ const UNAVAILABLE: PageFetchOutcome = {
   available: false,
   text: '',
   reason: FETCH_FALLBACK_NOTE,
+  capped: false,
 };
 
 /** The same fail-open shape, for a site that refuses apps. */
@@ -130,6 +141,7 @@ const SITE_REFUSES: PageFetchOutcome = {
   available: false,
   text: '',
   reason: FETCH_SITE_REFUSES_NOTE,
+  capped: false,
 };
 
 /**
@@ -201,11 +213,14 @@ export async function runFetch(
   // chrome — or the "similar jobs" rail — around it. Too thin, missing or
   // malformed, and the whole page is read exactly as it always was.
   const posting = jobPostingText(body);
-  const text = posting !== null && isPlausiblyReadable(posting) ? posting : htmlToText(body);
+  const { text, capped } =
+    posting !== null && isPlausiblyReadable(posting)
+      ? { text: posting, capped: false }
+      : htmlToTextBounded(body);
 
   // A login wall and a JavaScript-only shell both arrive with a 200 and look
   // like successes to anything watching the network. They are failures.
   if (!isPlausiblyReadable(text)) return UNAVAILABLE;
 
-  return { available: true, text, reason: null };
+  return { available: true, text, reason: null, capped };
 }

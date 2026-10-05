@@ -148,27 +148,33 @@ describe('sanitizeForPrompt — attack: fence forgery', () => {
     }
   });
 
-  it('LEAVES ordinary prose that happens to contain the word "job"', () => {
+  it('KEEPS THE WORDS of a heading that happens to contain "job" (L-207: the rules go)', () => {
     // The trap in the brief: a naive `i` flag on the wide pattern would eat
     // this heading, silently deleting a section of the advert we are analysing.
-    for (const prose of [
-      '===== Job requirements =====',
-      '===== job requirements =====',
-      '===== Job spec and benefits =====',
-      '===== Your CV should show =====',
-    ]) {
-      const advert = `Barclays, London.\n${prose}\nFive years of SQL.`;
-      expect(sanitizeForPrompt(advert), prose).toBe(advert);
+    // Since L-207 ANY run-label-run span loses its runs (the prompt builders
+    // emit too many labels to list), so the heading loses its decoration but
+    // every word stays. Deliberate tightening: the section is still there.
+    for (const [prose, kept] of [
+      ['===== Job requirements =====', 'Job requirements'],
+      ['===== job requirements =====', 'job requirements'],
+      ['===== Job spec and benefits =====', 'Job spec and benefits'],
+      ['===== Your CV should show =====', 'Your CV should show'],
+    ] as const) {
+      expect(sanitizeForPrompt(`Barclays, London.\n${prose}\nFive years of SQL.`), prose).toBe(
+        `Barclays, London.\n${kept}\nFive years of SQL.`,
+      );
     }
   });
 
-  it('LEAVES a decorated block whose middle line is real advert text', () => {
-    // The source pattern used `\s`, which matches newlines, so it would match
-    // from the first rule to the last and delete the sentence between them.
+  it('KEEPS the middle line of a decorated block; only the rules go (L-207)', () => {
+    // The source pattern used a whitespace class that matches newlines, so it
+    // would match from the first rule to the last and delete the sentence
+    // between them. A line that is only a run of fence characters is now
+    // emptied; the sentence stays.
     const advert = ['Requirements', '============', 'CV must be attached', '============'].join(
       '\n',
     );
-    expect(sanitizeForPrompt(advert)).toBe(advert);
+    expect(sanitizeForPrompt(advert)).toBe('Requirements\n\nCV must be attached');
   });
 
   it('KNOWN FALSE POSITIVE: an all-caps fence-shaped heading is removed', () => {
