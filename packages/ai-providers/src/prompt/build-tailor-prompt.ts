@@ -52,6 +52,13 @@
 import { sanitizeForPrompt, truncateForPrompt } from '@cviper/cv-parsing';
 
 import { MAX_CV_CHARS, MAX_JOB_CHARS } from './build-prompt';
+import { cleanOneLine } from './clean-one-line';
+import {
+  USER_FACTS_CARVE_OUT,
+  carveOut,
+  userMetricsSection,
+  type UserSuppliedMetric,
+} from './user-metrics';
 import {
   FAIRNESS_GUARDRAIL,
   JSON_ONLY,
@@ -81,22 +88,12 @@ export const MAX_PROMPT_KEYWORD_GAPS = 15;
 /** One gap is a word or a short phrase. Anything longer is a sentence, cut to size. */
 export const MAX_KEYWORD_GAP_CHARS = 60;
 
-/**
- * How many user-supplied achievements reach the model (L-205), and how long
- * each may be. Small on purpose: these are one-line metrics the candidate
- * typed against a keyword gap, and the list is bounded by the gap cap anyway.
- */
-export const MAX_USER_METRICS = MAX_PROMPT_KEYWORD_GAPS;
-export const MAX_USER_METRIC_CHARS = 300;
-
-/**
- * One achievement the candidate typed for one keyword gap AND explicitly
- * approved (L-205). Never generated, never pre-filled.
- */
-export interface UserSuppliedMetric {
-  readonly skill: string;
-  readonly text: string;
-}
+export {
+  MAX_USER_METRIC_CHARS,
+  MAX_USER_METRICS,
+  promptUserMetrics,
+  type UserSuppliedMetric,
+} from './user-metrics';
 
 export interface TailorPromptInput {
   readonly cvText: string;
@@ -236,19 +233,6 @@ function notesFence(notes: string | null): string | null {
 }
 
 /**
- * A plain cut to `MAX_KEYWORD_GAP_CHARS`. Not `truncateForPrompt`: its
- * "[truncated]" marker starts a new line, which inside this list would read
- * as one more advert word. Never splits a surrogate pair.
- */
-function cutGap(gap: string): string {
-  if (gap.length <= MAX_KEYWORD_GAP_CHARS) return gap;
-  let cut = MAX_KEYWORD_GAP_CHARS;
-  const last = gap.charCodeAt(cut - 1);
-  if (last >= 0xd800 && last <= 0xdbff) cut -= 1;
-  return gap.slice(0, cut).trim();
-}
-
-/**
  * The gaps as they go into the prompt: one line each, cleaned, de-duplicated
  * ignoring case, at most `MAX_PROMPT_KEYWORD_GAPS` of them, in the order given
  * (the scorer's, most important first).
@@ -260,9 +244,7 @@ export function promptKeywordGaps(gaps: readonly string[] | null | undefined): s
   const kept: string[] = [];
   const seen = new Set<string>();
   for (const gap of gaps ?? []) {
-    const cleaned = cutGap(
-      sanitizeForPrompt(gap.replace(/={3,}/g, ' ')).replace(/\s+/g, ' ').trim(),
-    );
+    const cleaned = cleanOneLine(gap, MAX_KEYWORD_GAP_CHARS, { stripBrackets: true });
     const key = cleaned.toLowerCase();
     if (cleaned === '' || seen.has(key)) continue;
     seen.add(key);
@@ -298,73 +280,57 @@ function keywordGapsSection(gaps: readonly string[] | null | undefined): string 
   ].join('\n');
 }
 
-/** One line of user text, cleaned: no fence-breaking runs, no newlines, capped. */
-function cleanOneLine(text: string, max: number): string {
-  const cleaned = sanitizeForPrompt(text.replace(/={3,}/g, ' ')).replace(/\s+/g, ' ').trim();
-  if (cleaned.length <= max) return cleaned;
-  let cut = max;
-  const last = cleaned.charCodeAt(cut - 1);
-  if (last >= 0xd800 && last <= 0xdbff) cut -= 1;
-  return cleaned.slice(0, cut).trim();
+/**
+ * The same text with the carve-out added at every place that says "only the
+ * base CV" (review C3). A strict model reads the rules AFTER the section, so a
+ * rule that still says "base CV only" would make it drop the user's lines.
+ * Numbers only: rules 2 and 4 (facts, certifications) are deliberately left.
+ */
+function systemWithUserFacts(): string {
+  return carveOut(
+    SYSTEM,
+    'Every role from the base CV appears in the output.',
+    `Every role from the base CV appears in the output. Numbers may come from the base CV ${USER_FACTS_CARVE_OUT}.`,
+  );
 }
 
-/**
- * The approved achievements as they go into the prompt: cleaned to one line,
- * blank entries dropped, one per skill (first wins, ignoring case), at most
- * `MAX_USER_METRICS` of them.
- */
-export function promptUserMetrics(
-  metrics: readonly UserSuppliedMetric[] | null | undefined,
-): UserSuppliedMetric[] {
-  const kept: UserSuppliedMetric[] = [];
-  const seen = new Set<string>();
-  for (const metric of metrics ?? []) {
-    const skill = cleanOneLine(metric.skill, MAX_KEYWORD_GAP_CHARS);
-    const text = cleanOneLine(metric.text, MAX_USER_METRIC_CHARS);
-    const key = skill.toLowerCase();
-    if (skill === '' || text === '' || seen.has(key)) continue;
-    seen.add(key);
-    kept.push({ skill, text });
-    if (kept.length === MAX_USER_METRICS) break;
-  }
-  return kept;
+function criticalWithUserFacts(): string {
+  return carveOut(
+    CRITICAL,
+    'MUST come from the base CV below.',
+    `MUST come from the base CV below. The only exception is a number, which may come from the base CV below ${USER_FACTS_CARVE_OUT}.`,
+  );
 }
 
-/**
- * The user-supplied achievements section, or `null` when there are none.
- *
- * ============================================================================
- * FACTS THE USER TYPED - USE THEM, NEVER GROW THEM
- * ============================================================================
- * Rule 1 and rule 12 say no number may be introduced that the base CV does not
- * hold. This section is the one stated exception, and it is narrow: only the
- * words and figures between the markers, only because the candidate typed and
- * approved them, and nothing around them (employer, date, qualification, a
- * rounder or bigger number) comes with them. The section is marked
- * USER-SUPPLIED so the model, and anyone reading the payload, can tell them
- * from the CV.
- */
-function userMetricsSection(
-  metrics: readonly UserSuppliedMetric[] | null | undefined,
-): string | null {
-  const kept = promptUserMetrics(metrics);
-  if (kept.length === 0) return null;
-  return [
-    '=== CANDIDATE-SUPPLIED ACHIEVEMENTS (USER-SUPPLIED FACTS, approved by the candidate) ===',
-    ...kept.map((metric) => `- [${metric.skill}] ${metric.text}`),
-    '=== END CANDIDATE-SUPPLIED ACHIEVEMENTS ===',
-    '',
-    'USER-SUPPLIED FACTS: the lines above were typed by the candidate, each against one advert word, and approved for use. They are true statements about the candidate, though not part of the base CV. You MAY use one, exactly as given, in a bullet or the summary, where the base CV shows related work. Do not embellish them: do not change, round or enlarge a number, and do not add detail, scope, a result or a timeframe they do not state. Never add an employer, date, qualification or number that is not in the base CV or in these lines. If a line does not fit anywhere the base CV supports, leave it out.',
-  ].join('\n');
+function rulesWithUserFacts(): string {
+  const rule1 = carveOut(
+    RULES,
+    '1. ALL content must come from the base CV above.',
+    `1. ALL content must come from the base CV above ${USER_FACTS_CARVE_OUT}.`,
+  );
+  return carveOut(
+    rule1,
+    'that is not in the base CV.',
+    `that is not in the base CV ${USER_FACTS_CARVE_OUT}.`,
+  );
+}
+
+function fieldRulesWithUserFacts(): string {
+  return carveOut(
+    FIELD_RULES,
+    'with numbers only where the base CV has them.',
+    `with numbers only where the base CV has them ${USER_FACTS_CARVE_OUT}.`,
+  );
 }
 
 export function buildTailorPrompt(input: TailorPromptInput): TailorPrompt {
   const notes = notesFence(input.profileNotes);
   const gaps = keywordGapsSection(input.keywordGaps);
   const userMetrics = userMetricsSection(input.userMetrics);
+  const hasUserMetrics = userMetrics !== null;
 
   const user = [
-    CRITICAL,
+    hasUserMetrics ? criticalWithUserFacts() : CRITICAL,
     '',
     fence('BASE CV (the ONLY source of truth)', input.cvText, MAX_CV_CHARS),
     '',
@@ -379,12 +345,12 @@ export function buildTailorPrompt(input: TailorPromptInput): TailorPrompt {
     '',
     SENIORITY_LADDER,
     '',
-    RULES,
+    hasUserMetrics ? rulesWithUserFacts() : RULES,
     '',
     FAIRNESS_GUARDRAIL,
     '',
-    FIELD_RULES,
+    hasUserMetrics ? fieldRulesWithUserFacts() : FIELD_RULES,
   ].join('\n');
 
-  return { system: SYSTEM, user };
+  return { system: hasUserMetrics ? systemWithUserFacts() : SYSTEM, user };
 }

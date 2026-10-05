@@ -19,7 +19,7 @@
  * withdraws the approval, so what was approved is always what is on screen.
  * A dismissed or merely typed entry is never returned.
  */
-import { promptKeywordGaps } from '@cviper/ai-providers';
+import { cleanOneLine, promptKeywordGaps } from '@cviper/ai-providers';
 
 /** The longest an approved achievement may be. Matches the prompt's own cap. */
 export const MAX_METRIC_CHARS = 300;
@@ -36,11 +36,17 @@ export type MetricStatus = 'editing' | 'approved' | 'dismissed';
 export interface MetricEntry {
   readonly draft: string;
   readonly status: MetricStatus;
+  /** True when approval changed the words (a phrase the prompt filter removes). */
+  readonly cleaned: boolean;
 }
 
-export type MetricState = Readonly<Record<string, MetricEntry>>;
+/**
+ * A Map, not a plain object: a skill called `constructor` or `__proto__` is an
+ * ordinary skill, and must not read a property off `Object.prototype`.
+ */
+export type MetricState = ReadonlyMap<string, MetricEntry>;
 
-export const EMPTY_METRIC_STATE: MetricState = {};
+export const EMPTY_METRIC_STATE: MetricState = new Map();
 
 /** An approved achievement, as the rewrite payload carries it. */
 export interface ApprovedMetric {
@@ -66,44 +72,67 @@ export function metricPromptsForGaps(gaps: readonly string[] | null | undefined)
   }));
 }
 
-/** Trim, collapse runs of whitespace, cap. What gets stored on approval. */
+/**
+ * What approval stores: the SAME one-line cleaner the prompt builders use, so
+ * the screen shows exactly what is sent. Capped, whitespace collapsed, and
+ * stripped of the phrasings and lookalike characters the prompt would drop.
+ */
 function clean(text: string): string {
-  const collapsed = text.replace(/\s+/g, ' ').trim();
-  if (collapsed.length <= MAX_METRIC_CHARS) return collapsed;
-  let cut = MAX_METRIC_CHARS;
-  const last = collapsed.charCodeAt(cut - 1);
-  if (last >= 0xd800 && last <= 0xdbff) cut -= 1; // never split a surrogate pair
-  return collapsed.slice(0, cut).trim();
+  return cleanOneLine(text, MAX_METRIC_CHARS);
 }
 
-/** Empty or whitespace-only text cannot be approved. */
+function collapse(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function withEntry(state: MetricState, key: string, entry: MetricEntry): MetricState {
+  const next = new Map(state);
+  next.set(key, entry);
+  return next;
+}
+
+/** Empty, whitespace-only, or text that cleans to nothing cannot be approved. */
 export function canApprove(draft: string): boolean {
   return clean(draft) !== '';
 }
 
 /** Typing. Always puts the entry back to `editing`: an edit withdraws approval. */
 export function setDraft(state: MetricState, key: string, draft: string): MetricState {
-  return { ...state, [key]: { draft, status: 'editing' } };
+  return withEntry(state, key, { draft, status: 'editing', cleaned: false });
 }
 
 /** Explicit approval. A no-op when there is nothing real to approve. */
 export function approve(state: MetricState, key: string): MetricState {
-  const entry = state[key];
+  const entry = state.get(key);
   if (entry === undefined || !canApprove(entry.draft)) return state;
-  return { ...state, [key]: { draft: clean(entry.draft), status: 'approved' } };
+  const text = clean(entry.draft);
+  return withEntry(state, key, {
+    draft: text,
+    status: 'approved',
+    cleaned: text !== collapse(entry.draft),
+  });
+}
+
+/** True when approval changed the words, so the screen can say so. */
+export function cleanedOnApproval(state: MetricState, key: string): boolean {
+  const entry = state.get(key);
+  return entry?.status === 'approved' && entry.cleaned;
 }
 
 /** "Not now". The draft is kept, but it is never sent. */
 export function dismiss(state: MetricState, key: string): MetricState {
-  const entry = state[key];
-  return { ...state, [key]: { draft: entry?.draft ?? '', status: 'dismissed' } };
+  return withEntry(state, key, {
+    draft: state.get(key)?.draft ?? '',
+    status: 'dismissed',
+    cleaned: false,
+  });
 }
 
-/** Back to editing, e.g. "Change" on an approved entry or "Add one" on a dismissed one. */
+/** Back to editing, e.g. "Change" on an approved entry or "Add a metric" on a skipped one. */
 export function reopen(state: MetricState, key: string): MetricState {
-  const entry = state[key];
+  const entry = state.get(key);
   if (entry === undefined) return state;
-  return { ...state, [key]: { draft: entry.draft, status: 'editing' } };
+  return withEntry(state, key, { draft: entry.draft, status: 'editing', cleaned: false });
 }
 
 /**
@@ -115,7 +144,7 @@ export function approvedMetrics(
   prompts: readonly MetricPrompt[],
 ): ApprovedMetric[] {
   return prompts.flatMap((prompt) => {
-    const entry = state[prompt.key];
+    const entry = state.get(prompt.key);
     if (entry?.status !== 'approved') return [];
     const text = clean(entry.draft);
     return text === '' ? [] : [{ skill: prompt.skill, text }];

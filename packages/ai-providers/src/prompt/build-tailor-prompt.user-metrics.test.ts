@@ -36,7 +36,13 @@ describe('buildTailorPrompt with user-supplied metrics (L-205)', () => {
     expect(user).toMatch(/typed by the candidate/i);
     expect(user).toMatch(/do not embellish/i);
     expect(user).toMatch(/exactly as given/i);
-    expect(user).toMatch(/never add an employer, date, qualification or number/i);
+    // C1: an employer, date or qualification comes from the base CV ONLY.
+    expect(user).toContain(
+      'An employer, date or qualification may come ONLY from the base CV; a number may come ONLY from the base CV or these lines.',
+    );
+    expect(user).not.toMatch(
+      /employer, date, qualification or number that is not in the base CV or in these lines/i,
+    );
   });
 
   it('sits after the advert and before the rules', () => {
@@ -95,5 +101,37 @@ describe('buildTailorPrompt with user-supplied metrics (L-205)', () => {
 
   it('adds nothing the user did not type: no section and no marker without input', () => {
     expect(prompt(undefined)).not.toContain('USER-SUPPLIED');
+  });
+
+  describe('C3: the base-CV-only rules carry the same narrow carve-out', () => {
+    const CARVE = 'or the CANDIDATE-SUPPLIED ACHIEVEMENTS section, exactly as given (numbers only)';
+    const withMetric = buildTailorPrompt({
+      cvText: CV,
+      jobText: JOB,
+      profileNotes: null,
+      userMetrics: [{ skill: 'dbt', text: 'Migrated 40 models' }],
+    });
+    const without = buildTailorPrompt({ cvText: CV, jobText: JOB, profileNotes: null });
+
+    it('the system message, the critical constraint, rules 1 and 12 and the experience field rule all say it', () => {
+      expect(withMetric.system).toContain(CARVE);
+      const lines = withMetric.user.split('\n');
+      const critical = lines.find((l) => l.startsWith('- Every company name, job title'));
+      const rule1 = lines.find((l) => l.startsWith('1. ALL content must come from'));
+      const rule12 = lines.find((l) => l.startsWith('12. '));
+      const experience = lines.find((l) => l.startsWith('- experience:'));
+      for (const line of [critical, rule1, rule12, experience]) expect(line).toContain(CARVE);
+    });
+
+    it('negative: with no metrics the rules are exactly as before', () => {
+      expect(without.system).not.toContain('CANDIDATE-SUPPLIED');
+      expect(without.user).not.toContain('CANDIDATE-SUPPLIED');
+    });
+
+    it('the carve-out is numbers only: rules 2 and 4 (facts, certifications) are not widened', () => {
+      const lines = withMetric.user.split('\n');
+      expect(lines.find((l) => l.startsWith('2. '))).not.toContain('CANDIDATE-SUPPLIED');
+      expect(lines.find((l) => l.startsWith('4. '))).not.toContain('CANDIDATE-SUPPLIED');
+    });
   });
 });

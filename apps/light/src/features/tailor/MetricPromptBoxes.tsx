@@ -33,7 +33,7 @@ export function MetricPromptBoxes({ prompts, state, onChange }: MetricPromptBoxe
   return (
     <div data-testid="tailor-metric-prompts" className="mt-2 space-y-2">
       {prompts.map((prompt, index) => {
-        const entry = state[prompt.key];
+        const entry = state.get(prompt.key);
         const status = entry?.status ?? 'editing';
         const draft = entry?.draft ?? '';
         const inputId = `${baseId}-${index}`;

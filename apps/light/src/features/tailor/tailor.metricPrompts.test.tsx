@@ -82,20 +82,25 @@ const FAITHFUL = {
   certifications: [],
 };
 
-/** Answers every chat with `draft`, and keeps every prompt it was sent. */
-function recording(draft: unknown = FAITHFUL) {
+/**
+ * Answers each chat with the next of `drafts` (the last one repeats), and keeps
+ * every prompt it was sent.
+ */
+function recording(...drafts: readonly unknown[]) {
+  const queue = drafts.length === 0 ? [FAITHFUL] : drafts;
   const prompts: string[] = [];
-  const reply: Result<ProviderHttpResponse, ProviderError> = ok({
-    status: 200,
-    body: JSON.stringify({
-      message: { role: 'assistant', content: JSON.stringify(draft) },
-      done_reason: 'stop',
-    }),
-  });
   const transport: ChatTransport = {
     chat: (_provider, body) => {
       const parsed = JSON.parse(body) as { messages: { content: string }[] };
       prompts.push(parsed.messages.map((message) => message.content).join('\n'));
+      const draft = queue[Math.min(prompts.length - 1, queue.length - 1)];
+      const reply: Result<ProviderHttpResponse, ProviderError> = ok({
+        status: 200,
+        body: JSON.stringify({
+          message: { role: 'assistant', content: JSON.stringify(draft) },
+          done_reason: 'stop',
+        }),
+      });
       return Promise.resolve(reply);
     },
     listModels: () => Promise.resolve(ok({ status: 200, body: TAGS })),
@@ -124,8 +129,8 @@ const HANDOFF: TailorHandoff = {
   keywordGaps: { cvId: 'cv-2', advert: ADVERT, gaps: ['Power BI', 'stakeholders'] },
 };
 
-async function renderWith(handoff: TailorHandoff | null, draft: unknown = FAITHFUL) {
-  const { prompts, transport } = recording(draft);
+async function renderWith(handoff: TailorHandoff | null, ...drafts: readonly unknown[]) {
+  const { prompts, transport } = recording(...drafts);
   const onHandoffHandled = vi.fn();
   const user = userEvent.setup();
   render(
@@ -293,5 +298,66 @@ describe('metric prompts on the Tailor screen (L-205)', () => {
     await third.user.click(addButton('Power BI'));
     await tailor(third.user, third.prompts);
     expect(screen.getByTestId('tailor-fabrication').textContent).toMatch(/Goldman Sachs/);
+  });
+
+  describe('the letter and the review get the same approved facts (C4)', () => {
+    const NUMBER_CV = { ...FAITHFUL, summary: 'Cut month-end reporting from 5 days to 2.' };
+    const LETTER = {
+      greeting: 'Dear Hiring Manager,',
+      paragraphs: ['I cut month-end reporting from 5 days to 2.'],
+      sign_off: 'Yours sincerely,',
+    };
+    const REVIEW = { verdict: 'ready', issues: [] };
+    const TYPED = 'Cut month-end reporting from 5 days to 2';
+
+    async function approvedThenTailored(...replies: readonly unknown[]) {
+      const ctx = await renderWith(HANDOFF, NUMBER_CV, ...replies);
+      await ctx.user.type(input('Power BI'), TYPED);
+      await ctx.user.click(addButton('Power BI'));
+      await tailor(ctx.user, ctx.prompts);
+      return ctx;
+    }
+
+    it('the cover letter prompt carries the marked section and its own figure check passes', async () => {
+      const { prompts, user } = await approvedThenTailored(LETTER);
+      await user.click(screen.getByTestId('tailor-letter-run'));
+      await screen.findByTestId('tailor-letter');
+
+      expect(prompts).toHaveLength(2);
+      expect(prompts[1]).toContain(HEADING);
+      expect(prompts[1]).toContain(`- [Power BI] ${TYPED}`);
+      expect(screen.queryByTestId('tailor-letter-claims')).toBeNull();
+    });
+
+    it('the review prompt carries the marked section too', async () => {
+      const { prompts, user } = await approvedThenTailored(REVIEW);
+      await user.click(screen.getByTestId('tailor-review-run'));
+      await screen.findByTestId('tailor-review');
+
+      expect(prompts[1]).toContain(HEADING);
+      expect(prompts[1]).toContain(`- [Power BI] ${TYPED}`);
+    });
+
+    it('uses what the CV was written with, even if the user later removes the entry', async () => {
+      const { prompts, user } = await approvedThenTailored(LETTER);
+      await user.click(within(box('Power BI')).getByRole('button', { name: /remove/i }));
+      await user.click(screen.getByTestId('tailor-letter-run'));
+      await screen.findByTestId('tailor-letter');
+
+      expect(prompts[1]).toContain(`- [Power BI] ${TYPED}`);
+    });
+
+    it('negative: with nothing approved, neither the letter nor the review prompt has a section', async () => {
+      const { prompts, user } = await renderWith(HANDOFF, FAITHFUL, LETTER, REVIEW);
+      await tailor(user, prompts);
+      await user.click(screen.getByTestId('tailor-letter-run'));
+      await screen.findByTestId('tailor-letter');
+      await user.click(screen.getByTestId('tailor-review-run'));
+      await screen.findByTestId('tailor-review');
+
+      expect(prompts).toHaveLength(3);
+      expect(prompts[1]).not.toContain('CANDIDATE-SUPPLIED');
+      expect(prompts[2]).not.toContain('CANDIDATE-SUPPLIED');
+    });
   });
 });

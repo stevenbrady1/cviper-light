@@ -26,7 +26,8 @@ import {
   type TailoredCv,
 } from '@cviper/core-types';
 
-import { buildTailorPrompt, type UserSuppliedMetric } from './prompt/build-tailor-prompt';
+import { buildTailorPrompt } from './prompt/build-tailor-prompt';
+import type { UserSuppliedMetric } from './prompt/user-metrics';
 import {
   runStructuredCall,
   type PipelineError,

@@ -25,6 +25,8 @@ import { JSON_ONLY, NO_FABRICATION, UNTRUSTED_CONTENT_BOUNDARY } from './constan
 /** The draft is the thing under review, so it gets the CV's full budget. */
 export const MAX_DRAFT_CHARS = MAX_CV_CHARS;
 
+import { userMetricsSection, type UserSuppliedMetric } from './user-metrics';
+
 export type ReviewKind = 'cv' | 'cover_letter';
 
 export interface ReviewPromptInput {
@@ -34,6 +36,8 @@ export interface ReviewPromptInput {
   /** The ORIGINAL CV: the only thing a claim in the draft may rest on. */
   readonly cvText: string;
   readonly kind: ReviewKind;
+  /** Achievements the candidate typed and approved (L-205). Absent or empty: none. */
+  readonly userMetrics?: readonly UserSuppliedMetric[] | null | undefined;
 }
 
 export interface ReviewPrompt {
@@ -51,13 +55,16 @@ const SYSTEM = [
   JSON_ONLY,
 ].join(' ');
 
-function whatToLookFor(kind: ReviewKind): string {
+function whatToLookFor(kind: ReviewKind, hasUserMetrics: boolean): string {
+  const supported = hasUserMetrics
+    ? ' (a number exactly as given in the CANDIDATE-SUPPLIED ACHIEVEMENTS section is supported)'
+    : '';
   const noun = kind === 'cv' ? 'CV' : 'cover letter';
   return `Read the ${noun} the way you would in the first thirty seconds of screening. Look for exactly four kinds of problem:
 1. TARGETING — does the ${noun} speak to THIS advert, or would it do for any role? Name the parts that are not aimed at this job.
 2. MISSED KEYWORDS — exact terms the advert uses for things the ORIGINAL CV shows the candidate can do, that the ${noun} does not use. Only terms the original CV supports: a keyword the candidate cannot back is not a miss.
 3. GENERIC LANGUAGE — clichés, filler, subjective self-praise with no evidence ("highly motivated", "excellent communicator"), weak verbs.
-4. UNSUPPORTED CLAIMS — any company, role, date, achievement, number, skill or certification in the ${noun} that the ORIGINAL CV does not contain. This is the most serious kind. Quote the claim.
+4. UNSUPPORTED CLAIMS — any company, role, date, achievement, number, skill or certification in the ${noun} that the ORIGINAL CV does not contain${supported}. This is the most serious kind. Quote the claim.
 
 Do NOT rewrite anything. Do NOT praise. If there is genuinely nothing serious, say so with an empty issues list and the verdict "ready".`;
 }
@@ -74,6 +81,7 @@ function fence(label: string, body: string, maxChars: number): string {
 }
 
 export function buildReviewPrompt(input: ReviewPromptInput): ReviewPrompt {
+  const userMetrics = userMetricsSection(input.userMetrics);
   const draftLabel =
     input.kind === 'cv' ? 'DRAFT CV (under review)' : 'DRAFT COVER LETTER (under review)';
 
@@ -86,8 +94,9 @@ export function buildReviewPrompt(input: ReviewPromptInput): ReviewPrompt {
     fence('JOB ADVERT', input.jobText, MAX_JOB_CHARS),
     '',
     fence('ORIGINAL CV (the only source a claim may rest on)', input.cvText, MAX_CV_CHARS),
+    ...(userMetrics === null ? [] : ['', userMetrics]),
     '',
-    whatToLookFor(input.kind),
+    whatToLookFor(input.kind, userMetrics !== null),
     '',
     FIELD_RULES,
   ].join('\n');

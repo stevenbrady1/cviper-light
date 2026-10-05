@@ -7,7 +7,11 @@
  * refused with a sentence, and `ollama` never reaches the gate at all. See
  * that file's header; the reasoning is not repeated here so it cannot drift.
  */
-import { writeCoverLetter, type ChatTransport } from '@cviper/ai-providers';
+import {
+  writeCoverLetter,
+  type ChatTransport,
+  type UserSuppliedMetric,
+} from '@cviper/ai-providers';
 import { err, ok, type CoverLetter, type Result } from '@cviper/core-types';
 
 import { createTauriTransport } from '../../ai/transport';
@@ -24,6 +28,8 @@ export interface CoverLetterRequest {
   /** The tailored CV as rendered text, when one was written first. */
   readonly tailoredCvText: string | null;
   readonly profileNotes: string | null;
+  /** Approved achievements the tailored CV was written with (L-205), or absent. */
+  readonly userMetrics?: readonly UserSuppliedMetric[] | null | undefined;
 }
 
 export interface CoverLetterRunSuccess {
@@ -64,6 +70,7 @@ export async function runCoverLetter(
     jobText: request.jobText,
     tailoredCvText: request.tailoredCvText,
     profileNotes: request.profileNotes,
+    userMetrics: request.userMetrics,
   });
 
   if (!written.ok) return err({ message: written.error.message });

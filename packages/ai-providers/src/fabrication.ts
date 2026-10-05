@@ -93,9 +93,35 @@ function yearsIn(text: string): Set<string> {
   return new Set([...text.matchAll(YEAR_PATTERN)].map((match) => match[0]));
 }
 
+/**
+ * A number typed after one of these is a certification or level identifier
+ * (ISO 27001, Series 7, Level 3), not a figure the candidate achieved.
+ */
+const IDENTIFIER_NUMBER =
+  /\b(?:ISO(?:\/IEC)?|IEC|Series|Level|Part|Grade|Class|Module|Paper)\s*\d+(?:[.:-]\d+)*/gi;
+
+/**
+ * The FIGURES in what the candidate typed and approved (L-205): years and
+ * identifier numbers are removed first, so typing "in 2019" or "ISO 27001"
+ * cannot launder those numbers anywhere in the draft.
+ *
+ * LIMIT, documented rather than hidden: this is a bag of numbers. "Team of 12"
+ * also makes "12 years" pass, because telling the two apart needs language
+ * understanding. The prompt tells the model to use a line exactly as given;
+ * this check only stops the figures nobody typed.
+ */
+function userFigures(facts: readonly string[]): Set<string> {
+  const known = new Set<string>();
+  for (const fact of facts) {
+    const text = fact.replace(IDENTIFIER_NUMBER, ' ').replace(YEAR_PATTERN, ' ');
+    for (const metric of metricsIn(text)) known.add(metric);
+  }
+  return known;
+}
+
 /** Metrics in `draft` that the original never mentions, in draft order. */
-function newMetrics(original: string, draft: string): string[] {
-  const known = metricsIn(original);
+function newMetrics(original: string, draft: string, userKnown: ReadonlySet<string>): string[] {
+  const known = new Set([...metricsIn(original), ...userKnown]);
   const seen = new Set<string>();
   const flagged: string[] = [];
   for (const match of draft.matchAll(METRIC_PATTERN)) {
@@ -165,8 +191,11 @@ export function checkFabrication(
   // Figures the candidate typed and approved (L-205) are theirs, so they are
   // known to the METRIC check only. Employers, years and certifications above
   // were compared with the CV alone: typing one cannot make it pass.
-  const metricSource = [originalCvText, ...userSuppliedFacts].join('\n');
-  for (const metric of newMetrics(metricSource, renderTailoredCv(cv, null))) {
+  for (const metric of newMetrics(
+    originalCvText,
+    renderTailoredCv(cv, null),
+    userFigures(userSuppliedFacts),
+  )) {
     if (flaggedYears.has(metric)) continue;
     flagged.push({ kind: 'metric', text: metric });
   }
@@ -185,9 +214,12 @@ export function checkFabrication(
 export function checkLetterClaims(
   originalCvText: string,
   letter: CoverLetter,
+  userSuppliedFacts: readonly string[] = [],
 ): readonly FabricationFlag[] {
-  return newMetrics(originalCvText, renderCoverLetter(letter)).map((text) => ({
-    kind: 'metric' as const,
-    text,
-  }));
+  return newMetrics(originalCvText, renderCoverLetter(letter), userFigures(userSuppliedFacts)).map(
+    (text) => ({
+      kind: 'metric' as const,
+      text,
+    }),
+  );
 }

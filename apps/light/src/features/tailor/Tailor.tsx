@@ -6,6 +6,7 @@ import {
   type ChatTransport,
   type FabricationFlag,
   type FabricationReport,
+  type UserSuppliedMetric,
   promptKeywordGaps,
 } from '@cviper/ai-providers';
 import {
@@ -122,6 +123,12 @@ interface TailorResult {
   readonly provider: string;
   readonly model: string;
   readonly retried: boolean;
+  /**
+   * The approved achievements this draft was written with (L-205). The letter
+   * and the review use THESE, not whatever the boxes say now: the numbers are
+   * already in the draft.
+   */
+  readonly userMetrics: readonly UserSuppliedMetric[];
 }
 
 interface LetterResult {
@@ -472,6 +479,7 @@ export function Tailor({
         provider: run.value.provider,
         model: run.value.model,
         retried: run.value.retried,
+        userMetrics,
       });
       setReview(null);
       setLetter(null);
@@ -486,7 +494,14 @@ export function Tailor({
       setPhase('reviewing');
 
       const run = await runReview(
-        { option, draftText: result.text, jobText, cvText, kind: 'cv' },
+        {
+          option,
+          draftText: result.text,
+          jobText,
+          cvText,
+          kind: 'cv',
+          userMetrics: result.userMetrics,
+        },
         createTransport,
         hasConsent,
       );
@@ -514,6 +529,7 @@ export function Tailor({
           jobText,
           tailoredCvText: result?.text ?? null,
           profileNotes: notes,
+          userMetrics: result?.userMetrics ?? null,
         },
         createTransport,
         hasConsent,
@@ -531,7 +547,11 @@ export function Tailor({
         letter: run.value.letter,
         text,
         words: wordCount(text),
-        claims: checkLetterClaims(cvText, run.value.letter),
+        claims: checkLetterClaims(
+          cvText,
+          run.value.letter,
+          (result?.userMetrics ?? []).map((metric) => metric.text),
+        ),
       });
     },
     [createTransport, cvText, hasConsent, jobText, notes, result],
