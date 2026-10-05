@@ -44,6 +44,7 @@ import {
 import { type InterviewPack } from '@cviper/core-types';
 
 import { createTauriTransport } from '../../ai/transport';
+import { advertForModel } from '../../lib/advertForModel';
 
 import { isCloudKind, readStoredConsent, type ConsentProviderKind } from '../analysis/consent';
 import { providerLabel } from '../analysis/model';
@@ -134,7 +135,12 @@ export async function runInterview(
   const provider = providerFor(request.option, createTransport());
   if (provider === null) return unavailable(NOT_IN_THIS_BUILD);
 
-  const result = await prepareInterview({ ...request.input, provider, model });
+  const result = await prepareInterview({
+    ...request.input,
+    advert: request.input.advert === null ? null : advertForModel(request.input.advert),
+    provider,
+    model,
+  });
   if (!result.ok) return unavailable(result.error.message);
 
   return { available: true, pack: result.value.pack, meta: result.value.meta };

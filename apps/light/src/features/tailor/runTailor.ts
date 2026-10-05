@@ -21,6 +21,7 @@ import { tailorCv, type ChatTransport, type UserSuppliedMetric } from '@cviper/a
 import { err, ok, type Result, type TailoredCv } from '@cviper/core-types';
 
 import { createTauriTransport } from '../../ai/transport';
+import { advertForModel } from '../../lib/advertForModel';
 
 import { isCloudKind, readStoredConsent, type ConsentProviderKind } from '../analysis/consent';
 import { type ProviderOption } from '../analysis/providers';
@@ -84,7 +85,7 @@ export async function runTailor(
     provider,
     model,
     cvText: request.cvText,
-    jobText: request.jobText,
+    jobText: advertForModel(request.jobText),
     profileNotes: request.profileNotes,
     keywordGaps: request.keywordGaps,
     userMetrics: request.userMetrics,

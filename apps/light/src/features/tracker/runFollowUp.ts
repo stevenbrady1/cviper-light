@@ -51,6 +51,7 @@ import {
 import { type FollowUpDraft } from '@cviper/core-types';
 
 import { createTauriTransport } from '../../ai/transport';
+import { advertForModel } from '../../lib/advertForModel';
 
 import { isCloudKind, readStoredConsent, type ConsentProviderKind } from '../analysis/consent';
 import { providerLabel } from '../analysis/model';
@@ -146,7 +147,10 @@ export async function runFollowUp(
     jobTitle: request.jobTitle,
     company: request.company,
     daysQuiet: request.daysQuiet,
-    materials: request.materials,
+    materials: {
+      ...request.materials,
+      advert: request.materials.advert === null ? null : advertForModel(request.materials.advert),
+    },
     writingStyle: request.writingStyle,
   });
 
