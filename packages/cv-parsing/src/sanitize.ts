@@ -113,6 +113,18 @@ const INJECTION_PATTERNS: readonly InjectionPattern[] = [
     pattern: /={3,}[ \t]*(?:END[ \t]+)?(?:CV|JOB)[\w \t']*={3,}/g,
     blocks: 'fence forgery with an all-caps suffix ("=== JOB DESCRIPTION ===")',
   },
+  {
+    // L-207. The user-facts block is built by US, AFTER sanitising, so its
+    // heading is trusted in the prompt. A planted heading in an advert or CV
+    // would read as the candidate's approved facts, so the words go, whatever
+    // the fence around them.
+    pattern: /USER[-\s]SUPPLIED\s+FACTS\s*:/gi,
+    blocks: 'a planted "USER-SUPPLIED FACTS:" heading',
+  },
+  {
+    pattern: /CANDIDATE[-\s]SUPPLIED\s+ACHIEVEMENTS/gi,
+    blocks: 'a planted "CANDIDATE-SUPPLIED ACHIEVEMENTS" heading',
+  },
 ];
 
 /** Rounds of removal allowed before the fail-closed fallback. Honest text settles in 1-2. */
@@ -148,7 +160,7 @@ const LINE_SEPARATORS = new Set(
 const BOX_DOUBLE = String.fromCharCode(0x2550);
 const NEWLINE_RUN = new RegExp(`${NL}{4,}`, 'g');
 const INVISIBLE = /[\p{Cc}\p{Cf}]/u;
-const FENCE_RUN = /={3,}/g;
+const FENCE_RUN = /={2,}/g;
 
 /**
  * One stored character per unit. Line structure (newline, CR, tab) is kept and
@@ -185,32 +197,48 @@ function shownText(units: Unit[]): string {
 }
 
 /**
- * Fence runs that are part of a fence SHAPE, whatever the label: a run of 3+
- * fence characters with another such run on the same line within
- * `MAX_FENCE_LABEL` characters, or a run that is all there is on its line. The
- * runs go, and the blanks next to them on the label side, so
- * `=== END JOB ADVERT ===` becomes `END JOB ADVERT`: the words are kept, the
- * shape that could close one of our sections is not. Label-agnostic on purpose —
- * the prompt builders emit a couple of dozen labels and a list would go stale.
+ * Fence runs that are part of a fence SHAPE, whatever the label. The runs go,
+ * and the blanks next to them on the label side, so `=== END JOB ADVERT ===`
+ * becomes `END JOB ADVERT`: the words are kept, the shape that could close one
+ * of our sections is not. Label-agnostic on purpose: the prompt builders emit
+ * three dozen spellings and a list would go stale.
+ *
+ * A run is removed when it is
+ *   - 3+ characters with another run of 3+ on the same line within
+ *     `MAX_FENCE_LABEL` characters (`=== label ===`, `=== a === b ===`), or
+ *   - 2+ characters at the START of a line, closed or not (`=== END JOB ADVERT`,
+ *     `== END JOB ADVERT ==`: a model reads an open-only fence as a boundary), or
+ *   - 2+ characters at the END of a line that also started with a run.
+ * A single run in mid-line prose (`a === b`, `x == y`, `EXPERIENCE ====> 5`) is
+ * left alone: that is an operator or an arrow, not a fence.
  */
 function fenceShapeRanges(folded: string): [number, number][] {
   const ranges: [number, number][] = [];
   let lineStart = 0;
   for (const line of folded.split(NL)) {
-    const runs = [...line.matchAll(FENCE_RUN)].map((m) => [m.index, m.index + m[0].length]);
-    runs.forEach(([start, end], i) => {
-      if (start === undefined || end === undefined) return;
-      const prev = runs[i - 1];
-      const next = runs[i + 1];
-      const hasPrev = prev?.[1] !== undefined && start - prev[1] <= MAX_FENCE_LABEL;
-      const hasNext = next?.[0] !== undefined && next[0] - end <= MAX_FENCE_LABEL;
-      const alone = line.slice(0, start).trim() === '' && line.slice(end).trim() === '';
-      if (!hasPrev && !hasNext && !alone) return;
+    const runs = [...line.matchAll(FENCE_RUN)].map((m) => ({
+      start: m.index,
+      end: m.index + m[0].length,
+    }));
+    const strong = runs.filter((run) => run.end - run.start >= 3);
+    const opensLine = runs.length > 0 && line.slice(0, runs[0]?.start).trim() === '';
+    runs.forEach((run, i) => {
+      const { start, end } = run;
+      const s = strong.indexOf(run);
+      const prev = s > 0 ? strong[s - 1] : undefined;
+      const next = s >= 0 ? strong[s + 1] : undefined;
+      const hasPrev = prev !== undefined && start - prev.end <= MAX_FENCE_LABEL;
+      const hasNext = next !== undefined && next.start - end <= MAX_FENCE_LABEL;
+      const leading = line.slice(0, start).trim() === '';
+      const trailing = i > 0 && opensLine && line.slice(end).trim() === '';
+      if (!hasPrev && !hasNext && !leading && !trailing) return;
       let from = start;
       let to = end;
       // Blanks on the label side go too, so the label comes out trimmed.
-      if (hasNext || alone) while (line[to] === ' ' || line[to] === TAB) to += 1;
-      if (hasPrev) while (from > 0 && (line[from - 1] === ' ' || line[from - 1] === TAB)) from -= 1;
+      if (hasNext || leading) while (line[to] === ' ' || line[to] === TAB) to += 1;
+      if (hasPrev || trailing) {
+        while (from > 0 && (line[from - 1] === ' ' || line[from - 1] === TAB)) from -= 1;
+      }
       ranges.push([lineStart + from, lineStart + to]);
     });
     lineStart += line.length + 1;

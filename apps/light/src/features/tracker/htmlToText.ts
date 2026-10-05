@@ -31,7 +31,7 @@
  * is what turns them back into failures, so the user gets the guided message
  * rather than a review form the model filled in from the words "Sign in".
  */
-import { normalizeWhitespace, sanitizeForPrompt } from '@cviper/cv-parsing';
+import { normalizeWhitespace, sanitizeWithStats } from '@cviper/cv-parsing';
 
 import { MAX_DESCRIPTION_LENGTH } from './model';
 
@@ -231,6 +231,18 @@ function decodeEntities(text: string): string {
  *      `sanitizeForPrompt`.
  */
 export function htmlToText(html: string): string {
+  return htmlToTextBounded(html).text;
+}
+
+/**
+ * `htmlToText`, and whether the page was longer than a saved description can be
+ * (`MAX_DESCRIPTION_LENGTH`) and so was cut to its start. The caller shows that
+ * to the person: a silent cut of a long advert is a requirement they never saw.
+ */
+export function htmlToTextBounded(html: string): {
+  readonly text: string;
+  readonly capped: boolean;
+} {
   const withoutComments = html.replace(/<!--[\s\S]*?-->/g, ' ');
 
   const withoutNoise = withoutComments.replace(DROP_WITH_CONTENT, '\n');
@@ -254,10 +266,11 @@ export function htmlToText(html: string): string {
 
   // Bounded at what a saved description may hold, not at the prompt default: the
   // text is stored whole and only cut to a field budget when a prompt is built.
-  return sanitizeForPrompt(
+  const { text, capped } = sanitizeWithStats(
     normalizeWhitespace(decodeEntities(oneBreakPerBoundary)),
     MAX_DESCRIPTION_LENGTH,
   );
+  return { text, capped };
 }
 
 /**

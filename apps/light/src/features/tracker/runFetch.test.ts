@@ -22,6 +22,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { err, ok, type Result } from '@cviper/core-types';
 
+import { MAX_DESCRIPTION_LENGTH } from './model';
 import { FETCH_FALLBACK_NOTE, FETCH_SITE_REFUSES_NOTE, runFetch } from './runFetch';
 import type { FetchedPage, PageFetchError, PageFetchTransport } from './pageFetch';
 
@@ -361,5 +362,24 @@ describe('what the user typed', () => {
     await runFetch('https://jobs.example.com:8443/advert?id=1&ref=2', () => transport);
 
     expect(fetchPage).toHaveBeenCalledWith('https://jobs.example.com:8443/advert?id=1&ref=2');
+  });
+});
+
+describe('a page longer than a saved description can be (L-207)', () => {
+  it('is kept to the first MAX_DESCRIPTION_LENGTH characters and says it was cut', async () => {
+    const body = `<main><p>${'Credit risk analyst. '.repeat(4000)}</p></main>`;
+    const outcome = await runFetch('https://jobs.example.com/advert/long', () =>
+      transportFor(ok({ status: 200, body })),
+    );
+    expect(outcome.available).toBe(true);
+    expect(outcome.capped).toBe(true);
+    expect(outcome.text.length).toBeLessThanOrEqual(MAX_DESCRIPTION_LENGTH);
+  });
+
+  it('an ordinary page is not marked as cut', async () => {
+    const outcome = await runFetch('https://jobs.example.com/advert/1', () =>
+      transportFor(ok({ status: 200, body: ADVERT_PAGE })),
+    );
+    expect(outcome.capped).toBe(false);
   });
 });

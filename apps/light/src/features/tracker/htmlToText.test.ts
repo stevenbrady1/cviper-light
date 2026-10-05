@@ -11,7 +11,12 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { htmlToText, isPlausiblyReadable, MIN_READABLE_CHARS } from './htmlToText';
+import {
+  htmlToText,
+  htmlToTextBounded,
+  isPlausiblyReadable,
+  MIN_READABLE_CHARS,
+} from './htmlToText';
 import { MAX_DESCRIPTION_LENGTH } from './model';
 
 /** A job advert as a real site serves it: chrome above, chrome below. */
@@ -257,5 +262,25 @@ describe('htmlToText — a long advert is not cut by the sanitiser bound (L-207)
   it('still cuts an absurdly long page at MAX_DESCRIPTION_LENGTH, so the cost is bounded', () => {
     const text = htmlToText(`<p>${'a'.repeat(200_000)}</p>`);
     expect(text.length).toBeLessThanOrEqual(MAX_DESCRIPTION_LENGTH);
+  });
+});
+
+describe('htmlToTextBounded — says when it cut (L-207)', () => {
+  it('reports capped:false for a page inside the bound', () => {
+    expect(htmlToTextBounded('<p>A short advert for a credit risk analyst role.</p>')).toEqual({
+      text: 'A short advert for a credit risk analyst role.',
+      capped: false,
+    });
+  });
+
+  it('reports capped:true, and only the first MAX_DESCRIPTION_LENGTH characters, for a longer one', () => {
+    const result = htmlToTextBounded(`<p>${'a'.repeat(MAX_DESCRIPTION_LENGTH + 500)}</p>`);
+    expect(result.capped).toBe(true);
+    expect(result.text.length).toBe(MAX_DESCRIPTION_LENGTH);
+  });
+
+  it('a page of exactly the bound is not capped (boundary)', () => {
+    const result = htmlToTextBounded(`<p>${'a'.repeat(MAX_DESCRIPTION_LENGTH)}</p>`);
+    expect(result.capped).toBe(false);
   });
 });

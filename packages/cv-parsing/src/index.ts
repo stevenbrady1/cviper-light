@@ -29,6 +29,8 @@ export { normalizeWhitespace, truncateForPrompt, TRUNCATION_MARKER } from './tex
 
 export {
   sanitizeForPrompt,
+  sanitizeWithStats,
+  type SanitizeStats,
   injectionPatterns,
   MAX_SANITIZE_INPUT_CHARS,
   type InjectionPattern,

@@ -23,7 +23,7 @@ import {
 } from './extraction';
 import { type PageFetchTransport } from './pageFetch';
 import { urlOnlyNote, urlOnlyPaste } from './pastedUrl';
-import { FETCH_DISCLOSURE, FETCH_SUCCESS_NOTE, runFetch } from './runFetch';
+import { FETCH_CAPPED_NOTE, FETCH_DISCLOSURE, FETCH_SUCCESS_NOTE, runFetch } from './runFetch';
 import { runExtraction } from './runExtraction';
 import { type ApplicationDraft } from './model';
 
@@ -336,7 +336,9 @@ export function PasteJobForm({
 
     if (outcome.available) {
       setText(outcome.text);
-      setFetchNote(FETCH_SUCCESS_NOTE);
+      setFetchNote(
+        outcome.capped ? `${FETCH_SUCCESS_NOTE} ${FETCH_CAPPED_NOTE}` : FETCH_SUCCESS_NOTE,
+      );
       return;
     }
     setFetchNote(outcome.reason);

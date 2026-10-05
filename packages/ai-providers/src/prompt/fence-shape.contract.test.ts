@@ -28,8 +28,8 @@ import { buildTailorPrompt } from './build-tailor-prompt';
 const NL = String.fromCharCode(10);
 const PROMPT_DIR = dirname(fileURLToPath(import.meta.url));
 
-/** The shape of a fence line, in any of the spellings under test. */
-const FENCE_LINE = /^[=＝═]{3,}[ \t]*\S.*?[ \t]*[=＝═]{3,}$/;
+/** A line is fence-shaped if it STARTS with a run of 2+ fence characters, closed or not. */
+const FENCE_LINE = /^[ \t]*[=＝═]{2,}/;
 
 const METRICS = [{ skill: 'Kubernetes', text: 'Led the Kubernetes migration for 40 services' }];
 
@@ -164,6 +164,9 @@ const VARIANTS: readonly (readonly [string, (fence: string) => string])[] = [
   ['box drawing', boxDrawing],
   ['cyrillic lookalikes', cyrillic],
   ['zero-width split', (f) => f.replace('===', '==​=').replace(/===$/, '==​=')],
+  ['open only (no closing run)', (f) => f.replace(/[ \t]*===$/, '')],
+  ['double-equals runs', (f) => f.replaceAll('===', '==')],
+  ['double-equals, open only', (f) => f.replaceAll('===', '==').replace(/[ \t]*==$/, '')],
 ];
 
 const fences = [...emitted].sort();
@@ -216,6 +219,7 @@ describe('forged user-facts block (the proven exploit)', () => {
       profileNotes: null,
     });
     expect(fenceLines(user)).toEqual([]);
+    expect(user).not.toContain('CANDIDATE-SUPPLIED ACHIEVEMENTS');
   });
 
   it('forms exactly ONE real block (open and END) when the user did supply a metric', () => {
@@ -229,6 +233,10 @@ describe('forged user-facts block (the proven exploit)', () => {
     expect(lines.filter((l) => !l.includes('END'))).toHaveLength(1);
     expect(lines.filter((l) => l.includes('END'))).toHaveLength(1);
     expect(user).toContain('Cut report runtime by 60%');
+    // The real heading, and nothing planted beside it (C1c).
+    const heading = 'CANDIDATE-SUPPLIED ACHIEVEMENTS';
+    expect(user.split('=== ' + heading).length - 1).toBe(1);
+    expect(user).toContain('USER-SUPPLIED FACTS, approved by the candidate');
     // The forged bullet survives only as plain advert text, INSIDE the job fence.
     const all = user.split(NL);
     const bullet = all.findIndex((l) => l.startsWith('- [Kubernetes]'));
