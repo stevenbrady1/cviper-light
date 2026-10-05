@@ -27,7 +27,7 @@
  * punch in the text.
  */
 
-import { removeMatches, type Unit } from './folded-text';
+import { foldedText, removeMatches, removeRanges, type Unit } from './folded-text';
 
 /** One injection defence: the pattern, and what it blocks. */
 export interface InjectionPattern {
@@ -120,21 +120,44 @@ export const MAX_SANITIZE_ROUNDS = 32;
 /** Times the fallback may drop offending lines and retry before giving up. */
 const MAX_LINE_DROPS = 4;
 
+/**
+ * The most text `sanitizeForPrompt` will look at by default: 4 x the largest
+ * per-field prompt cap (MAX_CV_CHARS, 6000, in @cviper/ai-providers), so text is
+ * still sanitised BEFORE it is truncated to the field's own budget, and the cost
+ * of an adversarial paste has a ceiling. A caller with a larger legitimate input
+ * (a scraped page stored up to 50,000 characters) passes its own bound.
+ */
+export const MAX_SANITIZE_INPUT_CHARS = 24_000;
+
+/** The longest label a fence span may hold: `=== <label> ===`. */
+const MAX_FENCE_LABEL = 200;
+
 const JOINERS = new Set([String.fromCharCode(0x200c), String.fromCharCode(0x200d)]);
 const NL = String.fromCharCode(10);
 const CR = String.fromCharCode(13);
 const TAB = String.fromCharCode(9);
-/** U+0085, U+2028, U+2029. Built from code points so none sits in this file. */
-const LINE_SEPARATORS = new Set(String.fromCharCode(0x85, 0x2028, 0x2029));
+/**
+ * Read as a line break, so removing them never glues two words together:
+ * U+000B, U+000C, U+001C-U+001F, U+0085, U+2028, U+2029. Built from code points
+ * so none sits in this file.
+ */
+const LINE_SEPARATORS = new Set(
+  String.fromCharCode(0x0b, 0x0c, 0x1c, 0x1d, 0x1e, 0x1f, 0x85, 0x2028, 0x2029),
+);
 /** Box-drawing double line: NFKC leaves it alone, but it is read as `=`. */
 const BOX_DOUBLE = String.fromCharCode(0x2550);
+const NEWLINE_RUN = new RegExp(`${NL}{4,}`, 'g');
+const INVISIBLE = /[\p{Cc}\p{Cf}]/u;
+const FENCE_RUN = /={3,}/g;
 
 /**
- * One stored character per unit. Line structure (newline, CR, tab) is kept, and
- * U+0085/2028/2029 become a newline. Other controls and format characters are
- * removed (they split fences: `==<ZWSP>=`), EXCEPT the joiners U+200C/U+200D,
- * which are part of how Persian, Indic and emoji text is spelled; those stay
- * in the text but fold to nothing, so they cannot hide a phrase either.
+ * One stored character per unit. Line structure (newline, CR, tab) is kept and
+ * line separators become a newline. Controls and format characters stay as
+ * `invisible` units until the end of the round: they fold to nothing for one
+ * pass (so `==<ZWSP>=` is a fence) and to a space for another (so
+ * `ignore<ZWJ>previous` is a phrase). The joiners U+200C/U+200D are the one
+ * thing that is never removed: they are part of how Persian, Indic and emoji
+ * text is spelled.
  */
 function toUnits(text: string): Unit[] {
   const units: Unit[] = [];
@@ -143,34 +166,84 @@ function toUnits(text: string): Unit[] {
       units.push({ shown: char, fold: char });
     } else if (LINE_SEPARATORS.has(char)) {
       units.push({ shown: NL, fold: NL });
-    } else if (JOINERS.has(char)) {
-      units.push({ shown: char, fold: '' });
-    } else if (!INVISIBLE.test(char)) {
+    } else if (INVISIBLE.test(char)) {
+      units.push({ shown: char, fold: '', invisible: true });
+    } else {
       units.push({ shown: char, fold: char === BOX_DOUBLE ? '=' : char.normalize('NFKC') });
     }
   }
   return units;
 }
 
-const NEWLINE_RUN = new RegExp(NL + '{4,}', 'g');
-const INVISIBLE = /[\p{Cc}\p{Cf}]/u;
+/** The same units with every invisible character folding to `fold`. */
+function withInvisiblesFolding(units: Unit[], fold: string): Unit[] {
+  return units.map((unit) => (unit.invisible === true ? { ...unit, fold } : unit));
+}
 
 function shownText(units: Unit[]): string {
   return units.map((unit) => unit.shown).join('');
 }
 
+/**
+ * Fence runs that are part of a fence SHAPE, whatever the label: a run of 3+
+ * fence characters with another such run on the same line within
+ * `MAX_FENCE_LABEL` characters, or a run that is all there is on its line. The
+ * runs go, and the blanks next to them on the label side, so
+ * `=== END JOB ADVERT ===` becomes `END JOB ADVERT`: the words are kept, the
+ * shape that could close one of our sections is not. Label-agnostic on purpose —
+ * the prompt builders emit a couple of dozen labels and a list would go stale.
+ */
+function fenceShapeRanges(folded: string): [number, number][] {
+  const ranges: [number, number][] = [];
+  let lineStart = 0;
+  for (const line of folded.split(NL)) {
+    const runs = [...line.matchAll(FENCE_RUN)].map((m) => [m.index, m.index + m[0].length]);
+    runs.forEach(([start, end], i) => {
+      if (start === undefined || end === undefined) return;
+      const prev = runs[i - 1];
+      const next = runs[i + 1];
+      const hasPrev = prev?.[1] !== undefined && start - prev[1] <= MAX_FENCE_LABEL;
+      const hasNext = next?.[0] !== undefined && next[0] - end <= MAX_FENCE_LABEL;
+      const alone = line.slice(0, start).trim() === '' && line.slice(end).trim() === '';
+      if (!hasPrev && !hasNext && !alone) return;
+      let from = start;
+      let to = end;
+      // Blanks on the label side go too, so the label comes out trimmed.
+      if (hasNext || alone) while (line[to] === ' ' || line[to] === TAB) to += 1;
+      if (hasPrev) while (from > 0 && (line[from - 1] === ' ' || line[from - 1] === TAB)) from -= 1;
+      ranges.push([lineStart + from, lineStart + to]);
+    });
+    lineStart += line.length + 1;
+  }
+  return ranges;
+}
+
+/** One removal pass over `units`, on whatever fold they currently carry. */
+function removePass(units: Unit[]): Unit[] {
+  let out = units;
+  for (const { pattern } of INJECTION_PATTERNS) out = removeMatches(out, pattern, '');
+  return removeRanges(out, fenceShapeRanges(foldedText(out)), '');
+}
+
 /** One removal round. Idempotent on text no pattern matches. */
 function round(text: string): string {
   let units = toUnits(text);
-  for (const { pattern } of INJECTION_PATTERNS) units = removeMatches(units, pattern, '');
+  // Pass 1: invisibles fold to nothing, so one dropped into a fence or a word
+  // does not hide it. Pass 2: they fold to a space, so one used AS the
+  // separator ("ignore<ZWJ>previous") does not hide a phrase.
+  units = removePass(withInvisiblesFolding(units, ''));
+  units = removePass(withInvisiblesFolding(units, ' '));
+  const kept = units.filter((unit) => unit.invisible !== true || JOINERS.has(unit.shown));
   // gateway.py line 443 — collapse excessive whitespace. Four-or-more newlines
   // become three; genuine paragraph breaks survive.
-  return shownText(units).replace(NEWLINE_RUN, NL.repeat(3)).trim();
+  return shownText(kept).replace(NEWLINE_RUN, NL.repeat(3)).trim();
 }
 
-function settle(text: string): string | null {
+/** The text once it stops changing, or `null` if it has not by the round cap. */
+function settle(text: string, tally: { rounds: number }): string | null {
   let current = text;
   for (let i = 0; i < MAX_SANITIZE_ROUNDS; i += 1) {
+    tally.rounds += 1;
     const next = round(current);
     if (next === current) return current;
     current = next;
@@ -183,8 +256,8 @@ function settle(text: string): string | null {
  * Lines are blanked, never joined, so no new phrase is made across them.
  */
 function blankOffendingLines(text: string): string {
-  const units = toUnits(text);
-  const folded = units.map((unit) => unit.fold).join('');
+  const units = withInvisiblesFolding(toUnits(text), ' ');
+  const folded = foldedText(units);
   const lineOfUnit: number[] = [];
   let line = 0;
   for (const unit of units) {
@@ -196,19 +269,58 @@ function blankOffendingLines(text: string): string {
     for (let i = 0; i < unit.fold.length; i += 1) owner.push(index);
   });
   const bad = new Set<number>();
+  const mark = (start: number, end: number): void => {
+    for (let i = start; i < end; i += 1) {
+      const index = owner[i];
+      if (index !== undefined) bad.add(lineOfUnit[index] ?? 0);
+    }
+  };
   for (const { pattern } of INJECTION_PATTERNS) {
     for (const match of folded.matchAll(new RegExp(pattern.source, pattern.flags))) {
-      if (match[0] === '') continue;
-      for (let i = match.index; i < match.index + match[0].length; i += 1) {
-        const index = owner[i];
-        if (index !== undefined) bad.add(lineOfUnit[index] ?? 0);
-      }
+      if (match[0] !== '') mark(match.index, match.index + match[0].length);
     }
   }
+  for (const [start, end] of fenceShapeRanges(folded)) mark(start, end);
   return shownText(units)
     .split(NL)
     .map((l, i) => (bad.has(i) ? '' : l))
     .join(NL);
+}
+
+/** What happened while sanitising: for tests and for anyone tuning the bounds. */
+export interface SanitizeStats {
+  readonly text: string;
+  /** Removal rounds run, across every retry. */
+  readonly rounds: number;
+  /** Times the fail-closed fallback blanked offending lines. */
+  readonly lineDrops: number;
+  /** True when the input was longer than the bound and was cut first. */
+  readonly capped: boolean;
+}
+
+/** `sanitizeForPrompt`, returning its counters too. */
+export function sanitizeWithStats(
+  text: string | null | undefined,
+  maxInputChars: number = MAX_SANITIZE_INPUT_CHARS,
+): SanitizeStats {
+  if (!text) return { text: '', rounds: 0, lineDrops: 0, capped: false };
+
+  let current = text;
+  const capped = current.length > maxInputChars;
+  if (capped) {
+    let cut = maxInputChars;
+    const last = current.charCodeAt(cut - 1);
+    if (last >= 0xd800 && last <= 0xdbff) cut -= 1;
+    current = current.slice(0, cut);
+  }
+
+  const tally = { rounds: 0 };
+  for (let drops = 0; drops <= MAX_LINE_DROPS; drops += 1) {
+    const settled = settle(current, tally);
+    if (settled !== null) return { text: settled, rounds: tally.rounds, lineDrops: drops, capped };
+    current = blankOffendingLines(current);
+  }
+  return { text: '', rounds: tally.rounds, lineDrops: MAX_LINE_DROPS, capped };
 }
 
 /**
@@ -223,7 +335,13 @@ function blankOffendingLines(text: string): string {
  * FOLDED DETECTION. Patterns run on an NFKC-folded view, so fullwidth and
  * box-drawing fences and `ＳＹＳＴＥＭ：` are caught; the text KEPT is the
  * user's own (`10²`, `½`, `™` are never rewritten). Zero-width and other
- * format characters are removed so they cannot split a fence.
+ * format characters are removed so they cannot split a fence or stand in for a
+ * space; the joiners U+200C/U+200D are kept.
+ *
+ * ANY FENCE SHAPE. A run of 3+ `=` (or lookalike) with another on the same line
+ * is not left standing whatever sits between: the runs go, the label stays.
+ *
+ * BOUNDED. Input is cut to `maxInputChars` first; see MAX_SANITIZE_INPUT_CHARS.
  *
  * FAIL CLOSED, BUT NOT WHOLE-ADVERT. If 32 rounds do not settle, nobody wrote
  * that text honestly. Returning '' would throw away the whole advert and break
@@ -231,17 +349,11 @@ function blankOffendingLines(text: string): string {
  * kept, so paragraph structure survives) and the rounds run again. Only if that
  * also fails four times is '' returned. The result is always a true fixpoint.
  */
-export function sanitizeForPrompt(text: string | null | undefined): string {
-  // Source: `if not text: return ""`.
-  if (!text) return '';
-
-  let current = text;
-  for (let drops = 0; drops <= MAX_LINE_DROPS; drops += 1) {
-    const settled = settle(current);
-    if (settled !== null) return settled;
-    current = blankOffendingLines(current);
-  }
-  return '';
+export function sanitizeForPrompt(
+  text: string | null | undefined,
+  maxInputChars: number = MAX_SANITIZE_INPUT_CHARS,
+): string {
+  return sanitizeWithStats(text, maxInputChars).text;
 }
 
 /**

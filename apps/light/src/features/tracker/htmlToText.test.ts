@@ -12,6 +12,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { htmlToText, isPlausiblyReadable, MIN_READABLE_CHARS } from './htmlToText';
+import { MAX_DESCRIPTION_LENGTH } from './model';
 
 /** A job advert as a real site serves it: chrome above, chrome below. */
 const ADVERT_PAGE = `
@@ -242,5 +243,19 @@ describe('deciding whether a page was actually readable', () => {
   it('negative: whitespace is not length', () => {
     expect(isPlausiblyReadable(' '.repeat(MIN_READABLE_CHARS * 2))).toBe(false);
     expect(isPlausiblyReadable('')).toBe(false);
+  });
+});
+
+describe('htmlToText — a long advert is not cut by the sanitiser bound (L-207)', () => {
+  it('keeps a 40,000 character page whole: it is stored up to MAX_DESCRIPTION_LENGTH', () => {
+    const line = 'Senior analyst role with SQL and Python. ';
+    const body = line.repeat(Math.ceil(40_000 / line.length)).slice(0, 40_000);
+    const text = htmlToText(`<p>${body}</p>`);
+    expect(text.length).toBeGreaterThan(39_000);
+  });
+
+  it('still cuts an absurdly long page at MAX_DESCRIPTION_LENGTH, so the cost is bounded', () => {
+    const text = htmlToText(`<p>${'a'.repeat(200_000)}</p>`);
+    expect(text.length).toBeLessThanOrEqual(MAX_DESCRIPTION_LENGTH);
   });
 });

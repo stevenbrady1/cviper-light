@@ -16,31 +16,42 @@
 export interface Unit {
   readonly shown: string;
   readonly fold: string;
+  /** A control or format character: invisible, and no part of what a person reads. */
+  readonly invisible?: boolean;
+}
+
+/** A half-open `[start, end)` span of the FOLDED text. */
+export type FoldedRange = readonly [start: number, end: number];
+
+/** The folded text of `units`. */
+export function foldedText(units: readonly Unit[]): string {
+  return units.map((unit) => unit.fold).join('');
 }
 
 /**
- * Remove every span `pattern` finds in the folded text. Every stored character
- * the span touches goes; `replacement` (if any) is put where the span began.
- * Returns the SAME array when nothing matched.
+ * Remove every stored character the given folded-text ranges touch; `replacement`
+ * (if any) goes where each range began. Returns the SAME array when `ranges` is
+ * empty or touches nothing.
  */
-export function removeMatches(units: Unit[], pattern: RegExp, replacement: string): Unit[] {
-  const folded = units.map((unit) => unit.fold).join('');
+export function removeRanges(
+  units: Unit[],
+  ranges: readonly FoldedRange[],
+  replacement: string,
+): Unit[] {
   const owner: number[] = [];
   units.forEach((unit, index) => {
     for (let i = 0; i < unit.fold.length; i += 1) owner.push(index);
   });
 
   const doomed = new Set<number>();
-  const firstOfSpan = new Map<number, string>();
-  for (const match of folded.matchAll(new RegExp(pattern.source, pattern.flags))) {
-    if (match[0] === '') continue;
-    const start = match.index;
+  const firstOfSpan = new Set<number>();
+  for (const [start, end] of ranges) {
     let first = true;
-    for (let i = start; i < start + match[0].length; i += 1) {
+    for (let i = start; i < end; i += 1) {
       const index = owner[i];
       if (index === undefined) continue;
       if (first) {
-        firstOfSpan.set(index, replacement);
+        firstOfSpan.add(index);
         first = false;
       }
       doomed.add(index);
@@ -50,9 +61,22 @@ export function removeMatches(units: Unit[], pattern: RegExp, replacement: strin
 
   const out: Unit[] = [];
   units.forEach((unit, index) => {
-    const swap = firstOfSpan.get(index);
-    if (swap !== undefined && swap !== '') out.push({ shown: swap, fold: swap });
+    if (firstOfSpan.has(index) && replacement !== '') {
+      out.push({ shown: replacement, fold: replacement });
+    }
     if (!doomed.has(index)) out.push(unit);
   });
   return out;
+}
+
+/**
+ * Remove every span `pattern` finds in the folded text; units touched go, and
+ * `replacement` (if any) is put where the span began.
+ */
+export function removeMatches(units: Unit[], pattern: RegExp, replacement: string): Unit[] {
+  const ranges: FoldedRange[] = [];
+  for (const match of foldedText(units).matchAll(new RegExp(pattern.source, pattern.flags))) {
+    if (match[0] !== '') ranges.push([match.index, match.index + match[0].length]);
+  }
+  return removeRanges(units, ranges, replacement);
 }

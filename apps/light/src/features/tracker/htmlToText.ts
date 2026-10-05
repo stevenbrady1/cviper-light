@@ -33,6 +33,8 @@
  */
 import { normalizeWhitespace, sanitizeForPrompt } from '@cviper/cv-parsing';
 
+import { MAX_DESCRIPTION_LENGTH } from './model';
+
 /**
  * The shortest thing we will accept as an advert.
  *
@@ -250,7 +252,12 @@ export function htmlToText(html: string): string {
   // lines, which is also what copying it out of a browser gives you.
   const oneBreakPerBoundary = withoutTags.replace(/\n[ \t]*(?:\n[ \t]*)+/g, '\n');
 
-  return sanitizeForPrompt(normalizeWhitespace(decodeEntities(oneBreakPerBoundary)));
+  // Bounded at what a saved description may hold, not at the prompt default: the
+  // text is stored whole and only cut to a field budget when a prompt is built.
+  return sanitizeForPrompt(
+    normalizeWhitespace(decodeEntities(oneBreakPerBoundary)),
+    MAX_DESCRIPTION_LENGTH,
+  );
 }
 
 /**
