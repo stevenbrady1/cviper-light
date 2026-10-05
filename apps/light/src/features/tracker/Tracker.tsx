@@ -397,7 +397,6 @@ export function Tracker({
       setSavingSubstages(true);
 
       try {
-        const previousList = substagesRef.current;
         const affected = new Set(
           entries
             .filter(
@@ -426,9 +425,16 @@ export function Tracker({
         // write may have half landed, and a stale snapshot is what the next
         // edit would build its delete on.
         const [reread, reloaded] = await Promise.all([trackerPort.substages(), trackerPort.load()]);
-        const list = reread.ok ? reread.value : previousList;
-        substagesRef.current = list;
-        setSubstages(list);
+        if (reread.ok) {
+          substagesRef.current = reread.value;
+          setSubstages(reread.value);
+        } else {
+          // Could not ask the database what it holds. Do NOT fall back to the
+          // list from before the edit: that is exactly the stale picture the
+          // next save would delete against. Block editing until Retry works.
+          setSubstagesLoaded(false);
+          setSubstagesFailed(reread.error.message);
+        }
         if (reloaded.ok) {
           setEntries(reloaded.value);
         } else if (removedId !== null) {
@@ -703,23 +709,39 @@ export function Tracker({
             subtitle="Your own stages inside Interviewing, such as HR Screen or Final."
             onClose={() => setPane({ kind: 'closed' })}
           >
-            <SubstageEditor
-              substages={substages}
-              busy={savingSubstages}
-              usage={(id) =>
-                entries.filter((entry) => entry.application.interview_substage_id === id).length
-              }
-              onAdd={(name) =>
-                applySubstages(addSubstage(substagesRef.current, name, crypto.randomUUID()))
-              }
-              onRename={(id, name) =>
-                applySubstages(renameSubstage(substagesRef.current, id, name))
-              }
-              onMove={(id, direction) =>
-                applySubstages(ok(moveSubstage(substagesRef.current, id, direction)))
-              }
-              onRemove={(id) => applySubstages(ok(removeSubstage(substagesRef.current, id)), id)}
-            />
+            {!substagesLoaded ? (
+              <div data-testid="substage-blocked" className="space-y-3 text-ink-muted">
+                <p>
+                  Your interview stages need to load again before you can edit them, so nothing you
+                  change here can overwrite what is saved.
+                </p>
+                <button
+                  type="button"
+                  className={SECONDARY_BUTTON}
+                  onClick={() => void loadSubstages()}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <SubstageEditor
+                substages={substages}
+                busy={savingSubstages}
+                usage={(id) =>
+                  entries.filter((entry) => entry.application.interview_substage_id === id).length
+                }
+                onAdd={(name) =>
+                  applySubstages(addSubstage(substagesRef.current, name, crypto.randomUUID()))
+                }
+                onRename={(id, name) =>
+                  applySubstages(renameSubstage(substagesRef.current, id, name))
+                }
+                onMove={(id, direction) =>
+                  applySubstages(ok(moveSubstage(substagesRef.current, id, direction)))
+                }
+                onRemove={(id) => applySubstages(ok(removeSubstage(substagesRef.current, id)), id)}
+              />
+            )}
           </DetailPane>
         ) : pane.kind === 'new' ? (
           <DetailPane

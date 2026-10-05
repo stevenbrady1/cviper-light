@@ -89,14 +89,12 @@ describe('C2: one sub-stage save at a time', () => {
 
     // While it is in flight nothing else can be started.
     await waitFor(() => expect(editor.getAttribute('aria-busy')).toBe('true'));
-    expect(
-      (within(editor).getByRole('button', { name: 'Remove Technical Test' }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
-    expect(
-      (within(editor).getByRole('button', { name: 'Move Panel Round up' }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
+    // Busy, not gone: aria-disabled keeps keyboard focus where it is.
+    for (const name of ['Remove Technical Test', 'Move Panel Round up']) {
+      expect(within(editor).getByRole('button', { name }).getAttribute('aria-disabled')).toBe(
+        'true',
+      );
+    }
 
     fail();
 
@@ -143,18 +141,174 @@ describe('C2: one sub-stage save at a time', () => {
   });
 });
 
-describe('C3: Enter then blur commits a rename once', () => {
-  it('saves once, not twice', async () => {
+describe('C3: Enter then blur while the save is pending', () => {
+  it('Enter then blur while the save is pending, and the save fails: one save, the draft survives', async () => {
     const port = createFakeTrackerPort([entry('one', null)], { substages: STAGES });
+    let fail!: () => void;
+    const save = vi.spyOn(port, 'saveSubstages').mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          fail = () => resolve(err(FAILURE));
+        }),
+    );
     const { user, editor } = await openEditor(port);
-    const save = vi.spyOn(port, 'saveSubstages');
-
     const input = within(editor).getByRole('textbox', { name: 'Name of HR Screen' });
     await user.clear(input);
     await user.type(input, 'Recruiter Call{Enter}');
-    await user.tab();
-
-    await waitFor(() => expect(port.substageList()[0]?.name).toBe('Recruiter Call'));
+    await user.tab(); // blur WHILE the save is pending
+    fail();
+    await waitFor(() => expect(editor.getAttribute('aria-busy')).not.toBe('true'));
     expect(save).toHaveBeenCalledTimes(1);
+    expect(
+      (within(editor).getAllByRole('textbox', { name: /^Name of / })[0] as HTMLInputElement).value,
+    ).toBe('Recruiter Call');
+  });
+});
+
+describe('focus is never dropped by a busy control (WCAG 2.4.3)', () => {
+  function hold(port: ReturnType<typeof createFakeTrackerPort>) {
+    const real = port.saveSubstages.bind(port);
+    let release!: () => void;
+    const spy = vi.spyOn(port, 'saveSubstages').mockImplementationOnce(
+      (next) =>
+        new Promise((resolve) => {
+          release = () => resolve(real(next));
+        }),
+    );
+    return { release: () => release(), spy };
+  }
+
+  it('Enter on a move arrow keeps focus on it while saving, then on the same arrow', async () => {
+    const port = createFakeTrackerPort([entry('one', null)], { substages: STAGES });
+    const { release } = hold(port);
+    const { user, editor } = await openEditor(port);
+
+    const down = within(editor).getByRole('button', { name: 'Move HR Screen down' });
+    down.focus();
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(editor.getAttribute('aria-busy')).toBe('true'));
+    expect(document.activeElement).toBe(down);
+    expect(down.getAttribute('aria-disabled')).toBe('true');
+
+    release();
+    await waitFor(() => expect(editor.getAttribute('aria-busy')).not.toBe('true'));
+    expect(document.activeElement).toBe(
+      within(editor).getByRole('button', { name: 'Move HR Screen down' }),
+    );
+    expect(port.substageList().map((s) => s.id)).toEqual(['sub-b', 'sub-a', 'sub-c']);
+  });
+
+  it('a busy arrow ignores a second Enter instead of starting another save', async () => {
+    const port = createFakeTrackerPort([entry('one', null)], { substages: STAGES });
+    const { release, spy } = hold(port);
+    const { user, editor } = await openEditor(port);
+
+    const down = within(editor).getByRole('button', { name: 'Move HR Screen down' });
+    down.focus();
+    await user.keyboard('{Enter}');
+    await user.keyboard('{Enter}');
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    release();
+  });
+
+  it("when the move leaves the arrow at an end, focus goes to that row's name box", async () => {
+    const port = createFakeTrackerPort([entry('one', null)], { substages: STAGES });
+    const { user, editor } = await openEditor(port);
+
+    const down = within(editor).getByRole('button', { name: 'Move Technical Test down' });
+    down.focus();
+    await user.keyboard('{Enter}');
+
+    await waitFor(() =>
+      expect(port.substageList().map((s) => s.id)).toEqual(['sub-a', 'sub-c', 'sub-b']),
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(editor).getByRole('textbox', { name: 'Name of Technical Test' }),
+      ),
+    );
+  });
+
+  it('Enter on Remove keeps focus on it while the save is pending', async () => {
+    const port = createFakeTrackerPort([entry('one', null)], { substages: STAGES });
+    const { release } = hold(port);
+    const { user, editor } = await openEditor(port);
+
+    const remove = within(editor).getByRole('button', { name: 'Remove HR Screen' });
+    remove.focus();
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(editor.getAttribute('aria-busy')).toBe('true'));
+    expect(document.activeElement).not.toBe(document.body);
+    release();
+    await waitFor(() => expect(editor.getAttribute('aria-busy')).not.toBe('true'));
+    expect(document.activeElement).not.toBe(document.body);
+  });
+});
+
+describe('a failed save whose re-read also fails (double failure)', () => {
+  it('blocks editing until Retry succeeds, instead of trusting an old list', async () => {
+    const port = createFakeTrackerPort([entry('one', null)], { substages: STAGES });
+    vi.spyOn(port, 'saveSubstages').mockImplementationOnce(async () => {
+      // The re-read that follows this failure fails too.
+      port.failNext('substages');
+      return err(FAILURE);
+    });
+    const { user, editor } = await openEditor(port);
+
+    await user.click(within(editor).getByRole('button', { name: 'Remove HR Screen' }));
+
+    const banner = await screen.findByTestId('tracker-substages-error');
+    expect(screen.queryByTestId('substage-editor')).toBeNull();
+    expect(screen.getByTestId('substage-blocked')).toBeTruthy();
+    expect(screen.queryByTestId('tracker-edit-substages')).toBeNull();
+
+    await user.click(within(banner).getByRole('button', { name: 'Retry' }));
+
+    const back = await screen.findByTestId('substage-editor');
+    expect(
+      within(back)
+        .getAllByRole('textbox', { name: /^Name of / })
+        .map((input) => (input as HTMLInputElement).value),
+    ).toEqual(['HR Screen', 'Technical Test', 'Panel Round']);
+  });
+});
+
+describe('small things', () => {
+  it('rename boxes stop at the name limit', async () => {
+    const port = createFakeTrackerPort([entry('one', null)], { substages: STAGES });
+    const { editor } = await openEditor(port);
+    for (const input of within(editor).getAllByRole('textbox', { name: /^Name of / })) {
+      expect(input.getAttribute('maxlength')).toBe('40');
+    }
+  });
+
+  it('an identical announcement twice in a row is a fresh one', async () => {
+    const port = createFakeTrackerPort([entry('one', null)], { substages: STAGES });
+    const { user, editor } = await openEditor(port);
+    const region = within(editor).getByRole('status');
+
+    await user.click(within(editor).getByRole('button', { name: 'Move HR Screen down' }));
+    await waitFor(() => expect(region.textContent).toBe('Moved HR Screen down'));
+    const first = within(region).getByTestId('substage-status-text');
+
+    await user.click(within(editor).getByRole('button', { name: 'Move HR Screen down' }));
+    await waitFor(() =>
+      expect(port.substageList().map((s) => s.id)).toEqual(['sub-b', 'sub-c', 'sub-a']),
+    );
+    expect(region.textContent).toBe('Moved HR Screen down');
+    // A new node, so a screen reader announces it again.
+    expect(within(region).getByTestId('substage-status-text')).not.toBe(first);
+  });
+
+  it('the Enter/Escape hint is attached to the first row only', async () => {
+    const port = createFakeTrackerPort([entry('one', null)], { substages: STAGES });
+    const { editor } = await openEditor(port);
+    const inputs = within(editor).getAllByRole('textbox', { name: /^Name of / });
+    expect(inputs[0]?.getAttribute('aria-describedby')).toContain('substage-hint');
+    expect(inputs[1]?.getAttribute('aria-describedby')).toBeNull();
+    expect(inputs[2]?.getAttribute('aria-describedby')).toBeNull();
   });
 });

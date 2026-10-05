@@ -65,6 +65,9 @@ interface SubstageEditorProps {
 
 type Message = { readonly text: string; readonly source: 'add' | 'general' };
 
+/** The look of a control that is busy, not gone: same shape, dimmer, no pointer. */
+const BUSY = 'aria-disabled:cursor-not-allowed aria-disabled:text-ink-faint';
+
 const FIELD =
   'min-w-0 rounded-control border border-line bg-card px-2.5 py-1.5 text-ink ' +
   'placeholder:text-ink-muted aria-[invalid=true]:border-danger';
@@ -80,7 +83,10 @@ export function SubstageEditor({
 }: SubstageEditorProps) {
   const [newName, setNewName] = useState('');
   const [message, setMessage] = useState<Message | null>(null);
-  const [status, setStatus] = useState('');
+  /** `n` changes on every announcement, so an identical sentence is heard again. */
+  const [status, setAnnouncement] = useState({ text: '', n: 0 });
+  const setStatus = (text: string): void =>
+    setAnnouncement((current) => ({ text, n: current.n + 1 }));
   /** Names being typed, by id. Absent means "show the stored name". */
   const [drafts, setDrafts] = useState<Readonly<Record<string, string>>>({});
   const [rowErrors, setRowErrors] = useState<Readonly<Record<string, string>>>({});
@@ -92,6 +98,9 @@ export function SubstageEditor({
   /** Rows whose rename is in flight: Enter then blur must not save twice. */
   const committing = useRef(new Set<string>());
   const pendingFocus = useRef<{ removedId: string; target: string | 'new' } | null>(null);
+  const arrows = useRef(new Map<string, HTMLButtonElement>());
+  /** After a move settles: put focus back on the arrow that was used. */
+  const [refocus, setRefocus] = useState<{ id: string; direction: 'up' | 'down' } | null>(null);
 
   // Into the pane when it opens: the first stage's name, or the add box if
   // there are none. A keyboard user opened this; they should be IN it.
@@ -109,6 +118,16 @@ export function SubstageEditor({
     pendingFocus.current = null;
     (pending.target === 'new' ? newBox.current : inputs.current.get(pending.target))?.focus();
   }, [substages]);
+
+  // After a move settles, back to the arrow that was used. If the row is now
+  // at that end the arrow is disabled and cannot take focus, so the row's own
+  // name box does.
+  useEffect(() => {
+    if (refocus === null) return;
+    const arrow = arrows.current.get(`${refocus.id}:${refocus.direction}`);
+    (arrow !== undefined && !arrow.disabled ? arrow : inputs.current.get(refocus.id))?.focus();
+    setRefocus(null);
+  }, [refocus]);
 
   // The question is a safe default: Keep, not Remove.
   useEffect(() => {
@@ -177,6 +196,29 @@ export function SubstageEditor({
     return false;
   }
 
+  function arrowRef(id: string, direction: 'up' | 'down') {
+    return (element: HTMLButtonElement | null): void => {
+      const key = `${id}:${direction}`;
+      if (element === null) arrows.current.delete(key);
+      else arrows.current.set(key, element);
+    };
+  }
+
+  /**
+   * A busy arrow is `aria-disabled`, not `disabled`: a really disabled button
+   * drops keyboard focus to the page, so a press of Enter would throw the user
+   * out of the list. It just ignores the press until the save answers.
+   */
+  async function move(substage: InterviewSubstage, direction: 'up' | 'down'): Promise<void> {
+    if (busy) return;
+    const moved = await act(
+      substage,
+      () => onMove(substage.id, direction),
+      `Moved ${drafts[substage.id]?.trim() ?? substage.name} ${direction}`,
+    );
+    if (moved) setRefocus({ id: substage.id, direction });
+  }
+
   async function remove(substage: InterviewSubstage, index: number): Promise<void> {
     const next = substages[index + 1] ?? substages[index - 1];
     pendingFocus.current = { removedId: substage.id, target: next?.id ?? 'new' };
@@ -210,7 +252,9 @@ export function SubstageEditor({
 
       {/* Spoken, not shown loudly: what just happened. */}
       <p role="status" aria-live="polite" data-testid="substage-status" className="sr-only">
-        {status}
+        <span key={status.n} data-testid="substage-status-text">
+          {status.text}
+        </span>
       </p>
 
       {message === null ? null : (
@@ -246,7 +290,10 @@ export function SubstageEditor({
                     type="text"
                     aria-label={`Name of ${substage.name}`}
                     aria-invalid={rowError === undefined ? undefined : true}
-                    aria-describedby={rowError === undefined ? 'substage-hint' : errorId}
+                    aria-describedby={
+                      rowError !== undefined ? errorId : index === 0 ? 'substage-hint' : undefined
+                    }
+                    maxLength={INTERVIEW_SUBSTAGE_NAME_MAX}
                     readOnly={busy}
                     value={drafts[substage.id] ?? substage.name}
                     onChange={(event) => {
@@ -279,42 +326,36 @@ export function SubstageEditor({
                       <button
                         type="button"
                         aria-label={`Move ${substage.name} up`}
-                        disabled={busy || index === 0}
+                        ref={arrowRef(substage.id, 'up')}
+                        disabled={index === 0}
+                        aria-disabled={busy ? true : undefined}
                         onMouseDown={(event) => event.preventDefault()}
-                        onClick={() =>
-                          void act(
-                            substage,
-                            () => onMove(substage.id, 'up'),
-                            `Moved ${drafts[substage.id]?.trim() ?? substage.name} up`,
-                          )
-                        }
-                        className={`${QUIET_BUTTON} min-w-11`}
+                        onClick={() => void move(substage, 'up')}
+                        className={`${QUIET_BUTTON} min-w-11 ${BUSY}`}
                       >
                         ↑
                       </button>
                       <button
                         type="button"
                         aria-label={`Move ${substage.name} down`}
-                        disabled={busy || index === substages.length - 1}
+                        ref={arrowRef(substage.id, 'down')}
+                        disabled={index === substages.length - 1}
+                        aria-disabled={busy ? true : undefined}
                         onMouseDown={(event) => event.preventDefault()}
-                        onClick={() =>
-                          void act(
-                            substage,
-                            () => onMove(substage.id, 'down'),
-                            `Moved ${drafts[substage.id]?.trim() ?? substage.name} down`,
-                          )
-                        }
-                        className={`${QUIET_BUTTON} min-w-11`}
+                        onClick={() => void move(substage, 'down')}
+                        className={`${QUIET_BUTTON} min-w-11 ${BUSY}`}
                       >
                         ↓
                       </button>
                       <button
                         type="button"
                         aria-label={`Remove ${substage.name}`}
-                        disabled={busy}
+                        aria-disabled={busy ? true : undefined}
                         onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => requestRemove(substage, index)}
-                        className={SECONDARY_BUTTON}
+                        onClick={() => {
+                          if (!busy) requestRemove(substage, index);
+                        }}
+                        className={`${SECONDARY_BUTTON} ${BUSY}`}
                       >
                         Remove
                       </button>
@@ -357,12 +398,13 @@ export function SubstageEditor({
                         type="button"
                         data-testid="substage-confirm-remove"
                         aria-label={`Remove ${substage.name}`}
-                        disabled={busy}
+                        aria-disabled={busy ? true : undefined}
                         onClick={() => {
+                          if (busy) return;
                           setConfirming(null);
                           void remove(substage, index);
                         }}
-                        className={SECONDARY_BUTTON}
+                        className={`${SECONDARY_BUTTON} ${BUSY}`}
                       >
                         Remove
                       </button>

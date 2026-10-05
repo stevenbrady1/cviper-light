@@ -212,3 +212,34 @@ describe('importing a legacy backup over existing cards (C4)', () => {
     expect(destination.snapshot().interview_substages).toEqual(STAGES);
   });
 });
+
+describe('the merged total must stay restorable (import cap)', () => {
+  it('refuses an import that would leave more stages than a backup can hold, writing nothing', async () => {
+    const file = await exported({
+      ...EMPTY,
+      jobs: [JOB],
+      interview_substages: stages('file', 500),
+    });
+    const mine = createFakeBackupPort({ ...EMPTY, interview_substages: stages('mine', 1) });
+
+    const { user } = await importInto(file, mine);
+    await user.click(await screen.findByTestId('settings-confirm-import'));
+
+    const problem = await screen.findByTestId('settings-problem');
+    expect(problem.textContent).toMatch(/interview stages/i);
+    expect(problem.textContent).toContain('501');
+    expect(mine.snapshot().interview_substages).toHaveLength(1);
+    expect(mine.snapshot().jobs).toEqual([]);
+  });
+
+  it('boundary: exactly the cap is fine, and ids already in the database do not count twice', async () => {
+    const file = await exported({ ...EMPTY, interview_substages: stages('file', 500) });
+    const mine = createFakeBackupPort({ ...EMPTY, interview_substages: stages('file', 3) });
+
+    const { user } = await importInto(file, mine);
+    await user.click(await screen.findByTestId('settings-confirm-import'));
+    await screen.findByTestId('settings-message');
+
+    expect(mine.snapshot().interview_substages).toHaveLength(500);
+  });
+});
