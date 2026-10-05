@@ -201,6 +201,9 @@ function sourceFiles(dir: string): string[] {
   return found.sort();
 }
 
+/** Bare brand colours as text: `text-teal`, `hover:text-gold`; not `text-teal-ink`. */
+const BARE_BRAND_TEXT = /(?<![w-])(?:[a-z0-9-]+:)*text-(?:teal|gold)(?![w-])/g;
+
 const css = readFileSync(THEME, 'utf8');
 const tokens = parseTokens(css);
 const names = [...tokens.keys()];
@@ -241,6 +244,17 @@ describe('text contrast contract (WCAG 2.1 AA, 4.5:1)', () => {
     expect(failures()).toEqual([]);
   });
 
+  it('no source uses bare text-teal or text-gold; words use the -ink tokens', () => {
+    const offences: string[] = [];
+    for (const root of ROOTS) {
+      for (const file of sourceFiles(root)) {
+        const found = readFileSync(file, 'utf8').match(BARE_BRAND_TEXT);
+        if (found) offences.push(`${relative(REPO, file)}: ${found.join(', ')}`);
+      }
+    }
+    expect(offences).toEqual([]);
+  });
+
   it('allowlist entries each carry a reason', () => {
     for (const a of ALLOWLIST) expect(a.reason.length).toBeGreaterThan(10);
   });
@@ -275,6 +289,26 @@ describe('text contrast contract (WCAG 2.1 AA, 4.5:1)', () => {
       const pairs = findPairs("'placeholder:text-ink-faint bg-sunken'", names);
       expect(pairs).toHaveLength(1);
       expect(worstRatio(pairs[0]!, weak)).toBeLessThan(AA_TEXT);
+    });
+
+    it('the bare-brand guard catches text-teal and variants, not the -ink tokens', () => {
+      const hits = "'text-teal hover:text-gold text-teal-ink text-gold-ink'".match(BARE_BRAND_TEXT);
+      expect(hits).toEqual(['text-teal', 'hover:text-gold']);
+    });
+
+    it('pairs and judges a group-hover: variant', () => {
+      const weak = new Map(tokens);
+      weak.set('ink-faint', [0x9a, 0xa5, 0xb5]);
+      const pairs = findPairs("'bg-card group-hover:text-ink-faint'", names);
+      expect(pairs.map((p) => p.text.state)).toContain('group-hover');
+      expect(pairs.every((p) => worstRatio(p, weak) < AA_TEXT)).toBe(true);
+    });
+
+    it('a placeholder: text colour is judged against the surrounding background', () => {
+      const [pair] = findPairs("'bg-sunken placeholder:text-ink-faint'", names);
+      expect(pair!.text.state).toBe('placeholder');
+      expect(pair!.bg?.name).toBe('sunken');
+      expect(worstRatio(pair!, tokens)).toBeGreaterThanOrEqual(AA_TEXT);
     });
 
     it('boundary: black on white is 21:1, the same colour is 1:1', () => {

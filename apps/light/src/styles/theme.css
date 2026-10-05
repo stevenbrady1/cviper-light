@@ -69,9 +69,13 @@
    * every surface and tint the app uses. Use `text-teal-ink` / `text-gold-ink`
    * for words; keep `bg-teal`, `border-teal` and the tints for the marks.
    * `contrast.contract.test.ts` enforces it.
+   *
+   * `teal-ink` and `success` are deliberately the same green family: in this
+   * product brand-positive IS success. They stay two names with two values, not
+   * an alias, so either can move without dragging the other.
    */
   --color-teal-ink: #0a6c4b;
-  --color-gold-ink: #885402;
+  --color-gold-ink: #8a5200;
 
   /* --- Surfaces --------------------------------------------------------- */
   /* canvas is the page, sunken is a well cut into it, card sits on top. */
@@ -83,7 +87,7 @@
   /* --- Ink -------------------------------------------------------------- */
   --color-ink: #0b1729;
   --color-ink-muted: #46536a;
-  --color-ink-faint: #586376;
+  --color-ink-faint: #5f6b80;
 
   /*
    * Ink ON navy. These are the SAME two values as `canvas` and `line` — no new
