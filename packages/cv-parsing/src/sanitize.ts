@@ -27,6 +27,8 @@
  * punch in the text.
  */
 
+import { removeMatches, type Unit } from './folded-text';
+
 /** One injection defence: the pattern, and what it blocks. */
 export interface InjectionPattern {
   readonly pattern: RegExp;
@@ -113,29 +115,133 @@ const INJECTION_PATTERNS: readonly InjectionPattern[] = [
   },
 ];
 
+/** Rounds of removal allowed before the fail-closed fallback. Honest text settles in 1-2. */
+export const MAX_SANITIZE_ROUNDS = 32;
+/** Times the fallback may drop offending lines and retry before giving up. */
+const MAX_LINE_DROPS = 4;
+
+const JOINERS = new Set([String.fromCharCode(0x200c), String.fromCharCode(0x200d)]);
+const NL = String.fromCharCode(10);
+const CR = String.fromCharCode(13);
+const TAB = String.fromCharCode(9);
+/** U+0085, U+2028, U+2029. Built from code points so none sits in this file. */
+const LINE_SEPARATORS = new Set(String.fromCharCode(0x85, 0x2028, 0x2029));
+/** Box-drawing double line: NFKC leaves it alone, but it is read as `=`. */
+const BOX_DOUBLE = String.fromCharCode(0x2550);
+
+/**
+ * One stored character per unit. Line structure (newline, CR, tab) is kept, and
+ * U+0085/2028/2029 become a newline. Other controls and format characters are
+ * removed (they split fences: `==<ZWSP>=`), EXCEPT the joiners U+200C/U+200D,
+ * which are part of how Persian, Indic and emoji text is spelled; those stay
+ * in the text but fold to nothing, so they cannot hide a phrase either.
+ */
+function toUnits(text: string): Unit[] {
+  const units: Unit[] = [];
+  for (const char of text) {
+    if (char === NL || char === CR || char === TAB) {
+      units.push({ shown: char, fold: char });
+    } else if (LINE_SEPARATORS.has(char)) {
+      units.push({ shown: NL, fold: NL });
+    } else if (JOINERS.has(char)) {
+      units.push({ shown: char, fold: '' });
+    } else if (!INVISIBLE.test(char)) {
+      units.push({ shown: char, fold: char === BOX_DOUBLE ? '=' : char.normalize('NFKC') });
+    }
+  }
+  return units;
+}
+
+const NEWLINE_RUN = new RegExp(NL + '{4,}', 'g');
+const INVISIBLE = /[\p{Cc}\p{Cf}]/u;
+
+function shownText(units: Unit[]): string {
+  return units.map((unit) => unit.shown).join('');
+}
+
+/** One removal round. Idempotent on text no pattern matches. */
+function round(text: string): string {
+  let units = toUnits(text);
+  for (const { pattern } of INJECTION_PATTERNS) units = removeMatches(units, pattern, '');
+  // gateway.py line 443 — collapse excessive whitespace. Four-or-more newlines
+  // become three; genuine paragraph breaks survive.
+  return shownText(units).replace(NEWLINE_RUN, NL.repeat(3)).trim();
+}
+
+function settle(text: string): string | null {
+  let current = text;
+  for (let i = 0; i < MAX_SANITIZE_ROUNDS; i += 1) {
+    const next = round(current);
+    if (next === current) return current;
+    current = next;
+  }
+  return null;
+}
+
+/**
+ * Blank every line a trigger touches. Used only when the rounds did not settle.
+ * Lines are blanked, never joined, so no new phrase is made across them.
+ */
+function blankOffendingLines(text: string): string {
+  const units = toUnits(text);
+  const folded = units.map((unit) => unit.fold).join('');
+  const lineOfUnit: number[] = [];
+  let line = 0;
+  for (const unit of units) {
+    lineOfUnit.push(line);
+    if (unit.shown === NL) line += 1;
+  }
+  const owner: number[] = [];
+  units.forEach((unit, index) => {
+    for (let i = 0; i < unit.fold.length; i += 1) owner.push(index);
+  });
+  const bad = new Set<number>();
+  for (const { pattern } of INJECTION_PATTERNS) {
+    for (const match of folded.matchAll(new RegExp(pattern.source, pattern.flags))) {
+      if (match[0] === '') continue;
+      for (let i = match.index; i < match.index + match[0].length; i += 1) {
+        const index = owner[i];
+        if (index !== undefined) bad.add(lineOfUnit[index] ?? 0);
+      }
+    }
+  }
+  return shownText(units)
+    .split(NL)
+    .map((l, i) => (bad.has(i) ? '' : l))
+    .join(NL);
+}
+
 /**
  * Strip known prompt-injection patterns from untrusted text (job descriptions,
  * scraped adverts, pasted postings) before embedding it in a prompt.
  *
- * Source: gateway.py `sanitize_for_prompt`, lines 422-444.
+ * Source: gateway.py `sanitize_for_prompt`, lines 422-444, extended in L-207:
+ *
+ * FIXPOINT. Removing a phrase can re-form one ("SysSystem:tem:" -> "System:"),
+ * so removal repeats until the text stops changing.
+ *
+ * FOLDED DETECTION. Patterns run on an NFKC-folded view, so fullwidth and
+ * box-drawing fences and `ＳＹＳＴＥＭ：` are caught; the text KEPT is the
+ * user's own (`10²`, `½`, `™` are never rewritten). Zero-width and other
+ * format characters are removed so they cannot split a fence.
+ *
+ * FAIL CLOSED, BUT NOT WHOLE-ADVERT. If 32 rounds do not settle, nobody wrote
+ * that text honestly. Returning '' would throw away the whole advert and break
+ * analysis, so the lines the remaining triggers touch are blanked (newlines
+ * kept, so paragraph structure survives) and the rounds run again. Only if that
+ * also fails four times is '' returned. The result is always a true fixpoint.
  */
 export function sanitizeForPrompt(text: string | null | undefined): string {
   // Source: `if not text: return ""`.
   if (!text) return '';
 
-  let out = text;
-  for (const { pattern } of INJECTION_PATTERNS) {
-    out = out.replace(pattern, '');
+  let current = text;
+  for (let drops = 0; drops <= MAX_LINE_DROPS; drops += 1) {
+    const settled = settle(current);
+    if (settled !== null) return settled;
+    current = blankOffendingLines(current);
   }
-
-  // gateway.py line 443 — collapse excessive whitespace. Runs LAST, so the gaps
-  // left by the removals above are tidied. Four-or-more newlines become three;
-  // the source keeps three deliberately, so genuine paragraph breaks in a job
-  // advert survive.
-  out = out.replace(/\n{4,}/g, '\n\n\n');
-
-  // gateway.py line 444 — `return text.strip()`.
-  return out.trim();
+  return '';
 }
 
 /**

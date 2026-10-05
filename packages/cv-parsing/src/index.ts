@@ -28,6 +28,7 @@ export { extractText } from './extract';
 export { normalizeWhitespace, truncateForPrompt, TRUNCATION_MARKER } from './text';
 
 export { sanitizeForPrompt, injectionPatterns, type InjectionPattern } from './sanitize';
+export { removeMatches, type Unit } from './folded-text';
 
 export {
   configurePdfJs,
