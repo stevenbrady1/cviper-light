@@ -15,6 +15,7 @@ import {
 import { err, ok, type CoverLetter, type Result } from '@cviper/core-types';
 
 import { createTauriTransport } from '../../ai/transport';
+import { advertForModel } from '../../lib/advertForModel';
 
 import { isCloudKind, readStoredConsent, type ConsentProviderKind } from '../analysis/consent';
 import { type ProviderOption } from '../analysis/providers';
@@ -67,7 +68,7 @@ export async function runCoverLetter(
     provider,
     model,
     cvText: request.cvText,
-    jobText: request.jobText,
+    jobText: advertForModel(request.jobText),
     tailoredCvText: request.tailoredCvText,
     profileNotes: request.profileNotes,
     userMetrics: request.userMetrics,
