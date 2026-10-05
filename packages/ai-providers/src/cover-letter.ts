@@ -18,6 +18,7 @@ import {
 } from '@cviper/core-types';
 
 import { buildCoverLetterPrompt } from './prompt/build-cover-letter-prompt';
+import type { UserSuppliedMetric } from './prompt/user-metrics';
 import {
   runStructuredCall,
   type PipelineError,
@@ -46,6 +47,8 @@ export interface WriteCoverLetterOptions {
   readonly tailoredCvText: string | null;
   /** The candidate's own notes on how they write. `null` for none. */
   readonly profileNotes: string | null;
+  /** Achievements the candidate typed and approved (L-205), or absent. */
+  readonly userMetrics?: readonly UserSuppliedMetric[] | null | undefined;
   readonly maxOutputTokens?: number;
 }
 
@@ -70,6 +73,7 @@ export async function writeCoverLetter(
     jobText: options.jobText,
     tailoredCvText: options.tailoredCvText,
     profileNotes: options.profileNotes,
+    userMetrics: options.userMetrics,
   });
 
   const result = await runStructuredCall<CoverLetter>({

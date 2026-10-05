@@ -16,6 +16,7 @@ import {
 } from '@cviper/core-types';
 
 import { buildReviewPrompt, type ReviewKind } from './prompt/build-review-prompt';
+import type { UserSuppliedMetric } from './prompt/user-metrics';
 import {
   runStructuredCall,
   type PipelineError,
@@ -41,6 +42,8 @@ export interface ReviewDraftOptions {
   /** The ORIGINAL CV, which is the only thing a claim may rest on. */
   readonly cvText: string;
   readonly kind: ReviewKind;
+  /** Achievements the candidate typed and approved (L-205), or absent. */
+  readonly userMetrics?: readonly UserSuppliedMetric[] | null | undefined;
   readonly maxOutputTokens?: number;
 }
 
@@ -65,6 +68,7 @@ export async function reviewDraft(
     jobText: options.jobText,
     cvText: options.cvText,
     kind: options.kind,
+    userMetrics: options.userMetrics,
   });
 
   const result = await runStructuredCall<DraftReview>({
