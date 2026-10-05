@@ -93,40 +93,82 @@ function yearsIn(text: string): Set<string> {
   return new Set([...text.matchAll(YEAR_PATTERN)].map((match) => match[0]));
 }
 
-/**
- * A number typed after one of these is a certification or level identifier
- * (ISO 27001, Series 7, Level 3), not a figure the candidate achieved.
- */
-const IDENTIFIER_NUMBER =
-  /\b(?:ISO(?:\/IEC)?|IEC|Series|Level|Part|Grade|Class|Module|Paper)\s*\d+(?:[.:-]\d+)*/gi;
+const NUM = String.raw`\d+(?:[.:-]\d+)*`;
 
 /**
- * The FIGURES in what the candidate typed and approved (L-205): years and
- * identifier numbers are removed first, so typing "in 2019" or "ISO 27001"
- * cannot launder those numbers anywhere in the draft.
- *
- * LIMIT, documented rather than hidden: this is a bag of numbers. "Team of 12"
- * also makes "12 years" pass, because telling the two apart needs language
- * understanding. The prompt tells the model to use a line exactly as given;
- * this check only stops the figures nobody typed.
+ * A number typed after one of these is a certification, level or stage
+ * identifier (ISO-27001, Series 7 and 63, NVQ 3, Year 5), not a figure the
+ * candidate achieved. A hyphen or dash may separate them, and numbers chained
+ * straight after with "and", a comma, a slash or "&" are identifiers too.
  */
-function userFigures(facts: readonly string[]): Set<string> {
-  const known = new Set<string>();
+const IDENTIFIER_NUMBER = new RegExp(
+  String.raw`\b(?:ISO(?:\/IEC)?|IEC|Series|Level|Part|Grade|Class|Module|Paper|NVQ|Tier|Band|Stage|Year)[\s\-–]*${NUM}(?:\s*(?:and|,|\/|&)\s*${NUM})*`,
+  'gi',
+);
+
+/** A two-digit year: '19, ’19. */
+const SHORT_YEAR = /['’]\d{2}\b/g;
+
+/** "years" or "yrs" straight after a number. */
+const YEARS_AFTER = /^\s*(?:years?|yrs?)\b/i;
+const YEARS_BEFORE_NUMBER = new RegExp(String.raw`(${NUM})\s*(?:years?|yrs?)\b`, 'gi');
+
+interface UserFigures {
+  /** Every figure the user typed. */
+  readonly figures: ReadonlySet<string>;
+  /** The figures the user themselves put next to "years". */
+  readonly yearNumbers: ReadonlySet<string>;
+}
+
+/**
+ * The FIGURES in what the candidate typed and approved (L-205): years,
+ * two-digit years and identifier numbers are removed first, so typing "in
+ * 2019", "'19" or "ISO 27001" cannot launder those numbers anywhere in the
+ * draft.
+ *
+ * Two guards beyond that:
+ *   * a figure known ONLY from the user's text is flagged if the draft puts
+ *     "years" straight after it and the user did not ("team of 12" does not
+ *     make "12 years" pass);
+ *   * everything else is a bag of numbers. Telling "12 clients" from "a team
+ *     of 12" needs language understanding, so that gap remains. The prompt
+ *     tells the model to use a line exactly as given; this check only stops
+ *     the figures nobody typed.
+ */
+function userFigures(facts: readonly string[]): UserFigures {
+  const figures = new Set<string>();
+  const yearNumbers = new Set<string>();
   for (const fact of facts) {
-    const text = fact.replace(IDENTIFIER_NUMBER, ' ').replace(YEAR_PATTERN, ' ');
-    for (const metric of metricsIn(text)) known.add(metric);
+    const text = fact
+      .replace(IDENTIFIER_NUMBER, ' ')
+      .replace(SHORT_YEAR, ' ')
+      .replace(YEAR_PATTERN, ' ');
+    for (const metric of metricsIn(text)) figures.add(metric);
+    for (const match of text.matchAll(YEARS_BEFORE_NUMBER)) {
+      for (const metric of metricsIn(match[1] ?? '')) yearNumbers.add(metric);
+    }
   }
-  return known;
+  return { figures, yearNumbers };
 }
 
 /** Metrics in `draft` that the original never mentions, in draft order. */
-function newMetrics(original: string, draft: string, userKnown: ReadonlySet<string>): string[] {
-  const known = new Set([...metricsIn(original), ...userKnown]);
+function newMetrics(original: string, draft: string, user: UserFigures): string[] {
+  const originalKnown = metricsIn(original);
   const seen = new Set<string>();
   const flagged: string[] = [];
   for (const match of draft.matchAll(METRIC_PATTERN)) {
     const key = match[0].toLowerCase();
-    if (known.has(key) || seen.has(key)) continue;
+    let known = originalKnown.has(key) || user.figures.has(key);
+    const userOnly = !originalKnown.has(key) && user.figures.has(key);
+    if (
+      known &&
+      userOnly &&
+      !user.yearNumbers.has(key) &&
+      YEARS_AFTER.test(draft.slice((match.index ?? 0) + match[0].length))
+    ) {
+      known = false;
+    }
+    if (known || seen.has(key)) continue;
     seen.add(key);
     flagged.push(match[0]);
   }

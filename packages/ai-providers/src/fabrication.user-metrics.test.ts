@@ -114,10 +114,15 @@ describe('checkFabrication with user-supplied facts (L-205)', () => {
       expect(flagged.map((f) => f.text)).toEqual(['7', '3']);
     });
 
-    it('KNOWN LIMIT: it is a bag of numbers - "team of 12" also whitelists "12 years"', () => {
-      // Documented, not endorsed: matching a figure to its context would need
-      // a language model. The prompt tells the model to use a line as given.
+    it('"team of 12" no longer whitelists "12 years" (see N3)', () => {
       const report = checkFabrication(ORIGINAL, cv({ summary: '12 years of experience.' }), [USER]);
+      expect(report.flagged).toEqual([{ kind: 'metric', text: '12' }]);
+    });
+
+    it('KNOWN LIMIT: otherwise it is a bag of numbers - "12" as a team size passes as 12 clients', () => {
+      // Documented, not endorsed: matching a figure to its context needs a
+      // language model. The prompt tells the model to use a line as given.
+      const report = checkFabrication(ORIGINAL, cv({ summary: 'Advised 12 clients.' }), [USER]);
       expect(report.clean).toBe(true);
     });
 

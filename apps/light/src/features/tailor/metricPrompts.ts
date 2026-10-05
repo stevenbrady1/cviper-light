@@ -150,3 +150,28 @@ export function approvedMetrics(
     return text === '' ? [] : [{ skill: prompt.skill, text }];
   });
 }
+
+/**
+ * Of the metrics a draft was written with, those still approved NOW with the
+ * same skill and the same text. A line the user has since removed, changed or
+ * hidden (another CV, another advert) is no longer theirs to rely on, so it is
+ * not sent again and not whitelisted by the letter's figure check.
+ */
+export function stillApproved(
+  used: readonly ApprovedMetric[],
+  current: readonly ApprovedMetric[],
+): ApprovedMetric[] {
+  return used.filter((entry) =>
+    current.some(
+      (now) => now.skill.toLowerCase() === entry.skill.toLowerCase() && now.text === entry.text,
+    ),
+  );
+}
+
+/** True when the approved set is not the one the draft was written with. */
+export function metricsChanged(
+  used: readonly ApprovedMetric[],
+  current: readonly ApprovedMetric[],
+): boolean {
+  return stillApproved(used, current).length !== used.length || used.length !== current.length;
+}

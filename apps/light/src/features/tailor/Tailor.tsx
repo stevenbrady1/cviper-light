@@ -52,6 +52,8 @@ import {
   EMPTY_METRIC_STATE,
   approvedMetrics,
   metricPromptsForGaps,
+  metricsChanged,
+  stillApproved,
   type MetricState,
 } from './metricPrompts';
 import { AtsStep } from './AtsStep';
@@ -500,7 +502,7 @@ export function Tailor({
           jobText,
           cvText,
           kind: 'cv',
-          userMetrics: result.userMetrics,
+          userMetrics: stillApproved(result.userMetrics, userMetrics),
         },
         createTransport,
         hasConsent,
@@ -514,7 +516,7 @@ export function Tailor({
       }
       setReview(run.value.review);
     },
-    [createTransport, cvText, hasConsent, jobText, result],
+    [createTransport, cvText, hasConsent, jobText, result, userMetrics],
   );
 
   const performLetter = useCallback(
@@ -529,7 +531,7 @@ export function Tailor({
           jobText,
           tailoredCvText: result?.text ?? null,
           profileNotes: notes,
-          userMetrics: result?.userMetrics ?? null,
+          userMetrics: stillApproved(result?.userMetrics ?? [], userMetrics),
         },
         createTransport,
         hasConsent,
@@ -550,11 +552,11 @@ export function Tailor({
         claims: checkLetterClaims(
           cvText,
           run.value.letter,
-          (result?.userMetrics ?? []).map((metric) => metric.text),
+          stillApproved(result?.userMetrics ?? [], userMetrics).map((metric) => metric.text),
         ),
       });
     },
-    [createTransport, cvText, hasConsent, jobText, notes, result],
+    [createTransport, cvText, hasConsent, jobText, notes, result, userMetrics],
   );
 
   const perform = useCallback(
@@ -1110,6 +1112,12 @@ export function Tailor({
                 fabrication={{ clean: result.report.clean, flagged: result.report.flagged.length }}
               />
             )}
+
+            {metricsChanged(result.userMetrics, userMetrics) ? (
+              <p data-testid="tailor-metrics-changed-note" className="text-xs text-ink-muted">
+                Your added results changed since this draft. Re-run tailoring to use them.
+              </p>
+            ) : null}
 
             <div className="flex flex-wrap items-center gap-2">
               <button

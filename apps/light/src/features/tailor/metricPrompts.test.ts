@@ -17,7 +17,9 @@ import {
   dismiss,
   metricPromptsForGaps,
   reopen,
+  metricsChanged,
   setDraft,
+  stillApproved,
 } from './metricPrompts';
 
 const prompts = metricPromptsForGaps(['Power BI', 'dbt']);
@@ -170,4 +172,30 @@ describe('keys that are object-prototype names (C7)', () => {
       expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     },
   );
+});
+
+describe('what a draft was written with versus what is approved now (re-review C2)', () => {
+  const used = [
+    { skill: 'Power BI', text: 'Cut reporting from 5 days to 2' },
+    { skill: 'dbt', text: 'Migrated 40 models' },
+  ];
+
+  it('keeps only entries still approved with the same skill and text', () => {
+    const now = [{ skill: 'power bi', text: 'Cut reporting from 5 days to 2' }];
+    expect(stillApproved(used, now)).toEqual([used[0]]);
+  });
+
+  it('negative: a changed text, a removed entry or nothing approved drops it', () => {
+    expect(stillApproved(used, [{ skill: 'dbt', text: 'Migrated 400 models' }])).toEqual([]);
+    expect(stillApproved(used, [])).toEqual([]);
+    expect(stillApproved([], used)).toEqual([]);
+  });
+
+  it('metricsChanged is false only when the two sets are the same', () => {
+    expect(metricsChanged(used, [...used].reverse())).toBe(false);
+    expect(metricsChanged(used, [used[0]!])).toBe(true);
+    expect(metricsChanged([], used)).toBe(true);
+    expect(metricsChanged([], [])).toBe(false);
+    expect(metricsChanged(used, [used[0]!, { skill: 'dbt', text: 'Other' }])).toBe(true);
+  });
 });

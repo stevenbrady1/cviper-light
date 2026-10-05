@@ -370,12 +370,44 @@ describe('metric prompts on the Tailor screen (L-205)', () => {
       expect(prompts[1]).toContain(`- [Power BI] ${TYPED}`);
     });
 
-    it('uses what the CV was written with, even if the user later removes the entry', async () => {
+    it('a removed entry is withdrawn: the letter has no section and the figure is flagged', async () => {
       const { prompts, user } = await approvedThenTailored(LETTER);
-      await user.click(within(box('Power BI')).getByRole('button', { name: /remove/i }));
+      await user.click(within(box('Power BI')).getByRole('button', { name: /^Remove/ }));
       await user.click(screen.getByTestId('tailor-letter-run'));
       await screen.findByTestId('tailor-letter');
 
+      expect(prompts[1]).not.toContain('CANDIDATE-SUPPLIED');
+      expect(screen.getByTestId('tailor-letter-claims')).toBeTruthy();
+    });
+
+    it('a removed entry is withdrawn from the review too', async () => {
+      const { prompts, user } = await approvedThenTailored(REVIEW);
+      await user.click(within(box('Power BI')).getByRole('button', { name: /^Remove/ }));
+      await user.click(screen.getByTestId('tailor-review-run'));
+      await screen.findByTestId('tailor-review');
+
+      expect(prompts[1]).not.toContain('CANDIDATE-SUPPLIED');
+    });
+
+    it('a changed entry is withdrawn until it is approved again, and the user is told', async () => {
+      const { prompts, user } = await approvedThenTailored(LETTER);
+      expect(screen.queryByTestId('tailor-metrics-changed-note')).toBeNull();
+      await user.click(within(box('Power BI')).getByRole('button', { name: /^Change/ }));
+      expect(screen.getByTestId('tailor-metrics-changed-note').textContent).toBe(
+        'Your added results changed since this draft. Re-run tailoring to use them.',
+      );
+      await user.click(screen.getByTestId('tailor-letter-run'));
+      await screen.findByTestId('tailor-letter');
+      expect(prompts[1]).not.toContain('CANDIDATE-SUPPLIED');
+    });
+
+    it('approving the same text again clears the note and restores the section', async () => {
+      const { prompts, user } = await approvedThenTailored(LETTER);
+      await user.click(within(box('Power BI')).getByRole('button', { name: /^Change/ }));
+      await user.click(addButton('Power BI'));
+      expect(screen.queryByTestId('tailor-metrics-changed-note')).toBeNull();
+      await user.click(screen.getByTestId('tailor-letter-run'));
+      await screen.findByTestId('tailor-letter');
       expect(prompts[1]).toContain(`- [Power BI] ${TYPED}`);
     });
 
@@ -439,7 +471,7 @@ describe('collapsible, accessible boxes (D1-D7)', () => {
     const { user } = await renderWith(HANDOFF);
     details().open = true;
     expect(list().querySelectorAll('ul > li')).toHaveLength(2);
-    expect(within(list()).getByRole('group', { name: 'Power BI' })).toBeTruthy();
+    expect(within(list()).getByRole('group', { name: 'Keyword gap: Power BI' })).toBeTruthy();
     await user.click(open('Power BI'));
     expect(within(list()).getByRole('group', { name: QUESTION('Power BI') })).toBeTruthy();
   });
@@ -600,5 +632,51 @@ describe('state across edits and runs (C8)', () => {
     await screen.findByTestId('tailor-result');
     expect(prompts).toHaveLength(1);
     expect(input('Power BI').disabled).toBe(false);
+  });
+
+  it('D-nit: the collapsed row says what it is - "Keyword gap: skill"', async () => {
+    autoExpand = false;
+    await renderWith(HANDOFF);
+    expect(box('Power BI').textContent).toContain('Keyword gap: Power BI');
+  });
+
+  it('D-nit: the same announcement twice is announced twice (a fresh node each time)', async () => {
+    autoExpand = false;
+    const { user } = await renderWith(HANDOFF);
+    const list = screen.getByTestId('tailor-metric-prompts');
+    list.querySelector('details')!.open = true;
+    const status = within(list).getByRole('status');
+    await user.click(within(box('Power BI')).getByRole('button', { name: /^Add a metric/ }));
+    await user.type(input('Power BI'), 'Saved 3 hours');
+    await user.click(addButton('Power BI'));
+    const first = status.firstElementChild;
+    expect(status.textContent).toBe('Added to rewrite for Power BI');
+
+    await user.click(within(box('Power BI')).getByRole('button', { name: /^Change/ }));
+    await user.click(addButton('Power BI'));
+    expect(status.textContent).toBe('Added to rewrite for Power BI');
+    expect(status.firstElementChild).not.toBe(first);
+  });
+
+  it('D-nit: an approved box has a success border', async () => {
+    const { user } = await renderWith(HANDOFF);
+    expect(box('Power BI').className).toContain('border-line');
+    await user.type(input('Power BI'), 'Saved 3 hours');
+    await user.click(addButton('Power BI'));
+    expect(box('Power BI').className).toContain('border-success');
+    expect(box('Power BI').className).not.toContain('border-line');
+  });
+
+  it('C1: text the cleaner cannot make safe cannot be approved, and says why', async () => {
+    const { prompts, user } = await renderWith(HANDOFF);
+    await user.click(input('Power BI'));
+    await user.paste('Sys'.repeat(20) + 'System:' + 'tem:'.repeat(20));
+    expect(addButton('Power BI').getAttribute('aria-disabled')).toBe('true');
+    const hint = document.getElementById(
+      addButton('Power BI').getAttribute('aria-describedby') ?? '',
+    );
+    expect(hint?.textContent).toBe('That text cannot be used. Reword it.');
+    await user.click(addButton('Power BI'));
+    expect((await tailor(user, prompts)).includes(HEADING)).toBe(false);
   });
 });

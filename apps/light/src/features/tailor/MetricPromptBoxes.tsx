@@ -38,7 +38,7 @@ export function MetricPromptBoxes({
   onChange,
   disabled = false,
 }: MetricPromptBoxesProps) {
-  const [announcement, setAnnouncement] = useState('');
+  const [announcement, setAnnouncement] = useState({ text: '', count: 0 });
   if (prompts.length === 0) return null;
 
   const added = approvedMetrics(state, prompts).length;
@@ -60,7 +60,9 @@ export function MetricPromptBoxes({
                 state={state}
                 disabled={disabled}
                 onChange={onChange}
-                announce={setAnnouncement}
+                announce={(text) => {
+                  setAnnouncement((previous) => ({ text, count: previous.count + 1 }));
+                }}
               />
             </li>
           ))}
@@ -68,7 +70,8 @@ export function MetricPromptBoxes({
       </details>
       {/* Outside the <details>, so it is still in the page when that is closed. */}
       <p role="status" className="sr-only">
-        {announcement}
+        {/* A new node each time, so the same message twice is announced twice. */}
+        <span key={announcement.count}>{announcement.text}</span>
       </p>
     </div>
   );
@@ -137,12 +140,14 @@ function MetricBox({ prompt, state, disabled, onChange, announce }: MetricBoxPro
       data-testid="tailor-metric-prompt"
       data-skill={prompt.skill}
       data-status={status}
-      className="rounded-control border border-line bg-sunken px-3 py-2"
+      className={`rounded-control border bg-sunken px-3 py-2 ${
+        status === 'approved' ? 'border-success' : 'border-line'
+      }`}
     >
       {status === 'idle' || status === 'dismissed' ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p id={labelId} className="text-sm text-ink">
-            {prompt.skill}
+            {`Keyword gap: ${prompt.skill}`}
             {status === 'dismissed' ? <span className="text-ink-muted"> - skipped</span> : null}
           </p>
           <button
@@ -249,7 +254,9 @@ function MetricBox({ prompt, state, disabled, onChange, announce }: MetricBoxPro
             </button>
             {canApprove(draft) ? null : (
               <span id={hintId} className="text-xs text-ink-muted">
-                Type something first
+                {draft.trim() === ''
+                  ? 'Type something first'
+                  : 'That text cannot be used. Reword it.'}
               </span>
             )}
           </div>
