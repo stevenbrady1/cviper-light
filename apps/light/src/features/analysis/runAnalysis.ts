@@ -45,7 +45,12 @@ import {
   type ChatTransport,
 } from '@cviper/ai-providers';
 import { err, ok, type CvAnalysis, type Result } from '@cviper/core-types';
-import { KEYWORD_SCORING_VERSION, atsKeywordScore, scoreByKeywords } from '@cviper/keyword-scoring';
+import {
+  KEYWORD_SCORING_VERSION,
+  atsKeywordScore,
+  scoreByKeywords,
+  stripJobBoilerplate,
+} from '@cviper/keyword-scoring';
 
 import { createTauriTransport } from '../../ai/transport';
 
@@ -190,7 +195,10 @@ export async function runAnalysis(
     provider,
     model,
     cvText: request.cvText,
-    jobText: request.jobText,
+    // The model reads the advert without its cookie notice and legal footer
+    // (L-205). The keyword scorers above strip the same way themselves; the
+    // raw text stays on the request, in the box and in storage.
+    jobText: stripJobBoilerplate(request.jobText),
   });
 
   if (!analysed.ok) {

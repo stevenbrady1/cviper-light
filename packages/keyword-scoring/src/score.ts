@@ -36,6 +36,7 @@ import {
   jobDescriptionTooShortError,
   type ScoringError,
 } from './errors';
+import { stripJobBoilerplate } from './boilerplate';
 import { matchProfileToJob, type MatchResult } from './match';
 import { buildCvProfile, buildJobPosting } from './profile';
 import { DEFAULT_SKILL_WEIGHT, skillWeight } from './weights';
@@ -233,7 +234,7 @@ export function atsKeywordScore(
   jobDescription: string,
 ): Result<number, ScoringError> {
   const cv = prepare(cvText);
-  const advert = prepare(jobDescription);
+  const advert = prepare(stripJobBoilerplate(jobDescription));
   const refusal = refuseUnscorable(cv, advert);
   if (refusal !== null) return err(refusal);
   return ok(atsScore(cv, advert).score);
@@ -250,7 +251,7 @@ export function scoreByKeywords(
   jobDescription: string,
 ): Result<CvAnalysis, ScoringError> {
   const cv = prepare(cvText);
-  const advert = prepare(jobDescription);
+  const advert = prepare(stripJobBoilerplate(jobDescription));
 
   const refusal = refuseUnscorable(cv, advert);
   if (refusal !== null) return err(refusal);
