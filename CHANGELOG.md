@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Interviewing can be split into your own stages (HR Screen, Technical Test, Panel Round, Final): add, rename, reorder and remove them, and put a card in one. Removing a stage never removes a card. Backups carry the stages (still format version 1). Note: importing a backup written before this release over a card you already have clears that card's stage, because an old file cannot say which stage it was in (L-205).
+
 ## [0.6.0] — 2026-09-29
 
 One flow from finding a job to tailoring your CV for it, a tidier Set up

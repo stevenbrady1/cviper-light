@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { INTERVIEW_SUBSTAGE_NAME_MAX, type InterviewSubstage } from '@cviper/core-types';
 
@@ -31,6 +31,8 @@ import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 
 interface SubstageEditorProps {
   readonly substages: readonly InterviewSubstage[];
+  /** A save is in flight: nothing else may start until it answers. */
+  readonly busy: boolean;
   readonly onAdd: (name: string) => Promise<string | null>;
   readonly onRename: (id: string, name: string) => Promise<string | null>;
   readonly onMove: (id: string, direction: 'up' | 'down') => Promise<string | null>;
@@ -39,6 +41,7 @@ interface SubstageEditorProps {
 
 export function SubstageEditor({
   substages,
+  busy,
   onAdd,
   onRename,
   onMove,
@@ -62,20 +65,29 @@ export function SubstageEditor({
     });
   }
 
+  /** Rows whose rename is in flight: Enter then blur must not save twice. */
+  const committing = useRef(new Set<string>());
+
   async function commitName(substage: InterviewSubstage): Promise<void> {
+    if (committing.current.has(substage.id)) return;
     const draft = drafts[substage.id];
     if (draft === undefined || draft === substage.name) {
       discardDraft(substage.id);
       return;
     }
-    // Success OR refusal, the box goes back to the stored name: the list is
-    // the truth, and a rejected edit left showing would look as though it stuck.
-    await run(onRename(substage.id, draft));
-    discardDraft(substage.id);
+    committing.current.add(substage.id);
+    try {
+      // Success OR refusal, the box goes back to the stored name: the list is
+      // the truth, and a rejected edit left showing would look as though it stuck.
+      await run(onRename(substage.id, draft));
+      discardDraft(substage.id);
+    } finally {
+      committing.current.delete(substage.id);
+    }
   }
 
   return (
-    <div data-testid="substage-editor" className="space-y-4">
+    <div data-testid="substage-editor" aria-busy={busy} className="space-y-4">
       <p className="text-ink-muted">
         Break Interviewing into your own steps. A card in Interviewing can be in one of them.
         Removing a step never removes a card — it just stops saying which step it is in.
@@ -103,6 +115,7 @@ export function SubstageEditor({
                 type="text"
                 aria-label={`Name of ${substage.name}`}
                 maxLength={INTERVIEW_SUBSTAGE_NAME_MAX * 2}
+                readOnly={busy}
                 value={drafts[substage.id] ?? substage.name}
                 onChange={(event) => {
                   const value = event.currentTarget.value;
@@ -125,7 +138,7 @@ export function SubstageEditor({
               <button
                 type="button"
                 aria-label={`Move ${substage.name} up`}
-                disabled={index === 0}
+                disabled={busy || index === 0}
                 onClick={() => void run(onMove(substage.id, 'up'))}
                 className={QUIET_BUTTON}
               >
@@ -134,7 +147,7 @@ export function SubstageEditor({
               <button
                 type="button"
                 aria-label={`Move ${substage.name} down`}
-                disabled={index === substages.length - 1}
+                disabled={busy || index === substages.length - 1}
                 onClick={() => void run(onMove(substage.id, 'down'))}
                 className={QUIET_BUTTON}
               >
@@ -143,6 +156,7 @@ export function SubstageEditor({
               <button
                 type="button"
                 aria-label={`Remove ${substage.name}`}
+                disabled={busy}
                 onClick={() => void run(onRemove(substage.id))}
                 className={SECONDARY_BUTTON}
               >

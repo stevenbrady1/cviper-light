@@ -45,7 +45,7 @@ import {
   ApplicationSchema,
   CvSchema,
   DocumentSchema,
-  INTERVIEW_SUBSTAGES_MAX,
+  INTERVIEW_SUBSTAGES_IMPORT_MAX,
   InterviewSubstageSchema,
   JobSchema,
   ProfileSchema,
@@ -525,8 +525,9 @@ function readOptionalCollection<TSchema extends z.ZodObject>(
 /**
  * The user's interview sub-stages (L-205). Absent reads as none.
  *
- * Held to more than the plain collection check: at most `INTERVIEW_SUBSTAGES_MAX`
- * of them, and no two sharing an id (the id is what cards point at, so a
+ * Held to more than the plain collection check: at most `INTERVIEW_SUBSTAGES_IMPORT_MAX`
+ * of them (a sanity bound, NOT the editor's limit of 20: a merge import can
+ * leave the app with more, and anything the app can export must import), and no two sharing an id (the id is what cards point at, so a
  * repeated one would make "which sub-stage" ambiguous). Two with the same NAME
  * are allowed — they are distinguishable by id and harmless; only the editor
  * refuses to create them.
@@ -537,10 +538,10 @@ function readInterviewSubstages(
   const records = readOptionalCollection(document, 'interview_substages', InterviewSubstageSchema);
   if (!records.ok) return records;
 
-  if (records.value.length > INTERVIEW_SUBSTAGES_MAX) {
+  if (records.value.length > INTERVIEW_SUBSTAGES_IMPORT_MAX) {
     return err({
       code: 'INVALID_RECORD',
-      message: `A backup may hold at most ${INTERVIEW_SUBSTAGES_MAX} interview sub-stages, but this file has ${records.value.length}.`,
+      message: `A backup may hold at most ${INTERVIEW_SUBSTAGES_IMPORT_MAX} interview stages, but this file has ${records.value.length}.`,
       path: 'interview_substages',
     });
   }

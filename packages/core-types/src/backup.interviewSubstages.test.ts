@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BACKUP_SCHEMA_VERSION, exportBackup, importBackup, type BackupPayload } from './backup';
 import {
   INTERVIEW_SUBSTAGE_NAME_MAX,
+  INTERVIEW_SUBSTAGES_IMPORT_MAX,
   INTERVIEW_SUBSTAGES_MAX,
   InterviewSubstageSchema,
   type Application,
@@ -235,16 +236,27 @@ describe('boundaries', () => {
     }));
   }
 
-  it('accepts exactly the maximum number of sub-stages', () => {
-    const imported = importBackup(withKeys({ interview_substages: many(INTERVIEW_SUBSTAGES_MAX) }));
+  it('accepts more than the editor maximum, because a merge import can leave the app with more', () => {
+    // DB 5 + file 20 different ids = 25: the app can export that, so the
+    // importer must be able to read it back.
+    const imported = importBackup(
+      withKeys({ interview_substages: many(INTERVIEW_SUBSTAGES_MAX + 5) }),
+    );
     expect(imported.ok).toBe(true);
     if (!imported.ok) return;
-    expect(imported.value.interview_substages).toHaveLength(INTERVIEW_SUBSTAGES_MAX);
+    expect(imported.value.interview_substages).toHaveLength(INTERVIEW_SUBSTAGES_MAX + 5);
   });
 
-  it('rejects one more than the maximum', () => {
+  it('accepts exactly the importer sanity bound', () => {
     const imported = importBackup(
-      withKeys({ interview_substages: many(INTERVIEW_SUBSTAGES_MAX + 1) }),
+      withKeys({ interview_substages: many(INTERVIEW_SUBSTAGES_IMPORT_MAX) }),
+    );
+    expect(imported.ok).toBe(true);
+  });
+
+  it('rejects one more than the importer sanity bound', () => {
+    const imported = importBackup(
+      withKeys({ interview_substages: many(INTERVIEW_SUBSTAGES_IMPORT_MAX + 1) }),
     );
     expect(imported.ok).toBe(false);
     if (imported.ok) return;

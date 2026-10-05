@@ -181,6 +181,9 @@ export function Tracker({
   const [substages, setSubstages] = useState<readonly InterviewSubstage[]>([]);
   const [substagesLoaded, setSubstagesLoaded] = useState(false);
   const substagesRef = useRef<readonly InterviewSubstage[]>([]);
+  /** One sub-stage save at a time. A ref as well as state: the check must be synchronous. */
+  const savingSubstagesRef = useRef(false);
+  const [savingSubstages, setSavingSubstages] = useState(false);
   /**
    * What this machine can offer the detail pane's AI panels. `null` until the
    * first card is opened: the probe (Ollama's port, the credential store) is
@@ -362,46 +365,64 @@ export function Tracker({
       removedId: string | null = null,
     ): Promise<string | null> => {
       if (!change.ok) return change.error;
+      // Serial, because the save REPLACES the stored list: a second one built
+      // on a list the first has not confirmed can delete real stages.
+      if (savingSubstagesRef.current) return 'Wait for the current save to finish.';
+      savingSubstagesRef.current = true;
+      setSavingSubstages(true);
 
-      const previousList = substagesRef.current;
-      const affected = new Set(
-        entries
-          .filter(
-            (entry) => removedId !== null && entry.application.interview_substage_id === removedId,
-          )
-          .map((entry) => entry.application.id),
-      );
-
-      substagesRef.current = change.value;
-      setSubstages(change.value);
-      if (removedId !== null) {
-        setEntries((current) =>
-          current.map((entry) =>
-            affected.has(entry.application.id)
-              ? { ...entry, application: { ...entry.application, interview_substage_id: null } }
-              : entry,
-          ),
+      try {
+        const previousList = substagesRef.current;
+        const affected = new Set(
+          entries
+            .filter(
+              (entry) =>
+                removedId !== null && entry.application.interview_substage_id === removedId,
+            )
+            .map((entry) => entry.application.id),
         );
-      }
 
-      const written = await trackerPort.saveSubstages(change.value);
-      if (written.ok) return null;
+        substagesRef.current = change.value;
+        setSubstages(change.value);
+        if (removedId !== null) {
+          setEntries((current) =>
+            current.map((entry) =>
+              affected.has(entry.application.id)
+                ? { ...entry, application: { ...entry.application, interview_substage_id: null } }
+                : entry,
+            ),
+          );
+        }
 
-      substagesRef.current = previousList;
-      setSubstages(previousList);
-      if (removedId !== null) {
-        setEntries((current) =>
-          current.map((entry) =>
-            affected.has(entry.application.id)
-              ? {
-                  ...entry,
-                  application: { ...entry.application, interview_substage_id: removedId },
-                }
-              : entry,
-          ),
-        );
+        const written = await trackerPort.saveSubstages(change.value);
+        if (written.ok) return null;
+
+        // FAILED. Do not restore a snapshot: ask the database what it holds. The
+        // write may have half landed, and a stale snapshot is what the next
+        // edit would build its delete on.
+        const [reread, reloaded] = await Promise.all([trackerPort.substages(), trackerPort.load()]);
+        const list = reread.ok ? reread.value : previousList;
+        substagesRef.current = list;
+        setSubstages(list);
+        if (reloaded.ok) {
+          setEntries(reloaded.value);
+        } else if (removedId !== null) {
+          setEntries((current) =>
+            current.map((entry) =>
+              affected.has(entry.application.id)
+                ? {
+                    ...entry,
+                    application: { ...entry.application, interview_substage_id: removedId },
+                  }
+                : entry,
+            ),
+          );
+        }
+        return `That change could not be saved: ${written.error.message} Try again.`;
+      } finally {
+        savingSubstagesRef.current = false;
+        setSavingSubstages(false);
       }
-      return `That change could not be saved: ${written.error.message} Try again.`;
     },
     [entries, trackerPort],
   );
@@ -646,6 +667,7 @@ export function Tracker({
           >
             <SubstageEditor
               substages={substages}
+              busy={savingSubstages}
               onAdd={(name) =>
                 applySubstages(addSubstage(substagesRef.current, name, crypto.randomUUID()))
               }

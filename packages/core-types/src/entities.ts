@@ -136,6 +136,14 @@ export interface Application {
 /** The most sub-stages a person may define. Generous; a card-sized board needs few. */
 export const INTERVIEW_SUBSTAGES_MAX = 20;
 
+/**
+ * The importer's sanity bound. DELIBERATELY far above the editor's limit: a
+ * merge import can leave the database holding more than `INTERVIEW_SUBSTAGES_MAX`
+ * (5 of yours + 20 from a file), the app will export all of them, and a backup
+ * the app wrote must always be restorable. This only stops a runaway file.
+ */
+export const INTERVIEW_SUBSTAGES_IMPORT_MAX = 500;
+
 /** The longest a sub-stage name may be, once trimmed. */
 export const INTERVIEW_SUBSTAGE_NAME_MAX = 40;
 

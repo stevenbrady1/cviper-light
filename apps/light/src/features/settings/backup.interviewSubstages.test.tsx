@@ -152,3 +152,63 @@ describe('export then import, through the screen', () => {
     expect(destination.snapshot().interview_substages).toEqual([]);
   });
 });
+
+function stages(prefix: string, count: number): InterviewSubstage[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `${prefix}-${index}`,
+    name: `${prefix} ${index}`,
+    position: index,
+  }));
+}
+
+describe('merge imports and the 20-stage editor limit (C1)', () => {
+  it('a backup the app wrote after a merge to more than 20 stages can be restored', async () => {
+    // The database holds 5; the file holds 20 DIFFERENT ids. Imports merge, so
+    // the database now holds 25 and the app will export all 25.
+    const file = await exported({ ...EMPTY, interview_substages: stages('file', 20) });
+    const mine = createFakeBackupPort({ ...EMPTY, interview_substages: stages('mine', 5) });
+
+    const first = await importInto(file, mine);
+    await first.user.click(await screen.findByTestId('settings-confirm-import'));
+    await screen.findByTestId('settings-message');
+    expect(mine.snapshot().interview_substages).toHaveLength(25);
+    cleanup();
+
+    // Export those 25, then restore them onto an empty database.
+    const again = await exported(mine.snapshot());
+    const second = await importInto(again);
+    await second.user.click(await screen.findByTestId('settings-confirm-import'));
+    await screen.findByTestId('settings-message');
+    expect(second.destination.snapshot().interview_substages).toHaveLength(25);
+  });
+});
+
+describe('importing a legacy backup over existing cards (C4)', () => {
+  it('sets interview_substage_id to none on a card with the same id (intended)', async () => {
+    // A file from before sub-stages cannot say which stage a card is in, and an
+    // import upserts every column, so the existing card loses its label. The
+    // stage list itself is untouched. Pinned so it is a decision, not a surprise.
+    const destination = createFakeBackupPort({
+      ...EMPTY,
+      jobs: [JOB],
+      applications: [CARD],
+      interview_substages: STAGES,
+    });
+    const legacy = JSON.stringify({
+      schemaVersion: 1,
+      exportedAt: '2026-09-01T09:00:00.000Z',
+      app: { name: 'cviper-light', version: '0.6.0' },
+      jobs: [JOB],
+      applications: [{ ...CARD, interview_substage_id: undefined }],
+      cvs: [],
+      analyses: [],
+    });
+
+    const { user } = await importInto(legacy, destination);
+    await user.click(await screen.findByTestId('settings-confirm-import'));
+    await screen.findByTestId('settings-message');
+
+    expect(destination.snapshot().applications[0]?.interview_substage_id ?? null).toBeNull();
+    expect(destination.snapshot().interview_substages).toEqual(STAGES);
+  });
+});

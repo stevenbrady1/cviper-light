@@ -28,6 +28,7 @@ export {
   CvSchema,
   DocumentSchema,
   INTERVIEW_SUBSTAGE_NAME_MAX,
+  INTERVIEW_SUBSTAGES_IMPORT_MAX,
   INTERVIEW_SUBSTAGES_MAX,
   InterviewSubstageSchema,
   JobSchema,
