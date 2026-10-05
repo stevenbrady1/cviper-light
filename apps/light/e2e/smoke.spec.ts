@@ -156,6 +156,7 @@ import { Builder, By, Capabilities, until, type WebDriver } from 'selenium-webdr
 // source a person can read. No binary fixture is ever committed here — see the
 // header of that file for why.
 import { makeMinimalPdf, makeScannedPdf } from '../../../packages/cv-parsing/src/test/fixtures.ts';
+import { createSessionWhenWindowReady } from './smoke-session.ts';
 
 /**
  * The port the app's own WebDriver server listens on.
@@ -172,6 +173,9 @@ const ELEMENT_TIMEOUT = 20_000;
 
 /** How long to wait for the app's embedded WebDriver server to start listening. */
 const DRIVER_STARTUP_TIMEOUT = 30_000;
+
+/** How long, after the server is listening, to wait for the app window (L-206). */
+const WINDOW_STARTUP_TIMEOUT = 60_000;
 
 /**
  * The heading on the first-run welcome.
@@ -649,7 +653,12 @@ describe('the built CViper Light binary', () => {
       capabilities.set('tauri:options', { application });
       capabilities.setBrowserName('tauri');
 
-      driver = await new Builder().withCapabilities(capabilities).usingServer(DRIVER_URL).build();
+      // The port being open does not mean the window exists yet (L-206).
+      driver = await createSessionWhenWindowReady({
+        create: () => new Builder().withCapabilities(capabilities).usingServer(DRIVER_URL).build(),
+        timeoutMs: WINDOW_STARTUP_TIMEOUT,
+        intervalMs: 500,
+      });
     },
     { timeout: 120_000 },
   );
