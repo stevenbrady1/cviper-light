@@ -40,6 +40,14 @@ import {
   type ProviderOption,
 } from '../analysis/providers';
 import { gapsForTailor, type TailorHandoff } from '../flow/handoff';
+import { JobStepBar } from '../flow/JobStepBar';
+import {
+  NO_SAVED_PROGRESS,
+  createDbJobProgressPort,
+  type JobProgressPort,
+  type SavedProgress,
+} from '../flow/progress';
+import { type StepId } from '../flow/steps';
 
 import { lineDiff } from './diff';
 import { MetricPromptBoxes } from './MetricPromptBoxes';
@@ -153,6 +161,32 @@ export interface TailorProps {
    * own for as long as it is mounted.
    */
   readonly jobSessions?: JobSessions | undefined;
+  /**
+   * Where the step bar's ✓ for Analyse and Export come from (L-200). Left
+   * undefined, the database — unless the tailor port was injected, in which
+   * case a test that faked the data layer gets no real reads behind it.
+   */
+  readonly progressPort?: JobProgressPort | undefined;
+  /** The step to open on — ATS Score or Export when the user came from the bar elsewhere. */
+  readonly entryStep?: TailorStep | undefined;
+  /** Find and Analyse are other screens: the shell moves there, with this job. */
+  readonly onJobStep?: ((step: StepId, job: Job) => void) | undefined;
+  /** "◀ Tracker" on the step bar. */
+  readonly onTracker?: (() => void) | undefined;
+}
+
+/** The three steps that are this screen's own (L-200). */
+export type TailorStep = 'tailor' | 'ats' | 'export';
+
+/** Where each of this screen's steps is on the page, to scroll to. */
+const STEP_ANCHOR: Readonly<Record<TailorStep, string>> = {
+  tailor: 'tailor-step-tailor',
+  ats: 'tailor-step-ats',
+  export: 'tailor-step-export',
+};
+
+function isTailorStep(step: StepId): step is TailorStep {
+  return step === 'tailor' || step === 'ats' || step === 'export';
 }
 
 function consentKindFor(kind: ProviderOption['kind']): ConsentProviderKind | null {
@@ -176,11 +210,21 @@ export function Tailor({
   handoff,
   onHandoffHandled,
   jobSessions,
+  progressPort,
+  entryStep,
+  onJobStep,
+  onTracker,
 }: TailorProps = {}) {
   const tailorPort = useMemo(() => port ?? createDbTailorPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
   const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
   const sessions = useMemo(() => jobSessions ?? createJobSessions(), [jobSessions]);
+  const progress = useMemo<JobProgressPort>(
+    () =>
+      progressPort ??
+      (port === undefined ? createDbJobProgressPort() : { load: async () => NO_SAVED_PROGRESS }),
+    [port, progressPort],
+  );
   const sessionsState = useSyncExternalStore(sessions.watch, sessions.get);
 
   const [cvs, setCvs] = useState<readonly Cv[]>([]);
@@ -469,6 +513,39 @@ export function Tailor({
    */
   const advertEdited = selectedJob !== null && jobText !== jobAdvertText(selectedJob);
 
+  // ── The step bar (L-200) ─────────────────────────────────────────────────
+
+  /** Which of this screen's steps the user is on. */
+  const [step, setStep] = useState<TailorStep>(entryStep ?? 'tailor');
+  /** The saved half of the job's progress: analysed, exported. */
+  const [saved, setSaved] = useState<SavedProgress>(NO_SAVED_PROGRESS);
+  useEffect(() => {
+    setSaved(NO_SAVED_PROGRESS);
+    if (selectedJobId === null) return;
+    let cancelled = false;
+    void progress.load(selectedJobId).then((loaded) => {
+      if (!cancelled) setSaved(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [progress, selectedJobId]);
+  // Scroll the step into view once it is on the page. ATS Score and Export
+  // only exist once there is a draft; before that the screen stays put.
+  useEffect(() => {
+    const anchor = document.getElementById(STEP_ANCHOR[step]);
+    if (anchor !== null && typeof anchor.scrollIntoView === 'function') {
+      anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [step]);
+  const onBarStep = useCallback(
+    (target: StepId) => {
+      if (isTailorStep(target)) setStep(target);
+      else if (selectedJob !== null) onJobStep?.(target, selectedJob);
+    },
+    [onJobStep, selectedJob],
+  );
+
   /** The fresh consent check every run module gets — the store, not a snapshot. */
   const hasConsent = useCallback(
     (kind: ConsentProviderKind) => consentStore.read().then((read) => read.ok && read.value[kind]),
@@ -724,6 +801,7 @@ export function Tailor({
 
     setSaving(false);
     setSaveMessage(savedMessage({ advert: advertSaved, letter: letterSaved }));
+    setSaved((current) => ({ ...current, exported: true }));
   }, [
     advertEdited,
     jobText,
@@ -833,6 +911,22 @@ export function Tailor({
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-tailor">
       <ViewHeader title={view.label} summary={view.summary} />
 
+      {selectedJob === null ? null : (
+        <JobStepBar
+          title={selectedJob.title}
+          company={selectedJob.company}
+          location={selectedJob.location}
+          current={step}
+          progress={{
+            analysed: saved.analysed,
+            tailored: result !== null,
+            exported: saved.exported,
+          }}
+          onStep={onBarStep}
+          onTracker={onTracker}
+        />
+      )}
+
       {shownError === null ? null : (
         <p
           role="alert"
@@ -844,6 +938,7 @@ export function Tailor({
       )}
 
       <div className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+        <span id={STEP_ANCHOR.tailor} aria-hidden="true" />
         {/* ── 1. The CV ───────────────────────────────────────────────── */}
         <div>
           <label htmlFor="tailor-cv-pick" className="block text-xs font-medium text-ink-muted">
@@ -993,6 +1088,11 @@ export function Tailor({
                   // A job seen before comes back as it was left (L-199); a new
                   // one starts from its advert, with the CV and model the user
                   // already chose — those are choices, not this job's work.
+                  // Another job starts on its own Tailor step. Set HERE, on
+                  // the user's pick, not on any change of job: a hand-off
+                  // from another screen's step bar sets the job too, and
+                  // must keep the step it asked for (L-200).
+                  if (picked.id !== selectedJobId) setStep('tailor');
                   sessions.open(picked.id, () => ({
                     advert: jobAdvertText(picked),
                     cvId: selectedCvId,
@@ -1215,6 +1315,7 @@ export function Tailor({
               advert, before → after, so the last thing read before saving is
               whether tailoring helped. Pure and offline — see `atsComparison.ts`.
             */}
+            <span id={STEP_ANCHOR.ats} aria-hidden="true" />
             {atsComparison === null ? null : (
               <AtsStep
                 comparison={atsComparison}
@@ -1353,6 +1454,7 @@ export function Tailor({
             )}
 
             {/* ── Save to an application ─────────────────────────────── */}
+            <span id={STEP_ANCHOR.export} aria-hidden="true" />
             <div className="flex flex-wrap items-center gap-2">
               {applications.length === 0 ? null : (
                 <select
