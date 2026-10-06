@@ -22,11 +22,19 @@ import { type TailorPort } from '../port';
  */
 
 type Method =
-  'loadCvs' | 'loadJobs' | 'loadApplicationsFor' | 'profile' | 'saveDocument' | 'loadDocumentsFor';
+  | 'loadCvs'
+  | 'loadJobs'
+  | 'loadApplicationsFor'
+  | 'profile'
+  | 'saveDocument'
+  | 'loadDocumentsFor'
+  | 'createApplication';
 
 export interface FakeTailorPort extends TailorPort {
   /** Every document currently "stored", newest first. */
   readonly storedDocuments: () => readonly Document[];
+  /** Every application currently "stored", including any this screen created. */
+  readonly storedApplications: () => readonly Application[];
   /** Make the next call to the named method fail. */
   readonly failNext: (method: Method) => void;
   readonly calls: Record<Method, number>;
@@ -61,6 +69,7 @@ export function createFakeTailorPort(
     profile: 0,
     saveDocument: 0,
     loadDocumentsFor: 0,
+    createApplication: 0,
   };
 
   function failure(method: Method): Result<never, DbError> | null {
@@ -72,6 +81,7 @@ export function createFakeTailorPort(
   return {
     calls,
     storedDocuments: () => documents,
+    storedApplications: () => applications,
     failNext: (method) => failing.add(method),
 
     async loadCvs() {
@@ -102,6 +112,14 @@ export function createFakeTailorPort(
       const refused = failure('saveDocument');
       if (refused !== null) return refused;
       documents = [document, ...documents.filter((candidate) => candidate.id !== document.id)];
+      return ok(undefined);
+    },
+
+    async createApplication(application) {
+      calls.createApplication += 1;
+      const refused = failure('createApplication');
+      if (refused !== null) return refused;
+      applications.push(application);
       return ok(undefined);
     },
 

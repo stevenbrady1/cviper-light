@@ -1,5 +1,5 @@
 /**
- * The five things the tailor view does to storage, and nothing else.
+ * Everything the tailor view does to storage, and nothing else.
  *
  * Same reasoning as `features/analysis/port.ts`: `src/db` talks to
  * `tauri-plugin-sql`, which needs a Tauri runtime a Vitest process does not
@@ -9,8 +9,9 @@
  * purpose.
  *
  * Nothing here WRITES a CV row or a job: the tailor reads what the Analysis
- * and Tracker screens saved, and the only thing it writes is a `Document`
- * archived against an application (L-155) — the tailored CV, the letter.
+ * and Tracker screens saved. It writes a `Document` archived against an
+ * application (L-155) — the tailored CV, the letter — and, when the job has
+ * no application yet, a new `saved` one to archive it in (L-199).
  */
 import {
   getProfile,
@@ -18,6 +19,7 @@ import {
   listCvs,
   listDocumentsForApplication,
   listJobs,
+  upsertApplication,
   upsertDocument,
   type DbError,
 } from '../../db';
@@ -40,6 +42,11 @@ export interface TailorPort {
   loadApplicationsFor(jobId: string): Promise<Result<Application[], DbError>>;
   /** The candidate profile, or `null` if there has never been one. */
   profile(): Promise<Result<Profile | null, DbError>>;
+  /**
+   * Start an application for a job that has none, so a tailored CV can be
+   * saved to it (L-199). Always `saved` — the same first step Search uses.
+   */
+  createApplication(application: Application): Promise<Result<void, DbError>>;
   /** Archive a document against an application. */
   saveDocument(document: Document): Promise<Result<void, DbError>>;
   /** What is already archived against an application, newest first. */
@@ -59,6 +66,7 @@ export function createDbTailorPort(): TailorPort {
       return ok(all.value.filter((application) => application.job_id === jobId));
     },
     profile: getProfile,
+    createApplication: upsertApplication,
     saveDocument: upsertDocument,
     loadDocumentsFor: listDocumentsForApplication,
   };

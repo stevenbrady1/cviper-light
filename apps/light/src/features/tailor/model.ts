@@ -8,6 +8,7 @@
 import { MIN_SCORABLE_CHARS } from '@cviper/keyword-scoring';
 
 import {
+  type Application,
   type Cv,
   type Document,
   type DocumentKind,
@@ -145,6 +146,52 @@ export function documentTitle(kind: 'cv' | 'cover_letter', jobTitle: string): st
   const what = kind === 'cv' ? 'Tailored CV' : 'Cover letter';
   const job = jobTitle.trim();
   return job === '' ? what : `${what} — ${job}`;
+}
+
+/**
+ * The title an edited advert is archived under (L-199): it says it is the
+ * user's version, so nobody later mistakes it for the employer's text.
+ */
+export function editedAdvertTitle(jobTitle: string): string {
+  const job = jobTitle.trim();
+  return job === '' ? 'Advert (edited)' : `Advert (edited) — ${job}`;
+}
+
+/** What "Save to an application" reports, naming each thing it saved. */
+export function savedMessage(saved: {
+  readonly advert: boolean;
+  readonly letter: boolean;
+}): string {
+  const things = ['the tailored CV'];
+  if (saved.advert) things.push('the edited advert');
+  if (saved.letter) things.push('the cover letter');
+  const list =
+    things.length === 1
+      ? things[0]
+      : `${things.slice(0, -1).join(', ')} and ${things[things.length - 1]}`;
+  return `Saved ${list} to the application.`;
+}
+
+/**
+ * A job's first application, started so a tailored CV has somewhere to go
+ * (L-199). `saved` with no date — the same first step Search takes: keeping a
+ * CV for a job is not applying for it.
+ */
+export function newSavedApplication(input: {
+  readonly id: string;
+  readonly jobId: string;
+  readonly now: IsoTimestamp;
+}): Application {
+  return {
+    id: input.id,
+    job_id: input.jobId,
+    status: 'saved',
+    applied_date: null,
+    notes: null,
+    next_action: null,
+    next_action_date: null,
+    updated_at: input.now,
+  };
 }
 
 /**
