@@ -213,8 +213,12 @@ describe('a handoff that fits', () => {
     expect(pick('tailor-application').value).toBe('app-1');
     await user.click(screen.getByTestId('tailor-save-application'));
 
-    await vi.waitFor(() => expect(port.storedDocuments()).toHaveLength(1));
-    expect(port.storedDocuments()[0]).toMatchObject({ application_id: 'app-1', kind: 'cv' });
+    // The handed-over advert is the full text pasted over the job's preview,
+    // so it is the user's version (L-199): it is saved beside the CV, marked.
+    await vi.waitFor(() => expect(port.storedDocuments()).toHaveLength(2));
+    const byKind = new Map(port.storedDocuments().map((document) => [document.kind, document]));
+    expect(byKind.get('cv')).toMatchObject({ application_id: 'app-1' });
+    expect(byKind.get('advert')).toMatchObject({ application_id: 'app-1', text: HANDOFF.jobText });
   });
 
   it('is applied once: an edit afterwards is not put back', async () => {

@@ -16,6 +16,7 @@ import { Profile, type ProfileProps } from '../features/profile/Profile';
 import { forgetWelcome, hasSeenWelcome, markWelcomeSeen } from '../features/onboarding/store';
 import { Search, type SearchProps } from '../features/search/Search';
 import { Settings, type SettingsProps } from '../features/settings/Settings';
+import { createJobSessions } from '../features/tailor/jobSessions';
 import { Tailor, type TailorProps } from '../features/tailor/Tailor';
 import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
 import { type TrackerEntry } from '../features/tracker/model';
@@ -183,6 +184,12 @@ export default function App({
    * cleared by "Delete everything" along with the analysis session.
    */
   const [tailorHandoff, setTailorHandoff] = useState<TailorHandoff | null>(null);
+  /**
+   * The Tailor screen's work, one session per job (L-199): the draft, the
+   * review, the letter. Held here for the same reason as the analysis
+   * session — the view unmounts on every switch — and cleared with it.
+   */
+  const [jobSessions] = useState(createJobSessions);
 
   /**
    * The update offered by the check on launch, or `null` for the usual case.
@@ -385,10 +392,12 @@ export default function App({
     setWelcomeOpen(true);
     // The CV and advert on the analysis screen were in the database that just
     // went; the screen must not be the one place they survive. The same goes
-    // for a job still on its way to Tailor (L-190).
+    // for a job still on its way to Tailor (L-190), and for every tailored
+    // draft still on screen (L-199).
     analysisSession.reset();
+    jobSessions.reset();
     setTailorHandoff(null);
-  }, [analysisSession]);
+  }, [analysisSession, jobSessions]);
 
   const narrow = viewport === 'narrow';
   // The phone's insets — notch, corners, home indicator — kept off the content
@@ -484,6 +493,7 @@ export default function App({
             onOpenSettings: () => setActiveView('settings'),
             handoff: tailorHandoff,
             onHandoffHandled: onTailorHandoffHandled,
+            jobSessions,
           },
           settings: {
             port: backupPort,

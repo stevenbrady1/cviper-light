@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import {
   checkFabrication,
   checkLetterClaims,
   type ChatTransport,
   type FabricationFlag,
-  type FabricationReport,
-  type UserSuppliedMetric,
   promptKeywordGaps,
 } from '@cviper/ai-providers';
 import {
@@ -14,12 +12,9 @@ import {
   renderTailoredCv,
   wordCount,
   type Application,
-  type CoverLetter,
   type Cv,
-  type DraftReview,
   type Job,
   type Profile,
-  type TailoredCv,
 } from '@cviper/core-types';
 
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
@@ -44,7 +39,7 @@ import {
   providerOptions,
   type ProviderOption,
 } from '../analysis/providers';
-import { gapsForTailor, type HandedGaps, type TailorHandoff } from '../flow/handoff';
+import { gapsForTailor, type TailorHandoff } from '../flow/handoff';
 
 import { lineDiff } from './diff';
 import { MetricPromptBoxes } from './MetricPromptBoxes';
@@ -54,8 +49,8 @@ import {
   metricPromptsForGaps,
   metricsChanged,
   stillApproved,
-  type MetricState,
 } from './metricPrompts';
+import { createJobSessions, sessionIn, type JobSessions, type TailorJobState } from './jobSessions';
 import { AtsStep } from './AtsStep';
 import { compareAts } from './atsComparison';
 import { buildCoverLetterDocx, buildCvDocx } from './docx';
@@ -63,9 +58,12 @@ import {
   LETTER_WORD_LIMIT,
   NO_AI_REASON,
   documentTitle,
+  editedAdvertTitle,
   exportFileName,
   newDocument,
+  newSavedApplication,
   profileNotes,
+  savedMessage,
   runDisabledReason,
   tailorOptions,
 } from './model';
@@ -111,34 +109,8 @@ import { runTailor } from './runTailor';
 /** How often the elapsed counter ticks while a model is thinking. */
 const TICK_MS = 1000;
 
-/** Which of the three model calls is in flight, if any. */
-type Phase = 'idle' | 'tailoring' | 'reviewing' | 'writing';
-
 /** What the gate is waiting to run, once the user has answered. */
 type PendingAction = 'tailor' | 'review' | 'letter';
-
-interface TailorResult {
-  readonly cv: TailoredCv;
-  /** `renderTailoredCv` of `cv`, computed once. */
-  readonly text: string;
-  readonly report: FabricationReport;
-  readonly provider: string;
-  readonly model: string;
-  readonly retried: boolean;
-  /**
-   * The approved achievements this draft was written with (L-205). The letter
-   * and the review use THESE, not whatever the boxes say now: the numbers are
-   * already in the draft.
-   */
-  readonly userMetrics: readonly UserSuppliedMetric[];
-}
-
-interface LetterResult {
-  readonly letter: CoverLetter;
-  readonly text: string;
-  readonly words: number;
-  readonly claims: readonly FabricationFlag[];
-}
 
 export interface TailorProps {
   /** Injected by tests. Defaults to the real SQLite-backed port. */
@@ -175,6 +147,12 @@ export interface TailorProps {
    */
   readonly handoff?: TailorHandoff | null | undefined;
   readonly onHandoffHandled?: (() => void) | undefined;
+  /**
+   * The per-job work (L-199), owned by the shell so it outlives this view.
+   * Left undefined in a test that does not care, and this screen keeps its
+   * own for as long as it is mounted.
+   */
+  readonly jobSessions?: JobSessions | undefined;
 }
 
 function consentKindFor(kind: ProviderOption['kind']): ConsentProviderKind | null {
@@ -197,10 +175,13 @@ export function Tailor({
   onOpenSettings,
   handoff,
   onHandoffHandled,
+  jobSessions,
 }: TailorProps = {}) {
   const tailorPort = useMemo(() => port ?? createDbTailorPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
   const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
+  const sessions = useMemo(() => jobSessions ?? createJobSessions(), [jobSessions]);
+  const sessionsState = useSyncExternalStore(sessions.watch, sessions.get);
 
   const [cvs, setCvs] = useState<readonly Cv[]>([]);
   const [cvsLoaded, setCvsLoaded] = useState(false);
@@ -208,32 +189,56 @@ export function Tailor({
   /** False until the saved-jobs read has come back, either way. A handoff waits for it. */
   const [jobsLoaded, setJobsLoaded] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [selectedCvId, setSelectedCvId] = useState<string | null>(null);
-  const [jobText, setJobText] = useState('');
-  /** The tracked job the advert came from, or `null` for a paste. */
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [applications, setApplications] = useState<readonly Application[]>([]);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
+  /** The job whose applications `applications` holds — saving waits for them. */
+  const [applicationsFor, setApplicationsFor] = useState<string | null>(null);
+
+  const [options, setOptions] = useState<readonly ProviderOption[]>([]);
+  const [availabilityRead, setAvailabilityRead] = useState(false);
+  const [localModelHint, setLocalModelHint] = useState<string | null>(null);
+
+  const [elapsed, setElapsed] = useState(0);
+  /** Screen-level problems: a failed read or save. A failed RUN belongs to its job. */
+  const [error, setError] = useState<string | null>(null);
+
+  // ── This job's work (L-199) ──────────────────────────────────────────────
+  //
+  // Everything that belongs to a JOB lives in `sessions`, keyed by job id, so
+  // it outlives this view and a second job cannot overwrite the first. What is
+  // left in `useState` above and below is about the screen, not the job.
+
+  /** The tracked job the advert came from, or `null` for a paste. */
+  const selectedJobId = sessionsState.activeJobId;
+  const work: TailorJobState = sessionIn(sessionsState, selectedJobId);
+  /** Change the job on screen. Read at call time, so a stale closure cannot misfile it. */
+  const patchActive = useCallback(
+    (patch: Partial<TailorJobState>) => sessions.patch(sessions.get().activeJobId, patch),
+    [sessions],
+  );
+  /** The job's CV, if it still exists — otherwise the newest one. */
+  const selectedCvId =
+    work.cvId !== null && cvs.some((cv) => cv.id === work.cvId) ? work.cvId : (cvs[0]?.id ?? null);
+  const jobText = work.advert;
   /**
    * The Analysis result's keyword gaps, as handed over (L-202). Kept even when
    * the user moves to another CV or edits the advert: `gapsForTailor` decides
    * at each render whether they still apply, so going back brings them back.
    */
-  const [handedGaps, setHandedGaps] = useState<HandedGaps | null>(null);
+  const handedGaps = work.handedGaps;
   /** What the user typed against each gap, and whether they approved it (L-205). */
-  const [metricState, setMetricState] = useState<MetricState>(EMPTY_METRIC_STATE);
-
-  const [options, setOptions] = useState<readonly ProviderOption[]>([]);
-  const [optionKey, setOptionKey] = useState<string>('');
-  const [availabilityRead, setAvailabilityRead] = useState(false);
-  const [localModelHint, setLocalModelHint] = useState<string | null>(null);
-
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [elapsed, setElapsed] = useState(0);
-  const [result, setResult] = useState<TailorResult | null>(null);
-  const [review, setReview] = useState<DraftReview | null>(null);
-  const [letter, setLetter] = useState<LetterResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const metricState = work.metricState;
+  /** The job's option, if this machine still offers it — otherwise the default. */
+  const optionKey =
+    work.optionKey !== null && optionByKey(options, work.optionKey) !== null
+      ? work.optionKey
+      : (options[0]?.key ?? '');
+  const phase = work.phase;
+  const result = work.result;
+  const review = work.review;
+  const letter = work.letter;
+  /** A failed read or save on this screen, else why this job's last run failed. */
+  const shownError = error ?? work.error;
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   /**
@@ -281,7 +286,6 @@ export function Tailor({
         return;
       }
       setCvs(loaded.value);
-      setSelectedCvId((current) => current ?? loaded.value[0]?.id ?? null);
     });
 
     void tailorPort.loadJobs().then((loaded) => {
@@ -290,7 +294,13 @@ export function Tailor({
       // waiting on it still has an advert worth putting in the box.
       setJobsLoaded(true);
       // Not surfaced: the tracked-job shortcut is a convenience.
-      if (loaded.ok) setJobs(loaded.value);
+      if (!loaded.ok) return;
+      setJobs(loaded.value);
+      // The job this screen was showing has been deleted since: show a paste.
+      const active = sessions.get().activeJobId;
+      if (active !== null && !loaded.value.some((candidate) => candidate.id === active)) {
+        sessions.open(null, () => ({}));
+      }
     });
 
     void tailorPort.profile().then((loaded) => {
@@ -301,7 +311,7 @@ export function Tailor({
     return () => {
       cancelled = true;
     };
-  }, [tailorPort]);
+  }, [sessions, tailorPort]);
 
   useEffect(() => {
     let cancelled = false;
@@ -310,7 +320,6 @@ export function Tailor({
       if (cancelled) return;
       const offered = tailorOptions(providerOptions(availability));
       setOptions(offered);
-      setOptionKey(offered[0]?.key ?? '');
       setLocalModelHint(ollamaHint(availability));
       setAvailabilityRead(true);
     });
@@ -321,15 +330,19 @@ export function Tailor({
   }, []);
 
   useEffect(() => {
-    if (selectedJobId === null) {
-      setApplications([]);
-      setSelectedApplicationId(null);
-      return;
-    }
+    setApplications([]);
+    setSelectedApplicationId(null);
+    setApplicationsFor(null);
+    if (selectedJobId === null) return;
 
     let cancelled = false;
     void tailorPort.loadApplicationsFor(selectedJobId).then((loaded) => {
-      if (cancelled || !loaded.ok) return;
+      if (cancelled) return;
+      // A failed read is a finished read: the save button must not wait for
+      // ever. It then starts an application, which is the worst case — a
+      // second empty one — rather than a CV the user cannot keep.
+      setApplicationsFor(selectedJobId);
+      if (!loaded.ok) return;
       setApplications(loaded.value);
       setSelectedApplicationId(loaded.value[0]?.id ?? null);
     });
@@ -367,31 +380,42 @@ export function Tailor({
     if (!cvsLoaded || !jobsLoaded || !availabilityRead) return;
     appliedHandoff.current = handoff;
 
-    if (handoff.cvId !== null && cvs.some((candidate) => candidate.id === handoff.cvId)) {
-      setSelectedCvId(handoff.cvId);
-    }
-    setJobText(handoff.jobText);
-    // Selecting the job is what loads its applications and picks the first,
-    // so "Save to an application" works on the record the flow started from.
     // A job that is not on the board leaves the advert as a paste.
-    setSelectedJobId(
+    const jobId =
       handoff.jobId !== null && jobs.some((candidate) => candidate.id === handoff.jobId)
         ? handoff.jobId
-        : null,
-    );
-    // Only an option THIS screen offers. The basic match is never one — it
-    // cannot write a paragraph — so a check run with it lands on the default.
-    if (handoff.optionKey !== null && optionByKey(options, handoff.optionKey) !== null) {
-      setOptionKey(handoff.optionKey);
-    }
-    setHandedGaps(handoff.keywordGaps ?? null);
-    setMetricState(EMPTY_METRIC_STATE);
-    setResult(null);
-    setReview(null);
-    setLetter(null);
+        : null;
+    sessions.open(jobId, () => ({ advert: handoff.jobText }));
+    sessions.patch(jobId, (current) => {
+      const cvId =
+        handoff.cvId !== null && cvs.some((candidate) => candidate.id === handoff.cvId)
+          ? handoff.cvId
+          : current.cvId;
+      // Only an option THIS screen offers. The basic match is never one — it
+      // cannot write a paragraph — so a check run with it lands on the default.
+      const option =
+        handoff.optionKey !== null && optionByKey(options, handoff.optionKey) !== null
+          ? handoff.optionKey
+          : current.optionKey;
+      // A hand-off is the user pressing "Tailor my CV" — a fresh start for
+      // this job (L-205): the draft, the review, the letter and the boxes go.
+      // Leaving this screen and coming back, or picking the job again below,
+      // is NOT a hand-off, and keeps them (L-199).
+      return {
+        advert: handoff.jobText,
+        cvId,
+        optionKey: option,
+        handedGaps: handoff.keywordGaps ?? null,
+        metricState: EMPTY_METRIC_STATE,
+        result: null,
+        review: null,
+        letter: null,
+        error: null,
+      };
+    });
     setSaveMessage(null);
     setHandedOff(handoff);
-  }, [availabilityRead, cvs, cvsLoaded, handoff, jobs, jobsLoaded, options]);
+  }, [availabilityRead, cvs, cvsLoaded, handoff, jobs, jobsLoaded, options, sessions]);
 
   const selectedOption = optionByKey(options, optionKey);
   const running = phase !== 'idle';
@@ -439,6 +463,11 @@ export function Tailor({
     [metricPrompts, metricState],
   );
   const jobTitle = selectedJob?.title ?? '';
+  /**
+   * The advert in the box is not the tracked job's own text (L-199). The job
+   * link is KEPT — owner decision, 2026-10-01 — and the screen says so.
+   */
+  const advertEdited = selectedJob !== null && jobText !== jobAdvertText(selectedJob);
 
   /** The fresh consent check every run module gets — the store, not a snapshot. */
   const hasConsent = useCallback(
@@ -448,9 +477,12 @@ export function Tailor({
 
   const performTailor = useCallback(
     async (option: ProviderOption) => {
+      // The job this run is FOR. Its answer is filed there, whatever is on
+      // screen by the time it arrives (L-199).
+      const jobId = sessions.get().activeJobId;
       setError(null);
       setSaveMessage(null);
-      setPhase('tailoring');
+      sessions.patch(jobId, { phase: 'tailoring', error: null });
 
       const run = await runTailor(
         { option, cvText, jobText, profileNotes: notes, keywordGaps, userMetrics },
@@ -458,16 +490,13 @@ export function Tailor({
         hasConsent,
       );
 
-      setPhase('idle');
-
       if (!run.ok) {
-        setResult(null);
-        setError(run.error.message);
+        sessions.patch(jobId, { phase: 'idle', result: null, error: run.error.message });
         return;
       }
 
       const text = renderTailoredCv(run.value.cv, null);
-      setResult({
+      const tailored = {
         cv: run.value.cv,
         text,
         // Deterministic, on the original text, before anything is shown.
@@ -482,18 +511,18 @@ export function Tailor({
         model: run.value.model,
         retried: run.value.retried,
         userMetrics,
-      });
-      setReview(null);
-      setLetter(null);
+      };
+      sessions.patch(jobId, { phase: 'idle', result: tailored, review: null, letter: null });
     },
-    [createTransport, cvText, hasConsent, jobText, keywordGaps, notes, userMetrics],
+    [createTransport, cvText, hasConsent, jobText, keywordGaps, notes, sessions, userMetrics],
   );
 
   const performReview = useCallback(
     async (option: ProviderOption) => {
       if (result === null) return;
+      const jobId = sessions.get().activeJobId;
       setError(null);
-      setPhase('reviewing');
+      sessions.patch(jobId, { phase: 'reviewing', error: null });
 
       const run = await runReview(
         {
@@ -508,21 +537,20 @@ export function Tailor({
         hasConsent,
       );
 
-      setPhase('idle');
-
       if (!run.ok) {
-        setError(run.error.message);
+        sessions.patch(jobId, { phase: 'idle', error: run.error.message });
         return;
       }
-      setReview(run.value.review);
+      sessions.patch(jobId, { phase: 'idle', review: run.value.review });
     },
-    [createTransport, cvText, hasConsent, jobText, result, userMetrics],
+    [createTransport, cvText, hasConsent, jobText, result, sessions, userMetrics],
   );
 
   const performLetter = useCallback(
     async (option: ProviderOption) => {
+      const jobId = sessions.get().activeJobId;
       setError(null);
-      setPhase('writing');
+      sessions.patch(jobId, { phase: 'writing', error: null });
 
       const run = await runCoverLetter(
         {
@@ -537,15 +565,13 @@ export function Tailor({
         hasConsent,
       );
 
-      setPhase('idle');
-
       if (!run.ok) {
-        setError(run.error.message);
+        sessions.patch(jobId, { phase: 'idle', error: run.error.message });
         return;
       }
 
       const text = renderCoverLetter(run.value.letter);
-      setLetter({
+      const written = {
         letter: run.value.letter,
         text,
         words: wordCount(text),
@@ -554,9 +580,10 @@ export function Tailor({
           run.value.letter,
           stillApproved(result?.userMetrics ?? [], userMetrics).map((metric) => metric.text),
         ),
-      });
+      };
+      sessions.patch(jobId, { phase: 'idle', letter: written });
     },
-    [createTransport, cvText, hasConsent, jobText, notes, result, userMetrics],
+    [createTransport, cvText, hasConsent, jobText, notes, result, sessions, userMetrics],
   );
 
   const perform = useCallback(
@@ -608,16 +635,39 @@ export function Tailor({
   );
 
   const onSaveToApplication = useCallback(async () => {
-    if (result === null || selectedApplicationId === null) return;
+    if (result === null) return;
+    // A paste has no job, so no application to save into. A tracked job with
+    // none gets one, below: the user should never be sent to the tracker first.
+    if (selectedApplicationId === null && selectedJob === null) return;
     setError(null);
     setSaveMessage(null);
     setSaving(true);
 
     const stamp = (now ?? new Date()).toISOString();
+
+    let applicationId = selectedApplicationId;
+    if (applicationId === null && selectedJob !== null) {
+      const application = newSavedApplication({
+        id: crypto.randomUUID(),
+        jobId: selectedJob.id,
+        now: stamp,
+      });
+      const created = await tailorPort.createApplication(application);
+      if (!created.ok) {
+        setSaving(false);
+        setError(`The tailored CV could not be saved: ${created.error.message}`);
+        return;
+      }
+      setApplications([application]);
+      setSelectedApplicationId(application.id);
+      applicationId = application.id;
+    }
+    if (applicationId === null) return;
+
     const saved = await tailorPort.saveDocument(
       newDocument({
         id: crypto.randomUUID(),
-        applicationId: selectedApplicationId,
+        applicationId,
         kind: 'cv',
         title: documentTitle('cv', jobTitle),
         text: result.text,
@@ -630,12 +680,34 @@ export function Tailor({
       return;
     }
 
-    let count = 1;
+    // The CV was written for THIS text, so the record keeps it (L-199, owner
+    // decision 2026-10-01): an edited advert is saved beside the CV, marked.
+    let advertSaved = false;
+    if (advertEdited) {
+      const savedAdvert = await tailorPort.saveDocument(
+        newDocument({
+          id: crypto.randomUUID(),
+          applicationId,
+          kind: 'advert',
+          title: editedAdvertTitle(jobTitle),
+          text: jobText,
+          now: stamp,
+        }),
+      );
+      if (!savedAdvert.ok) {
+        setSaving(false);
+        setError(`The CV was saved, but the edited advert was not: ${savedAdvert.error.message}`);
+        return;
+      }
+      advertSaved = true;
+    }
+
+    let letterSaved = false;
     if (letter !== null) {
       const savedLetter = await tailorPort.saveDocument(
         newDocument({
           id: crypto.randomUUID(),
-          applicationId: selectedApplicationId,
+          applicationId,
           kind: 'cover_letter',
           title: documentTitle('cover_letter', jobTitle),
           text: letter.text,
@@ -647,16 +719,22 @@ export function Tailor({
         setError(`The CV was saved, but the letter was not: ${savedLetter.error.message}`);
         return;
       }
-      count = 2;
+      letterSaved = true;
     }
 
     setSaving(false);
-    setSaveMessage(
-      count === 1
-        ? 'Saved the tailored CV to the application.'
-        : 'Saved the tailored CV and the cover letter to the application.',
-    );
-  }, [jobTitle, letter, now, result, selectedApplicationId, tailorPort]);
+    setSaveMessage(savedMessage({ advert: advertSaved, letter: letterSaved }));
+  }, [
+    advertEdited,
+    jobText,
+    jobTitle,
+    letter,
+    now,
+    result,
+    selectedApplicationId,
+    selectedJob,
+    tailorPort,
+  ]);
 
   const onSaveText = useCallback(
     async (kind: 'cv' | 'cover_letter') => {
@@ -755,13 +833,13 @@ export function Tailor({
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-tailor">
       <ViewHeader title={view.label} summary={view.summary} />
 
-      {error === null ? null : (
+      {shownError === null ? null : (
         <p
           role="alert"
           data-testid="tailor-error"
           className="border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
         >
-          {error}
+          {shownError}
         </p>
       )}
 
@@ -778,10 +856,14 @@ export function Tailor({
             disabled={cvs.length === 0 || !cvsLoaded}
             onChange={(event) => {
               const id = event.currentTarget.value;
-              setSelectedCvId(id === '' ? null : id);
-              setResult(null);
-              setReview(null);
-              setLetter(null);
+              // A draft written from another CV is not this CV's draft.
+              patchActive({
+                cvId: id === '' ? null : id,
+                result: null,
+                review: null,
+                letter: null,
+                error: null,
+              });
               setSaveMessage(null);
             }}
             className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
@@ -869,13 +951,30 @@ export function Tailor({
             value={jobText}
             placeholder="Paste the whole advert, including the requirements list."
             onChange={(event) => {
-              setJobText(event.currentTarget.value);
-              // Edited by hand: it is no longer that tracked job's advert, so
-              // there is no application to save into.
-              setSelectedJobId(null);
+              // Edited by hand. The job link is KEPT (L-199, owner decision
+              // 2026-10-01): it is still that job, and the marker below says
+              // the text is the user's version of its advert.
+              patchActive({ advert: event.currentTarget.value });
             }}
             className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
           />
+
+          {!advertEdited || selectedJob === null ? null : (
+            <div
+              data-testid="tailor-advert-edited"
+              className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-muted"
+            >
+              <span>Advert edited — the tailoring uses your version.</span>
+              <button
+                type="button"
+                data-testid="tailor-advert-restore"
+                onClick={() => patchActive({ advert: jobAdvertText(selectedJob) })}
+                className={QUIET_BUTTON}
+              >
+                Restore the original
+              </button>
+            </div>
+          )}
 
           {jobs.length === 0 ? null : (
             <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -887,10 +986,20 @@ export function Tailor({
                 data-testid="tailor-job-pick"
                 value={selectedJobId ?? ''}
                 onChange={(event) => {
-                  const job = jobs.find((candidate) => candidate.id === event.currentTarget.value);
-                  if (job === undefined) return;
-                  setJobText(jobAdvertText(job));
-                  setSelectedJobId(job.id);
+                  const picked = jobs.find(
+                    (candidate) => candidate.id === event.currentTarget.value,
+                  );
+                  if (picked === undefined) return;
+                  // A job seen before comes back as it was left (L-199); a new
+                  // one starts from its advert, with the CV and model the user
+                  // already chose — those are choices, not this job's work.
+                  sessions.open(picked.id, () => ({
+                    advert: jobAdvertText(picked),
+                    cvId: selectedCvId,
+                    optionKey: work.optionKey,
+                  }));
+                  setError(null);
+                  setSaveMessage(null);
                 }}
                 className="min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 py-1 text-ink"
               >
@@ -914,7 +1023,7 @@ export function Tailor({
           <MetricPromptBoxes
             prompts={metricPrompts}
             state={metricState}
-            onChange={setMetricState}
+            onChange={(next) => patchActive({ metricState: next })}
             disabled={running}
           />
         </div>
@@ -929,7 +1038,7 @@ export function Tailor({
             data-testid="tailor-provider"
             value={optionKey}
             disabled={!aiAvailable}
-            onChange={(event) => setOptionKey(event.currentTarget.value)}
+            onChange={(event) => patchActive({ optionKey: event.currentTarget.value })}
             className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
           >
             {aiAvailable ? null : (
@@ -1266,17 +1375,22 @@ export function Tailor({
               <button
                 type="button"
                 data-testid="tailor-save-application"
-                disabled={running || saving || selectedApplicationId === null}
+                disabled={
+                  running ||
+                  saving ||
+                  selectedJobId === null ||
+                  // Wait for the job's applications, so a quick press cannot
+                  // start a second one beside the one it already has.
+                  applicationsFor !== selectedJobId
+                }
                 onClick={() => void onSaveToApplication()}
                 className={SECONDARY_BUTTON}
               >
                 {saving ? 'Saving…' : 'Save to an application'}
               </button>
-              {selectedApplicationId !== null ? null : (
+              {selectedJobId !== null ? null : (
                 <p data-testid="tailor-save-application-reason" className="text-xs text-ink-muted">
-                  {selectedJobId === null
-                    ? 'Choose a tracked job above to save into one of its applications.'
-                    : 'That job has no application yet. Add one on the Tracker first.'}
+                  Choose a tracked job above to save into one of its applications.
                 </p>
               )}
             </div>
