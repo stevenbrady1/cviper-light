@@ -28,6 +28,9 @@ import { ResumeBanner } from '../features/tailor/ResumeBanner';
 import { Tailor, type TailorProps } from '../features/tailor/Tailor';
 import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
 import { type TrackerEntry } from '../features/tracker/model';
+import { type StepId } from '../features/flow/steps';
+import { type TailorStep } from '../features/tailor/Tailor';
+import { type Job } from '@cviper/core-types';
 import {
   createTauriOpenedCvPort,
   type FileError,
@@ -375,7 +378,16 @@ export default function App({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  const onSelect = useCallback((id: ViewId) => setActiveView(id), []);
+  /**
+   * Which of Tailor's own steps it opens on (L-200). Set by a step bar on
+   * another screen; the sidebar and every other route open it on Tailor.
+   */
+  const [tailorEntryStep, setTailorEntryStep] = useState<TailorStep>('tailor');
+
+  const onSelect = useCallback((id: ViewId) => {
+    setTailorEntryStep('tailor');
+    setActiveView(id);
+  }, []);
 
   // ── Find Job → Analyse → Tailor CV (L-190) ──────────────────────────────
 
@@ -395,6 +407,45 @@ export default function App({
   }, []);
 
   const onTailorHandoffHandled = useCallback(() => setTailorHandoff(null), []);
+
+  /**
+   * A step on a job's step bar that lives on another screen (L-200). Only
+   * MOVES the user — nothing here runs a check or a model.
+   *
+   * Going to Tailor reopens the job's own work when it has some; only a job
+   * with none takes the hand-off ("Tailor my CV for this job"), which would
+   * otherwise start its draft again (L-205).
+   */
+  const onJobStep = useCallback(
+    (step: StepId, job: Job, handoff?: TailorHandoff) => {
+      if (step === 'find') {
+        setActiveView('search');
+        return;
+      }
+      if (step === 'analyse') {
+        // The same job stays as it is — its result included.
+        if (analysisSession.get().jobId !== job.id) {
+          loadJobIntoAnalysis(analysisSession, { job, applicationId: null, note: null });
+        }
+        setActiveView('analysis');
+        return;
+      }
+      if (jobSessions.has(job.id) || handoff === undefined) {
+        jobSessions.open(job.id, () => ({ advert: jobAdvertText(job) }));
+        setActiveView('tailor');
+      } else {
+        onTailorJob(handoff);
+      }
+      setTailorEntryStep(step);
+    },
+    [analysisSession, jobSessions, onTailorJob],
+  );
+
+  const onTracker = useCallback(() => setActiveView('tracker'), []);
+  const tailoredJob = useCallback(
+    (jobId: string) => jobSessions.session(jobId).result !== null,
+    [jobSessions],
+  );
 
   // The tracker's two buttons. Its job holds the advert as saved, so nothing
   // is fetched and there is no note: the pane has its own "Open the advert"
@@ -575,7 +626,13 @@ export default function App({
             incomingCv,
             onIncomingCvHandled,
             session: analysisSession,
-            onTailor: onTailorJob,
+            onTailor: (handoff: TailorHandoff) => {
+              setTailorEntryStep('tailor');
+              onTailorJob(handoff);
+            },
+            tailoredJob,
+            onJobStep,
+            onTracker,
           },
           tailor: {
             port: tailorPort,
@@ -588,6 +645,9 @@ export default function App({
             handoff: tailorHandoff,
             onHandoffHandled: onTailorHandoffHandled,
             jobSessions,
+            entryStep: tailorEntryStep,
+            onJobStep,
+            onTracker,
           },
           settings: {
             port: backupPort,

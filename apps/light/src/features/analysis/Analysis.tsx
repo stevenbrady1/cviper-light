@@ -58,6 +58,14 @@ import {
 import { runAnalysis } from './runAnalysis';
 import { createAnalysisSession, type AnalysisSession } from './session';
 import { gapsFromAnalysis, type TailorHandoff } from '../flow/handoff';
+import { JobStepBar } from '../flow/JobStepBar';
+import {
+  NO_SAVED_PROGRESS,
+  createDbJobProgressPort,
+  type JobProgressPort,
+  type SavedProgress,
+} from '../flow/progress';
+import { type StepId } from '../flow/steps';
 import { type ChatTransport } from '@cviper/ai-providers';
 
 /**
@@ -146,6 +154,22 @@ export interface AnalysisProps {
    * none.
    */
   readonly onTailor?: ((handoff: TailorHandoff) => void) | undefined;
+  /**
+   * Where the step bar's ✓ for Analyse and Export come from (L-200). Left
+   * undefined, the database — unless the analysis port was injected, in which
+   * case a test that faked the data layer gets no real reads behind it.
+   */
+  readonly progressPort?: JobProgressPort | undefined;
+  /** Whether this job has a tailored draft — the Tailor sessions, read by the shell. */
+  readonly tailoredJob?: ((jobId: string) => boolean) | undefined;
+  /**
+   * Every step but this one is elsewhere: the shell moves the user there.
+   * `handoff` is what "Tailor my CV for this job" would hand over, for the
+   * steps that go to Tailor.
+   */
+  readonly onJobStep?: ((step: StepId, job: Job, handoff: TailorHandoff) => void) | undefined;
+  /** "◀ Tracker" on the step bar. */
+  readonly onTracker?: (() => void) | undefined;
 }
 
 /**
@@ -170,10 +194,20 @@ export function Analysis({
   profilePort,
   session: sessionProp,
   onTailor,
+  progressPort,
+  tailoredJob,
+  onJobStep,
+  onTracker,
 }: AnalysisProps = {}) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke in the advert box.
   const analysisPort = useMemo(() => port ?? createDbAnalysisPort(), [port]);
+  const progress = useMemo<JobProgressPort>(
+    () =>
+      progressPort ??
+      (port === undefined ? createDbJobProgressPort() : { load: async () => NO_SAVED_PROGRESS }),
+    [port, progressPort],
+  );
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
   const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
   const profiles = useMemo(() => profilePort ?? createDbProfilePort(), [profilePort]);
@@ -648,6 +682,47 @@ export function Analysis({
   // may have happened while the user was on another view.
   const shownError = error ?? runError;
 
+  // ── The step bar (L-200) ─────────────────────────────────────────────────
+
+  /** The tracked job the advert belongs to, if it is on the board. */
+  const stepJob =
+    jobId === null ? null : (jobs.find((candidate) => candidate.id === jobId) ?? null);
+  const [saved, setSaved] = useState<SavedProgress>(NO_SAVED_PROGRESS);
+  useEffect(() => {
+    setSaved(NO_SAVED_PROGRESS);
+    if (jobId === null) return;
+    let cancelled = false;
+    void progress.load(jobId).then((loaded) => {
+      if (!cancelled) setSaved(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId, progress]);
+
+  /** What "Tailor my CV for this job" hands over — the same, whichever button. */
+  const tailorHandoff = useCallback(
+    (): TailorHandoff => ({
+      jobId,
+      jobText,
+      cvId: selectedCvId,
+      optionKey,
+      // The gaps this result found, for the advert it CHECKED (L-202). Never
+      // `missing_skills`: see `gapsFromAnalysis`.
+      keywordGaps:
+        result === null ? null : gapsFromAnalysis(result.analysis, selectedCvId, checkedAdvert),
+    }),
+    [checkedAdvert, jobId, jobText, optionKey, result, selectedCvId],
+  );
+
+  const onBarStep = useCallback(
+    (step: StepId) => {
+      if (step === 'analyse' || stepJob === null) return;
+      onJobStep?.(step, stepJob, tailorHandoff());
+    },
+    [onJobStep, stepJob, tailorHandoff],
+  );
+
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-analysis">
       {/*
@@ -657,6 +732,23 @@ export function Analysis({
         its own reason, is a button nobody connects to anything.
       */}
       <ViewHeader title={view.label} summary={view.summary} />
+
+      {stepJob === null ? null : (
+        <JobStepBar
+          title={stepJob.title}
+          company={stepJob.company}
+          location={stepJob.location}
+          current="analyse"
+          progress={{
+            // A result on screen is this job's: loading another job clears it.
+            analysed: saved.analysed || result !== null,
+            tailored: tailoredJob?.(stepJob.id) ?? false,
+            exported: saved.exported,
+          }}
+          onStep={onBarStep}
+          onTracker={onTracker}
+        />
+      )}
 
       {shownError === null ? null : (
         <p
@@ -978,17 +1070,7 @@ export function Analysis({
                   <button
                     type="button"
                     data-testid="analysis-to-tailor"
-                    onClick={() =>
-                      onTailor({
-                        jobId,
-                        jobText,
-                        cvId: selectedCvId,
-                        optionKey,
-                        // The gaps this result found, for the advert it CHECKED
-                        // (L-202). Never `missing_skills`: see `gapsFromAnalysis`.
-                        keywordGaps: gapsFromAnalysis(result.analysis, selectedCvId, checkedAdvert),
-                      })
-                    }
+                    onClick={() => onTailor(tailorHandoff())}
                     className={SECONDARY_BUTTON}
                   >
                     Tailor my CV for this job
