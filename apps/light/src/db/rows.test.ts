@@ -310,7 +310,7 @@ describe('the migration column parser', () => {
 describe('every migration column is mapped in rows.ts', () => {
   const parsed = columnsFromMigration(MIGRATION_SQL);
 
-  it('creates exactly the seven tables rows.ts knows about', () => {
+  it('creates exactly the tables rows.ts knows about', () => {
     expect(Object.keys(parsed).sort()).toEqual(Object.keys(TABLE_COLUMNS).sort());
   });
 

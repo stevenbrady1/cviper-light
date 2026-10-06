@@ -9,6 +9,7 @@ All notable changes to CViper Light are recorded here. The format follows
 ### Added
 
 - Tailor keeps your work for each job. Leave Tailor for another screen and come back, and the tailored CV, the review and the letter are still there; pick another tracked job and it has its own draft, and the first one is waiting when you go back. A draft that finishes after you switched jobs lands on the job it was written for (L-199).
+- Your tailoring survives closing the app. Each job's advert, chosen CV and model, and unsaved draft, review and letter are kept on this computer and come back when you reopen it, and "Continue where you left off" takes you back to the job you were on. Nothing is kept for an advert you pasted without a tracked job. "Delete everything" removes all of it (L-199).
 - Editing a tracked job's advert on Tailor no longer unlinks the job. The screen says "Advert edited", "Restore the original" puts the job's own text back, and "Save to an application" saves your edited advert beside the CV (L-199).
 - Interviewing can be split into your own stages (HR Screen, Technical Test, Panel Round, Final): add, rename, reorder and remove them, and put a card in one. Removing a stage never removes a card. Backups carry the stages (still format version 1). Note: importing a backup written before this release over a card you already have clears that card's stage, because an old file cannot say which stage it was in (L-205).
 
