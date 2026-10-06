@@ -115,6 +115,11 @@ function keyOf(jobId: string | null): string {
   return jobId ?? PASTE_KEY;
 }
 
+/** The tracked jobs that have a session — every key but the pasted advert's. */
+export function trackedJobIds(state: JobSessionsState): string[] {
+  return [...state.sessions.keys()].filter((key) => key !== PASTE_KEY);
+}
+
 /** One job's session in a snapshot, or the empty one — for a render reading `get()`. */
 export function sessionIn(state: JobSessionsState, jobId: string | null): TailorJobState {
   return state.sessions.get(keyOf(jobId)) ?? EMPTY_TAILOR_JOB;
@@ -131,6 +136,8 @@ export interface JobSessions {
   readonly session: (jobId: string | null) => TailorJobState;
   /** The active job's session. */
   readonly active: () => TailorJobState;
+  /** Whether this job (or, for `null`, the pasted advert) has a session yet. */
+  readonly has: (jobId: string | null) => boolean;
   /**
    * Show this job. A job with no session yet gets one from `seed`; a job that
    * has one keeps it, untouched — coming back is not starting again.
@@ -173,6 +180,7 @@ export function createJobSessions(): JobSessions {
     },
     session,
     active: () => session(state.activeJobId),
+    has: (jobId) => state.sessions.has(keyOf(jobId)),
     open(jobId, seed) {
       const existing = state.sessions.get(keyOf(jobId));
       const base =

@@ -11,10 +11,12 @@ We — the people who make CViper Light — receive nothing from it. Not your CV
 ## What the app keeps, and where
 
 - **Your jobs, applications, CV text and every analysis** — one database file, cviper.db, in this app’s data folder for your user account.
+- **Tailoring you have not saved yet: the advert, the draft CV, its review and the letter, for each job** — the same database file, on this computer only — an export always leaves it out.
 - **Where each CV file came from on this computer** — the file’s full path, kept in the same database file on this computer only — an export always leaves it out.
 - **Your API keys** — this device’s credential store (the Keychain on an iPhone, iPad or Mac; Credential Manager on Windows; the Secret Service on Linux), one entry per key.
 - **Which job boards you enabled and how you ordered them** — job-boards.json in the same data folder.
 - **Which AI providers you agreed to send your CV to** — ai-provider-consent.json in the same data folder.
+- **Which job you were last tailoring for, so it can be offered back — its id only, no text** — workflow.json in the same data folder.
 - **Small conveniences: your last search, today’s request count, and that you have seen the introduction** — this app’s own browser storage, which no other program reads.
 
 ## Every address the app can contact

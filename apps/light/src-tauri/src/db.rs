@@ -83,6 +83,12 @@ pub fn migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/0006_interview_substages.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 7,
+            description: "job_workflow: a job's Tailor work in progress, kept across a restart (L-199)",
+            sql: include_str!("../migrations/0007_job_workflow.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -256,6 +262,38 @@ mod tests {
         );
         for forbidden in ["DROP", "RENAME", "UPDATE ", "DELETE FROM", "INSERT"] {
             assert!(!sql.contains(forbidden), "0006 must be additive; found `{forbidden}`");
+        }
+    }
+
+    #[test]
+    fn the_seventh_migration_only_creates_job_workflow() {
+        // L-199. One new table and nothing else: no existing table is altered,
+        // so a user's data reads exactly as before. The row goes with its job
+        // (`ON DELETE CASCADE`), and deleting a CV only unsets it. Run for real
+        // over a database holding data by `src/db/migration.jobWorkflow.test.ts`.
+        let migration = &migrations()[6];
+        assert_eq!(migration.version, 7);
+        assert!(matches!(migration.kind, MigrationKind::Up));
+        let sql = executable_sql(migration.sql);
+        assert_eq!(
+            sql.matches("CREATE TABLE IF NOT EXISTS").count(),
+            1,
+            "0007 must create exactly one table"
+        );
+        assert!(
+            sql.contains("CREATE TABLE IF NOT EXISTS job_workflow ("),
+            "0007 must create `job_workflow`"
+        );
+        assert!(
+            sql.contains("REFERENCES jobs (id) ON DELETE CASCADE"),
+            "a job's work in progress must go with the job"
+        );
+        assert!(
+            sql.contains("REFERENCES cvs (id) ON DELETE SET NULL"),
+            "deleting a CV must never delete a job's work in progress"
+        );
+        for forbidden in ["ALTER", "DROP", "RENAME", "UPDATE ", "DELETE FROM", "INSERT"] {
+            assert!(!sql.contains(forbidden), "0007 must only create; found `{forbidden}`");
         }
     }
 

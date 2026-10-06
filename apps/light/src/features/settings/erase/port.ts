@@ -29,6 +29,7 @@ import { wipeAll } from '../../../db';
 import { SECRET_KEYS } from '../../../status/environment';
 import { CONSENT_STORE_FILE } from '../../analysis/consent';
 import { BOARD_STORE_FILE } from '../../boards/port';
+import { WORKFLOW_STORE_FILE } from '../../tailor/persistence';
 
 /** A step that would not do what was asked, in words a user can read. */
 export interface EraseProblem {
@@ -69,6 +70,10 @@ const PREFERENCE_STORES: readonly { readonly file: string; readonly refusal: str
   {
     file: CONSENT_STORE_FILE,
     refusal: 'Your record of which AI providers you agreed to could not be cleared.',
+  },
+  {
+    file: WORKFLOW_STORE_FILE,
+    refusal: 'The record of which job you were last working on could not be cleared.',
   },
 ];
 

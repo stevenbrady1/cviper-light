@@ -17,6 +17,14 @@ import { forgetWelcome, hasSeenWelcome, markWelcomeSeen } from '../features/onbo
 import { Search, type SearchProps } from '../features/search/Search';
 import { Settings, type SettingsProps } from '../features/settings/Settings';
 import { createJobSessions } from '../features/tailor/jobSessions';
+import {
+  createTauriWorkflowPort,
+  hydrateJobSessions,
+  startWriteThrough,
+  type WorkflowPort,
+} from '../features/tailor/persistence';
+import { createDbTailorPort } from '../features/tailor/port';
+import { ResumeBanner } from '../features/tailor/ResumeBanner';
 import { Tailor, type TailorProps } from '../features/tailor/Tailor';
 import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
 import { type TrackerEntry } from '../features/tracker/model';
@@ -34,6 +42,7 @@ import { detectMobileOs } from '../platform/os';
 import { readEnvironmentStatus, type EnvironmentStatus } from '../status/environment';
 
 import { BottomNav } from './BottomNav';
+import { QUIET_BUTTON } from './buttons';
 import { Sidebar } from './Sidebar';
 import { useViewportClass } from './viewport';
 import { DEFAULT_VIEW, viewForShortcut, type ViewId } from './views';
@@ -143,6 +152,13 @@ export interface AppProps {
   readonly newId?: SearchProps['newId'];
   /** Injected by tests so every age, due date and stored timestamp is deterministic. */
   readonly now?: Date | undefined;
+  /**
+   * Where Tailor's work in progress is kept across a restart (L-199).
+   * Undefined in the app: the real database and store file are used — unless
+   * the tailor port itself was injected, in which case the shell does not
+   * reach past a fake data layer to the real one. `null` turns it off.
+   */
+  readonly workflowPort?: WorkflowPort | null | undefined;
 }
 
 export default function App({
@@ -164,6 +180,7 @@ export default function App({
   readKeyStates,
   newId,
   now,
+  workflowPort,
 }: AppProps = {}) {
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
   const [status, setStatus] = useState<EnvironmentStatus | null>(null);
@@ -190,6 +207,51 @@ export default function App({
    * session — the view unmounts on every switch — and cleared with it.
    */
   const [jobSessions] = useState(createJobSessions);
+  /** The job the last run of the app was tailoring for, offered back once. */
+  const [resumeOffer, setResumeOffer] = useState<{
+    readonly title: string;
+    readonly company: string;
+  } | null>(null);
+  /** A write-through that failed: said once, on a strip, never swallowed. */
+  const [keepProblem, setKeepProblem] = useState<string | null>(null);
+
+  // Once the user is on Tailor, the offer has been taken up either way.
+  useEffect(() => {
+    if (activeView === 'tailor') setResumeOffer(null);
+  }, [activeView]);
+
+  // Restore every job's Tailor work, then keep writing it through (L-199).
+  useEffect(() => {
+    let stopped = false;
+    let stopWriting: (() => void) | null = null;
+
+    void (async () => {
+      const port =
+        workflowPort !== undefined
+          ? workflowPort
+          : tailorPort === undefined
+            ? await createTauriWorkflowPort()
+            : null;
+      if (port === null || stopped) return;
+
+      const resumed = await hydrateJobSessions(jobSessions, port);
+      if (stopped) return;
+      stopWriting = startWriteThrough(jobSessions, port, undefined, setKeepProblem);
+      if (resumed === null) return;
+
+      // The job's title and company, for the sentence. A failed read still
+      // offers the work back, just without naming the job.
+      const jobs = await (tailorPort ?? createDbTailorPort()).loadJobs();
+      if (stopped) return;
+      const job = jobs.ok ? jobs.value.find((candidate) => candidate.id === resumed) : undefined;
+      setResumeOffer({ title: job?.title ?? '', company: job?.company ?? '' });
+    })();
+
+    return () => {
+      stopped = true;
+      stopWriting?.();
+    };
+  }, [jobSessions, tailorPort, workflowPort]);
 
   /**
    * The update offered by the check on launch, or `null` for the usual case.
@@ -397,6 +459,8 @@ export default function App({
     analysisSession.reset();
     jobSessions.reset();
     setTailorHandoff(null);
+    setResumeOffer(null);
+    setKeepProblem(null);
   }, [analysisSession, jobSessions]);
 
   const narrow = viewport === 'narrow';
@@ -439,6 +503,36 @@ export default function App({
             onInstall={() => void onInstallUpdate()}
             onDismiss={() => setOfferedUpdate(null)}
           />
+        )}
+
+        {resumeOffer === null || activeView === 'tailor' ? null : (
+          <ResumeBanner
+            title={resumeOffer.title}
+            company={resumeOffer.company}
+            onContinue={() => {
+              setResumeOffer(null);
+              setActiveView('tailor');
+            }}
+            onDismiss={() => setResumeOffer(null)}
+          />
+        )}
+
+        {keepProblem === null ? null : (
+          <div
+            role="status"
+            data-testid="workflow-keep-problem"
+            className="flex flex-wrap items-center gap-3 border-b border-line bg-sunken px-4 py-2 md:px-6"
+          >
+            <p className="min-w-0 flex-1 text-ink-muted">{keepProblem}</p>
+            <button
+              type="button"
+              data-testid="workflow-keep-problem-dismiss"
+              onClick={() => setKeepProblem(null)}
+              className={QUIET_BUTTON}
+            >
+              Close
+            </button>
+          </div>
         )}
 
         {renderView(activeView, {

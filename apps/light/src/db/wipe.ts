@@ -35,6 +35,9 @@ import { type TableName } from './rows';
  * own description of themselves behind after "delete everything".
  */
 export const WIPE_ORDER: readonly TableName[] = [
+  // A child of `jobs` and `cvs`, and the unsaved drafts "Delete everything"
+  // has to take with it (L-199).
+  'job_workflow',
   'analyses',
   'documents',
   'applications',

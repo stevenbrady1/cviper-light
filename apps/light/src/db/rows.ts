@@ -150,6 +150,19 @@ export const DOCUMENT_COLUMNS = [
   'created_at',
 ] as const;
 
+// 0007_job_workflow.sql (L-199). `id` is the job's id: one row per job. Read
+// and written by `workflow.ts` only, and NOT part of a backup — it is a
+// working copy, and what the user keeps is archived in `documents`.
+export const JOB_WORKFLOW_COLUMNS = [
+  'id',
+  'step',
+  'cv_id',
+  'ai_option',
+  'advert',
+  'draft_json',
+  'updated_at',
+] as const;
+
 export const TABLE_COLUMNS = {
   jobs: JOB_COLUMNS,
   applications: APPLICATION_COLUMNS,
@@ -158,6 +171,7 @@ export const TABLE_COLUMNS = {
   profile: PROFILE_COLUMNS,
   documents: DOCUMENT_COLUMNS,
   interview_substages: INTERVIEW_SUBSTAGE_COLUMNS,
+  job_workflow: JOB_WORKFLOW_COLUMNS,
 } as const;
 
 export type TableName = keyof typeof TABLE_COLUMNS;

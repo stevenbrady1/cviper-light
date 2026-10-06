@@ -73,6 +73,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: tauriCore.invoke }));
 
 const { BOARD_STORE_FILE, BOARD_STORE_KEY } = await import('../../boards/port');
 const { CONSENT_STORE_FILE, CONSENT_STORE_KEY } = await import('../../analysis/consent');
+const { WORKFLOW_STORE_FILE } = await import('../../tailor/persistence');
 const { SECRET_KEYS } = await import('../../../status/environment');
 const { createTauriErasePort } = await import('./port');
 
@@ -130,8 +131,9 @@ describe('forgetPreferences empties every preferences file', () => {
 
     await createTauriErasePort().forgetPreferences();
 
-    expect([...plugin.saves].sort()).toEqual([BOARD_STORE_FILE, CONSENT_STORE_FILE].sort());
-    for (const file of [BOARD_STORE_FILE, CONSENT_STORE_FILE]) {
+    const files = [BOARD_STORE_FILE, CONSENT_STORE_FILE, WORKFLOW_STORE_FILE];
+    expect([...plugin.saves].sort()).toEqual([...files].sort());
+    for (const file of files) {
       expect(plugin.load, file).toHaveBeenCalledWith(file, { autoSave: false });
     }
   });
@@ -180,8 +182,8 @@ describe('one file refusing does not cancel the others', () => {
     const message = result.ok ? '' : result.error.message;
     expect(message).toContain('Boards refused.');
     expect(message).not.toContain('Consent refused.');
-    // Both were still tried: two loads, not one.
-    expect(plugin.load).toHaveBeenCalledTimes(2);
+    // Every file was still tried, not just the first (L-199 made it three).
+    expect(plugin.load).toHaveBeenCalledTimes(3);
   });
 
   it('boundary: a refusal that is not an Error still produces a readable sentence', async () => {

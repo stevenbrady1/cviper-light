@@ -11,6 +11,7 @@
  */
 import { CONSENT_STORE_FILE } from '../../analysis/consent';
 import { BOARD_STORE_FILE } from '../../boards/port';
+import { WORKFLOW_STORE_FILE } from '../../tailor/persistence';
 import { DB_URL } from '../../../db/constants';
 
 export type EraseStep = 'database' | 'keys' | 'preferences';
@@ -30,6 +31,13 @@ export const DATA_LOCATIONS: readonly DataLocation[] = [
   {
     what: 'Your jobs, applications, CV text and every analysis',
     where: `one database file, ${DB_FILENAME}, in this app’s data folder for your user account`,
+    erasedBy: 'database',
+  },
+  {
+    // L-199: a working copy, so a restart does not lose a draft. Not in a
+    // backup — what the user keeps is saved to the application as a document.
+    what: 'Tailoring you have not saved yet: the advert, the draft CV, its review and the letter, for each job',
+    where: `the same database file, on this computer only — an export always leaves it out`,
     erasedBy: 'database',
   },
   {
@@ -55,6 +63,11 @@ export const DATA_LOCATIONS: readonly DataLocation[] = [
   {
     what: 'Which AI providers you agreed to send your CV to',
     where: `${CONSENT_STORE_FILE} in the same data folder`,
+    erasedBy: 'preferences',
+  },
+  {
+    what: 'Which job you were last tailoring for, so it can be offered back — its id only, no text',
+    where: `${WORKFLOW_STORE_FILE} in the same data folder`,
     erasedBy: 'preferences',
   },
   {

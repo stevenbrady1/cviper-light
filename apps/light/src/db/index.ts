@@ -56,3 +56,4 @@ export {
 } from './documents';
 export { readAll, writeAll, type DbSnapshot } from './backup';
 export { wipeAll, WIPE_ORDER } from './wipe';
+export { listJobWorkflows, upsertJobWorkflow, type JobWorkflowRow } from './workflow';
