@@ -11,11 +11,12 @@ const db = vi.hoisted(() => ({
   listAnalyses: vi.fn(),
   listApplications: vi.fn(),
   listDocumentsForApplication: vi.fn(),
+  listDocuments: vi.fn(),
 }));
 
 vi.mock('../../db', () => db);
 
-const { createDbJobProgressPort } = await import('./progress');
+const { createDbBoardProgressPort, createDbJobProgressPort } = await import('./progress');
 
 function analysis(jobId: string | null): Analysis {
   return {
@@ -59,6 +60,7 @@ beforeEach(() => {
   db.listAnalyses.mockResolvedValue(ok([]));
   db.listApplications.mockResolvedValue(ok([]));
   db.listDocumentsForApplication.mockResolvedValue(ok([]));
+  db.listDocuments.mockResolvedValue(ok([]));
 });
 
 describe('createDbJobProgressPort', () => {
@@ -102,5 +104,41 @@ describe('createDbJobProgressPort', () => {
       analysed: false,
       exported: false,
     });
+  });
+});
+
+describe('createDbBoardProgressPort', () => {
+  it('happy: one pass over the board, keyed by job', async () => {
+    db.listAnalyses.mockResolvedValue(ok([analysis('job-1'), analysis('job-2')]));
+    db.listApplications.mockResolvedValue(
+      ok([application('app-1', 'job-1'), application('app-3', 'job-3')]),
+    );
+    db.listDocuments.mockResolvedValue(
+      ok([document('app-3', 'cv'), document('app-1', 'cover_letter')]),
+    );
+
+    const all = await createDbBoardProgressPort().loadAll();
+
+    expect(Object.fromEntries(all)).toEqual({
+      'job-1': { analysed: true, exported: false },
+      'job-2': { analysed: true, exported: false },
+      'job-3': { analysed: false, exported: true },
+    });
+    // Three reads for the whole board, never one per application.
+    expect(db.listDocumentsForApplication).not.toHaveBeenCalled();
+  });
+
+  it('negative: a pasted-advert analysis and an orphan document mark nobody', async () => {
+    db.listAnalyses.mockResolvedValue(ok([analysis(null)]));
+    db.listDocuments.mockResolvedValue(ok([document('app-gone', 'cv')]));
+    expect((await createDbBoardProgressPort().loadAll()).size).toBe(0);
+  });
+
+  it('boundary: every read failing gives an empty board, not an error', async () => {
+    const failure = { code: 'QUERY_FAILED', message: 'locked', table: null };
+    db.listAnalyses.mockResolvedValue(err(failure));
+    db.listApplications.mockResolvedValue(err(failure));
+    db.listDocuments.mockResolvedValue(err(failure));
+    expect((await createDbBoardProgressPort().loadAll()).size).toBe(0);
   });
 });

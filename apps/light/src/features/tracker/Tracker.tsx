@@ -4,6 +4,7 @@ import {
   ok,
   type ApplicationStatus,
   type InterviewSubstage,
+  type Job,
   type Result,
 } from '@cviper/core-types';
 
@@ -19,6 +20,13 @@ import { viewById } from '../../app/views';
 import { readAvailability as readRealAvailability } from '../analysis/availability';
 import { type ConsentPort } from '../analysis/consent';
 import { type Availability } from '../analysis/providers';
+import {
+  NO_SAVED_PROGRESS,
+  createDbBoardProgressPort,
+  type BoardProgressPort,
+  type SavedProgress,
+} from '../flow/progress';
+import { type JobProgress, type StepId } from '../flow/steps';
 
 import { ApplicationDetail } from './ApplicationDetail';
 import { FunnelStrip } from './FunnelStrip';
@@ -125,6 +133,16 @@ export interface TrackerProps {
    */
   readonly onAnalyse?: ((entry: TrackerEntry) => void) | undefined;
   readonly onTailor?: ((entry: TrackerEntry) => void) | undefined;
+  /**
+   * Where the cards' ●●●○○ come from (L-200). Left undefined, the database —
+   * unless the tracker port was injected, when a faked data layer gets no
+   * real reads behind it.
+   */
+  readonly boardProgressPort?: BoardProgressPort | undefined;
+  /** Whether a job has a tailored draft — the Tailor sessions, read by the shell. */
+  readonly tailoredJob?: ((jobId: string) => boolean) | undefined;
+  /** "Continue" under a started job's card: the shell takes the user to that step. */
+  readonly onContinue?: ((job: Job, step: StepId) => void) | undefined;
 }
 
 /**
@@ -154,6 +172,9 @@ export function Tracker({
   consentPort,
   onAnalyse,
   onTailor,
+  boardProgressPort,
+  tailoredJob,
+  onContinue,
 }: TrackerProps) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke.
@@ -163,6 +184,39 @@ export function Tracker({
   const today = todayIsoDate(clock);
 
   const [entries, setEntries] = useState<readonly TrackerEntry[]>([]);
+
+  // ── Each job's steps (L-200) ─────────────────────────────────────────────
+  const boardProgress = useMemo<BoardProgressPort>(
+    () =>
+      boardProgressPort ??
+      (port === undefined ? createDbBoardProgressPort() : { loadAll: async () => new Map() }),
+    [boardProgressPort, port],
+  );
+  const [savedProgress, setSavedProgress] = useState<ReadonlyMap<string, SavedProgress>>(
+    () => new Map(),
+  );
+  // Re-read whenever the board changes: a card added, moved or removed may
+  // have brought or taken a saved CV with it.
+  useEffect(() => {
+    let cancelled = false;
+    void boardProgress.loadAll().then((loaded) => {
+      if (!cancelled) setSavedProgress(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [boardProgress, entries]);
+  const progressFor = useCallback(
+    (entry: TrackerEntry): JobProgress => {
+      const saved = savedProgress.get(entry.job.id) ?? NO_SAVED_PROGRESS;
+      return {
+        analysed: saved.analysed,
+        tailored: tailoredJob?.(entry.job.id) ?? false,
+        exported: saved.exported,
+      };
+    },
+    [savedProgress, tailoredJob],
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -671,6 +725,12 @@ export function Tracker({
                     onEditSubstages={substagesLoaded ? openSubstageEditor : undefined}
                     onSelect={(applicationId) => setPane({ kind: 'entry', applicationId })}
                     onDropCard={onStatusChange}
+                    progressFor={progressFor}
+                    onContinue={
+                      onContinue === undefined
+                        ? undefined
+                        : (entry, step) => onContinue(entry.job, step)
+                    }
                   />
                 ))}
               </div>

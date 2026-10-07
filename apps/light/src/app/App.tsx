@@ -162,6 +162,8 @@ export interface AppProps {
    * reach past a fake data layer to the real one. `null` turns it off.
    */
   readonly workflowPort?: WorkflowPort | null | undefined;
+  /** Injected by tests: the tracker cards' saved progress (L-200). */
+  readonly boardProgressPort?: TrackerProps['boardProgressPort'];
 }
 
 export default function App({
@@ -184,6 +186,7 @@ export default function App({
   newId,
   now,
   workflowPort,
+  boardProgressPort,
 }: AppProps = {}) {
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
   const [status, setStatus] = useState<EnvironmentStatus | null>(null);
@@ -614,6 +617,10 @@ export default function App({
             onOpenSettings: () => setActiveView('settings'),
             onAnalyse: onTrackerAnalyse,
             onTailor: onTrackerTailor,
+            boardProgressPort,
+            tailoredJob,
+            // "Continue" under a started card goes where the step bar would.
+            onContinue: (job: Job, step: StepId) => onJobStep(step, job),
           },
           analysis: {
             port: analysisPort,

@@ -5,6 +5,8 @@ import { type ApplicationStatus, type InterviewSubstage } from '@cviper/core-typ
 import { QUIET_BUTTON } from '../../app/buttons';
 
 import { substageName } from './interviewSubstages';
+import { CardProgress } from '../flow/CardProgress';
+import { isStarted, type JobProgress, type StepId } from '../flow/steps';
 import { CARD_DRAG_TYPE, TrackerCard } from './TrackerCard';
 import { STATUS_LABELS, type TrackerEntry } from './model';
 
@@ -43,6 +45,10 @@ interface TrackerColumnProps {
   readonly onEditSubstages?: ((trigger: HTMLElement) => void) | undefined;
   readonly onSelect: (applicationId: string) => void;
   readonly onDropCard: (applicationId: string, status: ApplicationStatus) => void;
+  /** A job's progress through its steps (L-200), or `null` when not known. */
+  readonly progressFor?: ((entry: TrackerEntry) => JobProgress | null) | undefined;
+  /** "Continue" under a started job's card. Left out, no row is drawn. */
+  readonly onContinue?: ((entry: TrackerEntry, step: StepId) => void) | undefined;
 }
 
 export function TrackerColumn({
@@ -56,6 +62,8 @@ export function TrackerColumn({
   onEditSubstages,
   onSelect,
   onDropCard,
+  progressFor,
+  onContinue,
 }: TrackerColumnProps) {
   const [over, setOver] = useState(false);
 
@@ -132,6 +140,20 @@ export function TrackerColumn({
               }
               onSelect={onSelect}
             />
+            {(() => {
+              // A sibling of the card, never inside it: the card is a button.
+              const progress = progressFor?.(entry) ?? null;
+              if (progress === null || onContinue === undefined || !isStarted(progress)) {
+                return null;
+              }
+              return (
+                <CardProgress
+                  applicationId={entry.application.id}
+                  progress={progress}
+                  onContinue={(step) => onContinue(entry, step)}
+                />
+              );
+            })()}
           </li>
         ))}
       </ul>

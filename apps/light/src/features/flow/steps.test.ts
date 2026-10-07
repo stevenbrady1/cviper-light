@@ -7,7 +7,15 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { STEPS, nextStep, previousStep, stepStates, type JobProgress } from './steps';
+import {
+  STEPS,
+  continueStep,
+  isStarted,
+  nextStep,
+  previousStep,
+  stepStates,
+  type JobProgress,
+} from './steps';
 
 const NOTHING: JobProgress = { analysed: false, tailored: false, exported: false };
 
@@ -95,5 +103,26 @@ describe('previousStep / nextStep', () => {
   it('boundary: there is nothing before Find and nothing after Export', () => {
     expect(previousStep('find')).toBeNull();
     expect(nextStep('export')).toBeNull();
+  });
+});
+
+describe('continueStep / isStarted', () => {
+  it('goes to the first thing still to do', () => {
+    expect(continueStep({ analysed: true, tailored: false, exported: false })).toBe('tailor');
+    expect(continueStep({ analysed: true, tailored: true, exported: false })).toBe('ats');
+  });
+
+  it('a draft without an analysis goes on from the draft, not back to Analyse', () => {
+    expect(continueStep({ analysed: false, tailored: true, exported: false })).toBe('ats');
+  });
+
+  it('boundary: nothing done goes to Analyse; everything done opens on Export', () => {
+    expect(continueStep(NOTHING)).toBe('analyse');
+    expect(continueStep({ analysed: true, tailored: true, exported: true })).toBe('export');
+  });
+
+  it('a job is started once anything beyond Find has happened', () => {
+    expect(isStarted(NOTHING)).toBe(false);
+    expect(isStarted({ analysed: false, tailored: false, exported: true })).toBe(true);
   });
 });
