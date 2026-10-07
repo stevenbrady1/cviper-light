@@ -8,6 +8,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Added
 
+- Choose your CV and AI engine once per job: what you pick on Analysis is what Tailor opens with, and the other way round. The step bar shows the choice ("CV: … · Engine: …"). Picking another CV for a job starts its draft again, as it always has on Tailor (L-200).
 - Tracker cards for jobs you have started show how far each one has got (●●●○○) and a Continue button that takes you to the next thing to do — Analyse, Tailor or the ATS Score — on the right job (L-200).
 - A step bar for each job on Analysis and Tailor: Find → Analyse → Tailor → ATS Score → Export, with Back and Next. It names the job, ticks off what is done, marks a step you went past as skipped (⊘) rather than locking anything, and takes you to any step — including back to the tracker. Moving between steps never runs a check or the AI; you still press the button on the step (L-200).
 - Tailor keeps your work for each job. Leave Tailor for another screen and come back, and the tailored CV, the review and the letter are still there; pick another tracked job and it has its own draft, and the first one is waiting when you go back. A draft that finishes after you switched jobs lands on the job it was written for (L-199).

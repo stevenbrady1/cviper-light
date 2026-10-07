@@ -102,4 +102,15 @@ describe('createJobSessions', () => {
     expect(store.get().activeJobId).toBeNull();
     expect(store.session('job-a')).toEqual(EMPTY_TAILOR_JOB);
   });
+
+  it('ensure seeds a job once without showing it, and never re-seeds', () => {
+    const store = createJobSessions();
+    store.open('job-a', () => ({ advert: 'Advert A' }));
+    store.ensure('job-b', () => ({ advert: 'Advert B' }));
+    store.patch('job-b', { cvId: 'cv-2' });
+    store.ensure('job-b', () => ({ advert: 'never used' }));
+
+    expect(store.get().activeJobId).toBe('job-a');
+    expect(store.session('job-b')).toMatchObject({ advert: 'Advert B', cvId: 'cv-2' });
+  });
 });

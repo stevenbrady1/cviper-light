@@ -33,6 +33,11 @@ export interface JobStepBarProps {
   readonly current: StepId;
   readonly progress: JobProgress;
   readonly onStep: (step: StepId) => void;
+  /**
+   * The CV and engine chosen for this job (L-200), picked once and used by
+   * every step. Left out, the line is not drawn.
+   */
+  readonly choice?: { readonly cv: string | null; readonly engine: string | null } | undefined;
   /** Back to the tracker, where the job lives. Left out, no link is drawn. */
   readonly onTracker?: (() => void) | undefined;
 }
@@ -63,6 +68,7 @@ export function JobStepBar({
   current,
   progress,
   onStep,
+  choice,
   onTracker,
 }: JobStepBarProps) {
   const steps = stepStates(current, progress);
@@ -94,6 +100,15 @@ export function JobStepBar({
           {job}
         </p>
       </div>
+
+      {choice === undefined ? null : (
+        <p data-testid="job-steps-choice" className="break-words text-xs text-ink-muted">
+          CV: <span className="text-ink">{choice.cv ?? 'none chosen'}</span>
+          <span aria-hidden="true"> · </span>
+          <span className="sr-only">, </span>
+          Engine: <span className="text-ink">{choice.engine ?? 'none set up'}</span>
+        </p>
+      )}
 
       <nav aria-label="Steps for this job">
         <ol className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
