@@ -122,7 +122,7 @@ function installMatchMedia(widthPx: number) {
   });
 }
 
-async function renderApp() {
+async function renderApp(saved: Record<string, { analysed?: boolean; exported?: boolean }> = {}) {
   const user = userEvent.setup();
   let counter = 0;
   render(
@@ -145,6 +145,15 @@ async function renderApp() {
       erasePort={createFakeErasePort()}
       createTransport={() => chat}
       workflowPort={null}
+      boardProgressPort={{
+        loadAll: async () =>
+          new Map(
+            Object.entries(saved).map(([jobId, progress]) => [
+              jobId,
+              { analysed: false, exported: false, ...progress },
+            ]),
+          ),
+      }}
       newId={() => `generated-${(counter += 1)}`}
       now={new Date('2026-10-06T09:00:00.000Z')}
     />,
@@ -245,5 +254,30 @@ describe('at phone width (375px)', () => {
     await screen.findByTestId('view-tailor');
     expect(current()).toBe('job-step-tailor');
     expect(screen.getByTestId('nav-tailor').getAttribute('aria-current')).toBe('page');
+  });
+});
+
+describe('Continue on a tracker card (L-200)', () => {
+  it('happy: an analysed job’s card continues straight to Tailor, with the job chosen', async () => {
+    const { user } = await renderApp({ 'job-tracked': { analysed: true } });
+    await user.click(screen.getByTestId('nav-tracker'));
+
+    const row = await screen.findByTestId('tracker-card-progress-app-tracked');
+    expect(row.textContent).toContain('●●○○○');
+    await user.click(screen.getByTestId('tracker-card-continue-app-tracked'));
+
+    await screen.findByTestId('view-tailor');
+    await vi.waitFor(() =>
+      expect(screen.getByTestId<HTMLSelectElement>('tailor-job-pick').value).toBe('job-tracked'),
+    );
+    expect(current()).toBe('job-step-tailor');
+    expect(chats).toBe(0);
+  });
+
+  it('negative: a job nothing has happened to has no Continue on its card', async () => {
+    const { user } = await renderApp();
+    await user.click(screen.getByTestId('nav-tracker'));
+    await screen.findByTestId('tracker-card-app-tracked');
+    expect(screen.queryByTestId('tracker-card-continue-app-tracked')).toBeNull();
   });
 });

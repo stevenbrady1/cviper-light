@@ -9,7 +9,12 @@
  * A HINT, NOT A GATE. Steps are never locked, so a failed read costs nothing
  * but a ✓: it reads as "not done", and the user can still go anywhere.
  */
-import { listAnalyses, listApplications, listDocumentsForApplication } from '../../db';
+import {
+  listAnalyses,
+  listApplications,
+  listDocuments,
+  listDocumentsForApplication,
+} from '../../db';
 
 export interface SavedProgress {
   readonly analysed: boolean;
@@ -37,6 +42,46 @@ export function createDbJobProgressPort(): JobProgressPort {
         }
       }
       return { analysed, exported: false };
+    },
+  };
+}
+
+/** Every job's saved progress at once — the tracker board's cards (L-200). */
+export interface BoardProgressPort {
+  /** Keyed by job id. A job with nothing saved has no entry. */
+  loadAll(): Promise<ReadonlyMap<string, SavedProgress>>;
+}
+
+/**
+ * Three reads for the whole board, not three per card: every analysis, every
+ * application and every document, joined here. Any read that fails leaves
+ * its half out — the cards lose a ✓, never the board.
+ */
+export function createDbBoardProgressPort(): BoardProgressPort {
+  return {
+    async loadAll() {
+      const [analyses, applications, documents] = await Promise.all([
+        listAnalyses(),
+        listApplications(),
+        listDocuments(),
+      ]);
+      const progress = new Map<string, SavedProgress>();
+      const mark = (jobId: string, change: Partial<SavedProgress>) =>
+        progress.set(jobId, { ...(progress.get(jobId) ?? NO_SAVED_PROGRESS), ...change });
+
+      if (analyses.ok) {
+        for (const analysis of analyses.value) {
+          if (analysis.job_id !== null) mark(analysis.job_id, { analysed: true });
+        }
+      }
+      if (applications.ok && documents.ok) {
+        const jobOf = new Map(applications.value.map((app) => [app.id, app.job_id]));
+        for (const document of documents.value) {
+          const jobId = jobOf.get(document.application_id);
+          if (document.kind === 'cv' && jobId !== undefined) mark(jobId, { exported: true });
+        }
+      }
+      return progress;
     },
   };
 }

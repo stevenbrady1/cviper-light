@@ -81,3 +81,20 @@ export function previousStep(step: StepId): StepId | null {
 export function nextStep(step: StepId): StepId | null {
   return STEPS[indexOf(step) + 1]?.id ?? null;
 }
+
+/** Whether anything has happened to the job beyond being found. */
+export function isStarted(progress: JobProgress): boolean {
+  return progress.analysed || progress.tailored || progress.exported;
+}
+
+/**
+ * Where "Continue" takes the user (L-200): the first thing still to do. A
+ * draft goes on to its ATS Score — the score is there to read before export —
+ * and a job with everything done opens on Export, where its CV is.
+ */
+export function continueStep(progress: JobProgress): StepId {
+  if (!progress.analysed && !progress.tailored) return 'analyse';
+  if (!progress.tailored) return 'tailor';
+  if (!progress.exported) return 'ats';
+  return 'export';
+}
