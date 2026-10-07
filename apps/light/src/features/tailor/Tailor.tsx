@@ -62,6 +62,7 @@ import { createJobSessions, sessionIn, type JobSessions, type TailorJobState } f
 import { AtsStep } from './AtsStep';
 import { compareAts } from './atsComparison';
 import { buildCoverLetterDocx, buildCvDocx } from './docx';
+import { buildCoverLetterPdf, buildCvPdf } from './pdf';
 import {
   LETTER_WORD_LIMIT,
   NO_AI_REASON,
@@ -836,30 +837,35 @@ export function Tailor({
     [files, jobTitle, letter, result],
   );
 
-  // The Word export (L-165): the same structured result the text render
-  // reads, built into a `.docx` on this machine and handed to the same
-  // dialog-in-Rust save. Success and cancel are worded exactly as the text
-  // path's, so the two buttons side by side behave as one feature.
-  const onSaveDocx = useCallback(
-    async (kind: 'cv' | 'cover_letter') => {
+  // The Word (L-165) and PDF (L-201) exports: the same structured result the
+  // text render reads, built into a file on this machine and handed to the
+  // same dialog-in-Rust save. Success and cancel are worded exactly as the
+  // text path's, so the buttons side by side behave as one feature.
+  const onSaveDocument = useCallback(
+    async (kind: 'cv' | 'cover_letter', format: 'docx' | 'pdf') => {
       // `null` for the name: the app never asks the model for one, and this
       // screen has nothing else to offer (see `renderTailoredCv`).
-      const build =
-        kind === 'cv'
-          ? result === null
-            ? null
-            : () => buildCvDocx(result.cv, null)
-          : letter === null
-            ? null
-            : () => buildCoverLetterDocx(letter.letter);
-      if (build === null) return;
+      const build = async (): Promise<{ bytes: Uint8Array; missing: readonly string[] }> => {
+        if (kind === 'cv' && result !== null) {
+          return format === 'pdf'
+            ? buildCvPdf(result.cv, null)
+            : { bytes: await buildCvDocx(result.cv, null), missing: [] };
+        }
+        if (kind === 'cover_letter' && letter !== null) {
+          return format === 'pdf'
+            ? buildCoverLetterPdf(letter.letter)
+            : { bytes: await buildCoverLetterDocx(letter.letter), missing: [] };
+        }
+        throw new Error('nothing to export');
+      };
+      if ((kind === 'cv' ? result : letter) === null) return;
       setError(null);
       setSaveMessage(null);
       setSaving(true);
 
-      let bytes: Uint8Array;
+      let built: { bytes: Uint8Array; missing: readonly string[] };
       try {
-        bytes = await build();
+        built = await build();
       } catch {
         // The builder runs over our own validated result, so this is our bug;
         // it still ends in a sentence on screen rather than a stuck spinner.
@@ -868,7 +874,11 @@ export function Tailor({
         return;
       }
 
-      const saved = await files.saveBytes(bytes, exportFileName(kind, jobTitle, 'docx'), 'docx');
+      const saved = await files.saveBytes(
+        built.bytes,
+        exportFileName(kind, jobTitle, format),
+        format,
+      );
       setSaving(false);
 
       if (!saved.ok) {
@@ -876,7 +886,13 @@ export function Tailor({
         return;
       }
       if (saved.value === null) return;
-      setSaveMessage(`Saved to ${saved.value}.`);
+      setSaveMessage(
+        built.missing.length === 0
+          ? `Saved to ${saved.value}.`
+          : `Saved to ${saved.value}. The PDF's built-in font cannot show ` +
+              `${built.missing.join(' ')}, so they appear as ? or a plain letter. ` +
+              'Save as Word to keep them exactly.',
+      );
     },
     [files, jobTitle, letter, result],
   );
@@ -1362,10 +1378,19 @@ export function Tailor({
                 type="button"
                 data-testid="tailor-save-docx-cv"
                 disabled={running || saving}
-                onClick={() => void onSaveDocx('cv')}
+                onClick={() => void onSaveDocument('cv', 'docx')}
                 className={SECONDARY_BUTTON}
               >
                 Save CV as Word…
+              </button>
+              <button
+                type="button"
+                data-testid="tailor-save-pdf-cv"
+                disabled={running || saving}
+                onClick={() => void onSaveDocument('cv', 'pdf')}
+                className={SECONDARY_BUTTON}
+              >
+                Save CV as PDF…
               </button>
             </div>
 
@@ -1446,10 +1471,19 @@ export function Tailor({
                   type="button"
                   data-testid="tailor-save-docx-letter"
                   disabled={running || saving}
-                  onClick={() => void onSaveDocx('cover_letter')}
+                  onClick={() => void onSaveDocument('cover_letter', 'docx')}
                   className={SECONDARY_BUTTON}
                 >
                   Save letter as Word…
+                </button>
+                <button
+                  type="button"
+                  data-testid="tailor-save-pdf-letter"
+                  disabled={running || saving}
+                  onClick={() => void onSaveDocument('cover_letter', 'pdf')}
+                  className={SECONDARY_BUTTON}
+                >
+                  Save letter as PDF…
                 </button>
               </div>
             )}
