@@ -122,16 +122,19 @@ function installMatchMedia(widthPx: number) {
   });
 }
 
-async function renderApp(saved: Record<string, { analysed?: boolean; exported?: boolean }> = {}) {
+async function renderApp(
+  saved: Record<string, { analysed?: boolean; exported?: boolean }> = {},
+  cvs: Cv[] = CVS,
+) {
   const user = userEvent.setup();
   let counter = 0;
   render(
     <App
       trackerPort={createFakeTrackerPort([TRACKED])}
       profilePort={createFakeProfilePort()}
-      analysisPort={createFakeAnalysisPort({ cvs: CVS, jobs: [TRACKED.job] })}
+      analysisPort={createFakeAnalysisPort({ cvs, jobs: [TRACKED.job] })}
       tailorPort={createFakeTailorPort({
-        cvs: CVS,
+        cvs,
         jobs: [TRACKED.job],
         applications: [TRACKED.application],
       })}
@@ -279,5 +282,48 @@ describe('Continue on a tracker card (L-200)', () => {
     await user.click(screen.getByTestId('nav-tracker'));
     await screen.findByTestId('tracker-card-app-tracked');
     expect(screen.queryByTestId('tracker-card-continue-app-tracked')).toBeNull();
+  });
+});
+
+describe('pick once: a job keeps its CV (L-200)', () => {
+  const TWO_CVS: Cv[] = [
+    ...CVS,
+    { ...CVS[0]!, id: 'cv-2', name: 'Risk CV.docx', created_at: '2026-08-02T09:00:00.000Z' },
+  ];
+
+  it('happy: a CV chosen on Analysis is the one Tailor opens with, and the bar says so', async () => {
+    const { user } = await renderApp({}, TWO_CVS);
+    await analyseTrackedJob(user);
+    await vi.waitFor(() =>
+      expect(screen.getByTestId<HTMLSelectElement>('analysis-cv').disabled).toBe(false),
+    );
+    await user.selectOptions(screen.getByTestId('analysis-cv'), 'cv-2');
+    expect(screen.getByTestId('job-steps-choice').textContent).toContain('CV: Risk CV.docx');
+
+    await user.click(screen.getByTestId('job-steps-next'));
+    await screen.findByTestId('view-tailor');
+    await vi.waitFor(() =>
+      expect(screen.getByTestId<HTMLSelectElement>('tailor-cv-pick').value).toBe('cv-2'),
+    );
+    expect(screen.getByTestId('job-steps-choice').textContent).toContain('CV: Risk CV.docx');
+    expect(chats).toBe(0);
+  });
+
+  it('a CV chosen on Tailor comes back on Analysis, without asking again', async () => {
+    const { user } = await renderApp({}, TWO_CVS);
+    await analyseTrackedJob(user);
+    await user.click(screen.getByTestId('job-steps-next'));
+    await screen.findByTestId('view-tailor');
+    await vi.waitFor(() =>
+      expect(screen.getByTestId<HTMLSelectElement>('tailor-job-pick').value).toBe('job-tracked'),
+    );
+    await user.selectOptions(screen.getByTestId('tailor-cv-pick'), 'cv-2');
+
+    await user.click(screen.getByTestId('job-step-analyse'));
+    await screen.findByTestId('view-analysis');
+    await vi.waitFor(() =>
+      expect(screen.getByTestId<HTMLSelectElement>('analysis-cv').value).toBe('cv-2'),
+    );
+    expect(screen.getByTestId('job-steps-choice').textContent).toContain('CV: Risk CV.docx');
   });
 });

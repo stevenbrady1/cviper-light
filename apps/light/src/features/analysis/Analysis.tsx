@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { extractText } from '@cviper/cv-parsing';
 import {
@@ -170,6 +170,22 @@ export interface AnalysisProps {
   readonly onJobStep?: ((step: StepId, job: Job, handoff: TailorHandoff) => void) | undefined;
   /** "◀ Tracker" on the step bar. */
   readonly onTracker?: (() => void) | undefined;
+  /**
+   * The CV and engine already chosen for a job (L-200, "pick once"), here or
+   * on Tailor, or `null` when it has none. Read when the job arrives.
+   */
+  readonly jobChoice?:
+    | ((
+        jobId: string,
+      ) => { readonly cvId: string | null; readonly optionKey: string | null } | null)
+    | undefined;
+  /** A CV or engine picked here, for a tracked job: recorded for that job. */
+  readonly onJobChoice?:
+    | ((
+        job: Job,
+        choice: { readonly cvId?: string | null; readonly optionKey?: string | null },
+      ) => void)
+    | undefined;
 }
 
 /**
@@ -198,6 +214,8 @@ export function Analysis({
   tailoredJob,
   onJobStep,
   onTracker,
+  jobChoice,
+  onJobChoice,
 }: AnalysisProps = {}) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke in the advert box.
@@ -700,6 +718,34 @@ export function Analysis({
     };
   }, [jobId, progress]);
 
+  /**
+   * A job arriving brings back its own CV and engine (L-200, "pick once"),
+   * once, after the CVs are read so a deleted CV is never selected. A job
+   * with no choice yet keeps whatever is picked now.
+   */
+  const choiceAppliedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (jobId === null) {
+      choiceAppliedFor.current = null;
+      return;
+    }
+    if (!cvsLoaded || choiceAppliedFor.current === jobId) return;
+    choiceAppliedFor.current = jobId;
+    const choice = jobChoice?.(jobId) ?? null;
+    if (choice === null) return;
+    const current = session.get();
+    const cvId =
+      choice.cvId !== null && cvs.some((cv) => cv.id === choice.cvId) ? choice.cvId : null;
+    if (cvId !== null && cvId !== current.selectedCvId) {
+      // Another CV: a result on screen was for the one being left.
+      session.supersede();
+      session.update({ selectedCvId: cvId, result: null, runError: null, warnings: [] });
+    }
+    if (choice.optionKey !== null && choice.optionKey !== current.optionKey) {
+      session.update({ optionKey: choice.optionKey });
+    }
+  }, [cvs, cvsLoaded, jobChoice, jobId, session]);
+
   /** What "Tailor my CV for this job" hands over — the same, whichever button. */
   const tailorHandoff = useCallback(
     (): TailorHandoff => ({
@@ -739,6 +785,7 @@ export function Analysis({
           company={stepJob.company}
           location={stepJob.location}
           current="analyse"
+          choice={{ cv: selectedCv?.name ?? null, engine: selectedOption?.label ?? null }}
           progress={{
             // A result on screen is this job's: loading another job clears it.
             analysed: saved.analysed || result !== null,
@@ -785,6 +832,8 @@ export function Analysis({
                   });
                   setUploadProblem(null);
                   setExportMessage(null);
+                  // Picked once, for the job (L-200).
+                  if (stepJob !== null) onJobChoice?.(stepJob, { cvId: id === '' ? null : id });
                 }}
                 className="min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
               >
@@ -943,7 +992,12 @@ export function Analysis({
               id="analysis-provider"
               data-testid="analysis-provider"
               value={optionKey}
-              onChange={(event) => session.update({ optionKey: event.currentTarget.value })}
+              onChange={(event) => {
+                const picked = event.currentTarget.value;
+                session.update({ optionKey: picked });
+                // Picked once, for the job (L-200).
+                if (stepJob !== null) onJobChoice?.(stepJob, { optionKey: picked });
+              }}
               className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
             >
               {options.map((option) => (

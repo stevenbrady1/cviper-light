@@ -143,6 +143,11 @@ export interface JobSessions {
    * has one keeps it, untouched — coming back is not starting again.
    */
   readonly open: (jobId: string | null, seed: () => Partial<TailorJobState>) => void;
+  /**
+   * Give a job a session if it has none, seeded once, WITHOUT showing it —
+   * for another screen recording a choice for the job (L-200).
+   */
+  readonly ensure: (jobId: string, seed: () => Partial<TailorJobState>) => void;
   /** Change ONE job's session, whichever job is showing. */
   readonly patch: (jobId: string | null, patch: Patch) => void;
   /** Forget every job ("Delete everything"). */
@@ -186,6 +191,10 @@ export function createJobSessions(): JobSessions {
       const base =
         existing === undefined ? withSession(jobId, { ...EMPTY_TAILOR_JOB, ...seed() }) : state;
       publish({ ...base, activeJobId: jobId });
+    },
+    ensure(jobId, seed) {
+      if (state.sessions.has(keyOf(jobId))) return;
+      publish(withSession(jobId, { ...EMPTY_TAILOR_JOB, ...seed() }));
     },
     patch(jobId, patch) {
       const current = session(jobId);
