@@ -1017,16 +1017,17 @@ pub(crate) async fn pick_and_read_profile_workspace(
 // is a refusal, never a best-effort byte string that is silently wrong.
 
 /// Extensions a binary export may be saved under. Lower-case, no dot.
-/// Exactly one: the frontend asks for it BY NAME and anything else is refused
-/// before a dialog opens, so this command cannot be talked into writing an
-/// `.exe`, a `.docm` (a Word file that carries macros) or a `.zip`.
-const BYTES_EXTENSIONS: [&str; 1] = ["docx"];
+/// Exactly two — a Word document (L-165) and a PDF (L-201): the frontend asks
+/// for one BY NAME and anything else is refused before a dialog opens, so
+/// this command cannot be talked into writing an `.exe`, a `.docm` (a Word
+/// file that carries macros) or a `.zip`.
+const BYTES_EXTENSIONS: [&str; 2] = ["docx", "pdf"];
 
 /// The largest binary export we will write, in bytes — measured on the
 /// DECODED size, and checked on the base64's length before a byte of it is
 /// decoded, so a payload that is about to be refused is never allocated.
 ///
-/// A tailored CV as a Word document is a few tens of kilobytes. 8 MB is a
+/// A tailored CV as a Word document or a PDF is a few tens of kilobytes. 8 MB is a
 /// few hundred of them, and small enough that the string a compromised
 /// frontend could ask us to write is not a disk-filling one.
 const MAX_BYTES_EXPORT: u64 = 8 * 1024 * 1024;
@@ -1090,7 +1091,16 @@ fn bytes_extension(requested: &str) -> Result<&'static str, String> {
         .iter()
         .find(|allowed| **allowed == lowered)
         .copied()
-        .ok_or_else(|| "A Word export can only be saved as .docx.".to_string())
+        .ok_or_else(|| "A document export can only be saved as .docx or .pdf.".to_string())
+}
+
+/// The save dialog's title and filter name for one export kind. `extension`
+/// has already passed `bytes_extension`, so it is one of `BYTES_EXTENSIONS`.
+fn bytes_dialog(extension: &str) -> (&'static str, &'static str) {
+    match extension {
+        "pdf" => ("Save as a PDF", "PDF document"),
+        _ => ("Save as a Word document", "Word document"),
+    }
 }
 
 /// The same rule as `bare_text_name`, for the binary export's extension.
@@ -1118,8 +1128,8 @@ fn decode_bytes_export(encoded: &str) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-/// Write a binary export — a Word document (L-165) — to the path the user
-/// chose. `extension` has already passed `bytes_extension`; the path the
+/// Write a binary export — a Word document (L-165) or a PDF (L-201) — to the
+/// path the user chose. `extension` has already passed `bytes_extension`; the path the
 /// dialog answered with must carry that same extension, so a user who types
 /// `cv.exe` into the save box gets a refusal, not a file.
 fn write_bytes_export_at(path: &Path, bytes: &[u8], extension: &str) -> Result<(), String> {
@@ -1146,13 +1156,13 @@ fn write_bytes_export_at(path: &Path, bytes: &[u8], extension: &str) -> Result<(
 }
 
 /// Ask where to save a binary export — a tailored CV or a cover letter as a
-/// Word document (L-165) — then write it. Same shape as `pick_and_write_text`:
+/// Word document (L-165) or a PDF (L-201) — then write it. Same shape as `pick_and_write_text`:
 /// `Ok(None)` is a cancel, `Ok(Some(path))` is where it went, and the path
 /// never passes through JavaScript on the way in.
 ///
 /// `encoded` is the file's bytes as base64, decoded here under the size cap
 /// BEFORE the dialog opens (`decode_bytes_export`). `extension` can only be
-/// `docx`: anything else is refused before the dialog too
+/// `docx` or `pdf`: anything else is refused before the dialog too
 /// (`bytes_extension`), the dialog's filter is that one extension, and the
 /// chosen path is checked against it again before a byte is written
 /// (`write_bytes_export_at`).
@@ -1167,14 +1177,15 @@ pub(crate) async fn pick_and_write_bytes(
 ) -> Result<Option<String>, String> {
     let extension = bytes_extension(&extension)?;
     let bytes = decode_bytes_export(&encoded)?;
+    let (title, filter) = bytes_dialog(extension);
 
     let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
 
     app.dialog()
         .file()
-        .set_title("Save as a Word document")
+        .set_title(title)
         .set_file_name(bare_bytes_name(&suggestion, extension))
-        .add_filter("Word document", &[extension])
+        .add_filter(filter, &[extension])
         .save_file(move |chosen| {
             let _ = answer.try_send(chosen);
         });
@@ -1849,17 +1860,28 @@ mod tests {
     }
 
     #[test]
-    fn a_bytes_export_accepts_only_docx() {
+    fn a_bytes_export_accepts_only_docx_and_pdf() {
         assert_eq!(bytes_extension("docx").unwrap(), "docx");
+        assert_eq!(bytes_extension("pdf").unwrap(), "pdf");
         // Boundary: case and surrounding whitespace are tidied, not refused.
         assert_eq!(bytes_extension(" DOCX ").unwrap(), "docx");
+        assert_eq!(bytes_extension("PDF").unwrap(), "pdf");
 
         // Negative: everything else is an error before a dialog could open —
         // including the text extensions, which have their own command.
-        for refused in ["exe", "json", "html", "bat", "", ".docx", "doc", "txt", "md", "docm"] {
+        for refused in [
+            "exe", "json", "html", "bat", "", ".docx", "doc", "txt", "md", "docm", ".pdf", "pdfx",
+        ] {
             let error = bytes_extension(refused).expect_err(refused);
             assert!(error.contains(".docx"), "{refused:?} produced: {error}");
+            assert!(error.contains(".pdf"), "{refused:?} produced: {error}");
         }
+    }
+
+    #[test]
+    fn each_bytes_export_names_its_own_kind_in_the_dialog() {
+        assert_eq!(bytes_dialog("docx"), ("Save as a Word document", "Word document"));
+        assert_eq!(bytes_dialog("pdf"), ("Save as a PDF", "PDF document"));
     }
 
     #[test]

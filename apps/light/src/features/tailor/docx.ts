@@ -23,13 +23,17 @@
  * read as nothing, or as the wrong thing. `docx.test.ts` asserts the
  * absences, so a decorative table cannot come back in a later change.
  *
- * An empty section is omitted rather than rendered as a bare heading, and
- * the candidate's name is written ONLY when the app knows it — the same two
- * rules as `renderTailoredCv`, for the same reasons.
+ * WHAT goes in, and in what order, is `exportBlocks.ts`'s — shared with the
+ * PDF export (L-201), so the two files always agree. An empty section is
+ * omitted rather than rendered as a bare heading, and the candidate's name is
+ * written ONLY when the app knows it — the same two rules as
+ * `renderTailoredCv`, for the same reasons.
  */
 import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx';
 
-import { type CoverLetter, type TailoredCv, type TailoredCvRole } from '@cviper/core-types';
+import { type CoverLetter, type TailoredCv } from '@cviper/core-types';
+
+import { cvBlocks, letterBlocks, type ExportBlock } from './exportBlocks';
 
 /**
  * One plain font, everywhere. Arial is on every Windows and macOS machine
@@ -88,7 +92,7 @@ function bullet(text: string): Paragraph {
  * line break — a sign-off's name sits under the valediction, not a blank
  * line away.
  */
-function block(text: string): Paragraph {
+function blockParagraph(text: string): Paragraph {
   const lines = text.split('\n').map((part) => part.trim());
   return new Paragraph({
     children: lines.map((part, index) =>
@@ -98,70 +102,23 @@ function block(text: string): Paragraph {
   });
 }
 
-/**
- * `Company | Location | Dates`, with any empty part left out rather than left
- * as a bare bar. The same rule as `renderTailoredCv`'s `roleLine`, kept in
- * step by `docx.test.ts`.
- */
-function roleLine(role: TailoredCvRole): string {
-  return [role.company, role.location, role.dates]
-    .map((part) => part.trim())
-    .filter((part) => part !== '')
-    .join(' | ');
-}
-
-/** The tailored CV's paragraphs, in `MANDATORY_STRUCTURE`'s order. */
-function cvParagraphs(cv: TailoredCv, name: string | null): Paragraph[] {
-  const paragraphs: Paragraph[] = [];
-
-  const trimmedName = name?.trim() ?? '';
-  if (trimmedName !== '') {
-    paragraphs.push(
-      new Paragraph({
-        children: [new TextRun({ text: trimmedName })],
+/** One block of the shared export list as a Word paragraph. */
+function paragraph(block: ExportBlock): Paragraph {
+  switch (block.kind) {
+    case 'name':
+      return new Paragraph({
+        children: [new TextRun({ text: block.text })],
         heading: HeadingLevel.TITLE,
-      }),
-    );
+      });
+    case 'heading':
+      return heading(block.text);
+    case 'line':
+      return line(block.text, block.bold === true ? { bold: true } : {});
+    case 'bullet':
+      return bullet(block.text);
+    case 'block':
+      return blockParagraph(block.text);
   }
-
-  paragraphs.push(heading('PROFESSIONAL SUMMARY'), line(cv.summary.trim()));
-
-  if (cv.key_skills.length > 0) {
-    paragraphs.push(heading('KEY SKILLS'), line(cv.key_skills.join(', ')));
-  }
-
-  if (cv.experience.length > 0) {
-    paragraphs.push(heading('PROFESSIONAL EXPERIENCE'));
-    for (const role of cv.experience) {
-      paragraphs.push(line(role.title.trim(), { bold: true }));
-      const header = roleLine(role);
-      if (header !== '') paragraphs.push(line(header));
-      for (const point of role.bullets) {
-        paragraphs.push(bullet(point.trim()));
-      }
-    }
-  }
-
-  if (cv.education.length > 0) {
-    paragraphs.push(heading('EDUCATION'), ...cv.education.map((entry) => line(entry.trim())));
-  }
-
-  if (cv.certifications.length > 0) {
-    paragraphs.push(
-      heading('CERTIFICATIONS'),
-      ...cv.certifications.map((entry) => line(entry.trim())),
-    );
-  }
-
-  return paragraphs;
-}
-
-/** The cover letter's paragraphs: greeting, body, sign-off. Blank blocks are dropped. */
-function letterParagraphs(letter: CoverLetter): Paragraph[] {
-  return [letter.greeting, ...letter.paragraphs, letter.sign_off]
-    .map((text) => text.trim())
-    .filter((text) => text !== '')
-    .map(block);
 }
 
 /**
@@ -185,10 +142,10 @@ async function pack(title: string, children: readonly Paragraph[]): Promise<Uint
  * know the candidate's name, and nothing here guesses one.
  */
 export function buildCvDocx(cv: TailoredCv, name: string | null): Promise<Uint8Array> {
-  return pack('Tailored CV', cvParagraphs(cv, name));
+  return pack('Tailored CV', cvBlocks(cv, name).map(paragraph));
 }
 
 /** The cover letter as `.docx` bytes. */
 export function buildCoverLetterDocx(letter: CoverLetter): Promise<Uint8Array> {
-  return pack('Cover letter', letterParagraphs(letter));
+  return pack('Cover letter', letterBlocks(letter).map(paragraph));
 }

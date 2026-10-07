@@ -203,7 +203,7 @@ export function newSavedApplication(input: {
 export function exportFileName(
   kind: 'cv' | 'cover_letter',
   jobTitle: string,
-  extension: 'txt' | 'docx' = 'txt',
+  extension: 'txt' | 'docx' | 'pdf' = 'txt',
 ): string {
   return `${documentTitle(kind, jobTitle)}.${extension}`;
 }

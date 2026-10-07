@@ -97,13 +97,14 @@ export interface WorkspaceFiles {
 }
 
 /**
- * The one format a binary export can be saved as (L-165): a Word document.
+ * The formats a binary export can be saved as: a Word document (L-165) or a
+ * PDF (L-201).
  *
- * A closed union of one, for the same reason as `TextExportExtension`: Rust
- * refuses anything else before a dialog opens, and typing it here means a
- * caller cannot ask for `.docm` or `.zip` and find out at runtime.
+ * A closed union, for the same reason as `TextExportExtension`: Rust refuses
+ * anything else before a dialog opens, and typing it here means a caller
+ * cannot ask for `.docm` or `.zip` and find out at runtime.
  */
-export type BytesExportExtension = 'docx';
+export type BytesExportExtension = 'docx' | 'pdf';
 
 export interface FilePort {
   /** Ask for a CV and read it. `null` means the user cancelled. */
@@ -137,10 +138,10 @@ export interface FilePort {
   pickProfileWorkspace(): Promise<Result<WorkspaceFiles | null, FileError>>;
   /**
    * Ask where to save a binary export — a tailored CV or a cover letter as a
-   * Word document (L-165) — then write it. Same contract as `saveText`: the
-   * path, or `null` for a cancel. The bytes are built on this machine by
-   * `features/tailor/docx.ts` and cross to Rust as base64, because a `.docx`
-   * is a zip and a zip is not a string; Rust decodes them, caps their size
+   * Word document (L-165) or a PDF (L-201) — then write it. Same contract as
+   * `saveText`: the path, or `null` for a cancel. The bytes are built on this
+   * machine by `features/tailor/docx.ts` or `pdf.ts` and cross to Rust as
+   * base64, because a `.docx` is a zip and neither file is a string; Rust decodes them, caps their size
    * and refuses any extension but the one named here.
    */
   saveBytes(

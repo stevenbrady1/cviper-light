@@ -8,6 +8,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Added
 
+- Save the tailored CV and the cover letter as a PDF, beside Word and text (L-201). The PDF is built on this machine with no extra library or font file, keeps the same single-column, ATS-safe layout, and is read back by the app's own PDF reader in the tests. Accented names (é, ł, ñ, ő, ș…) come out exactly; a character the PDF's built-in font cannot show (Cyrillic, Chinese, emoji) is named after the save, with Word as the way to keep it.
 - Tracker cards for jobs you have started show how far each one has got (●●●○○) and a Continue button that takes you to the next thing to do — Analyse, Tailor or the ATS Score — on the right job (L-200).
 - A step bar for each job on Analysis and Tailor: Find → Analyse → Tailor → ATS Score → Export, with Back and Next. It names the job, ticks off what is done, marks a step you went past as skipped (⊘) rather than locking anything, and takes you to any step — including back to the tracker. Moving between steps never runs a check or the AI; you still press the button on the step (L-200).
 - Tailor keeps your work for each job. Leave Tailor for another screen and come back, and the tailored CV, the review and the letter are still there; pick another tracked job and it has its own draft, and the first one is waiting when you go back. A draft that finishes after you switched jobs lands on the job it was written for (L-199).
