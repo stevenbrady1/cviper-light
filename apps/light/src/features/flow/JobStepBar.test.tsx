@@ -124,4 +124,37 @@ describe('JobStepBar', () => {
     renderBar();
     expect(document.querySelectorAll('[data-primary="true"]')).toHaveLength(0);
   });
+
+  it('shows the CV and engine chosen for the job, once, for every step', () => {
+    render(
+      <JobStepBar
+        title="Analyst"
+        company="Acme"
+        location={null}
+        current="tailor"
+        progress={{ analysed: false, tailored: false, exported: false }}
+        onStep={() => undefined}
+        choice={{ cv: 'steve-cv-2026.docx', engine: 'Ollama · llama3.1:8b' }}
+      />,
+    );
+    expect(screen.getByTestId('job-steps-choice').textContent).toBe(
+      'CV: steve-cv-2026.docx · , Engine: Ollama · llama3.1:8b',
+    );
+  });
+
+  it('boundary: nothing chosen yet says so rather than leaving a blank', () => {
+    render(
+      <JobStepBar
+        title="Analyst"
+        company="Acme"
+        location={null}
+        current="tailor"
+        progress={{ analysed: false, tailored: false, exported: false }}
+        onStep={() => undefined}
+        choice={{ cv: null, engine: null }}
+      />,
+    );
+    expect(screen.getByTestId('job-steps-choice').textContent).toContain('CV: none chosen');
+    expect(screen.getByTestId('job-steps-choice').textContent).toContain('Engine: none set up');
+  });
 });

@@ -445,6 +445,29 @@ export default function App({
   );
 
   const onTracker = useCallback(() => setActiveView('tracker'), []);
+
+  // "Pick once" (L-200): a job's CV and engine live in its Tailor session, so
+  // a choice made on either screen is the one the other opens with.
+  const jobChoice = useCallback(
+    (jobId: string) => {
+      if (!jobSessions.has(jobId)) return null;
+      const { cvId, optionKey } = jobSessions.session(jobId);
+      return { cvId, optionKey };
+    },
+    [jobSessions],
+  );
+  const onJobChoice = useCallback(
+    (job: Job, choice: { readonly cvId?: string | null; readonly optionKey?: string | null }) => {
+      jobSessions.ensure(job.id, () => ({ advert: jobAdvertText(job) }));
+      // As on Tailor: a draft written from another CV is not this CV's draft.
+      jobSessions.patch(job.id, (current) =>
+        choice.cvId !== undefined && current.cvId !== choice.cvId
+          ? { ...choice, result: null, review: null, letter: null, error: null }
+          : choice,
+      );
+    },
+    [jobSessions],
+  );
   const tailoredJob = useCallback(
     (jobId: string) => jobSessions.session(jobId).result !== null,
     [jobSessions],
@@ -640,6 +663,8 @@ export default function App({
             tailoredJob,
             onJobStep,
             onTracker,
+            jobChoice,
+            onJobChoice,
           },
           tailor: {
             port: tailorPort,

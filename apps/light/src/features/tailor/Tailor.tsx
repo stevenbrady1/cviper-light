@@ -933,6 +933,7 @@ export function Tailor({
           company={selectedJob.company}
           location={selectedJob.location}
           current={step}
+          choice={{ cv: selectedCv?.name ?? null, engine: selectedOption?.label ?? null }}
           progress={{
             analysed: saved.analysed,
             tailored: result !== null,
