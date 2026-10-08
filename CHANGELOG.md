@@ -6,6 +6,8 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-10-08
+
 ### Added
 
 - The job-board buttons on Search now carry your distance, minimum salary and contract type as well as the job title and location, wherever the site's own link format for it is confirmed (L-219): Reed, Totaljobs and CV-Library take all three; Indeed and LinkedIn take the distance, and LinkedIn "Contract"; Google Jobs takes the contract type. A distance or salary the site does not offer is rounded to the nearest it does — a wider distance, a lower salary — so no job you asked for is hidden. An empty or unreadable filter adds nothing to the link. Your own boards (Settings → Job boards) can use `{radius}`, `{salaryMin}` and `{contract}` too.
@@ -305,7 +307,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.7.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.8.0...main
+[0.8.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.7.0...light-v0.8.0
 [0.7.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.6.0...light-v0.7.0
 [0.6.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.5.0...light-v0.6.0
 [0.5.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.4.0...light-v0.5.0

@@ -170,7 +170,7 @@ describe('export', () => {
     expect(filePort.written()).toHaveLength(1);
     const written = JSON.parse(filePort.written()[0]?.contents ?? '{}') as Record<string, unknown>;
     expect(written['schemaVersion']).toBe(1);
-    expect(written['app']).toEqual({ name: 'cviper-light', version: '0.7.0' });
+    expect(written['app']).toEqual({ name: 'cviper-light', version: '0.8.0' });
     expect(written['jobs']).toHaveLength(1);
   });
 
