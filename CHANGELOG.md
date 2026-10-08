@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Clicking a step on Tailor's step bar (Tailor, ATS Score, Export, Back, Next) no longer slides the whole window up and leaves the bottom half blank. The step now scrolls only Tailor's own content area; the rail, the page and the window stay put. Tests walk every way of moving — each step link on Tailor and Analysis, each rail item and Ctrl+number shortcut, a tracker card's Continue, and phone width — and fail if anything outside a screen's own area scrolls (L-216).
+
 ## [0.7.0] — 2026-10-08
 
 ### Added
