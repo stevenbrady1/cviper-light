@@ -52,27 +52,20 @@ export const KEYLESS_INTRO =
   'so this is a browse of recent jobs rather than a look at the whole market.';
 
 /** What the fields the local filter reads, said where the user types them. */
+/**
+ * The honest sentence, short enough to read at a glance (L-219). The long
+ * version — `KEYLESS_INTRO` and `KEYLESS_FILTER_NOTE` — is one hover or Tab
+ * away on it. Never the word "search": the feeds take no query.
+ */
+export const KEYLESS_SUMMARY =
+  'Arbeitnow is mostly Germany and the rest of Europe; Guardian Jobs is the twenty latest UK ' +
+  'posts. Both are read here and narrowed on your computer, so they show recent jobs, not the ' +
+  'whole market.';
+
 export const KEYLESS_FILTER_NOTE =
   'These feeds cannot be asked for anything, so the narrowing happens here: the job title and ' +
   'the employer for the words, and whatever the advert wrote in its location box for the ' +
   'place. Many adverts name only a city.';
-
-/**
- * The label on the one primary button.
- *
- * It says what pressing it will do, and it NEVER calls a keyless browse a
- * search: the feeds ignore every query, and a button that says "Search" over a
- * filtered list of whatever was published today is a claim the user cannot
- * check.
- */
-export function submitLabel(keyedChosen: number, keylessChosen: number): string {
-  if (keyedChosen > 0 && keylessChosen > 0) return 'Search and browse';
-  if (keyedChosen > 0) return 'Search';
-  if (keylessChosen > 0) return 'Browse recent jobs';
-  // Nothing ticked. The button is disabled and its reason sits beside it, but
-  // it still reads as the thing the screen is for.
-  return 'Search';
-}
 
 /**
  * "Arbeitnow published 38 recent jobs and none of them matched." — or `null`.

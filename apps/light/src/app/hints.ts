@@ -99,3 +99,54 @@ export const VERDICT_HINT = {
 export function shortcutHint(label: string, key: string): string {
   return `Keyboard shortcut: hold Ctrl and press ${key} to open ${label}.`;
 }
+
+/** Which of the search form's filters a job board's link carries (L-219). */
+export interface BoardCarries {
+  readonly location: boolean;
+  readonly radius: boolean;
+  readonly salaryMin: boolean;
+  readonly contract: boolean;
+}
+
+function spoken(items: readonly string[]): string {
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+/**
+ * "Opens Indeed in your browser with your job title, location and distance.
+ * Its link cannot take your minimum salary and contract type, so set those on
+ * the site." — beside a job-board button.
+ */
+export function boardHint(
+  label: string,
+  carries: BoardCarries,
+  filters?:
+    | {
+        readonly contract?:
+          | { readonly permanent?: string | undefined; readonly contract?: string | undefined }
+          | undefined;
+      }
+    | undefined,
+): string {
+  const taken = ['job title'];
+  const missing: string[] = [];
+  (carries.location ? taken : missing).push('location');
+  (carries.radius ? taken : missing).push('distance');
+  (carries.salaryMin ? taken : missing).push('minimum salary');
+  (carries.contract ? taken : missing).push('contract type');
+
+  let text = `Opens ${label} in your browser with your ${spoken(taken)}.`;
+  if (missing.length > 0) {
+    text += ` Its link cannot take your ${spoken(missing)}, so set ${missing.length === 1 ? 'that' : 'those'} on the site.`;
+  }
+  const words = filters?.contract;
+  if (carries.contract && words !== undefined) {
+    if (words.permanent === undefined && words.contract !== undefined) {
+      text += ' It can filter for Contract roles, but has no Permanent filter.';
+    } else if (words.contract === undefined && words.permanent !== undefined) {
+      text += ' It can filter for Permanent roles, but has no Contract filter.';
+    }
+  }
+  return text;
+}

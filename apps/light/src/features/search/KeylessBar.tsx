@@ -1,6 +1,10 @@
-import { buildBoardUrl } from '@cviper/job-apis';
+import { useState } from 'react';
 
-import { SECONDARY_BUTTON } from '../../app/buttons';
+import { boardFilterSupport, buildBoardUrl } from '@cviper/job-apis';
+
+import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { Hint } from '../../app/Hint';
+import { boardHint } from '../../app/hints';
 import { type Board } from '../boards/model';
 import { type BrowserPort } from '../../platform/browser';
 
@@ -52,6 +56,65 @@ import { boardSearchInput, type SearchForm } from './model';
  * either.
  */
 
+/** How many boards show before "More" (L-219). The shipped order puts the five main UK boards first. */
+export const MAIN_BOARD_COUNT = 5;
+
+/**
+ * The boards always on show, and the rest behind "More" (L-219): the first
+ * five shipped boards in the user's order, plus every board the user added
+ * themselves — they added it to use it, so it is never hidden.
+ */
+export function mainBoards(enabled: readonly Board[]): {
+  readonly main: readonly Board[];
+  readonly rest: readonly Board[];
+} {
+  const shippedShown = new Set(
+    enabled
+      .filter((board) => !board.userAdded)
+      .slice(0, MAIN_BOARD_COUNT)
+      .map((board) => board.id),
+  );
+  const isMain = (board: Board) => board.userAdded || shippedShown.has(board.id);
+  return { main: enabled.filter(isMain), rest: enabled.filter((board) => !isMain(board)) };
+}
+
+interface BoardButtonsProps {
+  readonly boards: readonly Board[];
+  readonly form: SearchForm;
+  readonly browser: BrowserPort;
+  /** Test-id prefix, so two rows of the same boards stay distinguishable. */
+  readonly prefix: string;
+}
+
+/** One button per board; each says which of the form's filters its link carries (L-219). */
+function BoardButtons({ boards, form, browser, prefix }: BoardButtonsProps) {
+  const input = boardSearchInput(form);
+  return (
+    <>
+      {boards.map((board) => (
+        <Hint
+          key={board.id}
+          text={boardHint(board.label, boardFilterSupport(board), board.filters)}
+        >
+          {(trigger) => (
+            <button
+              {...trigger}
+              type="button"
+              data-testid={`${prefix}-${board.id}`}
+              data-board={board.id}
+              aria-label={`Search ${board.label} in your browser`}
+              onClick={() => void browser.open(buildBoardUrl(board, input))}
+              className={SECONDARY_BUTTON}
+            >
+              {board.label}
+            </button>
+          )}
+        </Hint>
+      ))}
+    </>
+  );
+}
+
 interface KeylessBarProps {
   readonly form: SearchForm;
   readonly browser: BrowserPort;
@@ -60,21 +123,22 @@ interface KeylessBarProps {
 }
 
 export function KeylessBar({ form, browser, boards }: KeylessBarProps) {
-  const input = boardSearchInput(form);
+  const [showAll, setShowAll] = useState(false);
   const shown = boards.filter((board) => board.enabled);
+  const { main, rest } = mainBoards(shown);
 
   return (
     <section
       data-testid="keyless-bar"
+      aria-labelledby="keyless-heading"
       className="rounded-card border border-line bg-sunken px-4 py-3"
     >
-      <p className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase">
-        Open in your browser
-      </p>
-      <p className="mt-1 text-ink">
-        Send these same words to a job board in your own browser, where you are already signed in. A
-        real search of that whole site — more than the free feeds above can show — with nothing to
-        set up and nothing to spend.
+      <h2 id="keyless-heading" className="font-medium text-ink">
+        Search job boards with these filters
+      </h2>
+      <p className="mt-0.5 text-xs text-ink-muted">
+        Opens the site in your browser, where you are already signed in, with the words and filters
+        above. Point at a board to see which filters it takes.
       </p>
 
       {shown.length === 0 ? (
@@ -83,25 +147,70 @@ export function KeylessBar({ form, browser, boards }: KeylessBarProps) {
         </p>
       ) : (
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          {shown.map((board) => (
+          <BoardButtons
+            boards={showAll ? shown : main}
+            form={form}
+            browser={browser}
+            prefix="keyless"
+          />
+          {rest.length === 0 ? null : (
             <button
-              key={board.id}
               type="button"
-              data-testid={`keyless-${board.id}`}
-              aria-label={`Search ${board.label} in your browser`}
-              onClick={() => void browser.open(buildBoardUrl(board, input))}
-              className={SECONDARY_BUTTON}
+              data-testid="keyless-more"
+              aria-expanded={showAll}
+              onClick={() => setShowAll((was) => !was)}
+              className={QUIET_BUTTON}
             >
-              {board.label}
+              {showAll ? 'Fewer boards' : `More boards (${rest.length})`}
             </button>
-          ))}
+          )}
         </div>
       )}
 
       <p className="mt-2 text-xs text-ink-faint">
-        Opens in your browser. CViper adds nothing to the link. Choose which boards appear, and add
-        your own, under Job boards in Settings.
+        CViper adds nothing to the link. Choose which boards appear, in what order, and add your
+        own, under Job boards in Settings.
       </p>
     </section>
+  );
+}
+
+/** Below this many results, the boards are offered beside them (L-219). */
+export const FEW_RESULTS = 5;
+
+interface FewResultsProps {
+  /** How many jobs CViper's own sources found. */
+  readonly count: number;
+  readonly form: SearchForm;
+  readonly browser: BrowserPort;
+  readonly boards: readonly Board[];
+}
+
+/**
+ * "Only 2 matches in CViper's sources. Try the same search on a job board:"
+ * with the main boards, each one click and one tab (L-219, owner decision
+ * 2026-10-08). Nothing is opened on its own: a search that suddenly opened
+ * five browser tabs would be the most jarring thing on the screen.
+ */
+export function FewResults({ count, form, browser, boards }: FewResultsProps) {
+  const { main } = mainBoards(boards.filter((board) => board.enabled));
+  if (count >= FEW_RESULTS || main.length === 0) return null;
+
+  return (
+    <div
+      data-testid="search-few-results"
+      role="status"
+      className="rounded-card border border-line bg-sunken px-4 py-3"
+    >
+      <p className="text-ink">
+        {count === 0
+          ? 'No matches in CViper’s sources.'
+          : `Only ${count} ${count === 1 ? 'match' : 'matches'} in CViper’s sources.`}{' '}
+        Try the same search on a job board:
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <BoardButtons boards={main} form={form} browser={browser} prefix="few" />
+      </div>
+    </div>
   );
 }

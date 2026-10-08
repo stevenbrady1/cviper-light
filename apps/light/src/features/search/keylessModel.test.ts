@@ -15,7 +15,7 @@ import {
 } from '@cviper/job-apis';
 import { type Job } from '@cviper/core-types';
 
-import { KEYLESS_INTRO, combineResults, nothingMatchedNote, submitLabel } from './keylessModel';
+import { KEYLESS_INTRO, combineResults, nothingMatchedNote } from './keylessModel';
 import { searchDisabledReason } from './model';
 
 /**
@@ -59,30 +59,6 @@ function job(
 function sourceOutcome(over: Partial<KeylessSourceOutcome> = {}): KeylessSourceOutcome {
   return { source: 'arbeitnow', fetched: 0, jobs: [], error: null, ...over };
 }
-
-describe('submitLabel — the button says what it will do', () => {
-  it('says Search when only keyed boards are ticked', () => {
-    expect(submitLabel(2, 0)).toBe('Search');
-  });
-
-  it('never calls a keyless browse a search', () => {
-    // The feeds ignore every query. Calling this a search would be a claim the
-    // user cannot check and that is not true.
-    const label = submitLabel(0, 2);
-    expect(label.toLowerCase()).not.toContain('search');
-    expect(label.toLowerCase()).toContain('browse');
-  });
-
-  it('says both when both are ticked', () => {
-    const label = submitLabel(2, 2).toLowerCase();
-    expect(label).toContain('search');
-    expect(label).toContain('browse');
-  });
-
-  it('boundary: with nothing ticked it still says something pressable', () => {
-    expect(submitLabel(0, 0).length).toBeGreaterThan(0);
-  });
-});
 
 describe('searchDisabledReason — now counts the free feeds too', () => {
   it('boundary: a machine with no keys at all can still press the button', () => {

@@ -1,6 +1,7 @@
 import { JOB_PROVIDER_IDS, PROVIDER_LABEL, type JobProviderId } from '@cviper/job-apis';
 
 import { QUIET_BUTTON } from '../../app/buttons';
+import { Hint } from '../../app/Hint';
 import { type KeyState } from '../../status/environment';
 
 import { providerAvailability } from './model';
@@ -46,14 +47,14 @@ export function ProviderToggles({
 }: ProviderTogglesProps) {
   return (
     <fieldset data-testid="provider-toggles" className="min-w-0">
-      <legend className="text-xs font-medium text-ink-muted">Search these boards</legend>
+      <legend className="text-xs font-medium text-ink-muted">Job boards with your free key</legend>
 
-      <div className="mt-1 space-y-1.5">
+      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
         {JOB_PROVIDER_IDS.map((provider) => {
           const { usable, reason } = providerAvailability(provider, keyStates[provider]);
 
           return (
-            <div key={provider} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <div key={provider} className="inline-flex items-center gap-1.5">
               <label className="inline-flex items-center gap-1.5 text-ink">
                 <input
                   type="checkbox"
@@ -70,24 +71,31 @@ export function ProviderToggles({
               {reason === null ? null : (
                 <>
                   {/*
-                    Not an alert. A board with no key is the default state of a
-                    freshly installed app, and the browser buttons below work
-                    perfectly without it.
+                    Not an alert, and one short link rather than a sentence per
+                    board (L-219): a board with no key is the default state of a
+                    freshly installed app, and the job-board buttons below work
+                    perfectly without it. The reason is the link's description.
                   */}
                   <span
+                    id={`provider-reason-${provider}`}
                     data-testid={`provider-reason-${provider}`}
-                    className="text-xs text-ink-faint"
+                    className="sr-only"
                   >
                     {reason}
                   </span>
-                  <button
-                    type="button"
-                    data-testid={`provider-settings-${provider}`}
-                    onClick={onOpenSettings}
-                    className={`${QUIET_BUTTON} px-0 text-xs text-blue hover:bg-card hover:text-navy`}
-                  >
-                    Open Settings →
-                  </button>
+                  <Hint text={reason}>
+                    {(trigger) => (
+                      <button
+                        {...trigger}
+                        type="button"
+                        data-testid={`provider-settings-${provider}`}
+                        onClick={onOpenSettings}
+                        className={`${QUIET_BUTTON} px-1 text-xs text-blue hover:bg-card hover:text-navy`}
+                      >
+                        set up in Settings
+                      </button>
+                    )}
+                  </Hint>
                 </>
               )}
             </div>
