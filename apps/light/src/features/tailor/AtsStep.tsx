@@ -1,6 +1,14 @@
 import { type CheckStatus } from '@cviper/ats-checks';
 import { atsBand } from '@cviper/keyword-scoring';
 
+import { Hint } from '../../app/Hint';
+import {
+  ATS_BAND_HINT,
+  ATS_CHECK_HINT,
+  ATS_HINT,
+  ATS_STATUS_HINT,
+  changeHint,
+} from '../../app/hints';
 import { ATS_BAND_TONE, ATS_BAND_WORD } from '../analysis/atsBandWords';
 
 import { type AtsComparison } from './atsComparison';
@@ -33,19 +41,39 @@ const STATUS_TONE: Readonly<Record<CheckStatus, string>> = {
   fail: 'whitespace-nowrap font-medium text-gold-ink',
 };
 
+// Every mark below carries a hint (L-215): what ✓ ⚠ ✗, ▲ ▼ and — mean, in
+// words, on hover, on focus and to a screen reader. See `app/hints.ts`.
+
 function Delta({ value }: { readonly value: number | null }) {
-  if (value === null) return <span className="text-ink-faint">—</span>;
-  if (value === 0) return <span className="whitespace-nowrap text-ink-faint">no change</span>;
-  return value > 0 ? (
-    <span className="whitespace-nowrap text-teal-ink">▲ +{value}</span>
-  ) : (
-    <span className="whitespace-nowrap text-gold-ink">▼ {value}</span>
+  if (value === null) {
+    return (
+      <Hint text={ATS_HINT.noScore} className="text-ink-faint">
+        —
+      </Hint>
+    );
+  }
+  if (value === 0) {
+    return (
+      <Hint text={ATS_HINT.noChange} className="whitespace-nowrap text-ink-faint">
+        no change
+      </Hint>
+    );
+  }
+  return (
+    <Hint
+      text={changeHint(value)}
+      className={`whitespace-nowrap ${value > 0 ? 'text-teal-ink' : 'text-gold-ink'}`}
+    >
+      {value > 0 ? `▲ +${value}` : `▼ ${value}`}
+    </Hint>
   );
 }
 
 function Score({ value }: { readonly value: number | null }) {
   return value === null ? (
-    <span className="text-ink-faint">—</span>
+    <Hint text={ATS_HINT.noScore} className="text-ink-faint">
+      —
+    </Hint>
   ) : (
     <span className="font-mono tabular-nums">{value}</span>
   );
@@ -67,7 +95,7 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
           id="tailor-ats-heading"
           className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase"
         >
-          ATS score
+          <Hint text={ATS_HINT.heading}>ATS score</Hint>
         </h3>
         <p className="mt-1 text-xs text-ink-muted">
           Your original CV and this draft, checked the same way, on this machine. Nothing is sent
@@ -83,10 +111,10 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
               Check
             </th>
             <th scope="col" className="py-1 pr-3 font-medium">
-              Before
+              <Hint text={ATS_HINT.before}>Before</Hint>
             </th>
             <th scope="col" className="py-1 pr-3 font-medium">
-              After
+              <Hint text={ATS_HINT.after}>After</Hint>
             </th>
             <th scope="col" className="py-1 pr-3 font-medium">
               <span className="sr-only">Change</span>
@@ -96,7 +124,7 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
         <tbody className="text-ink">
           <tr data-testid="tailor-ats-keyword">
             <th scope="row" className="py-1 pr-3 font-normal">
-              Keyword coverage
+              <Hint text={ATS_HINT.keyword}>Keyword coverage</Hint>
             </th>
             <td className="py-1 pr-3">
               <Score value={keyword.before} />
@@ -108,7 +136,7 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
                   data-testid="tailor-ats-band"
                   className={`ml-2 text-xs ${ATS_BAND_TONE[afterBand]}`}
                 >
-                  {ATS_BAND_WORD[afterBand]}
+                  <Hint text={ATS_BAND_HINT[afterBand]}>{ATS_BAND_WORD[afterBand]}</Hint>
                 </span>
               )}
             </td>
@@ -119,7 +147,7 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
 
           <tr data-testid="tailor-ats-bullets">
             <th scope="row" className="py-1 pr-3 font-normal">
-              Bullet strength
+              <Hint text={ATS_HINT.bullets}>Bullet strength</Hint>
             </th>
             <td className="py-1 pr-3">
               <Score value={bullets.totalBefore === 0 ? null : bullets.before} />
@@ -141,13 +169,13 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
               data-after={check.after}
             >
               <th scope="row" className="py-1 pr-3 font-normal">
-                {check.label}
+                <Hint text={ATS_CHECK_HINT[check.id]}>{check.label}</Hint>
               </th>
               <td className={`py-1 pr-3 text-xs ${STATUS_TONE[check.before]}`}>
-                {STATUS_WORD[check.before]}
+                <Hint text={ATS_STATUS_HINT[check.before]}>{STATUS_WORD[check.before]}</Hint>
               </td>
               <td className={`py-1 pr-3 text-xs ${STATUS_TONE[check.after]}`}>
-                {STATUS_WORD[check.after]}
+                <Hint text={ATS_STATUS_HINT[check.after]}>{STATUS_WORD[check.after]}</Hint>
               </td>
               <td className="py-1 pr-3" />
             </tr>
@@ -180,7 +208,9 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
 
       {stillMissing.length === 0 ? null : (
         <p data-testid="tailor-ats-missing" className="text-xs text-ink-muted">
-          <span className="font-medium text-ink">Still missing from the advert:</span>{' '}
+          <span className="font-medium text-ink">
+            <Hint text={ATS_HINT.stillMissing}>Still missing from the advert:</Hint>
+          </span>{' '}
           {stillMissing.join(', ')}. Only add a word if it is true for you.
         </p>
       )}
@@ -190,9 +220,10 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
         data-clean={fabrication.clean ? 'true' : 'false'}
         className={fabrication.clean ? 'text-xs text-teal-ink' : 'text-xs text-gold-ink'}
       >
+        <Hint text={ATS_HINT.fabrication}>Fabrication check:</Hint>{' '}
         {fabrication.clean
-          ? 'Fabrication check: every employer, year, certification and figure is in your original CV.'
-          : `Fabrication check: ${fabrication.flagged} ${fabrication.flagged === 1 ? 'thing' : 'things'} to check — listed at the top of the draft.`}
+          ? 'every employer, year, certification and figure is in your original CV.'
+          : `${fabrication.flagged} ${fabrication.flagged === 1 ? 'thing' : 'things'} to check — listed at the top of the draft.`}
       </p>
     </section>
   );
