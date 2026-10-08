@@ -863,12 +863,21 @@ export function Search({
             >
               <p className="font-medium text-ink">Nothing looked at yet.</p>
               <p className="mt-1 text-ink-muted">
-                Type a job title and press the button — the two free feeds need no key at all. Or
-                send the same words straight to a job site in your browser with the buttons above.
+                Type a job title and press Search: the free feeds need no key at all. Or search a
+                whole job board with the buttons above.
               </p>
             </div>
           ) : (
             <>
+              {running ? null : (
+                <FewResults
+                  count={results.jobs.length}
+                  form={form}
+                  browser={browserPort}
+                  boards={jobBoards}
+                />
+              )}
+
               {showsAdzuna ? (
                 // Attribution, wherever Adzuna's data appears. A condition of
                 // their API terms, and it belongs on screen rather than in a
@@ -907,15 +916,6 @@ export function Search({
                   words to your browser with the buttons above.
                 </p>
               ) : null}
-
-              {running ? null : (
-                <FewResults
-                  count={results.jobs.length}
-                  form={form}
-                  browser={browserPort}
-                  boards={jobBoards}
-                />
-              )}
 
               <div data-testid="search-results" className="space-y-3">
                 {ordered.map((entry) => {

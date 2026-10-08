@@ -282,3 +282,37 @@ describe('mainBoards (L-219)', () => {
     expect(rest).toEqual([]);
   });
 });
+
+describe('phone pass (L-219, part 3)', () => {
+  it('the few-results offer comes before the source credit and the cards', async () => {
+    await searchFor(2);
+    const few = await screen.findByTestId('search-few-results');
+    const credit = screen.getByTestId('adzuna-attribution');
+    const list = screen.getByTestId('search-results');
+    expect(few.compareDocumentPosition(credit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(credit.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('every source row is a full-size tap target on a phone, compact on a wide screen', async () => {
+    renderSearch(NO_KEYS);
+    await screen.findByTestId('search-empty');
+    for (const id of [
+      'provider-adzuna',
+      'provider-reed',
+      'keyless-source-arbeitnow',
+      'keyless-source-guardian',
+    ]) {
+      const label = screen.getByTestId(id).closest('label');
+      const classes = (label?.className ?? '').split(/\s+/);
+      expect(classes, id).toContain('min-h-11');
+      expect(classes, id).toContain('md:min-h-0');
+    }
+  });
+
+  it('the empty page names the button it means', async () => {
+    renderSearch(NO_KEYS);
+    const empty = await screen.findByTestId('search-empty');
+    expect(empty.textContent).toContain('press Search');
+    expect(empty.textContent).toContain('job board');
+  });
+});

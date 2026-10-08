@@ -51,7 +51,10 @@ export function KeylessFeedToggles({
 
       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
         {KEYLESS_SOURCE_IDS.map((source) => (
-          <label key={source} className="inline-flex items-center gap-1.5 text-ink">
+          <label
+            key={source}
+            className="inline-flex min-h-11 items-center gap-1.5 text-ink md:min-h-0"
+          >
             <input
               type="checkbox"
               data-testid={`keyless-source-${source}`}

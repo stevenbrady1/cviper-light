@@ -55,7 +55,7 @@ export function ProviderToggles({
 
           return (
             <div key={provider} className="inline-flex items-center gap-1.5">
-              <label className="inline-flex items-center gap-1.5 text-ink">
+              <label className="inline-flex min-h-11 items-center gap-1.5 text-ink md:min-h-0">
                 <input
                   type="checkbox"
                   data-testid={`provider-${provider}`}
