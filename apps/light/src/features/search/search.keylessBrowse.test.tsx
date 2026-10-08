@@ -132,9 +132,10 @@ describe('a machine with no keys at all', () => {
 
     const submit = (await screen.findByTestId('search-submit')) as HTMLButtonElement;
     expect(submit.disabled).toBe(false);
-    // And it says what it will do. It is not a search: the feeds ignore every
-    // query, and calling it one would be a claim the user cannot check.
-    expect(submit.textContent).toBe('Browse recent jobs');
+    // L-219 (owner decision 2026-10-08): the one button is always "Search".
+    // That the free feeds read their latest posts and narrow them here is said
+    // beside the feeds and under the results, not on the button.
+    expect(submit.textContent).toBe('Search');
     expect(screen.queryByTestId('search-reason')).toBeNull();
   });
 
@@ -174,12 +175,14 @@ describe('a machine with no keys at all', () => {
     // The feeds cannot filter — that is the whole reason the filter is local —
     // so a keyword travelling to them would be both useless and a lie about
     // what this feature does.
+    // Berlin, not London: since L-219 a UK location starts with Arbeitnow off
+    // (feedDefaults.test.ts), and this test needs both feeds asked.
     const { user, asked, argumentsSeen } = renderSearch();
-    await browse(user, 'credit risk analyst', 'London');
+    await browse(user, 'credit risk analyst', 'Berlin');
 
     expect([...asked()].sort()).toEqual(['arbeitnow:1', 'arbeitnow:2', 'guardian:1']);
     expect(JSON.stringify(argumentsSeen())).not.toContain('credit');
-    expect(JSON.stringify(argumentsSeen())).not.toContain('London');
+    expect(JSON.stringify(argumentsSeen())).not.toContain('Berlin');
   });
 
   it('spends none of the daily job-board allowance', async () => {

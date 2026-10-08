@@ -250,8 +250,10 @@ describe('the search view on a machine with no keys', () => {
 
     const submit = (await screen.findByTestId('search-submit')) as HTMLButtonElement;
     await vi.waitFor(() => expect(submit.disabled).toBe(false));
-    // It does not call itself a search. The feeds ignore every query.
-    expect(submit.textContent).toBe('Browse recent jobs');
+    // L-219 (owner decision 2026-10-08): the one button is always "Search".
+    // That the free feeds read their latest posts and narrow them here is said
+    // beside the feeds and under the results, not on the button.
+    expect(submit.textContent).toBe('Search');
     expect(screen.queryByTestId('search-reason')).toBeNull();
 
     await user.click(submit);

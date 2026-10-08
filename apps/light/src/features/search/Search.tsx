@@ -28,12 +28,19 @@ import { todayIsoDate } from '../../lib/dates';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { readJobKeyStates, type KeyState } from '../../status/environment';
 
-import { KeylessBar } from './KeylessBar';
+import { FewResults, KeylessBar } from './KeylessBar';
+import {
+  chosenFeeds,
+  isUkLocation,
+  readFeedChoice,
+  rememberFeedChoice,
+  type FeedChoice,
+} from './feedDefaults';
 import { KeylessFeedToggles } from './KeylessFeedToggles';
 import { ProviderToggles } from './ProviderToggles';
 import { ResultCard } from './ResultCard';
 import { readSearchMemory, rememberSearch, writeDraft } from './memory';
-import { combineResults, nothingMatchedNote, submitLabel } from './keylessModel';
+import { combineResults, nothingMatchedNote } from './keylessModel';
 import { dealBreakersIn, isScorable, rankResult, sortByBand, type RankBand } from './rank';
 import {
   CONTRACT_CHOICES,
@@ -159,9 +166,13 @@ export function Search({
     and no setup, so a machine with an empty credential store returns real
     adverts the first time the button is pressed — which is the whole point of
     the feature, and would be undone by making the user find and tick them.
+    Except Arbeitnow for a location in the UK (L-219): it is mostly Europe.
+    A tick or untick the user makes wins, and is remembered (`feedDefaults`).
   */
-  const [keylessChosen, setKeylessChosen] = useState<ReadonlySet<KeylessSourceId>>(
-    new Set(KEYLESS_SOURCE_IDS),
+  const [feedChoice, setFeedChoice] = useState<FeedChoice>(() => readFeedChoice());
+  const keylessChosen = useMemo(
+    () => chosenFeeds(feedChoice, form.location),
+    [feedChoice, form.location],
   );
   const [running, setRunning] = useState(false);
   const [outcome, setOutcome] = useState<JobSearchOutcome | null>(null);
@@ -540,12 +551,7 @@ export function Search({
   }, []);
 
   const onToggleKeyless = useCallback((source: KeylessSourceId, next: boolean) => {
-    setKeylessChosen((current) => {
-      const updated = new Set(current);
-      if (next) updated.add(source);
-      else updated.delete(source);
-      return updated;
-    });
+    setFeedChoice((current) => rememberFeedChoice(current, source, next));
   }, []);
 
   // ── Rendering ────────────────────────────────────────────────────────────
@@ -673,6 +679,9 @@ export function Search({
               <KeylessFeedToggles
                 chosen={keylessChosen}
                 onToggle={onToggleKeyless}
+                arbeitnowOffForUk={
+                  feedChoice.arbeitnow === undefined && isUkLocation(form.location)
+                }
                 disabled={running}
               />
             </div>
@@ -690,7 +699,12 @@ export function Search({
                 disabled={running || disabledReason !== null}
                 className={PRIMARY_BUTTON}
               >
-                {running ? 'Working…' : submitLabel(usableChosen.length, keylessWanted.length)}
+                {/*
+                  Always "Search" (L-219, owner decision 2026-10-08): one action,
+                  one name. What each source does with it is said where the
+                  sources are, and under the results.
+                */}
+                {running ? 'Working…' : 'Search'}
               </button>
 
               {disabledReason === null ? null : (
@@ -700,6 +714,12 @@ export function Search({
               )}
             </div>
           </form>
+
+          {/*
+            ALWAYS here, and right under the form (L-219): the same search on
+            the whole of a job board is one click away, before anything else.
+          */}
+          <KeylessBar form={form} browser={browserPort} boards={jobBoards} />
 
           {recent.length === 0 ? null : (
             <div data-testid="search-recent" className="flex flex-wrap items-center gap-2">
@@ -722,24 +742,6 @@ export function Search({
               ))}
             </div>
           )}
-
-          {/* ALWAYS here. Not a fallback, not an error state. */}
-          <KeylessBar form={form} browser={browserPort} boards={jobBoards} />
-
-          <div data-testid="search-quota" className="text-xs text-ink-faint">
-            Requests today — {PROVIDER_LABEL.reed}{' '}
-            <span className="font-mono tabular-nums">{quota.counts.reed}</span> of{' '}
-            <span className="font-mono tabular-nums">{REED_DAILY_LIMIT}</span> ·{' '}
-            {PROVIDER_LABEL.adzuna}{' '}
-            <span className="font-mono tabular-nums">{quota.counts.adzuna}</span>{' '}
-            {/*
-              A bare count for Adzuna, with no denominator. Their allowance
-              depends on the plan the user bought and cannot be queried, so any
-              figure here would be a confident wrong number on screen for ever.
-              Counted, shown, never enforced.
-            */}
-            (allowance depends on your plan)
-          </div>
 
           {reedVerdict.message === null ? null : (
             <p
@@ -767,21 +769,41 @@ export function Search({
             hidden rather than disabled because a disabled "Best match first"
             with no explanation is a promise the screen is visibly not keeping.
           */}
-          {cvText === undefined ? null : rankable ? (
-            <label className="flex items-center gap-2 text-ink-muted">
-              <input
-                type="checkbox"
-                data-testid="search-sort-best"
-                checked={bestFirst}
-                onChange={(event) => setBestFirst(event.currentTarget.checked)}
-              />
-              Best match first
-            </label>
-          ) : (
-            <p data-testid="search-rank-hint" className="text-xs text-ink-faint">
-              Upload a CV on the Analysis screen and results will be ranked against it.
-            </p>
-          )}
+          {/* The results' own bookkeeping, beside them rather than above the search (L-219). */}
+          <div
+            data-testid="search-results-header"
+            className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1"
+          >
+            {cvText === undefined ? null : rankable ? (
+              <label className="flex items-center gap-2 text-ink-muted">
+                <input
+                  type="checkbox"
+                  data-testid="search-sort-best"
+                  checked={bestFirst}
+                  onChange={(event) => setBestFirst(event.currentTarget.checked)}
+                />
+                Best match first
+              </label>
+            ) : (
+              <p data-testid="search-rank-hint" className="text-xs text-ink-faint">
+                Upload a CV on the Analysis screen and results will be ranked against it.
+              </p>
+            )}
+            <div data-testid="search-quota" className="text-xs text-ink-faint sm:text-right">
+              Requests today — {PROVIDER_LABEL.reed}{' '}
+              <span className="font-mono tabular-nums">{quota.counts.reed}</span> of{' '}
+              <span className="font-mono tabular-nums">{REED_DAILY_LIMIT}</span> ·{' '}
+              {PROVIDER_LABEL.adzuna}{' '}
+              <span className="font-mono tabular-nums">{quota.counts.adzuna}</span>{' '}
+              {/*
+                A bare count for Adzuna, with no denominator. Their allowance
+                depends on the plan the user bought and cannot be queried, so any
+                figure here would be a confident wrong number on screen for ever.
+                Counted, shown, never enforced.
+              */}
+              (allowance depends on your plan)
+            </div>
+          </div>
 
           {/*
             One line per board that failed, ABOVE results that are still there.
@@ -886,7 +908,16 @@ export function Search({
                 </p>
               ) : null}
 
-              <div className="space-y-3">
+              {running ? null : (
+                <FewResults
+                  count={results.jobs.length}
+                  form={form}
+                  browser={browserPort}
+                  boards={jobBoards}
+                />
+              )}
+
+              <div data-testid="search-results" className="space-y-3">
                 {ordered.map((entry) => {
                   const siblings = clusterSiblings(entry.job.id, results.clusters);
                   const key = externalKey(entry.job.source, entry.job.external_id);

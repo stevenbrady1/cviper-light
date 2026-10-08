@@ -1,6 +1,8 @@
 import { KEYLESS_SOURCE_IDS, KEYLESS_SOURCE_LABEL, type KeylessSourceId } from '@cviper/job-apis';
 
-import { KEYLESS_FILTER_NOTE, KEYLESS_INTRO } from './keylessModel';
+import { Hint } from '../../app/Hint';
+
+import { KEYLESS_FILTER_NOTE, KEYLESS_INTRO, KEYLESS_SUMMARY } from './keylessModel';
 
 /**
  * The two feeds that need no key, and the honest sentence about what they are.
@@ -33,14 +35,19 @@ interface KeylessFeedTogglesProps {
   readonly chosen: ReadonlySet<KeylessSourceId>;
   readonly onToggle: (source: KeylessSourceId, next: boolean) => void;
   readonly disabled: boolean;
+  /** Arbeitnow is off only because the location is in the UK (L-219). */
+  readonly arbeitnowOffForUk: boolean;
 }
 
-export function KeylessFeedToggles({ chosen, onToggle, disabled }: KeylessFeedTogglesProps) {
+export function KeylessFeedToggles({
+  chosen,
+  onToggle,
+  disabled,
+  arbeitnowOffForUk,
+}: KeylessFeedTogglesProps) {
   return (
     <fieldset data-testid="keyless-feeds" className="min-w-0">
-      <legend className="text-xs font-medium text-ink-muted">
-        Browse these free feeds — no key needed
-      </legend>
+      <legend className="text-xs font-medium text-ink-muted">Free feeds, no key needed</legend>
 
       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
         {KEYLESS_SOURCE_IDS.map((source) => (
@@ -56,13 +63,15 @@ export function KeylessFeedToggles({ chosen, onToggle, disabled }: KeylessFeedTo
             {KEYLESS_SOURCE_LABEL[source]}
           </label>
         ))}
+        {arbeitnowOffForUk ? (
+          <span data-testid="keyless-arbeitnow-uk" className="text-xs text-ink-faint">
+            Arbeitnow is off for a UK location, as it is mostly Europe. Tick it to include it.
+          </span>
+        ) : null}
       </div>
 
       <p data-testid="keyless-intro" className="mt-1 text-xs text-ink-faint">
-        {KEYLESS_INTRO}
-      </p>
-      <p data-testid="keyless-filter-note" className="mt-1 text-xs text-ink-faint">
-        {KEYLESS_FILTER_NOTE}
+        <Hint text={`${KEYLESS_INTRO} ${KEYLESS_FILTER_NOTE}`}>{KEYLESS_SUMMARY}</Hint>
       </p>
     </fieldset>
   );
