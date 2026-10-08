@@ -84,7 +84,7 @@
   <Identity
     Name="StBr.CViperLight"
     Publisher="CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399"
-    Version="0.6.0.0" />
+    Version="0.7.0.0" />
 
   <Properties>
     <DisplayName>CViper Light</DisplayName>
