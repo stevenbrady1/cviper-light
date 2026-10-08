@@ -23,6 +23,7 @@ import { type TailorPort } from '../port';
 
 type Method =
   | 'loadCvs'
+  | 'saveCv'
   | 'loadJobs'
   | 'loadApplicationsFor'
   | 'profile'
@@ -31,6 +32,8 @@ type Method =
   | 'createApplication';
 
 export interface FakeTailorPort extends TailorPort {
+  /** Every CV currently "stored", including any correction (L-218). */
+  readonly storedCvs: () => readonly Cv[];
   /** Every document currently "stored", newest first. */
   readonly storedDocuments: () => readonly Document[];
   /** Every application currently "stored", including any this screen created. */
@@ -55,7 +58,7 @@ export function createFakeTailorPort(
     documents?: readonly Document[];
   } = {},
 ): FakeTailorPort {
-  const cvs: Cv[] = [...(initial.cvs ?? [])];
+  let cvs: Cv[] = [...(initial.cvs ?? [])];
   const jobs: Job[] = [...(initial.jobs ?? [])];
   const applications: Application[] = [...(initial.applications ?? [])];
   const profile: Profile | null = initial.profile ?? null;
@@ -64,6 +67,7 @@ export function createFakeTailorPort(
   const failing = new Set<Method>();
   const calls: Record<Method, number> = {
     loadCvs: 0,
+    saveCv: 0,
     loadJobs: 0,
     loadApplicationsFor: 0,
     profile: 0,
@@ -80,6 +84,7 @@ export function createFakeTailorPort(
 
   return {
     calls,
+    storedCvs: () => cvs,
     storedDocuments: () => documents,
     storedApplications: () => applications,
     failNext: (method) => failing.add(method),
@@ -87,6 +92,14 @@ export function createFakeTailorPort(
     async loadCvs() {
       calls.loadCvs += 1;
       return failure('loadCvs') ?? ok([...cvs]);
+    },
+
+    async saveCv(cv) {
+      calls.saveCv += 1;
+      const refused = failure('saveCv');
+      if (refused !== null) return refused;
+      cvs = cvs.map((candidate) => (candidate.id === cv.id ? cv : candidate));
+      return ok(undefined);
     },
 
     async loadJobs() {

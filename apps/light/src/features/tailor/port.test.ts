@@ -13,6 +13,7 @@ const db = vi.hoisted(() => ({
   getProfile: vi.fn(),
   upsertDocument: vi.fn(),
   upsertApplication: vi.fn(),
+  upsertCv: vi.fn(),
   listDocumentsForApplication: vi.fn(),
 }));
 
@@ -34,6 +35,10 @@ function application(id: string, jobId: string): Application {
 }
 
 describe('createDbTailorPort', () => {
+  it('stores a corrected CV with the data layer’s own upsert (L-218)', () => {
+    expect(createDbTailorPort().saveCv).toBe(db.upsertCv);
+  });
+
   it('starts an application with the data layer’s own upsert (L-199)', () => {
     expect(createDbTailorPort().createApplication).toBe(db.upsertApplication);
   });

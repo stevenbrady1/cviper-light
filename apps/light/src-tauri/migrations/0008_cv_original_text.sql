@@ -1,0 +1,14 @@
+-- 0008: keep a CV's own text once the user has corrected it (L-218).
+--
+-- The text read from a CV file is what every AI request is sent, and a parser
+-- can misread a file. The user can now correct it on Tailor; the correction
+-- goes in `extracted_text`, where every reader already looks, and the text the
+-- file gave moves here so the app can show what changed and put it back.
+-- NULL means "never corrected", which is every CV that exists today, so no
+-- existing row is touched.
+--
+-- SQLite has no `ADD COLUMN IF NOT EXISTS`. This statement is applied exactly
+-- once because tauri-plugin-sql records each migration version in its own
+-- ledger table and never replays one; `db.rs` pins that this file is version 8
+-- and only adds this column. Forward-only: nothing here is ever downgraded.
+ALTER TABLE cvs ADD COLUMN original_text TEXT;
