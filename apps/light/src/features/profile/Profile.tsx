@@ -98,7 +98,7 @@ interface Loaded {
   readonly starKeys: readonly number[];
 }
 
-const FIELD = 'mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink';
+const FIELD = 'mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink';
 const LABEL = 'block text-xs font-medium text-ink-muted';
 
 export function Profile({ port, now, gapsPort, filePort }: ProfileProps) {

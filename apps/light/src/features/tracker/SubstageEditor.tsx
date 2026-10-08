@@ -69,7 +69,7 @@ type Message = { readonly text: string; readonly source: 'add' | 'general' };
 const BUSY = 'aria-disabled:cursor-not-allowed aria-disabled:text-ink-faint';
 
 const FIELD =
-  'min-w-0 rounded-control border border-line bg-card px-2.5 py-1.5 text-ink ' +
+  'min-w-0 rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink ' +
   'placeholder:text-ink-muted aria-[invalid=true]:border-danger';
 
 export function SubstageEditor({

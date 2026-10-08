@@ -978,7 +978,7 @@ export function Tailor({
               });
               setSaveMessage(null);
             }}
-            className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+            className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
           >
             {cvs.length > 0 ? null : (
               <option value="">{cvsLoaded ? 'No CV uploaded yet' : 'Reading your CVs…'}</option>
@@ -1068,7 +1068,7 @@ export function Tailor({
               // the text is the user's version of its advert.
               patchActive({ advert: event.currentTarget.value });
             }}
-            className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+            className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
           />
 
           {!advertEdited || selectedJob === null ? null : (
@@ -1118,7 +1118,7 @@ export function Tailor({
                   setError(null);
                   setSaveMessage(null);
                 }}
-                className="min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 py-1 text-ink"
+                className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1 text-ink"
               >
                 <option value="">Choose a tracked job…</option>
                 {jobs.map((job) => (
@@ -1156,7 +1156,7 @@ export function Tailor({
             value={optionKey}
             disabled={!aiAvailable}
             onChange={(event) => patchActive({ optionKey: event.currentTarget.value })}
-            className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+            className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
           >
             {aiAvailable ? null : (
               <option value="">
@@ -1497,7 +1497,7 @@ export function Tailor({
                   aria-label="Application to save into"
                   value={selectedApplicationId ?? ''}
                   onChange={(event) => setSelectedApplicationId(event.currentTarget.value || null)}
-                  className="min-w-0 rounded-control border border-line bg-card px-2.5 py-1 text-ink"
+                  className="min-w-0 rounded-control border border-field-line bg-card px-2.5 py-1 text-ink"
                 >
                   {applications.map((application) => (
                     <option key={application.id} value={application.id}>

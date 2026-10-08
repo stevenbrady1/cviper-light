@@ -835,7 +835,7 @@ export function Analysis({
                   // Picked once, for the job (L-200).
                   if (stepJob !== null) onJobChoice?.(stepJob, { cvId: id === '' ? null : id });
                 }}
-                className="min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+                className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
               >
                 {cvs.length > 0 ? null : (
                   <option value="">{cvsLoaded ? 'No CV uploaded yet' : 'Reading your CVs…'}</option>
@@ -950,7 +950,7 @@ export function Analysis({
                   value === '' ? { jobText: '', jobId: null, jobNote: null } : { jobText: value },
                 );
               }}
-              className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+              className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
             />
 
             {jobs.length === 0 ? null : (
@@ -970,7 +970,7 @@ export function Analysis({
                       session.update({ jobText: jobAdvertText(job), jobId: job.id, jobNote: null });
                     }
                   }}
-                  className="min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 py-1 text-ink"
+                  className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1 text-ink"
                 >
                   <option value="">Choose a tracked job…</option>
                   {jobs.map((job) => (
@@ -998,7 +998,7 @@ export function Analysis({
                 // Picked once, for the job (L-200).
                 if (stepJob !== null) onJobChoice?.(stepJob, { optionKey: picked });
               }}
-              className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+              className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
             >
               {options.map((option) => (
                 <option key={option.key} value={option.key}>

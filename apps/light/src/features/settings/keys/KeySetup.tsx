@@ -291,7 +291,7 @@ function KeyCard({ provider, port, browser }: KeyCardProps) {
                 // user fixes the thing it complained about is just noise.
                 setErrors((current) => ({ ...current, [field.key]: undefined }));
               }}
-              className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+              className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
             />
             <p className="mt-1 text-xs text-ink-faint">{field.hint}</p>
 

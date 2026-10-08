@@ -382,7 +382,7 @@ export function PasteJobForm({
               const next = event.currentTarget.value;
               setUrl(next);
             }}
-            className="min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+            className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
           />
           {/*
             SECONDARY, not primary. The blue button on this screen is the one
@@ -444,7 +444,7 @@ export function PasteJobForm({
           disabled={busy}
           placeholder="Paste the whole advert or recruiter email here."
           onChange={(event) => setText(event.currentTarget.value)}
-          className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+          className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
         />
         <p className="mt-1 text-xs text-ink-faint">
           Nothing is saved until you have checked every field on the next screen.
@@ -488,7 +488,7 @@ export function PasteJobForm({
               const key = event.currentTarget.value;
               setOptionKey(key);
             }}
-            className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+            className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
           >
             {options.map((option) => (
               <option key={option.key} value={option.key}>

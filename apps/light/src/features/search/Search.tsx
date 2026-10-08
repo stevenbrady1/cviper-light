@@ -641,7 +641,7 @@ export function Search({
                   onChange={(event) =>
                     setField('contractType', event.currentTarget.value as ContractChoice)
                   }
-                  className="mt-1 rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+                  className="mt-1 rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
                 >
                   {CONTRACT_CHOICES.map((choice) => (
                     <option key={choice.value} value={choice.value}>
@@ -943,7 +943,7 @@ function Field({ id, label, value, error, placeholder, onChange, grow = false }:
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.currentTarget.value)}
-        className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+        className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
       />
       {error === undefined ? null : (
         <p data-testid={`${id}-error`} className="mt-1 text-xs text-danger">

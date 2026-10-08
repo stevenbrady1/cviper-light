@@ -270,7 +270,7 @@ export function ApplicationDetail({
           data-testid="detail-status"
           value={application.status}
           onChange={(event) => onStatusChange(event.currentTarget.value as ApplicationStatus)}
-          className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+          className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
         >
           {TRACKER_COLUMNS.map((status) => (
             <option key={status} value={status}>
@@ -318,7 +318,7 @@ export function ApplicationDetail({
                   : ''
               }
               onChange={(event) => onSubstageChange(orNull(event.currentTarget.value))}
-              className="min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+              className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
             >
               <option value="">No stage</option>
               {substages.map((substage) => (
@@ -352,7 +352,7 @@ export function ApplicationDetail({
           placeholder="Chase the recruiter"
           onChange={(event) => nextAction.setDraft(event.currentTarget.value)}
           onBlur={nextAction.flush}
-          className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+          className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
         />
       </div>
 
@@ -369,7 +369,7 @@ export function ApplicationDetail({
           type="date"
           value={application.next_action_date ?? ''}
           onChange={(event) => onEdit({ next_action_date: orNull(event.currentTarget.value) })}
-          className={`mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 ${
+          className={`mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 ${
             urgency === 'none' ? 'font-mono tabular-nums text-ink' : NEXT_ACTION_TONES[urgency]
           }`}
         />
@@ -392,7 +392,7 @@ export function ApplicationDetail({
           placeholder="What happened, who you spoke to, what they said."
           onChange={(event) => notes.setDraft(event.currentTarget.value)}
           onBlur={notes.flush}
-          className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+          className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
         />
         <p className="mt-1 text-xs text-ink-faint">Saved as you type.</p>
       </div>
