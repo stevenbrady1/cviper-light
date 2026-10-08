@@ -6,6 +6,8 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-10-08
+
 ### Added
 
 - Save the tailored CV and the cover letter as a PDF, beside Word and text (L-201). The PDF is built on this machine with no extra library or font file, keeps the same single-column, ATS-safe layout, and is read back by the app's own PDF reader in the tests. Accented names (é, ł, ñ, ő, ș…) come out exactly; a character the PDF's built-in font cannot show (Cyrillic, Chinese, emoji) is named after the save, with Word as the way to keep it.
@@ -288,7 +290,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.6.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.7.0...main
+[0.7.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.6.0...light-v0.7.0
 [0.6.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.5.0...light-v0.6.0
 [0.5.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.4.0...light-v0.5.0
 [0.4.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.3.0...light-v0.4.0
