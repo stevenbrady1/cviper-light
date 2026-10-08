@@ -12,9 +12,11 @@
  * user's own boards are the same shape in their own store, and one builder
  * serves both.
  *
- * `{keyword}` and `{location}` are the only placeholders that exist. Everything
- * else in a template is a literal, including — deliberately — the word `jobs`
- * in Google's query.
+ * `{keyword}` and `{location}`, and since L-219 `{radius}`, `{salaryMin}` and
+ * `{contract}`, are the only placeholders that exist. Everything else in a
+ * template is a literal, including — deliberately — the word `jobs` in
+ * Google's query. A board that cannot take a filter simply leaves its
+ * placeholder out; `filters` says how a board that CAN take one wants it.
  */
 import { z } from './zod';
 
@@ -32,9 +34,49 @@ export const BOARD_ENCODINGS = ['hyphen', 'plus'] as const;
 
 export type BoardEncoding = (typeof BOARD_ENCODINGS)[number];
 
-/** The only two placeholders. Named here so builder and validator cannot drift. */
+/** The only placeholders. Named here so builder and validator cannot drift. */
 export const KEYWORD_PLACEHOLDER = '{keyword}';
 export const LOCATION_PLACEHOLDER = '{location}';
+/** Distance from the location (L-219). Miles unless `filters.radius.unit` says km. */
+export const RADIUS_PLACEHOLDER = '{radius}';
+/** Minimum yearly salary in pounds (L-219). */
+export const SALARY_MIN_PLACEHOLDER = '{salaryMin}';
+/** Permanent or contract, in the board's own word (L-219). */
+export const CONTRACT_PLACEHOLDER = '{contract}';
+
+export const BOARD_PLACEHOLDERS = [
+  KEYWORD_PLACEHOLDER,
+  LOCATION_PLACEHOLDER,
+  RADIUS_PLACEHOLDER,
+  SALARY_MIN_PLACEHOLDER,
+  CONTRACT_PLACEHOLDER,
+] as const;
+
+/**
+ * How a board wants the filters it can take (L-219). All optional: a board
+ * without this section gets plain values — whole miles, whole pounds, and the
+ * words `permanent` / `contract` — which is what a user's own board gets.
+ */
+export interface BoardFilters {
+  /** `steps`: the only distances the site offers, smallest first. */
+  readonly radius?:
+    { readonly unit: 'miles' | 'km'; readonly steps?: readonly number[] | undefined } | undefined;
+  /**
+   * `steps`: the only salary floors the site offers, smallest first.
+   * `with`: a fixed parameter the site needs beside the salary, sent only when
+   * a salary is (`&salarytypeid=1`: "a year").
+   */
+  readonly salaryMin?:
+    | { readonly steps?: readonly number[] | undefined; readonly with?: string | undefined }
+    | undefined;
+  /**
+   * The site's word for each contract type, used as written: a value
+   * (`permanent`), a path segment, or a whole parameter (`perm=true`). A type
+   * with no word sends nothing.
+   */
+  readonly contract?:
+    { readonly permanent?: string | undefined; readonly contract?: string | undefined } | undefined;
+}
 
 export interface BoardTemplate {
   /** Stable, and the key every user preference is stored against. */
@@ -44,7 +86,35 @@ export interface BoardTemplate {
   /** A full `https://` URL containing `{keyword}` and optionally `{location}`. */
   readonly urlTemplate: string;
   readonly encoding: BoardEncoding;
+  readonly filters?: BoardFilters | undefined;
 }
+
+const steps = z
+  .array(z.number().int().positive())
+  .min(1)
+  .refine((values) => values.every((value, index) => index === 0 || value > values[index - 1]!), {
+    message: 'steps must be in ascending order',
+  });
+
+const contractWord = z.string().regex(/^[A-Za-z0-9_.~-]+(=[A-Za-z0-9_.~-]+)?$/);
+
+const BoardFiltersSchema = z.object({
+  radius: z.object({ unit: z.enum(['miles', 'km']), steps: steps.optional() }).optional(),
+  salaryMin: z
+    .object({
+      steps: steps.optional(),
+      with: z
+        .string()
+        .regex(/^&[A-Za-z0-9_.~-]+=[A-Za-z0-9_.~-]+$/)
+        .optional(),
+    })
+    .optional(),
+  // Used as written, so held to characters that cannot reshape a URL: no
+  // `/`, `?`, `#`, `&` or spaces — one word, or one `name=value`.
+  contract: z
+    .object({ permanent: contractWord.optional(), contract: contractWord.optional() })
+    .optional(),
+});
 
 /**
  * Validates both the shipped JSON and anything read back out of the user's
@@ -57,6 +127,7 @@ export const BoardTemplateSchema = z.object({
   label: z.string().min(1),
   urlTemplate: z.string().min(1),
   encoding: z.enum(BOARD_ENCODINGS),
+  filters: BoardFiltersSchema.optional(),
 });
 
 /**

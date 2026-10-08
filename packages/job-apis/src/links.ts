@@ -42,16 +42,110 @@
  * empty.
  */
 import {
+  BOARD_PLACEHOLDERS,
+  CONTRACT_PLACEHOLDER,
   KEYWORD_PLACEHOLDER,
   LOCATION_PLACEHOLDER,
+  RADIUS_PLACEHOLDER,
+  SALARY_MIN_PLACEHOLDER,
   type BoardEncoding,
   type BoardTemplate,
 } from '@cviper/core-types';
 
-/** The same two fields the real search uses, so one form drives both. */
+/** The fields the real search uses, so one form drives both. */
 export interface BrowserSearchInput {
   readonly keywords: string;
   readonly location: string;
+  /** Distance from the location in miles, as typed (L-219). Empty or unusable: none sent. */
+  readonly distanceMiles?: string | undefined;
+  /** Minimum yearly salary in pounds, as typed — `£60,000` and `60k` read (L-219). */
+  readonly salaryMin?: string | undefined;
+  /** `any` sends nothing (L-219). */
+  readonly contract?: 'any' | 'permanent' | 'contract' | undefined;
+}
+
+// ── The extra filters (L-219) ─────────────────────────────────────────────
+
+/** Past this, a typed distance is a typo, not a search radius. */
+const MAX_MILES = 1000;
+/** Past this, a typed salary is a typo. */
+const MAX_SALARY = 10_000_000;
+const KM_PER_MILE = 1.609344;
+
+/** Whole miles from what was typed, or `null` for anything that is not one. */
+function wholeMiles(raw: string | undefined): number | null {
+  const text = (raw ?? '').trim();
+  if (!/^\d+$/.test(text)) return null;
+  const miles = Number(text);
+  return miles > 0 && miles <= MAX_MILES ? miles : null;
+}
+
+/** Pounds a year from `60000`, `£60,000`, `60 000` or `60k`; `null` for anything else. */
+function poundsPerYear(raw: string | undefined): number | null {
+  const text = (raw ?? '').replace(/[£,\s]/g, '');
+  const thousands = /^(\d+(?:\.\d+)?)k$/i.exec(text);
+  const pounds = thousands
+    ? Math.round(Number(thousands[1]) * 1000)
+    : /^\d+$/.test(text)
+      ? Number(text)
+      : Number.NaN;
+  return Number.isFinite(pounds) && pounds > 0 && pounds <= MAX_SALARY ? pounds : null;
+}
+
+/** The smallest step that covers `value` — never narrower than asked — or the widest. */
+function stepAtLeast(value: number, steps: readonly number[] | undefined): number {
+  if (steps === undefined || steps.length === 0) return value;
+  return steps.find((step) => step >= value) ?? steps[steps.length - 1]!;
+}
+
+/** The largest step not above `value` — never a higher floor than asked — or none. */
+function stepAtMost(value: number, steps: readonly number[] | undefined): number | null {
+  if (steps === undefined || steps.length === 0) return value;
+  let found: number | null = null;
+  for (const step of steps) if (step <= value) found = step;
+  return found;
+}
+
+function radiusValue(board: BoardTemplate, input: BrowserSearchInput): string {
+  const miles = wholeMiles(input.distanceMiles);
+  if (miles === null) return '';
+  const rule = board.filters?.radius;
+  const distance = rule?.unit === 'km' ? Math.round(miles * KM_PER_MILE) : miles;
+  return String(stepAtLeast(distance, rule?.steps));
+}
+
+function salaryValue(board: BoardTemplate, input: BrowserSearchInput): string {
+  const pounds = poundsPerYear(input.salaryMin);
+  if (pounds === null) return '';
+  const rule = board.filters?.salaryMin;
+  const floor = stepAtMost(pounds, rule?.steps);
+  return floor === null ? '' : `${floor}${rule?.with ?? ''}`;
+}
+
+function contractValue(board: BoardTemplate, input: BrowserSearchInput): string {
+  const type = input.contract ?? 'any';
+  if (type === 'any') return '';
+  const words = board.filters?.contract;
+  // A user's own board gets the plain word. A board with its own words gets
+  // only those, as written — the schema holds them to URL-safe characters.
+  if (words === undefined) return type;
+  return words[type] ?? '';
+}
+
+/** Which filters a board's link carries — for saying so beside its button. */
+export function boardFilterSupport(board: BoardTemplate): {
+  readonly location: boolean;
+  readonly radius: boolean;
+  readonly salaryMin: boolean;
+  readonly contract: boolean;
+} {
+  const template = board.urlTemplate;
+  return {
+    location: template.includes(LOCATION_PLACEHOLDER),
+    radius: template.includes(RADIUS_PLACEHOLDER),
+    salaryMin: template.includes(SALARY_MIN_PLACEHOLDER),
+    contract: template.includes(CONTRACT_PLACEHOLDER),
+  };
 }
 
 /**
@@ -135,10 +229,10 @@ const TRAILING_CONNECTOR = new RegExp(`(?:${JOIN}*(?<![a-z])(?:in|at|near))?${JO
 const LEADING_CONNECTOR = new RegExp(`^${JOIN}+(?:(?:in|at|near)(?=${JOIN}|$)${JOIN}*)?`);
 
 /** `{keyword}` or `{location}`, wherever the next one is. */
-const PLACEHOLDER = /\{(keyword|location)\}/;
+const PLACEHOLDER = /\{(keyword|location|radius|salaryMin|contract)\}/;
 
 /** A whole unit that is nothing but one placeholder. */
-const ONLY_PLACEHOLDER = /^\{(keyword|location)\}$/;
+const ONLY_PLACEHOLDER = /^\{(keyword|location|radius|salaryMin|contract)\}$/;
 
 type Values = Readonly<Record<string, string>>;
 
@@ -212,6 +306,9 @@ export function buildBoardUrl(board: BoardTemplate, input: BrowserSearchInput): 
   const values: Values = {
     keyword: encodeValue(input.keywords, board.encoding),
     location: encodeValue(input.location, board.encoding),
+    radius: radiusValue(board, input),
+    salaryMin: salaryValue(board, input),
+    contract: contractValue(board, input),
   };
 
   const { origin, rest } = splitOrigin(board.urlTemplate);
@@ -263,8 +360,8 @@ export function boardTemplateProblem(urlTemplate: string): string | null {
   }
 
   const { origin } = splitOrigin(template);
-  if (origin.includes(KEYWORD_PLACEHOLDER) || origin.includes(LOCATION_PLACEHOLDER)) {
-    return 'The name of the site has to be fixed — {keyword} and {location} belong after it.';
+  if (BOARD_PLACEHOLDERS.some((placeholder) => origin.includes(placeholder))) {
+    return 'The name of the site has to be fixed — {keyword}, {location} and the other placeholders belong after it.';
   }
 
   const probe: BoardTemplate = {
@@ -277,6 +374,13 @@ export function boardTemplateProblem(urlTemplate: string): string | null {
   for (const input of [
     { keywords: 'business analyst', location: 'Milton Keynes' },
     { keywords: 'business analyst', location: '' },
+    {
+      keywords: 'business analyst',
+      location: 'Milton Keynes',
+      distanceMiles: '10',
+      salaryMin: '60000',
+      contract: 'permanent' as const,
+    },
   ]) {
     let parsed: URL;
     try {

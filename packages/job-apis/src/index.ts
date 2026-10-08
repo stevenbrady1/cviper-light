@@ -149,7 +149,12 @@ export { SOURCE_LABEL } from './sources';
 
 // ── Keyless browser links: no key, no scraper, no account ────────────────────
 
-export { boardTemplateProblem, buildBoardUrl, type BrowserSearchInput } from './links';
+export {
+  boardFilterSupport,
+  boardTemplateProblem,
+  buildBoardUrl,
+  type BrowserSearchInput,
+} from './links';
 
 // ── The daily request budget ─────────────────────────────────────────────────
 

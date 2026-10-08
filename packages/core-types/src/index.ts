@@ -93,11 +93,16 @@ export {
 
 export {
   BOARD_ENCODINGS,
+  BOARD_PLACEHOLDERS,
   BoardTemplateSchema,
+  CONTRACT_PLACEHOLDER,
   KEYWORD_PLACEHOLDER,
   LOCATION_PLACEHOLDER,
+  RADIUS_PLACEHOLDER,
+  SALARY_MIN_PLACEHOLDER,
   parseBoardTemplates,
   type BoardEncoding,
+  type BoardFilters,
   type BoardTemplate,
 } from './boards';
 
