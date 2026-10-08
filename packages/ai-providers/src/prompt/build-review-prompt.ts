@@ -21,6 +21,7 @@ import { sanitizeForPrompt, truncateForPrompt } from '@cviper/cv-parsing';
 
 import { MAX_CV_CHARS, MAX_JOB_CHARS } from './build-prompt';
 import { JSON_ONLY, NO_FABRICATION, UNTRUSTED_CONTENT_BOUNDARY } from './constants';
+import { createFences, type Fences } from './fence';
 
 /** The draft is the thing under review, so it gets the CV's full budget. */
 export const MAX_DRAFT_CHARS = MAX_CV_CHARS;
@@ -75,25 +76,28 @@ const FIELD_RULES = `Field rules, in the order you must answer them:
 
 ${JSON_ONLY}`;
 
-function fence(label: string, body: string, maxChars: number): string {
+function fence(fences: Fences, label: string, body: string, maxChars: number): string {
   const cleaned = truncateForPrompt(sanitizeForPrompt(body), maxChars);
-  return `=== ${label} ===\n${cleaned}\n=== END ${label} ===`;
+  return fences.wrap(label, cleaned);
 }
 
 export function buildReviewPrompt(input: ReviewPromptInput): ReviewPrompt {
-  const userMetrics = userMetricsSection(input.userMetrics);
+  const fences = createFences();
+  const userMetrics = userMetricsSection(input.userMetrics, fences);
   const draftLabel =
     input.kind === 'cv' ? 'DRAFT CV (under review)' : 'DRAFT COVER LETTER (under review)';
 
   const user = [
+    fences.rule,
+    '',
     'Review this draft against the advert and the original CV.',
     JSON_ONLY,
     '',
-    fence(draftLabel, input.draftText, MAX_DRAFT_CHARS),
+    fence(fences, draftLabel, input.draftText, MAX_DRAFT_CHARS),
     '',
-    fence('JOB ADVERT', input.jobText, MAX_JOB_CHARS),
+    fence(fences, 'JOB ADVERT', input.jobText, MAX_JOB_CHARS),
     '',
-    fence('ORIGINAL CV (the only source a claim may rest on)', input.cvText, MAX_CV_CHARS),
+    fence(fences, 'ORIGINAL CV (the only source a claim may rest on)', input.cvText, MAX_CV_CHARS),
     ...(userMetrics === null ? [] : ['', userMetrics]),
     '',
     whatToLookFor(input.kind, userMetrics !== null),

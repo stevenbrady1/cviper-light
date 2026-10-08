@@ -53,6 +53,7 @@
 import { sanitizeForPrompt, truncateForPrompt } from '@cviper/cv-parsing';
 
 import { FAIRNESS_GUARDRAIL, JSON_ONLY, UNTRUSTED_CONTENT_BOUNDARY } from './constants';
+import { createFences, type Fences } from './fence';
 
 /**
  * Input budgets, in characters.
@@ -182,14 +183,19 @@ function short(value: string): string {
     .trim();
 }
 
-function fence(label: string, body: string): string {
-  return `=== ${label} ===\n${body}\n=== END ${label} ===`;
+function fence(fences: Fences, label: string, body: string): string {
+  return fences.wrap(label, body);
 }
 
 /** A material that may be absent. The fence is always there; the body says which. */
-function optionalFence(label: string, body: string | null, maxChars: number): string {
+function optionalFence(
+  fences: Fences,
+  label: string,
+  body: string | null,
+  maxChars: number,
+): string {
   const cleaned = body === null ? '' : clean(body, maxChars);
-  return fence(label, cleaned.trim().length === 0 ? NOT_SUPPLIED : cleaned);
+  return fence(fences, label, cleaned.trim().length === 0 ? NOT_SUPPLIED : cleaned);
 }
 
 /**
@@ -199,7 +205,7 @@ function optionalFence(label: string, body: string | null, maxChars: number): st
  * else — the boundary applies to what the user wrote too, because a profile
  * restored from a backup file is text this app did not author.
  */
-function candidateBlock(profile: InterviewPromptProfile): string {
+function candidateBlock(fences: Fences, profile: InterviewPromptProfile): string {
   const headline = profile.headline === null ? '' : short(profile.headline);
   const goals = profile.careerGoals
     .slice(0, MAX_CAREER_GOALS)
@@ -210,7 +216,7 @@ function candidateBlock(profile: InterviewPromptProfile): string {
     `Headline: ${headline.length === 0 ? NOT_SUPPLIED : headline}`,
     `Career goals: ${goals.length === 0 ? NOT_SUPPLIED : goals.join('; ')}`,
   ];
-  return fence('CV PROFILE', lines.join('\n'));
+  return fence(fences, 'CV PROFILE', lines.join('\n'));
 }
 
 /**
@@ -222,8 +228,8 @@ function candidateBlock(profile: InterviewPromptProfile): string {
  * Task, Action, Result — so the model can lift an answer's skeleton straight
  * from the material rather than reassembling it.
  */
-function starBlock(examples: readonly InterviewStarExample[]): string {
-  if (examples.length === 0) return fence('CV EXAMPLES', NOT_SUPPLIED);
+function starBlock(fences: Fences, examples: readonly InterviewStarExample[]): string {
+  if (examples.length === 0) return fence(fences, 'CV EXAMPLES', NOT_SUPPLIED);
 
   const field = (value: string) => clean(value, MAX_STAR_FIELD_CHARS).trim();
   const rendered = examples
@@ -239,7 +245,7 @@ function starBlock(examples: readonly InterviewStarExample[]): string {
     )
     .join('\n\n');
 
-  return fence('CV EXAMPLES', truncateForPrompt(rendered, MAX_INTERVIEW_STAR_CHARS));
+  return fence(fences, 'CV EXAMPLES', truncateForPrompt(rendered, MAX_INTERVIEW_STAR_CHARS));
 }
 
 /**
@@ -247,7 +253,7 @@ function starBlock(examples: readonly InterviewStarExample[]): string {
  * even when the advert is missing — a pack for "Credit Risk Analyst at Lloyds"
  * with no advert is thin but honest; one with no title is nothing.
  */
-function jobBlock(input: InterviewPromptInput): string {
+function jobBlock(fences: Fences, input: InterviewPromptInput): string {
   const advert = input.advert === null ? '' : clean(input.advert, MAX_INTERVIEW_ADVERT_CHARS);
   const lines = [
     `Title: ${short(input.jobTitle)}`,
@@ -255,23 +261,26 @@ function jobBlock(input: InterviewPromptInput): string {
     'Advert:',
     advert.trim().length === 0 ? NOT_SUPPLIED : advert,
   ];
-  return fence('JOB', lines.join('\n'));
+  return fence(fences, 'JOB', lines.join('\n'));
 }
 
 export function buildInterviewPrompt(input: InterviewPromptInput): InterviewPrompt {
+  const fences = createFences();
   const user = [
+    fences.rule,
+    '',
     'Prepare interview materials for this candidate applying to this job.',
     JSON_ONLY,
     '',
-    candidateBlock(input.profile),
+    candidateBlock(fences, input.profile),
     '',
-    starBlock(input.profile.starExamples),
+    starBlock(fences, input.profile.starExamples),
     '',
-    optionalFence('CV', input.cvText, MAX_INTERVIEW_CV_CHARS),
+    optionalFence(fences, 'CV', input.cvText, MAX_INTERVIEW_CV_CHARS),
     '',
-    optionalFence('CV LETTER', input.coverLetter, MAX_INTERVIEW_LETTER_CHARS),
+    optionalFence(fences, 'CV LETTER', input.coverLetter, MAX_INTERVIEW_LETTER_CHARS),
     '',
-    jobBlock(input),
+    jobBlock(fences, input),
     '',
     FIELD_RULES,
   ].join('\n');

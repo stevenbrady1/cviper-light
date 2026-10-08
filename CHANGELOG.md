@@ -19,6 +19,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Changed
 
+- Every AI prompt now marks its sections with a random tag made for that prompt alone (`=== JOB ADVERT === #k3f9x2ma`), and tells the model that only a marker ending in that tag opens or closes a section (L-210). A job advert is written before the prompt exists, so it cannot guess the tag: even a fake section marker that got past the text cleaner is read as part of the advert. The cleaner (L-207) still removes marker-shaped lines first; this is a second wall behind it.
 - The Store package's version must now be above every version already uploaded to the Store, not just equal to the app version (L-170). Uploads are recorded in `msix/store-submissions.json`; a rollback below the last upload fails `pnpm test`, and packing a version the Store has already been sent stops `msix.yml` before anything is packed.
 - "Save to an application" works for a job that has no application yet: it starts one as Saved and saves into it, instead of sending you to the tracker first (L-199).
 

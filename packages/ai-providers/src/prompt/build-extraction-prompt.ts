@@ -59,6 +59,7 @@
 import { sanitizeForPrompt, truncateForPrompt } from '@cviper/cv-parsing';
 
 import { JSON_ONLY, UNTRUSTED_CONTENT_BOUNDARY } from './constants';
+import { createFences } from './fence';
 
 /**
  * How much pasted advert reaches the model, in characters.
@@ -183,16 +184,15 @@ const FIELD_RULES = `Field rules, in the order you must answer them:
 
 ${JSON_ONLY}`;
 
-function fence(body: string): string {
-  return `=== JOB ADVERT ===\n${extractionSourceText(body)}\n=== END JOB ADVERT ===`;
-}
-
 export function buildExtractionPrompt(input: ExtractionPromptInput): ExtractionPrompt {
+  const fences = createFences();
   const user = [
+    fences.rule,
+    '',
     'Extract the job details from this advert, email or role spec.',
     JSON_ONLY,
     '',
-    fence(input.text),
+    fences.wrap('JOB ADVERT', extractionSourceText(input.text)),
     '',
     CRITICAL,
     '',

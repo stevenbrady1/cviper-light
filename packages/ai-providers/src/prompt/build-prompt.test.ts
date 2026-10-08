@@ -12,6 +12,7 @@ import {
   buildAnalysisPrompt,
   buildRepairPrompt,
 } from './build-prompt';
+import { untagged } from '../test/fence-tags';
 
 const CV = 'Jane Doe. 8 years Python and Django. AWS certified. Led a team of four.';
 const JOB = 'Senior Python Engineer, payments. Requires Python, AWS, PostgreSQL, 5+ years.';
@@ -178,7 +179,7 @@ describe('buildAnalysisPrompt — untrusted input handling', () => {
 
   it('truncates an over-long CV to the budget', () => {
     const huge = 'Python developer. '.repeat(5000);
-    const { user } = build(huge, JOB);
+    const user = untagged(build(huge, JOB).user);
     const cvBlock = user.slice(
       user.indexOf('=== CV ===') + '=== CV ==='.length,
       user.indexOf('=== END CV ==='),
@@ -189,7 +190,7 @@ describe('buildAnalysisPrompt — untrusted input handling', () => {
 
   it('truncates an over-long job description to its own, smaller budget', () => {
     const huge = 'Must have Kubernetes. '.repeat(5000);
-    const { user } = build(CV, huge);
+    const user = untagged(build(CV, huge).user);
     const jobBlock = user.slice(
       user.indexOf('=== JOB ===') + '=== JOB ==='.length,
       user.indexOf('=== END JOB ==='),

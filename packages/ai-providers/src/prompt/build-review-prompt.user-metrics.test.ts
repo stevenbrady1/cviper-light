@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildReviewPrompt } from './build-review-prompt';
+import { untagged } from '../test/fence-tags';
 
 const base = { draftText: 'draft', jobText: 'job', cvText: 'cv', kind: 'cv' as const };
 
@@ -24,6 +25,6 @@ describe('buildReviewPrompt with user-supplied metrics (L-205)', () => {
   it.each([undefined, null, []])('negative: %j leaves the prompt unchanged', (value) => {
     const { user } = buildReviewPrompt({ ...base, userMetrics: value });
     expect(user).not.toContain('CANDIDATE-SUPPLIED');
-    expect(user).toBe(buildReviewPrompt(base).user);
+    expect(untagged(user)).toBe(untagged(buildReviewPrompt(base).user));
   });
 });

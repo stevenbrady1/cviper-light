@@ -13,6 +13,7 @@
  * model, and anyone reading the payload, can tell it from the CV.
  */
 import { cleanOneLine } from './clean-one-line';
+import { type Fences } from './fence';
 
 /** At most this many entries, one per gap, matching the keyword-gap cap. */
 export const MAX_USER_METRICS = 15;
@@ -37,9 +38,16 @@ export interface UserSuppliedMetric {
 export const USER_FACTS_CARVE_OUT =
   'or the CANDIDATE-SUPPLIED ACHIEVEMENTS section, exactly as given (numbers only)';
 
-export const USER_METRICS_HEADING =
-  '=== CANDIDATE-SUPPLIED ACHIEVEMENTS (USER-SUPPLIED FACTS, approved by the candidate) ===';
-export const USER_METRICS_END = '=== END CANDIDATE-SUPPLIED ACHIEVEMENTS ===';
+const USER_METRICS_LABEL =
+  'CANDIDATE-SUPPLIED ACHIEVEMENTS (USER-SUPPLIED FACTS, approved by the candidate)';
+const USER_METRICS_END_LABEL = 'CANDIDATE-SUPPLIED ACHIEVEMENTS';
+
+/**
+ * The section's opening and closing markers WITHOUT the per-prompt tag
+ * (L-210): each line in a prompt is this text followed by ` #<tag>`.
+ */
+export const USER_METRICS_HEADING = `=== ${USER_METRICS_LABEL} ===`;
+export const USER_METRICS_END = `=== END ${USER_METRICS_END_LABEL} ===`;
 
 /**
  * The approved achievements as they go into a prompt: one line each, blank
@@ -66,13 +74,14 @@ export function promptUserMetrics(
 /** The section, or `null` when there is nothing approved. */
 export function userMetricsSection(
   metrics: readonly UserSuppliedMetric[] | null | undefined,
+  fences: Fences,
 ): string | null {
   const kept = promptUserMetrics(metrics);
   if (kept.length === 0) return null;
   return [
-    USER_METRICS_HEADING,
+    fences.open(USER_METRICS_LABEL),
     ...kept.map((metric) => `- [${metric.skill}] ${metric.text}`),
-    USER_METRICS_END,
+    fences.close(USER_METRICS_END_LABEL),
     '',
     'USER-SUPPLIED FACTS: the lines above were typed by the candidate, each against one advert word, and approved for use. They are true statements about the candidate, though not part of the base CV. You MAY use one, exactly as given, in a bullet, the summary or the letter, where the base CV shows related work. Do not embellish them: do not change, round or enlarge a number, and do not add detail, scope, a result or a timeframe they do not state. An employer, date or qualification may come ONLY from the base CV; a number may come ONLY from the base CV or these lines. If a line does not fit anywhere the base CV supports, leave it out.',
   ].join('\n');
