@@ -676,3 +676,69 @@ describe('saving as a Word document (L-165)', () => {
     expect(filePort.writtenBytes()).toHaveLength(0);
   });
 });
+
+describe('while a save window is open (L-217)', () => {
+  /** A save that waits until the test answers it, like a real dialog. */
+  function holdSaves(filePort: ReturnType<typeof createFakeFilePort>) {
+    let answer: (path: string | null) => void = () => undefined;
+    const pending = () =>
+      new Promise<Result<string | null, { message: string }>>((resolve) => {
+        answer = (path) => resolve(ok(path));
+      });
+    vi.spyOn(filePort, 'saveBytes').mockImplementation(pending as typeof filePort.saveBytes);
+    vi.spyOn(filePort, 'saveText').mockImplementation(pending as typeof filePort.saveText);
+    return { answer: (path: string | null) => answer(path) };
+  }
+
+  async function tailored() {
+    const ready = await renderReady([FAITHFUL]);
+    await ready.user.selectOptions(screen.getByTestId('tailor-job-pick'), 'job-1');
+    await ready.user.click(screen.getByTestId('tailor-run'));
+    await screen.findByTestId('tailor-result');
+    return ready;
+  }
+
+  it('happy: the screen says it is waiting for the save window — not "Saving…" on another button', async () => {
+    const { user, filePort } = await tailored();
+    const held = holdSaves(filePort);
+
+    await user.click(screen.getByTestId('tailor-save-pdf-cv'));
+
+    const waiting = await screen.findByTestId('tailor-save-choosing');
+    expect(waiting.getAttribute('role')).toBe('status');
+    expect(waiting.textContent).toContain('save window');
+    expect(screen.getByTestId('tailor-save-application').textContent).toBe(
+      'Save to an application',
+    );
+    // One save at a time, as before.
+    expect(screen.getByTestId('tailor-save-pdf-cv')).toHaveProperty('disabled', true);
+    expect(screen.getByTestId('tailor-save-application')).toHaveProperty('disabled', true);
+
+    held.answer('C:\\Users\\steve\\Documents\\Tailored CV.pdf');
+    await screen.findByTestId('tailor-save-message');
+    expect(screen.queryByTestId('tailor-save-choosing')).toBeNull();
+    expect(screen.getByTestId('tailor-save-pdf-cv')).toHaveProperty('disabled', false);
+  });
+
+  it('negative: cancelling the window clears the waiting line and says nothing else', async () => {
+    const { user, filePort } = await tailored();
+    const held = holdSaves(filePort);
+
+    await user.click(screen.getByTestId('tailor-save-text'));
+    await screen.findByTestId('tailor-save-choosing');
+
+    held.answer(null);
+    await vi.waitFor(() => expect(screen.queryByTestId('tailor-save-choosing')).toBeNull());
+    expect(screen.queryByTestId('tailor-save-message')).toBeNull();
+    expect(screen.queryByTestId('tailor-error')).toBeNull();
+    expect(screen.getByTestId('tailor-save-text')).toHaveProperty('disabled', false);
+  });
+
+  it('boundary: with no save running there is no waiting line', async () => {
+    await tailored();
+    expect(screen.queryByTestId('tailor-save-choosing')).toBeNull();
+    expect(screen.getByTestId('tailor-save-application').textContent).toBe(
+      'Save to an application',
+    );
+  });
+});

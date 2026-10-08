@@ -10,6 +10,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 - Every symbol, badge and abbreviation now says what it means (L-215). Hover, tab to, or tap a mark to see a short explanation: the ATS score's ✓ ⚠ ✗, ▲ ▼, the dash, the band words, each row and column, "ATS" itself and the fabrication check; the step bar's ✓ ● ⊘ ○ and the CV/engine line; a tracker card's progress dots; the rail's keyboard shortcuts, service dots and "Requests today"; and the Analysis verdict. Tailor's change list also says what green and struck-through lines mean. Screen readers hear the same words. A test fails if a screen starts showing a symbol without an explanation.
 
+### Fixed
+
+- Save windows (Save as PDF, Word or text, open a CV, backups) now always open in front of CViper, on the same screen. Before, Windows could put one on another monitor or behind the app, so a save seemed to do nothing. While a save window is open, Tailor now says "Choose where to save it in the save window", instead of showing "Saving…" on the "Save to an application" button (L-217).
+
 ## [0.7.0] — 2026-10-08
 
 ### Added
