@@ -37,6 +37,7 @@ import {
   ProfileSchema,
   err,
   ok,
+  withoutEmptyOriginal,
   type Analysis,
   type Application,
   type Cv,
@@ -102,7 +103,8 @@ export const APPLICATION_COLUMNS = [
 // 0006_interview_substages.sql (L-205).
 export const INTERVIEW_SUBSTAGE_COLUMNS = ['id', 'name', 'position'] as const;
 
-// `json_resume` is last because 0002_cv_json_resume.sql appended it (L-20b).
+// `json_resume` follows `created_at` because 0002_cv_json_resume.sql appended
+// it (L-20b); `original_text` is last because 0008 appended it (L-218).
 export const CV_COLUMNS = [
   'id',
   'name',
@@ -110,6 +112,7 @@ export const CV_COLUMNS = [
   'extracted_text',
   'created_at',
   'json_resume',
+  'original_text',
 ] as const;
 
 export const ANALYSIS_COLUMNS = [
@@ -323,7 +326,10 @@ export function cvFromRow(raw: unknown): Result<Cv, DbError> {
   if (!row.ok) return row;
 
   const parsed = CvSchema.safeParse(row.value);
-  return parsed.success ? ok(parsed.data) : malformed('cvs', describeIssues(parsed.error));
+  if (!parsed.success) return malformed('cvs', describeIssues(parsed.error));
+  // A CV that was never corrected (L-218) reads exactly as it did before the
+  // column existed: no `original_text` key at all, rather than a `null` one.
+  return ok(withoutEmptyOriginal(parsed.data));
 }
 
 export function analysisFromRow(raw: unknown): Result<Analysis, DbError> {
@@ -432,6 +438,7 @@ export function cvToValues(cv: Cv): SqlValue[] {
     extracted_text: cv.extracted_text,
     created_at: cv.created_at,
     json_resume: cv.json_resume,
+    original_text: cv.original_text ?? null,
   };
   return CV_COLUMNS.map((column) => row[column]);
 }

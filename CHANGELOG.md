@@ -8,6 +8,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Added
 
+- Correct the CV text the AI works from (L-218). On Tailor, "Your CV as the rewrite reads it" now looks read-only (a grey panel, not a text box) and says where the text came from. "Correct the text" opens a real text box: fix anything the app misread from your file, and the correction is kept on the CV, so Analysis, Tailor and every job use it. The panel then says the text was corrected, shows what you changed against the file, and "Restore the text from the file" puts it back (it asks first). A CV the app could read no text from can now be typed or pasted in. Backups carry the correction (still format version 1).
 - Every symbol, badge and abbreviation now says what it means (L-215). Hover, tab to, or tap a mark to see a short explanation: the ATS score's ✓ ⚠ ✗, ▲ ▼, the dash, the band words, each row and column, "ATS" itself and the fabrication check; the step bar's ✓ ● ⊘ ○ and the CV/engine line; a tracker card's progress dots; the rail's keyboard shortcuts, service dots and "Requests today"; and the Analysis verdict. Tailor's change list also says what green and struck-through lines mean. Screen readers hear the same words. A test fails if a screen starts showing a symbol without an explanation.
 
 ## [0.7.0] — 2026-10-08

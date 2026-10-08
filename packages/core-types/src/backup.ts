@@ -49,6 +49,7 @@ import {
   InterviewSubstageSchema,
   JobSchema,
   ProfileSchema,
+  withoutEmptyOriginal,
   type Analysis,
   type Application,
   type Cv,
@@ -320,6 +321,10 @@ function emitCv(cv: Cv): Record<string, unknown> {
       extracted_text: cv.extracted_text,
       created_at: cv.created_at,
       json_resume: cv.json_resume,
+      // L-218: `null` for a CV that was never corrected. Additive: an older
+      // app keeps the key in `__extra`, and an older file imports as "never
+      // corrected".
+      original_text: cv.original_text ?? null,
     },
     cv.__extra,
   );
@@ -682,7 +687,7 @@ export function importBackup(raw: unknown): Result<BackupPayload, BackupError> {
     applications: sanitiseSubstages(applications.value, substages.value),
     interview_substages: substages.value,
     documents: documents.value,
-    cvs: cvs.value,
+    cvs: cvs.value.map(withoutEmptyOriginal),
     analyses: analyses.value,
     ...(extra === undefined ? {} : { __extra: extra }),
   });
