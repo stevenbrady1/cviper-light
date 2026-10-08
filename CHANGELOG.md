@@ -19,6 +19,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Changed
 
+- The Store package's version must now be above every version already uploaded to the Store, not just equal to the app version (L-170). Uploads are recorded in `msix/store-submissions.json`; a rollback below the last upload fails `pnpm test`, and packing a version the Store has already been sent stops `msix.yml` before anything is packed.
 - "Save to an application" works for a job that has no application yet: it starts one as Saved and saves into it, instead of sending you to the tracker first (L-199).
 
 ## [0.6.0] — 2026-09-29

@@ -426,13 +426,18 @@ jobs:
       # before `winapp pack`. It also refuses a Store config fragment carrying
       # its own `version`, which would override the app version for this
       # flavour only.
-      - name: Assert the staged manifest version matches the app version
+      #
+      # It also refuses a version the Store has already been sent (L-170).
+      # Every upload is recorded in `msix/store-submissions.json`, and the
+      # Store only takes a version above all of them — so a rollback, or a
+      # resubmission without a bump, stops HERE rather than at Partner Center.
+      - name: Assert the staged manifest version matches the app version and is new to the Store
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           pnpm check:msix-manifest --manifest "$env:MANIFEST_PATH"
           if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error title=Version mismatch::The staged Package.appxmanifest does not match tauri.conf.json. Nothing was packed. See the check output above.'
+            Write-Host '::error title=Version refused::The staged Package.appxmanifest does not match tauri.conf.json, or the Store has already been sent this version. Nothing was packed. See the check output above.'
             exit 1
           }
 
