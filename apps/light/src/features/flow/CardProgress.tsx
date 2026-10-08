@@ -1,4 +1,6 @@
 import { QUIET_BUTTON } from '../../app/buttons';
+import { Hint } from '../../app/Hint';
+import { FLOW_HINT } from '../../app/hints';
 
 import { STEPS, continueStep, stepStates, type JobProgress, type StepId } from './steps';
 
@@ -36,9 +38,11 @@ export function CardProgress({ applicationId, progress, onContinue }: CardProgre
       data-done={done}
       className="mt-1 flex items-center justify-between gap-2 px-3"
     >
-      <span aria-hidden="true" className="font-mono text-[11px] tracking-[0.2em] text-ink-muted">
-        {filled.map((on) => (on ? '●' : '○')).join('')}
-      </span>
+      <Hint text={FLOW_HINT.cardDots} focusable={false}>
+        <span aria-hidden="true" className="font-mono text-[11px] tracking-[0.2em] text-ink-muted">
+          {filled.map((on) => (on ? '●' : '○')).join('')}
+        </span>
+      </Hint>
       <span className="sr-only">
         {done} of {STEPS.length} steps done. Next: {label}.
       </span>

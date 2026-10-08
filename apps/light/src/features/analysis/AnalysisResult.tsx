@@ -1,6 +1,8 @@
 import { type CvAnalysis, type SuggestionPriority, type Verdict } from '@cviper/core-types';
 import { atsBand } from '@cviper/keyword-scoring';
 
+import { Hint } from '../../app/Hint';
+import { ATS_BAND_HINT, VERDICT_HINT } from '../../app/hints';
 import { displayTerms } from './acronyms';
 import { ATS_BAND_TONE, ATS_BAND_WORD } from './atsBandWords';
 import { BandScale } from './BandScale';
@@ -188,7 +190,7 @@ export function AnalysisResult({
           data-testid="analysis-verdict"
           className={`rounded-pill px-2.5 py-1 font-medium ${VERDICT_TONE[analysis.verdict]}`}
         >
-          {VERDICT_LABEL[analysis.verdict]}
+          <Hint text={VERDICT_HINT[analysis.verdict]}>{VERDICT_LABEL[analysis.verdict]}</Hint>
         </span>
       </div>
 
@@ -216,7 +218,7 @@ export function AnalysisResult({
               data-testid="analysis-ats-band"
               className={`font-medium ${ATS_BAND_TONE[ats.band]}`}
             >
-              {ATS_BAND_WORD[ats.band]}
+              <Hint text={ATS_BAND_HINT[ats.band]}>{ATS_BAND_WORD[ats.band]}</Hint>
             </span>
           </div>
           <p data-testid="analysis-ats-source" className="mt-1.5 text-ink-muted">

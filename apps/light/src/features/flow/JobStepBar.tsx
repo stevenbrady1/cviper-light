@@ -1,4 +1,6 @@
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { Hint } from '../../app/Hint';
+import { FLOW_HINT, STEP_HINT } from '../../app/hints';
 
 import {
   nextStep,
@@ -87,14 +89,19 @@ export function JobStepBar({
     >
       <div className="flex flex-wrap items-center gap-2">
         {onTracker === undefined ? null : (
-          <button
-            type="button"
-            data-testid="job-steps-tracker"
-            onClick={onTracker}
-            className={QUIET_BUTTON}
-          >
-            <span aria-hidden="true">◀</span> Tracker
-          </button>
+          <Hint text={FLOW_HINT.tracker}>
+            {(trigger) => (
+              <button
+                type="button"
+                data-testid="job-steps-tracker"
+                onClick={onTracker}
+                className={QUIET_BUTTON}
+                {...trigger}
+              >
+                <span aria-hidden="true">◀</span> Tracker
+              </button>
+            )}
+          </Hint>
         )}
         <p data-testid="job-steps-job" className="min-w-0 flex-1 font-medium text-ink">
           {job}
@@ -103,10 +110,12 @@ export function JobStepBar({
 
       {choice === undefined ? null : (
         <p data-testid="job-steps-choice" className="break-words text-xs text-ink-muted">
-          CV: <span className="text-ink">{choice.cv ?? 'none chosen'}</span>
-          <span aria-hidden="true"> · </span>
-          <span className="sr-only">, </span>
-          Engine: <span className="text-ink">{choice.engine ?? 'none set up'}</span>
+          <Hint text={FLOW_HINT.choice}>
+            CV: <span className="text-ink">{choice.cv ?? 'none chosen'}</span>
+            <span aria-hidden="true"> · </span>
+            <span className="sr-only">, </span>
+            Engine: <span className="text-ink">{choice.engine ?? 'none set up'}</span>
+          </Hint>
         </p>
       )}
 
@@ -121,20 +130,25 @@ export function JobStepBar({
                   ─
                 </span>
               )}
-              <button
-                type="button"
-                data-testid={`job-step-${step.id}`}
-                data-state={step.state}
-                aria-current={step.state === 'current' ? 'step' : undefined}
-                onClick={() => onStep(step.id)}
-                className={QUIET_BUTTON}
-              >
-                <span aria-hidden="true">{SYMBOL[step.state]}</span>
-                <span className={step.state === 'current' ? 'font-semibold text-ink' : ''}>
-                  {step.label}
-                </span>
-                <span className="sr-only">, {SPOKEN[step.state]}</span>
-              </button>
+              <Hint text={STEP_HINT[step.state]}>
+                {(trigger) => (
+                  <button
+                    type="button"
+                    data-testid={`job-step-${step.id}`}
+                    data-state={step.state}
+                    aria-current={step.state === 'current' ? 'step' : undefined}
+                    onClick={() => onStep(step.id)}
+                    className={QUIET_BUTTON}
+                    {...trigger}
+                  >
+                    <span aria-hidden="true">{SYMBOL[step.state]}</span>
+                    <span className={step.state === 'current' ? 'font-semibold text-ink' : ''}>
+                      {step.label}
+                    </span>
+                    <span className="sr-only">, {SPOKEN[step.state]}</span>
+                  </button>
+                )}
+              </Hint>
             </li>
           ))}
         </ol>
