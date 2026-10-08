@@ -12,6 +12,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Fixed
 
+- Clicking a step on Tailor's step bar (Tailor, ATS Score, Export, Back, Next) no longer slides the whole window up and leaves the bottom half blank. The step now scrolls only Tailor's own content area; the rail, the page and the window stay put. Tests walk every way of moving — each step link on Tailor and Analysis, each rail item and Ctrl+number shortcut, a tracker card's Continue, and phone width — and fail if anything outside a screen's own area scrolls (L-216).
 - Save windows (Save as PDF, Word or text, open a CV, backups) now always open in front of CViper, on the same screen. Before, Windows could put one on another monitor or behind the app, so a save seemed to do nothing. While a save window is open, Tailor now says "Choose where to save it in the save window", instead of showing "Saving…" on the "Save to an application" button (L-217).
 
 ## [0.7.0] — 2026-10-08

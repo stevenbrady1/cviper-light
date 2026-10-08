@@ -18,6 +18,7 @@ import {
 } from '@cviper/core-types';
 
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
@@ -538,13 +539,15 @@ export function Tailor({
       cancelled = true;
     };
   }, [progress, selectedJobId]);
+  /** The screen's own scroll area: the only thing a step link may scroll (L-216). */
+  const scrollArea = useRef<HTMLDivElement | null>(null);
   // Scroll the step into view once it is on the page. ATS Score and Export
   // only exist once there is a draft; before that the screen stays put.
+  // Within Tailor's own area only — never `scrollIntoView`, which scrolls the
+  // shell and the page too (see `scrollWithin`).
   useEffect(() => {
     const anchor = document.getElementById(STEP_ANCHOR[step]);
-    if (anchor !== null && typeof anchor.scrollIntoView === 'function') {
-      anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    if (anchor !== null && scrollArea.current !== null) scrollWithin(scrollArea.current, anchor);
   }, [step]);
   const onBarStep = useCallback(
     (target: StepId) => {
@@ -961,7 +964,11 @@ export function Tailor({
         </p>
       )}
 
-      <div className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+      <div
+        ref={scrollArea}
+        data-testid="tailor-scroll"
+        className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 md:px-6 md:py-5"
+      >
         <span id={STEP_ANCHOR.tailor} aria-hidden="true" />
         {/* ── 1. The CV ───────────────────────────────────────────────── */}
         <div>
