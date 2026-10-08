@@ -11,6 +11,11 @@ All notable changes to CViper Light are recorded here. The format follows
 - Correct the CV text the AI works from (L-218). On Tailor, "Your CV as the rewrite reads it" now looks read-only (a grey panel, not a text box) and says where the text came from. "Correct the text" opens a real text box: fix anything the app misread from your file, and the correction is kept on the CV, so Analysis, Tailor and every job use it. The panel then says the text was corrected, shows what you changed against the file, and "Restore the text from the file" puts it back (it asks first). A CV the app could read no text from can now be typed or pasted in. Backups carry the correction (still format version 1).
 - Every symbol, badge and abbreviation now says what it means (L-215). Hover, tab to, or tap a mark to see a short explanation: the ATS score's ✓ ⚠ ✗, ▲ ▼, the dash, the band words, each row and column, "ATS" itself and the fabrication check; the step bar's ✓ ● ⊘ ○ and the CV/engine line; a tracker card's progress dots; the rail's keyboard shortcuts, service dots and "Requests today"; and the Analysis verdict. Tailor's change list also says what green and struck-through lines mean. Screen readers hear the same words. A test fails if a screen starts showing a symbol without an explanation.
 
+### Fixed
+
+- Clicking a step on Tailor's step bar (Tailor, ATS Score, Export, Back, Next) no longer slides the whole window up and leaves the bottom half blank. The step now scrolls only Tailor's own content area; the rail, the page and the window stay put. Tests walk every way of moving — each step link on Tailor and Analysis, each rail item and Ctrl+number shortcut, a tracker card's Continue, and phone width — and fail if anything outside a screen's own area scrolls (L-216).
+- Save windows (Save as PDF, Word or text, open a CV, backups) now always open in front of CViper, on the same screen. Before, Windows could put one on another monitor or behind the app, so a save seemed to do nothing. While a save window is open, Tailor now says "Choose where to save it in the save window", instead of showing "Saving…" on the "Save to an application" button (L-217).
+
 ## [0.7.0] — 2026-10-08
 
 ### Added

@@ -18,6 +18,7 @@ import {
 } from '@cviper/core-types';
 
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
@@ -287,7 +288,13 @@ export function Tailor({
   /** A failed read or save on this screen, else why this job's last run failed. */
   const shownError = error ?? work.error;
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  /**
+   * Which save is running, if any: one at a time. A file save is mostly the
+   * user choosing a place in the save window, so the screen says that rather
+   * than "Saving…" — which used to appear on "Save to an application" for
+   * every save, pointing at the wrong button (L-217).
+   */
+  const [saving, setSaving] = useState<'application' | 'file' | null>(null);
   /**
    * Whether the chosen CV's text is shown (L-192). Starts open, and is NOT
    * reset when the CV changes: a user who folded it away did so on purpose.
@@ -533,13 +540,15 @@ export function Tailor({
       cancelled = true;
     };
   }, [progress, selectedJobId]);
+  /** The screen's own scroll area: the only thing a step link may scroll (L-216). */
+  const scrollArea = useRef<HTMLDivElement | null>(null);
   // Scroll the step into view once it is on the page. ATS Score and Export
   // only exist once there is a draft; before that the screen stays put.
+  // Within Tailor's own area only — never `scrollIntoView`, which scrolls the
+  // shell and the page too (see `scrollWithin`).
   useEffect(() => {
     const anchor = document.getElementById(STEP_ANCHOR[step]);
-    if (anchor !== null && typeof anchor.scrollIntoView === 'function') {
-      anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    if (anchor !== null && scrollArea.current !== null) scrollWithin(scrollArea.current, anchor);
   }, [step]);
   const onBarStep = useCallback(
     (target: StepId) => {
@@ -721,7 +730,7 @@ export function Tailor({
     if (selectedApplicationId === null && selectedJob === null) return;
     setError(null);
     setSaveMessage(null);
-    setSaving(true);
+    setSaving('application');
 
     const stamp = (now ?? new Date()).toISOString();
 
@@ -734,7 +743,7 @@ export function Tailor({
       });
       const created = await tailorPort.createApplication(application);
       if (!created.ok) {
-        setSaving(false);
+        setSaving(null);
         setError(`The tailored CV could not be saved: ${created.error.message}`);
         return;
       }
@@ -755,7 +764,7 @@ export function Tailor({
       }),
     );
     if (!saved.ok) {
-      setSaving(false);
+      setSaving(null);
       setError(`The tailored CV could not be saved: ${saved.error.message}`);
       return;
     }
@@ -775,7 +784,7 @@ export function Tailor({
         }),
       );
       if (!savedAdvert.ok) {
-        setSaving(false);
+        setSaving(null);
         setError(`The CV was saved, but the edited advert was not: ${savedAdvert.error.message}`);
         return;
       }
@@ -795,14 +804,14 @@ export function Tailor({
         }),
       );
       if (!savedLetter.ok) {
-        setSaving(false);
+        setSaving(null);
         setError(`The CV was saved, but the letter was not: ${savedLetter.error.message}`);
         return;
       }
       letterSaved = true;
     }
 
-    setSaving(false);
+    setSaving(null);
     setSaveMessage(savedMessage({ advert: advertSaved, letter: letterSaved }));
     setSaved((current) => ({ ...current, exported: true }));
   }, [
@@ -834,10 +843,10 @@ export function Tailor({
       if (text === undefined) return;
       setError(null);
       setSaveMessage(null);
-      setSaving(true);
+      setSaving('file');
 
       const saved = await files.saveText(text, exportFileName(kind, jobTitle), 'txt');
-      setSaving(false);
+      setSaving(null);
 
       if (!saved.ok) {
         setError(`That could not be saved: ${saved.error.message}`);
@@ -874,7 +883,7 @@ export function Tailor({
       if ((kind === 'cv' ? result : letter) === null) return;
       setError(null);
       setSaveMessage(null);
-      setSaving(true);
+      setSaving('file');
 
       let built: { bytes: Uint8Array; missing: readonly string[] };
       try {
@@ -882,7 +891,7 @@ export function Tailor({
       } catch {
         // The builder runs over our own validated result, so this is our bug;
         // it still ends in a sentence on screen rather than a stuck spinner.
-        setSaving(false);
+        setSaving(null);
         setError('That document could not be built. Try running the tailoring again.');
         return;
       }
@@ -892,7 +901,7 @@ export function Tailor({
         exportFileName(kind, jobTitle, format),
         format,
       );
-      setSaving(false);
+      setSaving(null);
 
       if (!saved.ok) {
         setError(`That could not be saved: ${saved.error.message}`);
@@ -967,7 +976,11 @@ export function Tailor({
         </p>
       )}
 
-      <div className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+      <div
+        ref={scrollArea}
+        data-testid="tailor-scroll"
+        className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 md:px-6 md:py-5"
+      >
         <span id={STEP_ANCHOR.tailor} aria-hidden="true" />
         {/* ── 1. The CV ───────────────────────────────────────────────── */}
         <div>
@@ -1237,6 +1250,16 @@ export function Tailor({
           </p>
         ) : null}
 
+        {saving === 'file' ? (
+          <p
+            role="status"
+            data-testid="tailor-save-choosing"
+            className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
+          >
+            Choose where to save it in the save window.
+          </p>
+        ) : null}
+
         {saveMessage === null ? null : (
           <p
             role="status"
@@ -1355,7 +1378,7 @@ export function Tailor({
               <button
                 type="button"
                 data-testid="tailor-review-run"
-                disabled={running || saving}
+                disabled={running || saving !== null}
                 onClick={() => void gated('review')}
                 className={SECONDARY_BUTTON}
               >
@@ -1364,7 +1387,7 @@ export function Tailor({
               <button
                 type="button"
                 data-testid="tailor-letter-run"
-                disabled={running || saving}
+                disabled={running || saving !== null}
                 onClick={() => void gated('letter')}
                 className={SECONDARY_BUTTON}
               >
@@ -1373,7 +1396,7 @@ export function Tailor({
               <button
                 type="button"
                 data-testid="tailor-save-text"
-                disabled={running || saving}
+                disabled={running || saving !== null}
                 onClick={() => void onSaveText('cv')}
                 className={SECONDARY_BUTTON}
               >
@@ -1382,7 +1405,7 @@ export function Tailor({
               <button
                 type="button"
                 data-testid="tailor-save-docx-cv"
-                disabled={running || saving}
+                disabled={running || saving !== null}
                 onClick={() => void onSaveDocument('cv', 'docx')}
                 className={SECONDARY_BUTTON}
               >
@@ -1391,7 +1414,7 @@ export function Tailor({
               <button
                 type="button"
                 data-testid="tailor-save-pdf-cv"
-                disabled={running || saving}
+                disabled={running || saving !== null}
                 onClick={() => void onSaveDocument('cv', 'pdf')}
                 className={SECONDARY_BUTTON}
               >
@@ -1466,7 +1489,7 @@ export function Tailor({
                 <button
                   type="button"
                   data-testid="tailor-save-letter-text"
-                  disabled={running || saving}
+                  disabled={running || saving !== null}
                   onClick={() => void onSaveText('cover_letter')}
                   className={SECONDARY_BUTTON}
                 >
@@ -1475,7 +1498,7 @@ export function Tailor({
                 <button
                   type="button"
                   data-testid="tailor-save-docx-letter"
-                  disabled={running || saving}
+                  disabled={running || saving !== null}
                   onClick={() => void onSaveDocument('cover_letter', 'docx')}
                   className={SECONDARY_BUTTON}
                 >
@@ -1484,7 +1507,7 @@ export function Tailor({
                 <button
                   type="button"
                   data-testid="tailor-save-pdf-letter"
-                  disabled={running || saving}
+                  disabled={running || saving !== null}
                   onClick={() => void onSaveDocument('cover_letter', 'pdf')}
                   className={SECONDARY_BUTTON}
                 >
@@ -1519,7 +1542,7 @@ export function Tailor({
                 data-testid="tailor-save-application"
                 disabled={
                   running ||
-                  saving ||
+                  saving !== null ||
                   selectedJobId === null ||
                   // Wait for the job's applications, so a quick press cannot
                   // start a second one beside the one it already has.
@@ -1528,7 +1551,7 @@ export function Tailor({
                 onClick={() => void onSaveToApplication()}
                 className={SECONDARY_BUTTON}
               >
-                {saving ? 'Saving…' : 'Save to an application'}
+                {saving === 'application' ? 'Saving…' : 'Save to an application'}
               </button>
               {selectedJobId !== null ? null : (
                 <p data-testid="tailor-save-application-reason" className="text-xs text-ink-muted">
