@@ -1,3 +1,5 @@
+import { Hint, type HintTriggerProps } from './Hint';
+import { shortcutHint } from './hints';
 import { type EnvironmentStatus } from '../status/environment';
 
 import { CViperMark } from './CViperMark';
@@ -33,8 +35,27 @@ interface NavButtonProps {
 }
 
 function NavButton({ view, active, onSelect }: NavButtonProps) {
+  if (view.shortcut === null) {
+    return <NavButtonBody view={view} active={active} onSelect={onSelect} />;
+  }
+  return (
+    <Hint text={shortcutHint(view.label, String(view.shortcut))}>
+      {(trigger) => (
+        <NavButtonBody view={view} active={active} onSelect={onSelect} trigger={trigger} />
+      )}
+    </Hint>
+  );
+}
+
+function NavButtonBody({
+  view,
+  active,
+  onSelect,
+  trigger,
+}: NavButtonProps & { readonly trigger?: HintTriggerProps }) {
   return (
     <button
+      {...trigger}
       type="button"
       aria-current={active ? 'page' : undefined}
       data-testid={`nav-${view.id}`}

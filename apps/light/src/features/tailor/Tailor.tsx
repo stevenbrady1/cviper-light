@@ -40,6 +40,7 @@ import {
   type ProviderOption,
 } from '../analysis/providers';
 import { gapsForTailor, type TailorHandoff } from '../flow/handoff';
+import { FLOW_HINT } from '../../app/hints';
 import { JobStepBar } from '../flow/JobStepBar';
 import {
   NO_SAVED_PROGRESS,
@@ -1308,6 +1309,9 @@ export function Tailor({
               <summary className="cursor-pointer font-medium text-ink">
                 What changed against your original
               </summary>
+              <p data-testid="tailor-diff-legend" className="mt-2 text-xs text-ink-muted">
+                {FLOW_HINT.diff}
+              </p>
               <ol data-testid="tailor-diff" className="mt-2 space-y-0.5 font-mono text-xs">
                 {lineDiff(cvText, result.text).map((line, index) => (
                   <li

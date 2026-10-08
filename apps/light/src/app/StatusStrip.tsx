@@ -1,3 +1,5 @@
+import { Hint } from './Hint';
+import { RAIL_HINT, statusDotHint } from './hints';
 import {
   AI_STATUS_PROVIDERS,
   type EnvironmentStatus,
@@ -63,7 +65,15 @@ interface DotProps {
   readonly description: string;
 }
 
-function Dot({ testId, label, state, tone, description }: DotProps) {
+function Dot(props: DotProps) {
+  return (
+    <Hint text={statusDotHint(props.label, props.description)}>
+      <DotBody {...props} />
+    </Hint>
+  );
+}
+
+function DotBody({ testId, label, state, tone, description }: DotProps) {
   return (
     <span className="inline-flex items-center gap-1.5" data-testid={testId} data-state={state}>
       {/*
@@ -189,7 +199,7 @@ export function StatusStrip({ status, onOpenSettings }: StatusStripProps) {
         ) : null}
 
         <li className="flex items-center justify-between" data-testid="status-requests">
-          <span>Requests today</span>
+          <Hint text={RAIL_HINT.requests}>Requests today</Hint>
           {/*
             Mono and tabular, like every other number in this app, so it does
             not shuffle the row's width as it ticks from 9 to 10.
