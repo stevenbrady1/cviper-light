@@ -65,7 +65,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use tauri::AppHandle;
-use tauri_plugin_dialog::{DialogExt, FilePath};
+use tauri_plugin_dialog::{DialogExt, FileDialogBuilder, FilePath};
 
 /// The largest CV we will read, in bytes.
 ///
@@ -307,6 +307,40 @@ const NOT_A_LOCAL_FILE: &str = "CViper could not tell where that file is. Try pi
 
 /// How many answers the dialog channel holds. One dialog, one answer.
 const ONE_ANSWER: usize = 1;
+
+/// A file dialog that belongs to the app's window (L-217).
+///
+/// ============================================================================
+/// WHY EVERY DIALOG HAS A PARENT
+/// ============================================================================
+/// A dialog with no parent window is a window of its own, and Windows puts it
+/// wherever it likes: on another monitor, or behind CViper. The button that
+/// opened it then sits on "Saving…" while the user cannot see what it is
+/// waiting for — reported as "Save CV as PDF does nothing", when the save
+/// dialog was open on a different screen all along.
+///
+/// With CViper's window as its parent, the dialog opens in front of CViper,
+/// over it, on the same screen, and CViper waits beneath it as a dialog's
+/// owner should. Every dialog in this module is built here;
+/// `every_dialog_is_built_with_a_parent` keeps it that way.
+///
+/// Phones have one window and no parent to give, so there it is the plain
+/// dialog. So is a desktop with no window yet, which cannot happen while a
+/// button is being pressed but is not worth a refusal if it does.
+fn file_dialog(app: &AppHandle) -> FileDialogBuilder<tauri::Wry> {
+    let builder = app.dialog().file();
+    #[cfg(desktop)]
+    {
+        use tauri::Manager;
+        let window = app
+            .get_webview_window("main")
+            .or_else(|| app.webview_windows().into_values().next());
+        if let Some(window) = window {
+            return builder.set_parent(&window);
+        }
+    }
+    builder
+}
 
 /// Wait for the dialog the caller has just opened.
 ///
@@ -655,8 +689,7 @@ fn discard_inbox_copy(path: &Path) {
 pub(crate) async fn pick_and_read_cv(app: AppHandle) -> Result<Option<CvFile>, String> {
     let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
 
-    app.dialog()
-        .file()
+    file_dialog(&app)
         .set_title("Choose a CV")
         .add_filter("CV", &CV_EXTENSIONS)
         // `try_send` rather than `send`: the callback may run on the UI thread,
@@ -678,8 +711,7 @@ pub(crate) async fn pick_and_read_cv(app: AppHandle) -> Result<Option<CvFile>, S
 pub(crate) async fn pick_and_read_backup(app: AppHandle) -> Result<Option<BackupFile>, String> {
     let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
 
-    app.dialog()
-        .file()
+    file_dialog(&app)
         .set_title("Choose a CViper backup")
         .add_filter("CViper backup", &BACKUP_EXTENSIONS)
         .pick_file(move |chosen| {
@@ -715,8 +747,7 @@ pub(crate) async fn pick_and_write_backup(
 
     let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
 
-    app.dialog()
-        .file()
+    file_dialog(&app)
         .set_title("Save your CViper backup")
         .set_file_name(bare_file_name(&suggestion))
         .add_filter("CViper backup", &BACKUP_EXTENSIONS)
@@ -750,8 +781,7 @@ pub(crate) async fn pick_and_write_cv_json(
 
     let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
 
-    app.dialog()
-        .file()
+    file_dialog(&app)
         .set_title("Save your CV as a JSON Resume")
         .set_file_name(bare_json_name(&suggestion, FALLBACK_CV_JSON_NAME))
         .add_filter("JSON Resume", &BACKUP_EXTENSIONS)
@@ -795,8 +825,7 @@ pub(crate) async fn pick_and_write_text(
 
     let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
 
-    app.dialog()
-        .file()
+    file_dialog(&app)
         .set_title("Save as text")
         .set_file_name(bare_text_name(&suggestion, extension))
         .add_filter(extension, &[extension])
@@ -993,8 +1022,7 @@ pub(crate) async fn pick_and_read_profile_workspace(
     {
         let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
 
-        app.dialog()
-            .file()
+        file_dialog(&app)
             .set_title("Choose your ai-job-search folder")
             .pick_folder(move |chosen| {
                 let _ = answer.try_send(chosen);
@@ -1181,8 +1209,7 @@ pub(crate) async fn pick_and_write_bytes(
 
     let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
 
-    app.dialog()
-        .file()
+    file_dialog(&app)
         .set_title(title)
         .set_file_name(bare_bytes_name(&suggestion, extension))
         .add_filter(filter, &[extension])
@@ -2465,5 +2492,77 @@ mod tests {
         let error = read_workspace_at(&gone).unwrap_err();
         assert!(!error.contains("s3cr3t"), "{error}");
         assert!(!error.is_empty());
+    }
+
+    // ── Every dialog has a parent (L-217) ───────────────────────────────────
+
+    /// Shipped Rust only: comments and the test module dropped.
+    fn shipped(source: &str) -> String {
+        let production = match source.find("#[cfg(test)]") {
+            Some(index) => &source[..index],
+            None => source,
+        };
+        production
+            .lines()
+            .map(|line| match line.find("//") {
+                Some(index) => &line[..index],
+                None => line,
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// The body of `file_dialog`, up to the next item.
+    fn file_dialog_body(source: &str) -> &str {
+        let start = source
+            .find("fn file_dialog(")
+            .expect("file_dialog is gone: every dialog must be built through it");
+        let rest = &source[start..];
+        let end = rest.find("\n}\n").map_or(rest.len(), |index| index + 3);
+        &rest[..end]
+    }
+
+    #[test]
+    fn every_dialog_is_built_with_a_parent() {
+        // A dialog with no parent can open on another screen or behind the
+        // app, and the button that opened it waits on "Saving…" in plain view
+        // while the user cannot find the dialog. So `file_dialog` is the only
+        // place in the app that opens one, and it gives it CViper's window.
+        let source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut callers = Vec::new();
+        for entry in fs::read_dir(&source_dir).expect("src/ is readable") {
+            let path = entry.expect("a directory entry").path();
+            if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                continue;
+            }
+            let code = shipped(&fs::read_to_string(&path).expect("a source file"));
+            let count = code.matches(".dialog()").count();
+            if count > 0 {
+                callers.push((file_name_of(&path), count));
+            }
+        }
+        assert_eq!(
+            callers,
+            vec![("files.rs".to_string(), 1)],
+            "a dialog is opened outside file_dialog; build it with file_dialog(&app)"
+        );
+
+        let files = shipped(include_str!("files.rs"));
+        let helper = file_dialog_body(&files);
+        assert!(helper.contains(".dialog()"), "{helper}");
+        assert!(helper.contains(".set_parent(&window)"), "{helper}");
+        assert!(
+            files.matches("file_dialog(&app)").count() >= 7,
+            "every command builds its dialog through file_dialog"
+        );
+    }
+
+    #[test]
+    fn the_parent_check_can_fail() {
+        // Without this the check above could pass on a scan of nothing.
+        let unparented = "fn file_dialog(app: &AppHandle) -> X {\n    app.dialog().file()\n}\n";
+        assert!(!file_dialog_body(unparented).contains(".set_parent(&window)"));
+        let commented = "let a = 1; // app.dialog()\n#[cfg(test)]\napp.dialog()";
+        assert_eq!(shipped(commented).matches(".dialog()").count(), 0);
     }
 }
