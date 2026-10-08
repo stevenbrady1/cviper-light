@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The privacy policy (and Settings → Privacy) now lists every small convenience kept in the app's own browser storage: since 0.8.0 that includes which free job feeds you ticked on Search. It never leaves your computer, and "Delete everything" removes it with the rest (L-220).
+
 ## [0.8.0] — 2026-10-08
 
 ### Added

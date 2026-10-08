@@ -71,7 +71,7 @@ export const DATA_LOCATIONS: readonly DataLocation[] = [
     erasedBy: 'preferences',
   },
   {
-    what: 'Small conveniences: your last search, today’s request count, and that you have seen the introduction',
+    what: 'Small conveniences: your last search, which free job feeds you ticked, today’s request count, and that you have seen the introduction',
     where: 'this app’s own browser storage, which no other program reads',
     erasedBy: 'preferences',
   },
