@@ -89,6 +89,12 @@ pub fn migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/0007_job_workflow.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 8,
+            description: "cvs.original_text: the file's own text, kept once the user corrects it (L-218)",
+            sql: include_str!("../migrations/0008_cv_original_text.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -262,6 +268,25 @@ mod tests {
         );
         for forbidden in ["DROP", "RENAME", "UPDATE ", "DELETE FROM", "INSERT"] {
             assert!(!sql.contains(forbidden), "0006 must be additive; found `{forbidden}`");
+        }
+    }
+
+    #[test]
+    fn the_eighth_migration_only_adds_nullable_original_text_to_cvs() {
+        // L-218. One nullable column on `cvs`, and nothing else: every CV that
+        // exists reads as "never corrected". Run for real over a database
+        // holding data by `src/db/migration.cvOriginalText.test.ts`.
+        let migration = &migrations()[7];
+        assert_eq!(migration.version, 8);
+        assert!(matches!(migration.kind, MigrationKind::Up));
+        let sql = executable_sql(migration.sql);
+        assert!(
+            sql.contains("ALTER TABLE cvs ADD COLUMN original_text TEXT;"),
+            "0008 must add nullable cvs.original_text"
+        );
+        assert_eq!(sql.matches("ALTER TABLE").count(), 1, "0008 alters one table once");
+        for forbidden in ["CREATE", "DROP", "RENAME", "UPDATE", "DELETE", "NOT NULL", "INSERT"] {
+            assert!(!sql.contains(forbidden), "0008 must not contain {forbidden}");
         }
     }
 

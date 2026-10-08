@@ -184,6 +184,15 @@ export interface Cv {
    * back out (L-20b). `null` for a PDF, a .docx or pasted text.
    */
   json_resume: string | null;
+  /**
+   * The text first read from the file, kept once the user has corrected
+   * `extracted_text` (L-218). `extracted_text` is always the text the app uses
+   * — corrected or not — so every reader gets the correction without knowing
+   * about it; this is only for showing what changed and for "Restore".
+   * `null` or absent: never corrected. `''`: the file gave no text and the
+   * user typed it in.
+   */
+  original_text?: string | null | undefined;
   /** @internal forward-compatibility bag — see `ExtraFields`. */
   __extra?: ExtraFields;
 }
@@ -372,7 +381,21 @@ export const CvSchema = z.object({
   // Added in L-20b. Absent in every backup written before it, so absence reads
   // as `null` rather than refusing a file the user made last month.
   json_resume: z.string().nullable().default(null),
+  // Added in L-218 (SQLite v8). Absent from older backups and older rows:
+  // absence means "never corrected".
+  original_text: z.string().nullable().optional(),
 });
+
+/**
+ * A CV that was never corrected (L-218) has no `original_text` key at all,
+ * whether it was read from the database or a backup, so it compares and
+ * serialises exactly as a CV from before the field existed.
+ */
+export function withoutEmptyOriginal(cv: Cv): Cv {
+  if (cv.original_text !== null && cv.original_text !== undefined) return cv;
+  const { original_text: _absent, ...rest } = cv;
+  return rest;
+}
 
 export const AnalysisSchema = z.object({
   id: z.string(),

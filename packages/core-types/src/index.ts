@@ -26,6 +26,7 @@ export {
   AnalysisSchema,
   ApplicationSchema,
   CvSchema,
+  withoutEmptyOriginal,
   DocumentSchema,
   INTERVIEW_SUBSTAGE_NAME_MAX,
   INTERVIEW_SUBSTAGES_IMPORT_MAX,

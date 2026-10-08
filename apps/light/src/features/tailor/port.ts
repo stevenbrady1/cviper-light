@@ -20,6 +20,7 @@ import {
   listDocumentsForApplication,
   listJobs,
   upsertApplication,
+  upsertCv,
   upsertDocument,
   type DbError,
 } from '../../db';
@@ -36,6 +37,11 @@ import {
 export interface TailorPort {
   /** Every CV the user has uploaded, newest first. */
   loadCvs(): Promise<Result<Cv[], DbError>>;
+  /**
+   * Store a CV whose text the user corrected, or restored (L-218). The same
+   * row every screen reads, so Analysis and every job use the correction.
+   */
+  saveCv(cv: Cv): Promise<Result<void, DbError>>;
   /** Every job on the tracker board, so a saved advert can be reused. */
   loadJobs(): Promise<Result<Job[], DbError>>;
   /** The applications chasing ONE job — where a tailored CV can be archived. */
@@ -56,6 +62,7 @@ export interface TailorPort {
 export function createDbTailorPort(): TailorPort {
   return {
     loadCvs: listCvs,
+    saveCv: upsertCv,
     loadJobs: listJobs,
     async loadApplicationsFor(jobId) {
       // There is no `listApplicationsForJob` in `src/db`, and one job has a
