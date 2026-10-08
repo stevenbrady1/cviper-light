@@ -53,6 +53,7 @@ import { sanitizeForPrompt, truncateForPrompt } from '@cviper/cv-parsing';
 
 import { MAX_CV_CHARS, MAX_JOB_CHARS } from './build-prompt';
 import { cleanOneLine } from './clean-one-line';
+import { createFences, type Fences } from './fence';
 import {
   USER_FACTS_CARVE_OUT,
   carveOut,
@@ -213,11 +214,11 @@ const FIELD_RULES = `Field rules, in the order you must answer them:
 
 ${JSON_ONLY}`;
 
-function fence(label: string, body: string, maxChars: number): string {
+function fence(fences: Fences, label: string, body: string, maxChars: number): string {
   // Sanitise BEFORE truncating, as `build-prompt.ts` does: sanitising removes
   // text, so truncating first would spend budget on content about to go.
   const cleaned = truncateForPrompt(sanitizeForPrompt(body), maxChars);
-  return `=== ${label} ===\n${cleaned}\n=== END ${label} ===`;
+  return fences.wrap(label, cleaned);
 }
 
 /**
@@ -226,10 +227,14 @@ function fence(label: string, body: string, maxChars: number): string {
  * a note that closed our section by accident would be a confusing failure.
  * `null` when there is nothing to say.
  */
-function notesFence(notes: string | null): string | null {
+function notesFence(fences: Fences, notes: string | null): string | null {
   const cleaned = truncateForPrompt(sanitizeForPrompt(notes ?? ''), MAX_PROFILE_NOTES_CHARS);
   if (cleaned.trim() === '') return null;
-  return `=== CANDIDATE NOTES (how they write, what to emphasise) ===\n${cleaned}\n=== END CANDIDATE NOTES ===`;
+  return [
+    fences.open('CANDIDATE NOTES (how they write, what to emphasise)'),
+    cleaned,
+    fences.close('CANDIDATE NOTES'),
+  ].join('\n');
 }
 
 /**
@@ -268,13 +273,18 @@ export function promptKeywordGaps(gaps: readonly string[] | null | undefined): s
  * advert skill the CV does not show, and the fabrication check still runs on
  * the answer.
  */
-function keywordGapsSection(gaps: readonly string[] | null | undefined): string | null {
+function keywordGapsSection(
+  fences: Fences,
+  gaps: readonly string[] | null | undefined,
+): string | null {
   const kept = promptKeywordGaps(gaps);
   if (kept.length === 0) return null;
   return [
-    '=== ADVERT WORDS THE BASE CV DOES NOT USE (use one ONLY where the base CV already shows it) ===',
+    fences.open(
+      'ADVERT WORDS THE BASE CV DOES NOT USE (use one ONLY where the base CV already shows it)',
+    ),
     ...kept.map((gap) => `- ${gap}`),
-    '=== END ADVERT WORDS ===',
+    fences.close('ADVERT WORDS'),
     '',
     'KEYWORD GAPS: the words above appear in the advert, and screening software will look for them, but the base CV does not use them. Apply rule 11 to each one: use the word ONLY where the base CV already shows the same experience in other words. Where it does not, leave the word out. This list is NOT evidence that the candidate has any of it — never add a skill, tool or qualification because it is listed.',
   ].join('\n');
@@ -324,17 +334,21 @@ function fieldRulesWithUserFacts(): string {
 }
 
 export function buildTailorPrompt(input: TailorPromptInput): TailorPrompt {
-  const notes = notesFence(input.profileNotes);
-  const gaps = keywordGapsSection(input.keywordGaps);
-  const userMetrics = userMetricsSection(input.userMetrics);
+  const fences = createFences();
+  const notes = notesFence(fences, input.profileNotes);
+  const gaps = keywordGapsSection(fences, input.keywordGaps);
+  const userMetrics = userMetricsSection(input.userMetrics, fences);
   const hasUserMetrics = userMetrics !== null;
 
   const user = [
+    fences.rule,
+    '',
     hasUserMetrics ? criticalWithUserFacts() : CRITICAL,
     '',
-    fence('BASE CV (the ONLY source of truth)', input.cvText, MAX_CV_CHARS),
+    fence(fences, 'BASE CV (the ONLY source of truth)', input.cvText, MAX_CV_CHARS),
     '',
     fence(
+      fences,
       'JOB ADVERT (tailor for this role — do NOT invent experience to match it)',
       input.jobText,
       MAX_JOB_CHARS,

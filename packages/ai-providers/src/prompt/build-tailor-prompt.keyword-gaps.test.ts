@@ -20,6 +20,7 @@ import {
   buildTailorPrompt,
   promptKeywordGaps,
 } from './build-tailor-prompt';
+import { untagged } from '../test/fence-tags';
 
 const CV = 'Jane Doe. 8 years Python at Acme Ltd. Built dashboards for the risk team.';
 const JOB = 'Senior Python Engineer, payments. Power BI and dbt. 5+ years.';
@@ -64,7 +65,7 @@ describe('buildTailorPrompt with keyword gaps (L-202)', () => {
       const user = prompt(none);
       expect(user).not.toContain(HEADING);
       expect(user).not.toContain('KEYWORD GAPS');
-      expect(user).toBe(plain);
+      expect(untagged(user)).toBe(untagged(plain));
     }
   });
 

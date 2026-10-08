@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildCoverLetterPrompt } from './build-cover-letter-prompt';
+import { untagged } from '../test/fence-tags';
 
 const base = { cvText: 'cv', jobText: 'job', tailoredCvText: 'tailored', profileNotes: null };
 const HEADING = '=== CANDIDATE-SUPPLIED ACHIEVEMENTS';
@@ -27,7 +28,7 @@ describe('buildCoverLetterPrompt with user-supplied metrics (L-205)', () => {
   it.each([undefined, null, []])('negative: %j leaves the prompt unchanged', (value) => {
     const { user } = buildCoverLetterPrompt({ ...base, userMetrics: value });
     expect(user).not.toContain('CANDIDATE-SUPPLIED');
-    expect(user).toBe(buildCoverLetterPrompt(base).user);
+    expect(untagged(user)).toBe(untagged(buildCoverLetterPrompt(base).user));
   });
 
   it('boundary: a hostile entry cannot close the fence', () => {

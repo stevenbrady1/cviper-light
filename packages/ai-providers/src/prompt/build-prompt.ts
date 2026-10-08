@@ -33,6 +33,8 @@
  */
 import { sanitizeForPrompt, truncateForPrompt } from '@cviper/cv-parsing';
 
+import { createFences, fenceTagOf, type Fences } from './fence';
+
 import {
   ATS_SCORE_ANCHORS,
   FAIRNESS_GUARDRAIL,
@@ -154,18 +156,21 @@ const FIELD_RULES = `Field rules:
 
 ${JSON_ONLY}`;
 
-function fence(label: string, body: string, maxChars: number): string {
+function fence(fences: Fences, label: string, body: string, maxChars: number): string {
   // Sanitise BEFORE truncating: sanitising removes text, so truncating first
   // would spend budget on content that is about to be deleted anyway.
   const cleaned = truncateForPrompt(sanitizeForPrompt(body), maxChars);
-  return `=== ${label} ===\n${cleaned}\n=== END ${label} ===`;
+  return fences.wrap(label, cleaned);
 }
 
 export function buildAnalysisPrompt(input: AnalysisPromptInput): AnalysisPrompt {
+  const fences = createFences();
   const user = [
-    fence('CV', input.cvText, MAX_CV_CHARS),
+    fences.rule,
     '',
-    fence('JOB', input.jobText, MAX_JOB_CHARS),
+    fence(fences, 'CV', input.cvText, MAX_CV_CHARS),
+    '',
+    fence(fences, 'JOB', input.jobText, MAX_JOB_CHARS),
     '',
     REASONING_STEPS,
     FIT_SCORE_WEIGHTS,
@@ -208,11 +213,18 @@ export function buildRepairPrompt(
   const cleaned = truncateForPrompt(sanitizeForPrompt(rejectedOutput), MAX_QUOTED_OUTPUT_CHARS);
   const quoted = cleaned.trim().length > 0 ? cleaned : '(the reply was empty)';
 
-  return `${originalUser}
+  // The repair turn goes out under the ORIGINAL system message and repeats the
+  // original user turn, rule and all, so its own section takes the same tag.
+  // An original with no tagged fence gets a fresh one, and the rule with it.
+  const originalTag = fenceTagOf(originalUser);
+  const fences = createFences(originalTag ?? undefined);
+  const lead = originalTag === null ? `${fences.rule}\n\n${originalUser}` : originalUser;
 
-=== YOUR PREVIOUS REPLY ===
+  return `${lead}
+
+${fences.open('YOUR PREVIOUS REPLY')}
 ${quoted}
-=== END PREVIOUS REPLY ===
+${fences.close('PREVIOUS REPLY')}
 
 That reply was rejected because it did not match the required output. The problem was:
 

@@ -22,6 +22,7 @@ import {
   type InterviewPromptInput,
 } from './build-interview-prompt';
 import { FAIRNESS_GUARDRAIL, JSON_ONLY, UNTRUSTED_CONTENT_BOUNDARY } from './constants';
+import { untagged } from '../test/fence-tags';
 
 const STAR = {
   title: 'Moved the risk book to Postgres',
@@ -137,9 +138,11 @@ describe('buildInterviewPrompt — the materials', () => {
       }),
     );
 
-    expect(user).toContain('=== CV ===\n(not supplied)\n=== END CV ===');
-    expect(user).toContain('=== CV LETTER ===\n(not supplied)\n=== END CV LETTER ===');
-    expect(user).toContain('=== CV EXAMPLES ===\n(not supplied)\n=== END CV EXAMPLES ===');
+    expect(untagged(user)).toContain('=== CV ===\n(not supplied)\n=== END CV ===');
+    expect(untagged(user)).toContain('=== CV LETTER ===\n(not supplied)\n=== END CV LETTER ===');
+    expect(untagged(user)).toContain(
+      '=== CV EXAMPLES ===\n(not supplied)\n=== END CV EXAMPLES ===',
+    );
     expect(user).toContain('Headline: (not supplied)');
     expect(user).toContain('Career goals: (not supplied)');
     expect(user).toContain('Advert:\n(not supplied)');
@@ -149,7 +152,7 @@ describe('buildInterviewPrompt — the materials', () => {
 
   it('boundary: a whitespace-only material counts as absent', () => {
     const { user } = buildInterviewPrompt(input({ coverLetter: '   \n\n  ' }));
-    expect(user).toContain('=== CV LETTER ===\n(not supplied)\n=== END CV LETTER ===');
+    expect(untagged(user)).toContain('=== CV LETTER ===\n(not supplied)\n=== END CV LETTER ===');
   });
 
   it('negative: a forged closing fence inside a material does not survive', () => {
@@ -197,8 +200,8 @@ describe('buildInterviewPrompt — the budgets', () => {
   });
 
   it('truncates a long CV at the CV budget', () => {
-    const { user } = buildInterviewPrompt(
-      input({ cvText: 'b'.repeat(MAX_INTERVIEW_CV_CHARS * 2) }),
+    const user = untagged(
+      buildInterviewPrompt(input({ cvText: 'b'.repeat(MAX_INTERVIEW_CV_CHARS * 2) })).user,
     );
     const body = user.slice(
       user.indexOf('=== CV ===\n') + '=== CV ===\n'.length,
@@ -208,8 +211,8 @@ describe('buildInterviewPrompt — the budgets', () => {
   });
 
   it('truncates a long letter at the letter budget', () => {
-    const { user } = buildInterviewPrompt(
-      input({ coverLetter: 'c'.repeat(MAX_INTERVIEW_LETTER_CHARS * 2) }),
+    const user = untagged(
+      buildInterviewPrompt(input({ coverLetter: 'c'.repeat(MAX_INTERVIEW_LETTER_CHARS * 2) })).user,
     );
     const start = user.indexOf('=== CV LETTER ===\n') + '=== CV LETTER ===\n'.length;
     const body = user.slice(start, user.indexOf('\n=== END CV LETTER ==='));
@@ -218,8 +221,10 @@ describe('buildInterviewPrompt — the budgets', () => {
 
   it('boundary: twenty long worked examples still fit the STAR block budget', () => {
     const long = { ...STAR, action: 'x'.repeat(2000), result: 'y'.repeat(2000) };
-    const { user } = buildInterviewPrompt(
-      input({ profile: { headline: null, starExamples: Array(20).fill(long), careerGoals: [] } }),
+    const user = untagged(
+      buildInterviewPrompt(
+        input({ profile: { headline: null, starExamples: Array(20).fill(long), careerGoals: [] } }),
+      ).user,
     );
     const start = user.indexOf('=== CV EXAMPLES ===\n') + '=== CV EXAMPLES ===\n'.length;
     const body = user.slice(start, user.indexOf('\n=== END CV EXAMPLES ==='));

@@ -40,6 +40,7 @@
 import { sanitizeForPrompt, truncateForPrompt } from '@cviper/cv-parsing';
 
 import { MAX_CV_CHARS, MAX_JOB_CHARS } from './build-prompt';
+import { createFences, type Fences } from './fence';
 import { MAX_PROFILE_NOTES_CHARS } from './build-tailor-prompt';
 import {
   FAIRNESS_GUARDRAIL,
@@ -120,15 +121,20 @@ const FIELD_RULES = `Field rules, in the order you must answer them:
 
 ${JSON_ONLY}`;
 
-function fence(label: string, body: string, maxChars: number): string {
+function fence(fences: Fences, label: string, body: string, maxChars: number): string {
   const cleaned = truncateForPrompt(sanitizeForPrompt(body), maxChars);
-  return `=== ${label} ===\n${cleaned}\n=== END ${label} ===`;
+  return fences.wrap(label, cleaned);
 }
 
-function optionalFence(label: string, body: string | null, maxChars: number): string | null {
+function optionalFence(
+  fences: Fences,
+  label: string,
+  body: string | null,
+  maxChars: number,
+): string | null {
   const cleaned = truncateForPrompt(sanitizeForPrompt(body ?? ''), maxChars);
   if (cleaned.trim() === '') return null;
-  return `=== ${label} ===\n${cleaned}\n=== END ${label} ===`;
+  return fences.wrap(label, cleaned);
 }
 
 function requirementsWithUserFacts(): string {
@@ -145,24 +151,29 @@ function requirementsWithUserFacts(): string {
 }
 
 export function buildCoverLetterPrompt(input: CoverLetterPromptInput): CoverLetterPrompt {
-  const userMetrics = userMetricsSection(input.userMetrics);
+  const fences = createFences();
+  const userMetrics = userMetricsSection(input.userMetrics, fences);
   const tailored = optionalFence(
+    fences,
     'TAILORED CV (already written for this role — complement it, do not repeat it)',
     input.tailoredCvText,
     MAX_TAILORED_CONTEXT_CHARS,
   );
   const notes = optionalFence(
+    fences,
     'CANDIDATE NOTES (how they write, what to emphasise)',
     input.profileNotes,
     MAX_PROFILE_NOTES_CHARS,
   );
 
   const user = [
+    fences.rule,
+    '',
     'Write a professional cover letter for this job application.',
     '',
-    fence('CV (the ONLY source of facts about the candidate)', input.cvText, MAX_CV_CHARS),
+    fence(fences, 'CV (the ONLY source of facts about the candidate)', input.cvText, MAX_CV_CHARS),
     '',
-    fence('JOB ADVERT', input.jobText, MAX_JOB_CHARS),
+    fence(fences, 'JOB ADVERT', input.jobText, MAX_JOB_CHARS),
     ...(tailored === null ? [] : ['', tailored]),
     ...(userMetrics === null ? [] : ['', userMetrics]),
     ...(notes === null ? [] : ['', notes]),

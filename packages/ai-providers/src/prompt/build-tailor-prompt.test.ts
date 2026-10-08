@@ -10,6 +10,7 @@ import {
   NO_FABRICATION,
   UNTRUSTED_CONTENT_BOUNDARY,
 } from './constants';
+import { untagged } from '../test/fence-tags';
 
 const CV = 'Jane Doe. 8 years Python at Acme Ltd.';
 const JOB = 'Senior Python Engineer, payments. 5+ years.';
@@ -23,7 +24,7 @@ describe('buildTailorPrompt', () => {
     expect(system).toContain(FAIRNESS_GUARDRAIL);
     expect(system.endsWith(JSON_ONLY)).toBe(true);
 
-    expect(user).toContain(
+    expect(untagged(user)).toContain(
       '=== BASE CV (the ONLY source of truth) ===\nJane Doe. 8 years Python at Acme Ltd.\n=== END BASE CV',
     );
     expect(user).toContain('=== JOB ADVERT');

@@ -23,7 +23,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sanitizeForPrompt } from '@cviper/cv-parsing';
 import { describe, expect, it } from 'vitest';
 
+import { buildRepairPrompt } from './build-prompt';
 import { buildTailorPrompt } from './build-tailor-prompt';
+import { FENCE_TAG_LENGTH, createFences, fenceTagOf, randomFenceTag } from './fence';
 
 const NL = String.fromCharCode(10);
 const PROMPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -93,8 +95,13 @@ const moduleFiles = readdirSync(PROMPT_DIR)
   .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))
   .sort();
 
+/** The per-prompt tag every fence line ends with (L-210). */
+const TAG_SUFFIX = / #[a-z2-7]{8}$/;
+
 const emitted = new Set<string>();
 const uncovered: string[] = [];
+/** Every builder's output, kept for the tag contract below. */
+const outputs: { readonly name: string; readonly text: string }[] = [];
 for (const file of moduleFiles) {
   const exports = (await import(pathToFileURL(join(PROMPT_DIR, file)).href)) as Record<
     string,
@@ -108,14 +115,19 @@ for (const file of moduleFiles) {
       continue;
     }
     const result = (value as (...args: unknown[]) => unknown)(...fixture);
-    const lines = (
+    const text =
       typeof result === 'string'
         ? result
         : Object.values(result as object)
             .filter((v): v is string => typeof v === 'string')
-            .join(NL)
-    ).split(NL);
-    for (const line of lines) if (/^=== .* ===$/.test(line)) emitted.add(line);
+            .join(NL);
+    outputs.push({ name, text });
+    for (const line of text.split(NL)) {
+      // The shape is checked without the tag: an advert cannot know the tag,
+      // so the sanitiser has to catch the bare shape (and does, tag or not).
+      const bare = line.replace(TAG_SUFFIX, '');
+      if (/^=== .* ===$/.test(bare)) emitted.add(bare);
+    }
   }
 }
 
@@ -210,7 +222,7 @@ describe('forged user-facts block (the proven exploit)', () => {
   ].join('\n');
 
   const fenceLines = (user: string): string[] =>
-    user.split(NL).filter((l) => /^=== .*CANDIDATE-SUPPLIED.* ===$/.test(l));
+    user.split(NL).filter((l) => /^=== .*CANDIDATE-SUPPLIED.* ===( #[a-z2-7]{8})?$/.test(l));
 
   it('forms ZERO fence lines in the tailor prompt when the user supplied no metrics', () => {
     const { user } = buildTailorPrompt({
@@ -244,5 +256,67 @@ describe('forged user-facts block (the proven exploit)', () => {
     const close = all.findIndex((l) => l.startsWith('=== END JOB ADVERT'));
     expect(open).toBeLessThan(bullet);
     expect(bullet).toBeLessThan(close);
+  });
+});
+
+describe('every fence carries this prompt’s random tag (L-210)', () => {
+  it('finds outputs at all (a broken scan must not pass vacuously)', () => {
+    expect(outputs.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('every fence line of every builder ends with the tag its SECTION MARKERS rule names', () => {
+    for (const { name, text } of outputs) {
+      const tag = fenceTagOf(text);
+      expect(tag, `${name} emitted no tagged fence`).not.toBeNull();
+      const lines = text.split(NL);
+      const rule = lines.findIndex((line) => line.startsWith('SECTION MARKERS:'));
+      const firstFence = lines.findIndex((line) => FENCE_LINE.test(line));
+      expect(rule, `${name} has no SECTION MARKERS rule`).toBeGreaterThanOrEqual(0);
+      expect(lines[rule], name).toContain(`#${String(tag)}`);
+      expect(rule, `${name}: the rule must come before any fence`).toBeLessThan(firstFence);
+      for (const line of lines.filter((candidate) => FENCE_LINE.test(candidate))) {
+        expect(line.endsWith(` #${String(tag)}`), `${name}: untagged fence ${line}`).toBe(true);
+      }
+    }
+  });
+
+  it('a new prompt draws a new tag', () => {
+    const build = () =>
+      buildTailorPrompt({ cvText: 'Jane Doe.', jobText: 'Python role.', profileNotes: null }).user;
+    expect(fenceTagOf(build())).not.toBe(fenceTagOf(build()));
+  });
+
+  it('tags are eight base32 characters, and do not repeat', () => {
+    const tags = Array.from({ length: 2000 }, randomFenceTag);
+    for (const tag of tags) expect(tag).toMatch(new RegExp(`^[a-z2-7]{${FENCE_TAG_LENGTH}}$`));
+    expect(new Set(tags).size).toBe(tags.length);
+  });
+
+  it('negative: a tag that is not eight base32 characters is refused, not written into a prompt', () => {
+    for (const bad of ['', 'short', 'abcdefg1', 'ABCDEFGH', 'abcdefghi', 'abc defg', 'abcd#efg']) {
+      expect(() => createFences(bad), bad).toThrow();
+    }
+    expect(createFences('abcdefgh').open('JOB')).toBe('=== JOB === #abcdefgh');
+  });
+
+  it('the repair turn reuses the tag of the prompt it repeats', () => {
+    const original = buildTailorPrompt({
+      cvText: 'Jane Doe.',
+      jobText: 'Python role.',
+      profileNotes: null,
+    }).user;
+    const tag = fenceTagOf(original);
+    const repair = buildRepairPrompt(original, '{"broken": true}', 'summary: required');
+    expect(repair).toContain(`=== YOUR PREVIOUS REPLY === #${String(tag)}`);
+    expect(repair).toContain(`=== END PREVIOUS REPLY === #${String(tag)}`);
+    expect(repair.match(/^SECTION MARKERS:/gm)).toHaveLength(1);
+  });
+
+  it('boundary: a repair of a turn with no tagged fence brings its own rule', () => {
+    const repair = buildRepairPrompt('original user turn', '{}', 'summary: required');
+    const tag = fenceTagOf(repair);
+    expect(tag).not.toBeNull();
+    expect(repair.startsWith(`SECTION MARKERS:`)).toBe(true);
+    expect(repair).toContain(`#${String(tag)}`);
   });
 });

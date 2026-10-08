@@ -46,6 +46,7 @@
 import { sanitizeForPrompt, truncateForPrompt } from '@cviper/cv-parsing';
 
 import { JSON_ONLY, UNTRUSTED_CONTENT_BOUNDARY } from './constants';
+import { createFences, type Fences } from './fence';
 
 export type FollowUpKind = 'follow_up' | 'thank_you';
 
@@ -119,8 +120,8 @@ function typeBlock(kind: FollowUpKind): string {
 }
 
 /** One material, sanitised and cut to budget, between fences it cannot close. */
-function fence(label: string, body: string, budget: number): string {
-  return `=== ${label} ===\n${truncateForPrompt(sanitizeForPrompt(body), budget)}\n=== END ${label} ===`;
+function fence(fences: Fences, label: string, body: string, budget: number): string {
+  return fences.wrap(label, truncateForPrompt(sanitizeForPrompt(body), budget));
 }
 
 const FIELD_RULES = `Field rules:
@@ -134,20 +135,21 @@ ${JSON_ONLY}`;
 
 export function buildFollowUpPrompt(input: FollowUpPromptInput): FollowUpPrompt {
   const { materials } = input;
+  const fences = createFences();
 
   const provided: string[] = [];
   const missing: string[] = [];
 
   if (materials.advert !== null && materials.advert.trim() !== '') {
-    provided.push(fence('JOB ADVERT', materials.advert, MAX_FOLLOW_UP_ADVERT_CHARS));
+    provided.push(fence(fences, 'JOB ADVERT', materials.advert, MAX_FOLLOW_UP_ADVERT_CHARS));
   } else missing.push('the job advert');
 
   if (materials.cv !== null && materials.cv.trim() !== '') {
-    provided.push(fence('CV', materials.cv, MAX_FOLLOW_UP_CV_CHARS));
+    provided.push(fence(fences, 'CV', materials.cv, MAX_FOLLOW_UP_CV_CHARS));
   } else missing.push('the CV');
 
   if (materials.coverLetter !== null && materials.coverLetter.trim() !== '') {
-    provided.push(fence('COVER LETTER', materials.coverLetter, MAX_FOLLOW_UP_LETTER_CHARS));
+    provided.push(fence(fences, 'COVER LETTER', materials.coverLetter, MAX_FOLLOW_UP_LETTER_CHARS));
   } else missing.push('the cover letter');
 
   const context = [
@@ -164,11 +166,13 @@ export function buildFollowUpPrompt(input: FollowUpPromptInput): FollowUpPrompt 
       ? []
       : [
           "The candidate's own description of how they like to sound:",
-          fence('WRITING STYLE', input.writingStyle, MAX_WRITING_STYLE_CHARS),
+          fence(fences, 'WRITING STYLE', input.writingStyle, MAX_WRITING_STYLE_CHARS),
           '',
         ];
 
   const user = [
+    fences.rule,
+    '',
     OPENING[input.kind],
     JSON_ONLY,
     '',
