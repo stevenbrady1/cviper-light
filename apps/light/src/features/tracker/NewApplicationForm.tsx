@@ -84,7 +84,7 @@ function Field({
         onChange={(event) => onChange(event.currentTarget.value)}
         className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
           numeric ? 'font-mono tabular-nums' : ''
-        } ${error === undefined ? 'border-line' : 'border-danger'}`}
+        } ${error === undefined ? 'border-field-line' : 'border-danger'}`}
       />
       {error === undefined ? null : (
         <p id={`${id}-error`} className="mt-1 text-xs text-danger">
@@ -120,7 +120,7 @@ function DescriptionField({
         aria-describedby={error === undefined ? undefined : 'new-description-error'}
         onChange={(event) => onChange(event.currentTarget.value)}
         className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
-          error === undefined ? 'border-line' : 'border-danger'
+          error === undefined ? 'border-field-line' : 'border-danger'
         }`}
       />
       {error === undefined ? null : (
@@ -218,7 +218,7 @@ export function NewApplicationForm({ onCreate, onCancel, initial }: NewApplicati
             const status = event.currentTarget.value as ApplicationStatus;
             setDraft((current) => ({ ...current, status }));
           }}
-          className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+          className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
         >
           {TRACKER_COLUMNS.map((status) => (
             <option key={status} value={status}>
@@ -293,7 +293,7 @@ export function NewApplicationForm({ onCreate, onCancel, initial }: NewApplicati
               setDraft((current) => ({ ...current, salaryPeriod }));
             }}
             className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
-              visible.salaryPeriod === undefined ? 'border-line' : 'border-danger'
+              visible.salaryPeriod === undefined ? 'border-field-line' : 'border-danger'
             }`}
           >
             <option value="">Not stated</option>

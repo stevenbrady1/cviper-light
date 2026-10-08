@@ -408,7 +408,7 @@ export function FollowUpPanel({
               const key = event.currentTarget.value;
               setOptionKey(key);
             }}
-            className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+            className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
           >
             {options.map((option) => (
               <option key={option.key} value={option.key}>
@@ -492,7 +492,7 @@ export function FollowUpPanel({
                 const subject = event.currentTarget.value;
                 setDraft((current) => (current === null ? null : { ...current, subject }));
               }}
-              className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+              className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
             />
           </div>
           <div>
@@ -511,7 +511,7 @@ export function FollowUpPanel({
                 const body = event.currentTarget.value;
                 setDraft((current) => (current === null ? null : { ...current, body }));
               }}
-              className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+              className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
             />
             <p className="mt-1 text-xs text-ink-faint">
               Written from your archived documents only. Read it before it goes anywhere.

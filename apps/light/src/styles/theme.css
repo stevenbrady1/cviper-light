@@ -83,6 +83,15 @@
   --color-sunken: #edf0f5;
   --color-card: #ffffff;
   --color-line: #dce2ec;
+  /*
+   * The edge of a box you type into or pick from (L-212). `line` is a divider
+   * and may be faint; a field's edge is how the user finds the field at all,
+   * so WCAG 1.4.11 holds it to 3:1 against the field and against every
+   * surface it sits on: about 3.7:1 on card, 3.5:1 on canvas, 3.2:1 on sunken.
+   * `contrast.contract.test.ts` finds every input, select and textarea and
+   * holds its border to that.
+   */
+  --color-field-line: #7a869b;
 
   /* --- Ink -------------------------------------------------------------- */
   --color-ink: #0b1729;
@@ -207,6 +216,13 @@
    * then follows the element's border-radius on every control, which a 3px
    * outline does not do consistently across engines.
    *
+   * Two rings, not one (L-212): a 2px `card` ring inside a 2px solid `blue`
+   * one. The old ring was blue at 25% opacity — about 1.5:1 against the page,
+   * far under the 3:1 WCAG asks of a focus indicator. Solid blue measures
+   * 5.4:1 or more on every light surface; on the navy rail, where blue alone
+   * is 2.6:1, the white inner ring carries it at over 12:1. The contract
+   * test reads these two colours from this rule and checks every surface.
+   *
    * The cost, stated rather than discovered later: for the few focusable
    * elements that also carry `shadow-raised`, the ring replaces the elevation
    * while they are focused. On a card that is invisible; if it ever matters,
@@ -214,7 +230,9 @@
    */
   :focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgb(26 86 219 / 0.25);
+    box-shadow:
+      0 0 0 2px var(--color-card),
+      0 0 0 4px var(--color-blue);
   }
 
   /*

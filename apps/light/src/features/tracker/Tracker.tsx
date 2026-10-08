@@ -686,7 +686,7 @@ export function Tracker({
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Search applications"
-                  className="min-h-11 min-w-0 flex-1 rounded-control border border-line bg-card px-3 py-2 text-ink placeholder:text-ink-faint focus:border-blue focus:outline-none md:min-h-0"
+                  className="min-h-11 min-w-0 flex-1 rounded-control border border-field-line bg-card px-3 py-2 text-ink placeholder:text-ink-faint focus:border-blue focus:outline-none md:min-h-0"
                 />
                 {searchQuery.trim() === '' ? null : (
                   <button

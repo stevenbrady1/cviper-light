@@ -303,7 +303,7 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
             setFieldError(null);
           }}
           className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
-            fieldError === null ? 'border-line' : 'border-danger'
+            fieldError === null ? 'border-field-line' : 'border-danger'
           }`}
         />
         <p className="mt-1 text-xs text-ink-faint">{provider.fieldHint}</p>
@@ -400,7 +400,7 @@ function ModelPicker({ providerId }: { readonly providerId: AiKeyProviderId }) {
           // save would run a different model from the one on screen.
           if (chooseModel(providerId, next)) setModel(next);
         }}
-        className="mt-1 w-full rounded-control border border-line bg-card px-2.5 py-1.5 text-ink"
+        className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
       >
         {AI_MODEL_CHOICES[providerId].map((choice) => (
           <option key={choice.id} value={choice.id}>

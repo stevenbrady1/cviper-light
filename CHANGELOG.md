@@ -19,6 +19,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Changed
 
+- The keyboard focus ring and the edges of text boxes and drop-downs are now easy to see (L-212). The focus ring was blue at a quarter strength, about 1.5:1 against the page; it is now a crisp white-and-blue ring that measures 3:1 or more on every background, the dark side menu included. Every input, select and text area is edged in a new `field-line` grey at 3.2:1 or more, instead of the faint divider colour (about 1.3:1). The contrast test now checks both, as WCAG 1.4.11 asks.
 - Every AI prompt now marks its sections with a random tag made for that prompt alone (`=== JOB ADVERT === #k3f9x2ma`), and tells the model that only a marker ending in that tag opens or closes a section (L-210). A job advert is written before the prompt exists, so it cannot guess the tag: even a fake section marker that got past the text cleaner is read as part of the advert. The cleaner (L-207) still removes marker-shaped lines first; this is a second wall behind it.
 - The Store package's version must now be above every version already uploaded to the Store, not just equal to the app version (L-170). Uploads are recorded in `msix/store-submissions.json`; a rollback below the last upload fails `pnpm test`, and packing a version the Store has already been sent stops `msix.yml` before anything is packed.
 - "Save to an application" works for a job that has no application yet: it starts one as Saved and saves into it, instead of sending you to the tracker first (L-199).
