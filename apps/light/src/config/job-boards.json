@@ -2,32 +2,82 @@
   {
     "id": "linkedin",
     "label": "LinkedIn",
-    "urlTemplate": "https://www.linkedin.com/jobs/search/?keywords={keyword}&location={location}",
-    "encoding": "plus"
+    "urlTemplate": "https://www.linkedin.com/jobs/search/?keywords={keyword}&location={location}&distance={radius}&f_JT={contract}",
+    "encoding": "plus",
+    "filters": {
+      "radius": {
+        "unit": "miles",
+        "steps": [5, 10, 25, 50, 100]
+      },
+      "contract": {
+        "contract": "C"
+      }
+    }
   },
   {
     "id": "indeed",
     "label": "Indeed",
-    "urlTemplate": "https://uk.indeed.com/jobs?q={keyword}&l={location}",
-    "encoding": "plus"
+    "urlTemplate": "https://uk.indeed.com/jobs?q={keyword}&l={location}&radius={radius}",
+    "encoding": "plus",
+    "filters": {
+      "radius": {
+        "unit": "miles",
+        "steps": [5, 10, 15, 25, 35, 50, 100]
+      }
+    }
   },
   {
     "id": "totaljobs",
     "label": "Totaljobs",
-    "urlTemplate": "https://www.totaljobs.com/jobs/{keyword}/in-{location}",
-    "encoding": "hyphen"
+    "urlTemplate": "https://www.totaljobs.com/jobs/{contract}/{keyword}/in-{location}?radius={radius}&salary={salaryMin}",
+    "encoding": "hyphen",
+    "filters": {
+      "radius": {
+        "unit": "miles"
+      },
+      "salaryMin": {
+        "steps": [10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000],
+        "with": "&salarytypeid=1"
+      },
+      "contract": {
+        "permanent": "permanent",
+        "contract": "contract"
+      }
+    }
   },
   {
     "id": "cv-library",
     "label": "CV-Library",
-    "urlTemplate": "https://www.cv-library.co.uk/{keyword}-jobs-in-{location}",
-    "encoding": "hyphen"
+    "urlTemplate": "https://www.cv-library.co.uk/{keyword}-jobs-in-{location}?distance={radius}&salarymin={salaryMin}&{contract}",
+    "encoding": "hyphen",
+    "filters": {
+      "radius": {
+        "unit": "miles",
+        "steps": [1, 2, 5, 7, 10, 15, 20, 25, 35, 50, 75, 100, 250, 500, 750]
+      },
+      "salaryMin": {
+        "with": "&salarytype=annum"
+      },
+      "contract": {
+        "permanent": "permanent=true",
+        "contract": "contract=true"
+      }
+    }
   },
   {
     "id": "reed",
     "label": "Reed",
-    "urlTemplate": "https://www.reed.co.uk/jobs/{keyword}-jobs-in-{location}",
-    "encoding": "hyphen"
+    "urlTemplate": "https://www.reed.co.uk/jobs/{keyword}-jobs-in-{location}?proximity={radius}&salaryFrom={salaryMin}&{contract}",
+    "encoding": "hyphen",
+    "filters": {
+      "radius": {
+        "unit": "miles"
+      },
+      "contract": {
+        "permanent": "perm=true",
+        "contract": "contract=true"
+      }
+    }
   },
   {
     "id": "adzuna",
@@ -38,8 +88,14 @@
   {
     "id": "google-jobs",
     "label": "Google Jobs",
-    "urlTemplate": "https://www.google.com/search?q={keyword}+jobs+{location}&udm=8&hl=en&gl=uk",
-    "encoding": "plus"
+    "urlTemplate": "https://www.google.com/search?q={keyword}+{contract}+jobs+{location}&udm=8&hl=en&gl=uk",
+    "encoding": "plus",
+    "filters": {
+      "contract": {
+        "permanent": "permanent",
+        "contract": "contract"
+      }
+    }
   },
   {
     "id": "guardian",

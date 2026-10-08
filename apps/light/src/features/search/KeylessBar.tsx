@@ -4,7 +4,7 @@ import { SECONDARY_BUTTON } from '../../app/buttons';
 import { type Board } from '../boards/model';
 import { type BrowserPort } from '../../platform/browser';
 
-import { type SearchForm } from './model';
+import { boardSearchInput, type SearchForm } from './model';
 
 /**
  * The buttons that always work.
@@ -60,7 +60,7 @@ interface KeylessBarProps {
 }
 
 export function KeylessBar({ form, browser, boards }: KeylessBarProps) {
-  const input = { keywords: form.keywords, location: form.location };
+  const input = boardSearchInput(form);
   const shown = boards.filter((board) => board.enabled);
 
   return (

@@ -8,6 +8,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Added
 
+- The job-board buttons on Search now carry your distance, minimum salary and contract type as well as the job title and location, wherever the site's own link format for it is confirmed (L-219): Reed, Totaljobs and CV-Library take all three; Indeed and LinkedIn take the distance, and LinkedIn "Contract"; Google Jobs takes the contract type. A distance or salary the site does not offer is rounded to the nearest it does — a wider distance, a lower salary — so no job you asked for is hidden. An empty or unreadable filter adds nothing to the link. Your own boards (Settings → Job boards) can use `{radius}`, `{salaryMin}` and `{contract}` too.
 - Every symbol, badge and abbreviation now says what it means (L-215). Hover, tab to, or tap a mark to see a short explanation: the ATS score's ✓ ⚠ ✗, ▲ ▼, the dash, the band words, each row and column, "ATS" itself and the fabrication check; the step bar's ✓ ● ⊘ ○ and the CV/engine line; a tracker card's progress dots; the rail's keyboard shortcuts, service dots and "Requests today"; and the Analysis verdict. Tailor's change list also says what green and struck-through lines mean. Screen readers hear the same words. A test fails if a screen starts showing a symbol without an explanation.
 
 ### Fixed

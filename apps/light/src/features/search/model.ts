@@ -8,6 +8,7 @@
 import {
   MAX_QUERY_CHARS,
   PROVIDER_LABEL,
+  type BrowserSearchInput,
   type DuplicateCluster,
   type JobProviderId,
   type SearchInput,
@@ -30,6 +31,26 @@ export interface SearchForm {
   /** Salary floor, as typed. Empty means "do not send a floor at all". */
   readonly salaryMin: string;
   readonly contractType: ContractChoice;
+}
+
+/**
+ * The form as a job-board link reads it (L-219): every field, so a board
+ * button opens the same search the user set up — each board then takes the
+ * filters it can and leaves the rest out (`buildBoardUrl`).
+ */
+export function boardSearchInput(form: SearchForm): BrowserSearchInput {
+  return {
+    keywords: form.keywords,
+    location: form.location,
+    distanceMiles: form.distanceMiles,
+    salaryMin: form.salaryMin,
+    contract:
+      form.contractType === 'Permanent'
+        ? 'permanent'
+        : form.contractType === 'Contract'
+          ? 'contract'
+          : 'any',
+  };
 }
 
 export const EMPTY_FORM: SearchForm = {
