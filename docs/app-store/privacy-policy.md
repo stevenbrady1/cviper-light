@@ -17,7 +17,7 @@ We — the people who make CViper Light — receive nothing from it. Not your CV
 - **Which job boards you enabled and how you ordered them** — job-boards.json in the same data folder.
 - **Which AI providers you agreed to send your CV to** — ai-provider-consent.json in the same data folder.
 - **Which job you were last tailoring for, so it can be offered back — its id only, no text** — workflow.json in the same data folder.
-- **Small conveniences: your last search, today’s request count, and that you have seen the introduction** — this app’s own browser storage, which no other program reads.
+- **Small conveniences: your last search, which free job feeds you ticked, today’s request count, and that you have seen the introduction** — this app’s own browser storage, which no other program reads.
 
 ## Every address the app can contact
 
