@@ -1,0 +1,4 @@
+{
+  "$comment": "Every version uploaded to Microsoft Partner Center, oldest first (L-170). Add a line the day you upload - a rejected upload included - as { \"version\": \"<Identity/@Version>\", \"date\": \"YYYY-MM-DD\" }. msix.yml refuses to pack a version that is not above the last line. See docs/STORE-SUBMISSION.md.",
+  "submissions": []
+}

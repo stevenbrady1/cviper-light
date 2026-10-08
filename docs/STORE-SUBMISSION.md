@@ -381,6 +381,33 @@ override the app version for this flavour only. A `workflow_dispatch` from a
 stale ref, or a hotfix branch built from an older manifest, therefore cannot
 upload a package whose version disagrees with the app's.
 
+### Every upload is recorded, and the next one must be higher
+
+The Store only accepts a version **above every version it has been sent** —
+not equal, never lower, and a rejected upload counts too. Matching the app
+version is not enough on its own (L-170): after a rollback, or a resubmission
+without a version bump, the app version would be one the Store already has.
+
+So every upload is written down in
+[`apps/light/src-tauri/msix/store-submissions.json`](../apps/light/src-tauri/msix/store-submissions.json),
+oldest first. **The day you upload a package to Partner Center, add a line**
+and commit it:
+
+```json
+{ "version": "0.6.0.0", "date": "2026-10-08" }
+```
+
+`version` is the manifest's `Identity/@Version` (four numbers, ending `.0`).
+Two checks read the file:
+
+- **Every commit** (`storeSubmissions.contract.test.ts`): the record is in
+  order, and the app version is never _below_ the last upload. A rollback
+  fails `pnpm test` the day it is made. Equal is fine — that is the state
+  right after an upload.
+- **Pack time** (`pnpm check:msix-manifest` in `msix.yml`): the package must
+  be _above_ the last upload. To submit again — after a rejection, say —
+  bump the app version first.
+
 **A package built before the identity landed cannot be uploaded.** The three
 values were merged on 13 September 2026
 ([#76](https://github.com/stevenbrady1/cviper-light/pull/76)), so submit a
@@ -659,6 +686,8 @@ compliance position is that keys are optional.
       before `winapp pack` since L-169, so this stays true as the app version
       changes rather than naming a value that goes stale at the next bump
 - [ ] MSIX rebuilt **after** the identity was pasted, and downloaded from CI
+- [ ] After uploading: the version added to `msix/store-submissions.json` and
+      committed (L-170) — a rejected upload included
 - [ ] Certification kit reported overall **PASS** in the run summary
 - [ ] Step 4a done: the package installed on a real PC, the window opened, **and
       the app and the certificate were both removed again**
