@@ -225,6 +225,44 @@ jobs:
         run: ./gitleaks dir --no-banner --redact --config .gitleaks.toml --exit-code 1 apps/light/dist
 
   # ------------------------------------------------------------------
+  # KNOWN-VULNERABLE DEPENDENCIES (L-224).
+  # ------------------------------------------------------------------
+  # Nothing used to look. `@xmldom/xmldom` 0.8.14 — reached through
+  # `mammoth`, the Word CV reader — carried six high advisories (a crafted
+  # .docx could hang or bloat the app) for weeks with every check green.
+  #
+  # `--prod`: what ships. Dev tooling never reaches a user's machine.
+  # `--audit-level high`: high and critical fail the build. Moderate and low
+  # are printed, not fatal — today that is `sprintf-js` under mammoth's own
+  # command-line parser (`argparse`), which the library never calls and for
+  # which no patched version exists.
+  #
+  # ITS OWN JOB, NOT A STEP IN `verify`, for the reason `l-numbers` gives: it
+  # needs a network, and it can go red because an advisory was PUBLISHED, with
+  # nothing in the change under review at fault. `pnpm verify` stays offline.
+  # `dependency-audit-runs-in-ci.contract.test.ts` fails if this job stops
+  # running the audit, or is allowed to fail.
+  dependency-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      # No install, so no pnpm store to cache: with `cache: pnpm` the post-job
+      # save fails on the missing store path and turns a passing audit red.
+      # `package-manager-cache: false` as in release-admin.yml.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Fail on a high or critical advisory in a shipped dependency
+        run: pnpm audit --prod --audit-level high
+
+  # ------------------------------------------------------------------
   # THE WORK-ITEM NUMBER REGISTRY (L-92).
   # ------------------------------------------------------------------
   # A number is claimed by an issue titled `[L-NNN] <one line>`. Two sessions
