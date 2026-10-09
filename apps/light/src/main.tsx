@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './app/App';
+import { ErrorBoundary } from './app/ErrorBoundary';
 import { configurePdfJsAssets } from './parsing/pdfjs-assets';
 import { refuseForeignDrops } from './platform/foreignDrops';
 // Tailwind + design tokens. Imported first so utility layers precede component CSS.
@@ -22,8 +23,12 @@ if (!rootElement) {
   throw new Error('Root element #root not found in index.html');
 }
 
+// Outermost, so a render error anywhere shows a way back instead of a blank
+// window (L-226).
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>,
 );

@@ -21,6 +21,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Fixed
 
+- If part of the app crashes, you now see a "Something went wrong" screen with "Try again" and "Reload the app", instead of an empty window (L-226). It says plainly that your data is safe, because a crash on screen cannot touch what is saved on your computer. The error's details are not shown, so a screenshot of it cannot leak a line of your CV.
 - Fetching a job advert from a link can no longer freeze the app (L-225). A page built to be slow to read — the same few characters repeated a few hundred thousand times — used to lock the window for minutes. Each step that reads the page now goes through it once, so even the largest page Fetch accepts (5 MB) is read in well under a second.
 - The privacy policy (and Settings → Privacy) now lists every small convenience kept in the app's own browser storage: since 0.8.0 that includes which free job feeds you ticked on Search. It never leaves your computer, and "Delete everything" removes it with the rest (L-220).
 
