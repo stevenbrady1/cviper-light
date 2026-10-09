@@ -74,7 +74,6 @@ describe('originalJsonResume', () => {
     const base = {
       id: 'a',
       name: 'CV.json',
-      path: null,
       text: 't',
       now: '2026-09-08T09:00:00.000Z',
     };

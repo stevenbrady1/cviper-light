@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- CViper no longer keeps where a CV file sits on your computer (its full path, which on Windows names your user account). Nothing ever used it. Paths kept before are cleared when the app updates, and the privacy policy no longer lists them (L-147).
+
 ### Fixed
 
 - The privacy policy (and Settings → Privacy) now lists every small convenience kept in the app's own browser storage: since 0.8.0 that includes which free job feeds you ticked on Search. It never leaves your computer, and "Delete everything" removes it with the rest (L-220).

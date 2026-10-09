@@ -116,8 +116,6 @@ export function runDisabledReason(state: RunState): string | null {
 export function newCvRecord(input: {
   readonly id: string;
   readonly name: string;
-  /** Absolute path, or `null` when the text was pasted rather than opened. */
-  readonly path: string | null;
   readonly text: string;
   readonly now: IsoTimestamp;
   /**
@@ -129,7 +127,11 @@ export function newCvRecord(input: {
   return {
     id: input.id,
     name: input.name,
-    file_path: input.path,
+    // Never stored (L-147). Nothing read it, and a full path names the
+    // Windows user and their folders. The column stays for older rows and
+    // the backup format, always null from here on (migration 0009 cleared
+    // the rows written before).
+    file_path: null,
     extracted_text: input.text,
     created_at: input.now,
     json_resume: input.jsonResume ?? null,

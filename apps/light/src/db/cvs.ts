@@ -1,8 +1,8 @@
 /**
  * CVs — the documents the user analyses against jobs.
  *
- * `file_path` is a path on THIS machine and nothing more; the file itself is
- * never copied into the database. `extracted_text` is `null` until parsing has
+ * The CV file itself is never copied into the database, and since L-147 its
+ * path is not kept either: `file_path` is always null. `extracted_text` is `null` until parsing has
  * run, which is why a CV row is useful before it is readable.
  *
  * Every function returns a `Result`; nothing here throws.

@@ -198,7 +198,8 @@ describe('uploading a CV', () => {
 
     expect(port.storedCvs()[0]?.name).toBe('New CV.docx');
     expect(port.storedCvs()[0]?.extracted_text).toBe(CV_TEXT);
-    expect(port.storedCvs()[0]?.file_path).toBe('C:\\New CV.docx');
+    // L-147: the file's location on this computer is never stored.
+    expect(port.storedCvs()[0]?.file_path).toBeNull();
     expect(await screen.findByDisplayValue('New CV.docx')).toBeTruthy();
   });
 
