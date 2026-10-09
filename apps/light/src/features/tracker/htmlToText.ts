@@ -77,8 +77,103 @@ export const MIN_READABLE_CHARS = 400;
  * anything it does not actually know — rather than a wrong one. Dropping a
  * page-level banner is the common case and this is the uncommon one.
  */
-const DROP_WITH_CONTENT =
-  /<(script|style|noscript|svg|template|iframe|canvas|nav|header|footer|aside)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+const DROP_OPENER =
+  /<(script|style|noscript|svg|template|iframe|canvas|nav|header|footer|aside)\b[^>]*>/gi;
+
+/*
+ * ============================================================================
+ * EVERY PASS IS LINEAR, BECAUSE THE INPUT IS HOSTILE (L-225)
+ * ============================================================================
+ * These steps used to be single regexes — `<nav…>[\s\S]*?</nav>`,
+ * `<!--[\s\S]*?-->`, `<[^>]*>` — and each one goes quadratic on an opener with
+ * no closer: the engine scans to the end of the input, fails, and retries one
+ * character later. 500 KB of `<` took two minutes; Fetch accepts 5 MB, on the
+ * UI thread. So each pass below either scans once with `indexOf`, or runs its
+ * regex only where a match is still possible:
+ *
+ *   * A pattern that must END in `>` can only match before the last `>` in the
+ *     text. `splitAtLastClose` cuts there, the regex runs on the head — where
+ *     every `<` has a `>` after it and so every attempt succeeds or fails at
+ *     once — and the tail is handled on its own.
+ *   * A drop element whose closer is missing is remembered by name, so the
+ *     next opener of that name does not go looking for it again.
+ *
+ * `htmlToText.hostile.test.ts` holds each shape to a time budget.
+ */
+
+/** Text up to and including its last `>`, and what follows it. */
+function splitAtLastClose(text: string): readonly [string, string] {
+  const end = text.lastIndexOf('>') + 1;
+  return [text.slice(0, end), text.slice(end)];
+}
+
+/** `text.replace(pattern, …)` for a pattern whose every match ends in `>`. */
+function replaceClosed(text: string, pattern: RegExp, replacement: string): string {
+  const [head, tail] = splitAtLastClose(text);
+  return head.replace(pattern, replacement) + tail;
+}
+
+/** `<!-- … -->` removed, each as one space. An unclosed one is left for later steps. */
+function removeComments(html: string): string {
+  let out = '';
+  let from = 0;
+  for (;;) {
+    const open = html.indexOf('<!--', from);
+    if (open === -1) break;
+    // No `-->` after this one means none after any later one either: stop.
+    const close = html.indexOf('-->', open + 4);
+    if (close === -1) break;
+    out += `${html.slice(from, open)} `;
+    from = close + 3;
+  }
+  return out + html.slice(from);
+}
+
+/** The closing-tag pattern for one element name, built once. */
+const CLOSERS = new Map<string, RegExp>();
+function closerFor(name: string): RegExp {
+  let closer = CLOSERS.get(name);
+  if (closer === undefined) {
+    closer = new RegExp(`</${name}\\s*>`, 'gi');
+    CLOSERS.set(name, closer);
+  }
+  return closer;
+}
+
+/**
+ * Every `DROP_OPENER` element removed with its content, each as one newline.
+ *
+ * An opener is paired with the NEXT closer of its own name, as the old lazy
+ * regex did. One with no closer stays, to be stripped later as a plain tag.
+ */
+function dropWithContent(html: string): string {
+  const [head, tail] = splitAtLastClose(html);
+  const unclosed = new Set<string>();
+  const opener = new RegExp(DROP_OPENER.source, 'gi');
+  let out = '';
+  let from = 0;
+
+  for (let match = opener.exec(head); match !== null; match = opener.exec(head)) {
+    const name = (match[1] ?? '').toLowerCase();
+    if (unclosed.has(name)) continue;
+
+    const closer = closerFor(name);
+    closer.lastIndex = match.index + match[0].length;
+    const close = closer.exec(head);
+    if (close === null) {
+      unclosed.add(name);
+      // Retry one character on, once per name, as the regex would: an opener
+      // tucked inside this one's attributes is still found.
+      opener.lastIndex = match.index + 1;
+      continue;
+    }
+
+    out += `${head.slice(from, match.index)}\n`;
+    from = close.index + close[0].length;
+    opener.lastIndex = from;
+  }
+  return out + head.slice(from) + tail;
+}
 
 /** Tags that start or end a line of reading. */
 const BLOCK_TAGS =
@@ -243,18 +338,25 @@ export function htmlToTextBounded(html: string): {
   readonly text: string;
   readonly capped: boolean;
 } {
-  const withoutComments = html.replace(/<!--[\s\S]*?-->/g, ' ');
+  const withoutComments = removeComments(html);
 
-  const withoutNoise = withoutComments.replace(DROP_WITH_CONTENT, '\n');
+  const withoutNoise = dropWithContent(withoutComments);
 
-  const withBreaks = withoutNoise
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(new RegExp(`</(?:${BLOCK_TAGS})\\s*>`, 'gi'), '\n')
-    .replace(new RegExp(`<(?:${BLOCK_TAGS})\\b[^>]*>`, 'gi'), '\n');
+  const withBreaks = replaceClosed(
+    replaceClosed(
+      replaceClosed(withoutNoise, /<br\s*\/?>/gi, '\n'),
+      new RegExp(`</(?:${BLOCK_TAGS})\\s*>`, 'gi'),
+      '\n',
+    ),
+    new RegExp(`<(?:${BLOCK_TAGS})\\b[^>]*>`, 'gi'),
+    '\n',
+  );
 
   // An unclosed tag at the end of a truncated page would otherwise survive as
-  // visible text, so the final `<` with no `>` after it goes too.
-  const withoutTags = withBreaks.replace(/<[^>]*>/g, ' ').replace(/<[^>]*$/, ' ');
+  // visible text, so the final `<` with no `>` after it goes too. Every `<`
+  // before the last `>` is a closed tag; only the tail can hold the unclosed one.
+  const [head, tail] = splitAtLastClose(withBreaks);
+  const withoutTags = head.replace(/<[^>]*>/g, ' ') + tail.replace(/<[^>]*$/, ' ');
 
   // ONE newline per boundary. Adjacent blocks emit two — a closing tag's and
   // the next opening tag's — and keeping both would put a blank line between
@@ -281,8 +383,34 @@ export function htmlToTextBounded(html: string): {
  * `htmlToText` runs, because step 2 of that function drops every `<script>`
  * with its content — which is right for JavaScript and would throw this away.
  */
-const JSON_LD_BLOCK =
-  /<script\b[^>]*\btype\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script\s*>/gi;
+const SCRIPT_OPENER = /<script\b[^>]*>/gi;
+const JSON_LD_TYPE = /\btype\s*=\s*["']?application\/ld\+json["']?/i;
+
+/**
+ * The body of every structured-data script, in page order.
+ *
+ * A scan, not one regex, for the reason above `splitAtLastClose`: the old
+ * `<script…ld+json…>([\s\S]*?)</script>` went quadratic on openers with no
+ * closer. Every `<script>` tag is matched once and its type checked on the
+ * tag's own text; the first one with no `</script>` after it ends the search,
+ * because none after it can have one either.
+ */
+function jsonLdBodies(html: string): string[] {
+  const [head] = splitAtLastClose(html);
+  const opener = new RegExp(SCRIPT_OPENER.source, 'gi');
+  const closer = /<\/script\s*>/gi;
+  const bodies: string[] = [];
+
+  for (let match = opener.exec(head); match !== null; match = opener.exec(head)) {
+    const bodyStart = match.index + match[0].length;
+    closer.lastIndex = bodyStart;
+    const close = closer.exec(head);
+    if (close === null) break;
+    if (JSON_LD_TYPE.test(match[0])) bodies.push(head.slice(bodyStart, close.index));
+    opener.lastIndex = close.index + close[0].length;
+  }
+  return bodies;
+}
 
 /**
  * How deep the structured-data walk goes before it gives up.
@@ -367,10 +495,10 @@ function organisationName(value: unknown): string {
  * point: schema.org defines `description` as HTML.
  */
 export function jobPostingText(html: string): string | null {
-  for (const match of html.matchAll(JSON_LD_BLOCK)) {
+  for (const body of jsonLdBodies(html)) {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(match[1] ?? '');
+      parsed = JSON.parse(body);
     } catch {
       // A malformed block is one site's bug, not a reason to stop looking —
       // pages often carry several blocks and only one of them is the posting.
