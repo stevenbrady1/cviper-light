@@ -251,10 +251,13 @@ jobs:
       - name: Enable pnpm through corepack
         run: corepack enable pnpm
 
+      # No install, so no pnpm store to cache: with `cache: pnpm` the post-job
+      # save fails on the missing store path and turns a passing audit red.
+      # `package-manager-cache: false` as in release-admin.yml.
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-          cache: pnpm
+          package-manager-cache: false
 
       - name: Fail on a high or critical advisory in a shipped dependency
         run: pnpm audit --prod --audit-level high
