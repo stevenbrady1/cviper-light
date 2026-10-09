@@ -84,7 +84,7 @@ pub(crate) const MAX_SECRET_BYTES: usize = 1024;
 /// If this were a `String`, JavaScript could name any account in the credential
 /// store — `git:https://github.com`, a saved Wi-Fi password, anything the user
 /// has under this service — and `secret_status` would happily confirm whether it
-/// existed. An enum makes the set of addressable credentials exactly these nine,
+/// existed. An enum makes the set of addressable credentials exactly these ten,
 /// enforced by serde before our code runs at all.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -99,6 +99,12 @@ pub enum SecretKey {
     MistralApiKey,
     GrokApiKey,
     OpenrouterApiKey,
+    // L-150: an AI service at an address the user typed. NOT a bare key: the
+    // address, the "own network" tick and the key, saved TOGETHER so the key
+    // can only ever go to the address it was saved with. Only
+    // `custom_provider::custom_provider_save` writes it — `secret_set` refuses
+    // it — and `secret_status` / `secret_delete` work on it as on any other.
+    CustomProvider,
 }
 
 impl SecretKey {
@@ -119,6 +125,7 @@ impl SecretKey {
             SecretKey::MistralApiKey => "mistral_api_key",
             SecretKey::GrokApiKey => "grok_api_key",
             SecretKey::OpenrouterApiKey => "openrouter_api_key",
+            SecretKey::CustomProvider => "custom_provider",
         }
     }
 }
@@ -264,10 +271,30 @@ fn validate_secret(value: &str) -> Result<(), String> {
 /// replace a working key with a blank one.
 #[tauri::command]
 pub(crate) fn secret_set(key: SecretKey, value: String) -> Result<(), String> {
+    if key == SecretKey::CustomProvider {
+        // Written here, the address and the key could be set apart from each
+        // other and from the test that proves they work together.
+        return Err(
+            "This service is saved from its own card in Settings, which tests it first."
+                .to_string(),
+        );
+    }
     validate_secret(&value)?;
 
     entry(key)
         .and_then(|entry| entry.set_password(&value))
+        .map_err(|error| describe(&error))
+}
+
+/// Save the AI service at a typed address (L-150): its address, tick and key as
+/// one entry. **NOT a `#[tauri::command]`.** Its only caller is
+/// `custom_provider::custom_provider_save`, after that command has tested the
+/// pair, so the bundle reaching here is one the app built and proved.
+pub(crate) fn store_custom_provider(bundle: &str) -> Result<(), String> {
+    validate_secret(bundle)?;
+
+    entry(SecretKey::CustomProvider)
+        .and_then(|entry| entry.set_password(bundle))
         .map_err(|error| describe(&error))
 }
 
@@ -327,7 +354,7 @@ mod tests {
     /// exercises the parts that can be tested without one: the wire format, the
     /// account names, the input guards that run before any store call, and the
     /// error messages.
-    const ALL: [SecretKey; 9] = [
+    const ALL: [SecretKey; 10] = [
         SecretKey::AdzunaAppId,
         SecretKey::AdzunaAppKey,
         SecretKey::ReedApiKey,
@@ -337,9 +364,10 @@ mod tests {
         SecretKey::MistralApiKey,
         SecretKey::GrokApiKey,
         SecretKey::OpenrouterApiKey,
+        SecretKey::CustomProvider,
     ];
 
-    const EXPECTED_NAMES: [(SecretKey, &str); 9] = [
+    const EXPECTED_NAMES: [(SecretKey, &str); 10] = [
         (SecretKey::AdzunaAppId, "adzuna_app_id"),
         (SecretKey::AdzunaAppKey, "adzuna_app_key"),
         (SecretKey::ReedApiKey, "reed_api_key"),
@@ -349,6 +377,7 @@ mod tests {
         (SecretKey::MistralApiKey, "mistral_api_key"),
         (SecretKey::GrokApiKey, "grok_api_key"),
         (SecretKey::OpenrouterApiKey, "openrouter_api_key"),
+        (SecretKey::CustomProvider, "custom_provider"),
     ];
 
     #[test]
@@ -415,6 +444,31 @@ mod tests {
         // assertion. It returns on the validation failure, so no credential
         // store call is made and nothing on this machine changes.
         assert!(secret_set(SecretKey::ReedApiKey, String::new()).is_err());
+    }
+
+    #[test]
+    fn negative_the_typed_address_service_cannot_be_set_through_secret_set() {
+        // L-150. Returns before any store call, so nothing on this machine
+        // changes — and a value that would otherwise pass is refused.
+        let refused =
+            secret_set(SecretKey::CustomProvider, "{\"address\":\"x\"}".to_string())
+                .unwrap_err();
+        assert!(refused.contains("its own card"));
+    }
+
+    #[test]
+    fn the_typed_address_service_is_stored_only_from_rust() {
+        // `store_custom_provider` is not a command. Registering it would let
+        // JavaScript pair the saved key with any address, untested.
+        let handler = without_comments(include_str!("lib.rs"));
+        assert!(!handler.contains("store_custom_provider"));
+        let _: fn(&str) -> Result<(), String> = store_custom_provider;
+    }
+
+    #[test]
+    fn negative_an_empty_bundle_is_refused_before_the_store_is_touched() {
+        assert!(store_custom_provider("").is_err());
+        assert!(store_custom_provider(&"k".repeat(MAX_SECRET_BYTES + 1)).is_err());
     }
 
     #[test]

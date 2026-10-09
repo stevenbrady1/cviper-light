@@ -1,3 +1,4 @@
+mod custom_provider;
 mod db;
 mod fetch_page;
 mod files;
@@ -108,7 +109,7 @@ pub fn run() {
             secrets::secret_status,
             // The provider transport. Rust owns every base URL and injects the
             // API key from the keyring, so a compromised frontend can still
-            // only reach the three APIs named in providers.rs.
+            // only reach the APIs named in providers.rs.
             providers::provider_chat,
             providers::provider_list_models,
             providers::ollama_probe,
@@ -117,6 +118,16 @@ pub fn run() {
             // response body never read, nothing written anywhere. Same
             // test-before-save shape as jobs::job_test_credentials.
             providers::provider_test_key,
+            // An AI service at an address the user typed (L-150) — the one
+            // exception to "Rust owns every base URL", and only with the
+            // address re-vetted, resolved and pinned on EVERY call. The key is
+            // saved bound to its address, so it can only go where it was
+            // saved to. See the module comment in custom_provider.rs.
+            custom_provider::custom_provider_test,
+            custom_provider::custom_provider_save,
+            custom_provider::custom_provider_status,
+            custom_provider::custom_provider_models,
+            custom_provider::custom_provider_chat,
             // The job-board transport. Same shape: Rust owns both base URLs,
             // reads Adzuna's two keys and Reed's one from the keyring, and
             // enforces the minimum gap between submits — a disabled button
@@ -156,8 +167,10 @@ pub fn run() {
             // Fetching the ONE page whose address the user pasted, so the same
             // extraction that reads a paste can read an advert from a link.
             //
-            // This is the only command in the app that takes a URL from
-            // JavaScript, and `fetch_page.rs` opens with the full account of
+            // One of only two places that take an address from JavaScript —
+            // the other is custom_provider.rs, which vets its saved address
+            // the same way on every call — and `fetch_page.rs` opens with the
+            // full account of
             // why that is not the SSRF hole the other two transports refuse to
             // become: the scheme, the host and every resolved address are
             // vetted before each connection, the connection is pinned to the

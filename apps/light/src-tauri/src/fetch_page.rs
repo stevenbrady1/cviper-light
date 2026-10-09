@@ -258,7 +258,7 @@ fn url_carries_credentials(url: &Url) -> bool {
 /// on this developer's machine, and a mistyped or hostile address must not
 /// reach it. RFC 6761 reserves the whole `localhost.` TLD, so subdomains go too.
 /// `.local` is mDNS: a printer, a NAS, a router on the user's own network.
-fn host_is_forbidden_by_name(host: &str) -> bool {
+pub(crate) fn host_is_forbidden_by_name(host: &str) -> bool {
     let host = host.trim_end_matches('.').to_ascii_lowercase();
     host == "localhost"
         || host.ends_with(".localhost")
@@ -315,7 +315,7 @@ fn ipv6_is_forbidden(ip: Ipv6Addr) -> bool {
     (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80
 }
 
-fn ip_is_forbidden(ip: IpAddr) -> bool {
+pub(crate) fn ip_is_forbidden(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => ipv4_is_forbidden(v4),
         IpAddr::V6(v6) => ipv6_is_forbidden(v6),
