@@ -461,7 +461,7 @@ function ProfileForm({
         <p className="mt-1 text-ink-muted">Each one, and how well you speak it.</p>
 
         {languageKeys.length === 0 ? (
-          <p data-testid="profile-languages-empty" className="mt-2 text-sm text-ink-faint">
+          <p data-testid="profile-languages-empty" className="mt-2 text-xs text-ink-faint">
             None added yet.
           </p>
         ) : null}
@@ -596,7 +596,7 @@ function ProfileForm({
         </p>
 
         {starKeys.length === 0 ? (
-          <p data-testid="profile-star-empty" className="mt-2 text-sm text-ink-faint">
+          <p data-testid="profile-star-empty" className="mt-2 text-xs text-ink-faint">
             None added yet.
           </p>
         ) : null}

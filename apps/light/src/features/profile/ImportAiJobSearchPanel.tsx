@@ -168,7 +168,7 @@ function ReviewPanel({ imported, onApply, onCancel }: ReviewPanelProps) {
         <summary className="cursor-pointer text-ink-muted">What was read, and what was not</summary>
         <ul
           data-testid="profile-import-notes"
-          className="mt-1 list-disc space-y-0.5 pl-5 text-ink-faint"
+          className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-ink-faint"
         >
           {imported.notes.map((note) => (
             <li key={note}>{note}</li>

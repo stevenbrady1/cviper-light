@@ -109,7 +109,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 
 /** A bulleted list, or a sentence saying the list is empty on purpose. */
 function Points({ items, emptyText }: { items: readonly string[]; emptyText: string }) {
-  if (items.length === 0) return <p className="mt-1.5 text-ink-faint">{emptyText}</p>;
+  if (items.length === 0) return <p className="mt-1.5 text-xs text-ink-faint">{emptyText}</p>;
   return (
     <ul className="mt-1.5 list-disc space-y-1 pl-5 text-ink">
       {items.map((item, index) => (
@@ -413,7 +413,7 @@ export function InterviewPanel({
           <section>
             <Eyebrow>Likely questions</Eyebrow>
             {pack.likely_questions.length === 0 ? (
-              <p className="mt-1.5 text-ink-faint">The model suggested no questions.</p>
+              <p className="mt-1.5 text-xs text-ink-faint">The model suggested no questions.</p>
             ) : (
               <ol className="mt-1.5 space-y-3">
                 {pack.likely_questions.map((item, index) => (
@@ -439,7 +439,7 @@ export function InterviewPanel({
           <section>
             <Eyebrow>Gaps to bridge</Eyebrow>
             {pack.gaps_to_bridge.length === 0 ? (
-              <p className="mt-1.5 text-ink-faint">
+              <p className="mt-1.5 text-xs text-ink-faint">
                 Nothing the advert asks for is missing from your material.
               </p>
             ) : (
