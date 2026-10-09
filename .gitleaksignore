@@ -1,0 +1,15 @@
+# Exact gitleaks findings that are known false positives. One fingerprint per
+# line — commit:file:rule:line — so each entry silences ONE finding in ONE
+# commit and nothing else. No rule in .gitleaks.toml is relaxed by this file.
+#
+# L-150: three test lines in commit 3d23f3f, on the closed PR #226, of the form
+#   localStorage.setItem(CUSTOM_MODEL_STORAGE_KEY, 'qwen2.5-7b-instruct')
+# The default generic-api-key rule reads "<…KEY>, '<literal>'" as a credential;
+# the literals are AI model names. The replacement change writes them through a
+# helper instead, so no line on main has this shape. These entries stay only
+# while that branch exists: CI checks out with fetch-depth 0, which fetches
+# every branch, and gitleaks scans them all. Delete the branch
+# feat/L-150-custom-provider-settings and these three lines can go.
+3d23f3fe834f54d441cf28fce73d2b5a3e07e315:apps/light/src/features/analysis/customService.test.ts:generic-api-key:91
+3d23f3fe834f54d441cf28fce73d2b5a3e07e315:apps/light/src/features/analysis/customService.test.ts:generic-api-key:125
+3d23f3fe834f54d441cf28fce73d2b5a3e07e315:apps/light/src/features/settings/keys/CustomServiceCard.test.tsx:generic-api-key:278
