@@ -18,7 +18,11 @@ export type ProviderId =
   | 'google'
   | 'mistral'
   | 'grok'
-  | 'openrouter';
+  | 'openrouter'
+  // L-150: one service at an address the user typed, speaking the same
+  // dialect. Its address and key live together in Rust
+  // (`custom_provider.rs`); nothing here knows where it is.
+  | 'custom';
 
 /** One model a provider will accept in `ChatJsonRequest.model`. */
 export interface ModelInfo {

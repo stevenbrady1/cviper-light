@@ -37,7 +37,16 @@ export { OPENAI_DEFAULT_MODEL } from './modelChoice';
 
 /** Which family an option belongs to. */
 export type ProviderKind =
-  'keyword' | 'ollama' | 'anthropic' | 'openai' | 'google' | 'mistral' | 'grok' | 'openrouter';
+  | 'keyword'
+  | 'ollama'
+  | 'anthropic'
+  | 'openai'
+  | 'google'
+  | 'mistral'
+  | 'grok'
+  | 'openrouter'
+  // L-150: the service at the address the user typed in Settings.
+  | 'custom';
 
 /** The key of the always-available option. */
 export const KEYWORD_KEY = 'keyword';

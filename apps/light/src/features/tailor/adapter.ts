@@ -34,7 +34,9 @@ export function providerFor(option: ProviderOption, transport: ChatTransport): A
     case 'mistral':
     case 'grok':
     case 'openrouter':
-      // L-177: one chat-completions adapter, routed by the kind itself.
+    case 'custom':
+      // L-177: one chat-completions adapter, routed by the kind itself. L-150's
+      // typed-address service speaks the same dialect.
       return createChatCompletionsProvider(option.kind, transport);
     case 'keyword':
       // Unreachable: `tailorOptions` filters this out before a user can pick

@@ -61,6 +61,9 @@ export interface ConsentState {
   readonly mistral: boolean;
   readonly grok: boolean;
   readonly openrouter: boolean;
+  // L-150: the service at the address the user typed. Its own flag: agreeing
+  // to a named company says nothing about a service CViper cannot name.
+  readonly custom: boolean;
 }
 
 /** The state of a machine that has never been asked. */
@@ -71,6 +74,7 @@ export const NO_CONSENT: ConsentState = {
   mistral: false,
   grok: false,
   openrouter: false,
+  custom: false,
 };
 
 /** The file, in the app's own data directory. Exported so tests name the real one. */
@@ -110,6 +114,7 @@ export function parseConsentState(raw: unknown): ConsentState {
     mistral: record['mistral'] === true,
     grok: record['grok'] === true,
     openrouter: record['openrouter'] === true,
+    custom: record['custom'] === true,
   };
 }
 

@@ -89,6 +89,66 @@ describe('createTauriTransport — the contract with Rust', () => {
   });
 });
 
+describe('createTauriTransport — the typed-address service (L-150)', () => {
+  it('sends a chat to custom_provider_chat with the body and nothing else', async () => {
+    tauri.invoke.mockResolvedValue(envelope(200, '{"choices":[]}'));
+
+    await createTauriTransport().chat('custom', '{"model":"qwen2.5"}');
+
+    expect(tauri.invoke).toHaveBeenCalledWith('custom_provider_chat', {
+      body: '{"model":"qwen2.5"}',
+    });
+  });
+
+  it('lists models through custom_provider_models with no arguments', async () => {
+    tauri.invoke.mockResolvedValue(envelope(200, '{"data":[]}'));
+
+    await createTauriTransport().listModels('custom');
+
+    expect(tauri.invoke).toHaveBeenCalledWith('custom_provider_models', {});
+  });
+
+  it('negative: never sends an address or a key — Rust holds both, bound together', async () => {
+    tauri.invoke.mockResolvedValue(envelope(200, '{}'));
+
+    await createTauriTransport().chat('custom', '{}');
+    await createTauriTransport().listModels('custom');
+
+    for (const call of tauri.invoke.mock.calls) {
+      const args = JSON.stringify(call[1] ?? {});
+      expect(args).not.toMatch(/https?:/);
+      expect(Object.keys(call[1] ?? {})).not.toContain('address');
+      expect(Object.keys(call[1] ?? {})).not.toContain('key');
+      expect(Object.keys(call[1] ?? {})).not.toContain('provider');
+    }
+  });
+
+  it('negative: a fixed provider still goes to its own command, not the custom one', async () => {
+    tauri.invoke.mockResolvedValue(envelope(200, '{}'));
+
+    await createTauriTransport().chat('openrouter', '{}');
+
+    expect(tauri.invoke).toHaveBeenCalledWith('provider_chat', {
+      provider: 'openrouter',
+      body: '{}',
+    });
+  });
+
+  it('reads a custom failure the same structured way, and counts the request', async () => {
+    tauri.invoke.mockRejectedValue(
+      JSON.stringify({ kind: 'no-key', message: 'No AI service address is saved.' }),
+    );
+
+    const result = await createTauriTransport().chat('custom', '{}');
+
+    expect(result).toEqual({
+      ok: false,
+      error: { provider: 'custom', kind: 'no-key', message: 'No AI service address is saved.' },
+    });
+    expect(requestLog.recordRequest).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('createTauriTransport — failures from Rust', () => {
   it('reads the structured kind rather than sniffing English', async () => {
     tauri.invoke.mockRejectedValue(

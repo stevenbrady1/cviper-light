@@ -95,8 +95,28 @@ describe('parseConsentState', () => {
       grok: true,
       openrouter: true,
     };
-    expect(parseConsentState(everyone)).toEqual(everyone);
+    // L-150 added a seventh flag; a file naming only the six reads it as no.
+    expect(parseConsentState(everyone)).toEqual({ ...everyone, custom: false });
     expect(parseConsentState({ mistral: true })).toEqual({ ...NO_CONSENT, mistral: true });
+  });
+
+  it('L-150: the typed-address service has its own flag, and a yes to every company is not a yes to it', () => {
+    const everyNamedCompany = {
+      anthropic: true,
+      openai: true,
+      google: true,
+      mistral: true,
+      grok: true,
+      openrouter: true,
+    };
+    expect(parseConsentState(everyNamedCompany).custom).toBe(false);
+    expect(parseConsentState({ custom: true })).toEqual({ ...NO_CONSENT, custom: true });
+  });
+
+  it('negative: L-150 — anything but the literal true for the typed-address service is no', () => {
+    for (const value of ['true', 1, 'yes', null, {}, []]) {
+      expect(parseConsentState({ custom: value }).custom).toBe(false);
+    }
   });
 
   it('boundary: a file written before L-177 grants none of the four providers it never named', () => {
@@ -229,6 +249,13 @@ describe('isCloudKind — an exclusion, so an unknown provider is gated by defau
   it('says yes to the two cloud providers that exist today', () => {
     expect(isCloudKind('anthropic')).toBe(true);
     expect(isCloudKind('openai')).toBe(true);
+  });
+
+  it("L-150: the typed-address service is asked about, even on the user's own network", () => {
+    // CViper cannot see what is at an address the user typed — a box under
+    // the desk, or a company's gateway. Asking costs one click; not asking
+    // could send a CV somewhere the user never agreed to.
+    expect(isCloudKind('custom')).toBe(true);
   });
 
   it('negative: the two local kinds are never asked about', () => {
