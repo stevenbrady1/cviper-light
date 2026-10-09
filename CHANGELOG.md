@@ -21,6 +21,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Fixed
 
+- Reading a Word (.docx) CV no longer uses a part with six known high-severity flaws, through which a specially made file could freeze the app or eat memory (L-224). The part is updated, and every change is now checked for known-vulnerable parts before it can be merged.
 - The privacy policy (and Settings → Privacy) now lists every small convenience kept in the app's own browser storage: since 0.8.0 that includes which free job feeds you ticked on Search. It never leaves your computer, and "Delete everything" removes it with the rest (L-220).
 
 ## [0.8.0] — 2026-10-08
