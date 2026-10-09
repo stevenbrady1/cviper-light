@@ -44,6 +44,7 @@ import {
   newAnalysisRecord,
   newCvRecord,
   originalJsonResume,
+  providerInSentence,
   providerLabel,
   runDisabledReason,
 } from './model';
@@ -1081,7 +1082,7 @@ export function Analysis({
                 ? `Asking ${selectedOption.model} on this machine. The first run after starting ` +
                   'your PC loads the model into memory, which takes 5 to 30 seconds. Nothing is ' +
                   'being sent anywhere.'
-                : `Sending your CV and the advert to ${providerLabel(selectedOption.kind)}. ` +
+                : `Sending your CV and the advert to ${providerInSentence(selectedOption.kind)}. ` +
                   'This usually takes a few seconds.'}{' '}
               <span className="font-mono tabular-nums">{elapsed}s</span>
             </p>

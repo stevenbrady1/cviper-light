@@ -39,6 +39,7 @@ import { probeOllama } from '../ai/transport';
 import { requestsToday } from './requestLog';
 import {
   ANTHROPIC_SECRET_KEY,
+  CUSTOM_PROVIDER_SECRET_KEY,
   GOOGLE_SECRET_KEY,
   GROK_SECRET_KEY,
   MISTRAL_SECRET_KEY,
@@ -68,6 +69,7 @@ export const SECRET_KEYS = [
   MISTRAL_SECRET_KEY,
   GROK_SECRET_KEY,
   OPENROUTER_SECRET_KEY,
+  CUSTOM_PROVIDER_SECRET_KEY,
 ] as const;
 
 export type SecretKeyName = (typeof SECRET_KEYS)[number];

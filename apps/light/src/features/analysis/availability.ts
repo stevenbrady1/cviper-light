@@ -39,7 +39,7 @@ import {
   OPENROUTER_SECRET_KEY,
 } from '../../status/secretKeyNames';
 
-import { type Availability } from './providers';
+import { type Availability, type CustomServiceSummary } from './providers';
 
 /**
  * A transport that answers `listModels` from text already fetched and refuses
@@ -96,8 +96,30 @@ async function hasKey(key: string): Promise<boolean> {
  * Every probe runs concurrently and independently, so a locked credential store
  * cannot stop the app finding out that Ollama is running. Nothing here rejects.
  */
+/**
+ * The typed-address service (L-150), if one is saved.
+ *
+ * Rust's status command answers with the address, the tick and whether a key
+ * is saved — never the key. Only the tick travels on from here. Anything that
+ * is not that exact shape, and any failure at all, is "none": the same
+ * fail-closed reading as `hasKey`.
+ */
+async function customService(): Promise<CustomServiceSummary | null> {
+  try {
+    const status: unknown = await invoke('custom_provider_status');
+    if (typeof status !== 'object' || status === null || Array.isArray(status)) return null;
+    const record = status as Record<string, unknown>;
+    const ownNetwork = record['own_network'];
+    return typeof record['address'] === 'string' && typeof ownNetwork === 'boolean'
+      ? { ownNetwork }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function readAvailability(): Promise<Availability> {
-  const [ollama, anthropicKey, openaiKey, googleKey, mistralKey, grokKey, openrouterKey] =
+  const [ollama, anthropicKey, openaiKey, googleKey, mistralKey, grokKey, openrouterKey, custom] =
     await Promise.all([
       ollamaState(),
       hasKey(ANTHROPIC_SECRET_KEY),
@@ -106,6 +128,7 @@ export async function readAvailability(): Promise<Availability> {
       hasKey(MISTRAL_SECRET_KEY),
       hasKey(GROK_SECRET_KEY),
       hasKey(OPENROUTER_SECRET_KEY),
+      customService(),
     ]);
 
   return {
@@ -117,5 +140,7 @@ export async function readAvailability(): Promise<Availability> {
     mistralKey,
     grokKey,
     openrouterKey,
+    // Present only when saved, so "none" reads exactly as it did before L-150.
+    ...(custom === null ? {} : { customService: custom }),
   };
 }

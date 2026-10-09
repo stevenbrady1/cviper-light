@@ -1293,6 +1293,23 @@ mod tests {
     }
 
     #[test]
+    fn the_settings_card_calls_save_and_status_by_these_names() {
+        // `own_network` is two words, so Tauri expects it as `ownNetwork` on
+        // the JavaScript side — exactly the drift nothing would report until
+        // a user pressed the button.
+        const PORT_TS: &str = include_str!("../../src/features/settings/keys/customServicePort.ts");
+        assert!(PORT_TS.contains("'custom_provider_save'"));
+        assert!(PORT_TS.contains("'custom_provider_status'"));
+        assert!(PORT_TS.contains("invoke(SAVE_COMMAND, { address, ownNetwork, key })"));
+        assert!(
+            !PORT_TS.contains("own_network:"),
+            "the card sends the snake_case name, which Tauri will not match"
+        );
+        // The card never writes the entry through `secret_set`, which refuses it.
+        assert!(!PORT_TS.contains("'secret_set'"));
+    }
+
+    #[test]
     fn every_command_is_registered_for_javascript() {
         let handler = without_comments(include_str!("lib.rs"));
         for command in [

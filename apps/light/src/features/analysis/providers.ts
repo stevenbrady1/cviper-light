@@ -29,6 +29,7 @@ import type { ModelInfo } from '@cviper/ai-providers';
 
 import type { AiKeyProviderId } from '../settings/keys/aiKeyModel';
 import { AI_KEY_PROVIDER_IDS } from '../settings/keys/aiKeyProviders';
+import { readCustomModel } from './customModel';
 import { readModelChoices } from './modelChoice';
 
 // Where it has lived since L-183, beside the list it now heads. Re-exported so
@@ -95,6 +96,18 @@ export interface Availability {
   readonly mistralKey?: boolean;
   readonly grokKey?: boolean;
   readonly openrouterKey?: boolean;
+  /**
+   * L-150: the AI service at an address the user typed, when one is saved.
+   * Absent or `null` is "none" — the same fail-closed reading as the flags
+   * above. Only whether it is on the user's own network travels this far: the
+   * address is Settings' business, and the key is nobody's.
+   */
+  readonly customService?: CustomServiceSummary | null;
+}
+
+export interface CustomServiceSummary {
+  /** The user ticked "this runs on my own computer or network". */
+  readonly ownNetwork: boolean;
 }
 
 /**
@@ -158,6 +171,7 @@ function canBeSetUp(kind: ProviderKind): boolean {
 export function providerOptions(
   availability: Availability,
   models: Readonly<Record<AiKeyProviderId, string>> = readModelChoices(),
+  customModel: string | null = readCustomModel(),
 ): ProviderOption[] {
   const options: ProviderOption[] = [KEYWORD_OPTION];
 
@@ -230,6 +244,31 @@ export function providerOptions(
         needsKey: true,
       });
     }
+  }
+
+  // L-150: last, so a service the user added never becomes the default ahead
+  // of one they set up by name. Offered only with a model chosen: there is no
+  // curated list to fall back on, and a request with no model is one the
+  // service can only refuse.
+  const custom = availability.customService;
+  if (custom !== undefined && custom !== null && customModel !== null) {
+    options.push({
+      key: 'custom',
+      kind: 'custom',
+      label: `Your AI service · ${customModel}`,
+      note: custom.ownNetwork
+        ? 'A full reading. Your CV and the advert go to the AI service on your own computer or network.'
+        : 'A full reading. Your CV and the advert are sent to the AI service you added in Settings.',
+      model: customModel,
+      // Never "local", even on the user's own network: CViper cannot tell a box
+      // under the desk from this machine, and "nothing is being sent anywhere"
+      // is not a promise it could keep.
+      local: false,
+      // A service on the user's own network may need no key, so this option
+      // does not exist "because a key is saved" — and the welcome card's
+      // "your … key is saved" sentence must not name it.
+      needsKey: false,
+    });
   }
 
   return options;

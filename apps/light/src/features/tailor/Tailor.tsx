@@ -33,7 +33,7 @@ import {
   type ConsentProviderKind,
   type ConsentState,
 } from '../analysis/consent';
-import { jobAdvertText, providerLabel } from '../analysis/model';
+import { jobAdvertText, providerInSentence } from '../analysis/model';
 import {
   ollamaHint,
   optionByKey,
@@ -940,7 +940,7 @@ export function Tailor({
         ? `Asking ${selectedOption.model} on this machine. The first run after starting ` +
           'your PC loads the model into memory, which takes 5 to 30 seconds. Nothing is ' +
           'being sent anywhere.'
-        : `Sending your CV and the advert to ${providerLabel(selectedOption.kind)}. ` +
+        : `Sending your CV and the advert to ${providerInSentence(selectedOption.kind)}. ` +
           'This usually takes a few seconds.';
 
   const grantedConsents = (['anthropic', 'openai'] as const).filter((kind) => consent[kind]);
@@ -1318,7 +1318,7 @@ export function Tailor({
             </div>
 
             <p data-testid="tailor-provenance" className="text-xs text-ink-faint">
-              Written by {providerLabel(result.provider)} · {result.model}
+              Written by {providerInSentence(result.provider)} · {result.model}
               {result.retried ? ' · recovered on retry' : ''}
             </p>
 

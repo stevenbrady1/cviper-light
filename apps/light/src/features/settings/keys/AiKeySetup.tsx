@@ -21,6 +21,8 @@ import {
 } from './aiKeyModel';
 import { AI_KEY_PROVIDER_IDS } from './aiKeyProviders';
 import { createTauriAiKeyPort, type AiKeyPort } from './aiKeyPort';
+import { CustomServiceCard } from './CustomServiceCard';
+import { type CustomServicePort } from './customServicePort';
 import { KEY_STATE_LABEL, KEY_STATE_TONE } from './model';
 
 /**
@@ -86,9 +88,11 @@ export interface AiKeySetupProps {
   readonly ports?: Partial<Record<AiKeyProviderId, AiKeyPort>> | undefined;
   /** Injected by tests: the real one opens the user's browser. */
   readonly browser?: BrowserPort | undefined;
+  /** Injected by tests: L-150's typed-address service. Defaults to the real commands. */
+  readonly customServicePort?: CustomServicePort | undefined;
 }
 
-export function AiKeySetup({ ports, browser }: AiKeySetupProps = {}) {
+export function AiKeySetup({ ports, browser, customServicePort }: AiKeySetupProps = {}) {
   const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
 
   return (
@@ -109,6 +113,12 @@ export function AiKeySetup({ ports, browser }: AiKeySetupProps = {}) {
             browser={browserPort}
           />
         ))}
+        {/*
+          L-150: last, after every provider CViper can name. Not one of
+          `AI_KEY_PROVIDER_IDS` — it has an address as well as a key, and no
+          curated model list — so it is its own card, not a row in that map.
+        */}
+        <CustomServiceCard port={customServicePort} />
       </div>
     </section>
   );

@@ -328,6 +328,22 @@ export const OUTBOUND_CAPABILITIES: readonly OutboundCapability[] = [
       'site sees your IP address, exactly as it would if you had clicked the link yourself.',
   },
   {
+    // L-150. The address is whatever the user typed, so it cannot be listed;
+    // the rules it must pass are what can be, and each is enforced in Rust on
+    // every call (`custom_provider.rs`).
+    id: 'your-ai-service',
+    what: 'an AI service you add yourself in Settings, at the address you type there',
+    purpose: 'fetched-with-your-key',
+    why:
+      'Contacted only if you add one. A CV analysis, a tailoring, a pasted job advert, a ' +
+      'follow-up or an interview pack that you start, after you agree, is sent to the address ' +
+      'you typed, with the key you saved for it, if any. The address must start with https:// ' +
+      'and be on the internet, unless you tick that the service runs on your own computer or ' +
+      'network, and then it must be there instead. Its key is kept with that address and is ' +
+      'never sent anywhere else. Settings also asks the service which models it offers. The ' +
+      'app follows no links the service sends back.',
+  },
+  {
     id: 'webview2-runtime',
     what: 'Microsoft, for the Windows WebView2 runtime this app draws in',
     purpose: 'made-by-your-system',
