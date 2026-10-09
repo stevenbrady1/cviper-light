@@ -95,7 +95,51 @@ jobs:
           echo "::error title=Nothing to do, so nothing was done::promote_tag was empty. Push a light-v* tag to build a release, or dispatch this workflow with promote_tag set to an already-published tag to promote its updater manifest. See section 3 of apps/light/src-tauri/RELEASE-SIGNING.md."
           exit 1
 
+  # ==========================================================================
+  # NOTHING IS BUNDLED UNTIL THE TAGGED COMMIT HAS PASSED CI (L-221).
+  # ==========================================================================
+  # `bundle` used to run on any pushed tag with no `needs:` at all. The tag push
+  # starts ci.yml too, but in parallel and gating nothing, and smoke.yml does
+  # not run on tags — so a tag at a red commit produced a signed draft.
+  #
+  # A job cannot `needs:` a job in another workflow, so this one asks the
+  # check-runs API for the tagged SHA: it must be on main, and verify, WebKit,
+  # secret-scan and the real-binary smoke test must each have passed on it. It
+  # waits while they are still running (a tag is often pushed moments after the
+  # merge) and fails, naming them, if they never go green.
+  # `release-waits-for-ci.contract.test.ts` fails the build if a bundling job
+  # stops needing this one.
+  ci-passed:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+
+    # Reads the check runs and the compare API. Writes nothing.
+    permissions:
+      contents: read
+      checks: read
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GATE_SHA: ${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # No pnpm: the script imports nothing but Node builtins and its own
+      # judge, as in release-admin.yml.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Wait for CI to pass on the tagged commit
+        run: node apps/light/src/release/checkCiGate.ts
+
   bundle:
+    needs: ci-passed
+
     # A PUSHED TAG AND NOTHING ELSE.
     #
     # Both halves matter. `ref_type == 'tag'` alone would still let a dispatch
