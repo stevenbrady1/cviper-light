@@ -131,9 +131,9 @@ export function PrivacyNotice() {
         <h3 className="font-medium text-ink">Every place this app can contact</h3>
         <p className="mt-1 text-xs text-ink-faint">
           This list is not a summary. It is the exact set of addresses the code is allowed to name;
-          a test fails the build if one is added without appearing here. Two things below have no
-          fixed address — the advert page you choose, and Windows itself — so they are described
-          instead of named.
+          a test fails the build if one is added without appearing here. Three things below have no
+          fixed address — the advert page you choose, an AI service you add yourself, and Windows
+          itself — so they are described instead of named.
         </p>
 
         {GROUPS.map((group) => {

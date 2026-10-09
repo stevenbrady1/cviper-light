@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Use any AI service that works like OpenAI's chat API (L-150). Settings → AI provider keys has a new card, "Your own AI service": type its address and key, press "Test and save", then pick a model from the service's own list (or type one). It works for LM Studio or llama.cpp on your own computer, a model server on your network, or a hosted service CViper doesn't list. An address on the internet must start with https://. Tick "This runs on my own computer or network" to use an http:// address and no key, and then the address must really be on your computer or home network. Some addresses are always refused, such as the one cloud servers use for their own secrets. The address and key are tested together and saved together in your computer's credential store, so the key can only ever be sent to that address. Like any provider, it asks before your CV is sent, and "Delete everything" removes it.
+
 ### Changed
 
 - CViper no longer keeps where a CV file sits on your computer (its full path, which on Windows names your user account). Nothing ever used it. Paths kept before are cleared when the app updates, and the privacy policy no longer lists them (L-147).

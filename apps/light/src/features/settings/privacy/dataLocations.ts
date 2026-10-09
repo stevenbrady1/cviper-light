@@ -41,7 +41,9 @@ export const DATA_LOCATIONS: readonly DataLocation[] = [
     erasedBy: 'database',
   },
   {
-    what: 'Your API keys',
+    // L-150: a service the user adds is saved as its address and its key in
+    // ONE entry, so the key can only go to that address.
+    what: 'Your API keys, and the address of an AI service you added, kept with its key',
     where:
       'this device’s credential store (the Keychain on an iPhone, iPad or Mac; Credential Manager on Windows; the Secret Service on Linux), one entry per key',
     erasedBy: 'keys',
@@ -62,7 +64,7 @@ export const DATA_LOCATIONS: readonly DataLocation[] = [
     erasedBy: 'preferences',
   },
   {
-    what: 'Small conveniences: your last search, which free job feeds you ticked, today’s request count, and that you have seen the introduction',
+    what: 'Small conveniences: your last search, which free job feeds you ticked, which AI model each service uses, today’s request count, and that you have seen the introduction',
     where: 'this app’s own browser storage, which no other program reads',
     erasedBy: 'preferences',
   },

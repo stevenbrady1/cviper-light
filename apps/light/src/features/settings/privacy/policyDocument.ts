@@ -98,9 +98,9 @@ export function renderPrivacyPolicy(inputs: PolicyInputs): string {
     '## Every address the app can contact',
     '',
     'This is not a summary. It is the exact set of addresses the code is allowed to name; a ' +
-      'test fails the build if one is added without appearing here. Two things below have no ' +
-      'fixed address — the advert page you choose, and Windows itself — so they are described ' +
-      'instead of named.',
+      'test fails the build if one is added without appearing here. Three things below have no ' +
+      'fixed address — the advert page you choose, an AI service you add yourself, and Windows ' +
+      'itself — so they are described instead of named.',
     '',
   );
 
