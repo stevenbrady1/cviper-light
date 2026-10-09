@@ -151,7 +151,7 @@ export function BandScale({ score, verdict }: BandScaleProps) {
         >
           {value}
         </span>
-        <span className="text-ink-faint">out of 100</span>
+        <span className="text-xs text-ink-faint">out of 100</span>
       </div>
 
       <div className="relative mt-3">

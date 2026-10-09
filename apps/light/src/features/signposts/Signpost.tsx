@@ -59,7 +59,7 @@ export function Signpost({ id, browser }: SignpostProps) {
         type="button"
         data-testid={`signpost-${id}-open`}
         onClick={() => void browser.open(url)}
-        className="min-h-11 text-left text-ink-faint underline-offset-2 hover:text-ink hover:underline md:min-h-0"
+        className="min-h-11 text-left text-xs text-ink-faint underline-offset-2 hover:text-ink hover:underline md:min-h-0"
       >
         {text}
       </button>

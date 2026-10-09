@@ -57,7 +57,7 @@ export function GateNotice({ results }: GateNoticeProps) {
 
   if (results.every((result) => result.verdict === 'pass')) {
     return (
-      <p data-testid="analysis-gates-clear" className="text-ink-faint">
+      <p data-testid="analysis-gates-clear" className="text-xs text-ink-faint">
         Eligibility and language: nothing in the advert stops you applying.
       </p>
     );

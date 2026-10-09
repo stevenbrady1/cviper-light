@@ -88,7 +88,7 @@ function TermChips({
 }) {
   if (terms.length === 0) {
     return (
-      <p data-testid={`${testId}-empty`} className="mt-1.5 text-ink-faint">
+      <p data-testid={`${testId}-empty`} className="mt-1.5 text-xs text-ink-faint">
         {emptyText}
       </p>
     );
@@ -213,7 +213,7 @@ export function AnalysisResult({
             >
               {ats.score}
             </span>
-            <span className="text-ink-faint">out of 100</span>
+            <span className="text-xs text-ink-faint">out of 100</span>
             <span
               data-testid="analysis-ats-band"
               className={`font-medium ${ATS_BAND_TONE[ats.band]}`}
@@ -277,7 +277,7 @@ export function AnalysisResult({
       <div>
         <Eyebrow>What to change</Eyebrow>
         {analysis.suggestions.length === 0 ? (
-          <p data-testid="analysis-suggestions-empty" className="mt-1.5 text-ink-faint">
+          <p data-testid="analysis-suggestions-empty" className="mt-1.5 text-xs text-ink-faint">
             No specific edits were suggested.
           </p>
         ) : (
@@ -316,7 +316,7 @@ export function AnalysisResult({
       <div>
         <Eyebrow>Applicant tracking system notes</Eyebrow>
         {analysis.ats_notes.length === 0 ? (
-          <p data-testid="analysis-ats-notes-empty" className="mt-1.5 text-ink-faint">
+          <p data-testid="analysis-ats-notes-empty" className="mt-1.5 text-xs text-ink-faint">
             Nothing was flagged about how your CV would be read by screening software.
           </p>
         ) : (
