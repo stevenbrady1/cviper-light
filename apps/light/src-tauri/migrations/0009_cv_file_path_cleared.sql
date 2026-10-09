@@ -1,0 +1,12 @@
+-- 0009: clear the CV file paths stored before L-147.
+--
+-- A CV's full path on this computer (C:\Users\<name>\...) was stored on import
+-- and never read: no screen showed it and nothing opened the file from it.
+-- From L-147 it is never written. This blanks the paths written before, so
+-- the privacy policy can stop listing them and nothing holds them any more.
+--
+-- The column stays: older backups carry it, and the backup format keeps the
+-- field (always null). Re-running this changes nothing, though
+-- tauri-plugin-sql applies each version exactly once; `db.rs` pins that this
+-- file is version 9 and only nulls this one column.
+UPDATE cvs SET file_path = NULL WHERE file_path IS NOT NULL;

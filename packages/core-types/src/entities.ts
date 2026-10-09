@@ -169,11 +169,11 @@ export interface Cv {
   id: string;
   name: string;
   /**
-   * Absolute path on this machine, when known. `null` for a pasted CV — but
-   * also, since L-133, for every CV in a fresh export: `exportBackup` now
-   * always writes `null` here on purpose, so `null` no longer means
-   * specifically "the text was pasted in". A v1 file exported before L-133
-   * may still carry a real path, and importing it is unaffected.
+   * Always `null` from Light 0.9 (L-147). It once held where the CV file sat
+   * on this machine; nothing read it, so it is no longer written, and
+   * migration 0009 cleared the rows written before. The field stays for the
+   * backup format: `exportBackup` writes `null`, and a v1 file exported
+   * before L-133 may still carry a real path, which importing accepts.
    */
   file_path: string | null;
   /** `null` until parsing has run. */

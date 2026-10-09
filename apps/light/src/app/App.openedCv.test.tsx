@@ -81,7 +81,8 @@ describe('a CV opened from the share sheet', () => {
     await vi.waitFor(() => expect(analysisPort.storedCvs()).toHaveLength(1));
     expect(analysisPort.storedCvs()[0]?.name).toBe('Jane CV.pdf');
     expect(analysisPort.storedCvs()[0]?.extracted_text).toBe(CV_TEXT);
-    expect(analysisPort.storedCvs()[0]?.file_path).toBe('/Documents/Inbox/Jane CV.pdf');
+    // L-147: where the file sat is never stored, wherever it was opened from.
+    expect(analysisPort.storedCvs()[0]?.file_path).toBeNull();
     expect(await screen.findByDisplayValue('Jane CV.pdf')).toBeTruthy();
   });
 

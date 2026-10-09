@@ -140,15 +140,16 @@ describe('newCvRecord', () => {
     const cv = newCvRecord({
       id: 'cv-9',
       name: 'CV.docx',
-      path: 'C:\\CV.docx',
       text: 'Some text',
       now: NOW,
     });
 
+    // L-147: where the file sat on this computer is never stored. Nothing
+    // read it, and a path names the Windows user and their folders.
     expect(cv).toEqual({
       id: 'cv-9',
       name: 'CV.docx',
-      file_path: 'C:\\CV.docx',
+      file_path: null,
       extracted_text: 'Some text',
       json_resume: null,
       created_at: NOW,
@@ -158,9 +159,7 @@ describe('newCvRecord', () => {
   it('records a pasted CV as having no file path, never an empty string', () => {
     // The data model spells absence as null throughout, and an empty string
     // would export as a value the cloud app has to special-case.
-    expect(
-      newCvRecord({ id: 'cv-9', name: 'Pasted', path: null, text: 'x', now: NOW }).file_path,
-    ).toBeNull();
+    expect(newCvRecord({ id: 'cv-9', name: 'Pasted', text: 'x', now: NOW }).file_path).toBeNull();
   });
 });
 

@@ -445,7 +445,6 @@ export function Analysis({
       const cv = newCvRecord({
         id: crypto.randomUUID(),
         name: picked.name,
-        path: picked.path,
         text: extracted.value.text,
         now: (now ?? new Date()).toISOString(),
         // Kept verbatim when the file WAS a JSON Resume, so "Save as JSON

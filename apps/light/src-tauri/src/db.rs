@@ -95,6 +95,12 @@ pub fn migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/0008_cv_original_text.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 9,
+            description: "cvs.file_path: clear the paths stored before L-147; never written again",
+            sql: include_str!("../migrations/0009_cv_file_path_cleared.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -268,6 +274,25 @@ mod tests {
         );
         for forbidden in ["DROP", "RENAME", "UPDATE ", "DELETE FROM", "INSERT"] {
             assert!(!sql.contains(forbidden), "0006 must be additive; found `{forbidden}`");
+        }
+    }
+
+    #[test]
+    fn the_ninth_migration_only_clears_cv_file_paths() {
+        // L-147. One UPDATE of one column on `cvs`, to NULL, and nothing else:
+        // no table or column is created, dropped or renamed. Run for real over
+        // a database holding data by `src/db/migration.cvFilePath.test.ts`.
+        let migration = &migrations()[8];
+        assert_eq!(migration.version, 9);
+        assert!(matches!(migration.kind, MigrationKind::Up));
+        let sql = executable_sql(migration.sql);
+        assert!(
+            sql.contains("UPDATE cvs SET file_path = NULL WHERE file_path IS NOT NULL;"),
+            "0009 must null cvs.file_path"
+        );
+        assert_eq!(sql.matches("UPDATE").count(), 1, "0009 updates one table once");
+        for forbidden in ["CREATE", "DROP", "RENAME", "ALTER", "DELETE", "INSERT"] {
+            assert!(!sql.contains(forbidden), "0009 must not contain {forbidden}");
         }
     }
 
