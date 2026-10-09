@@ -1,0 +1,17 @@
+# Exact gitleaks findings that are known false positives. One fingerprint per
+# line — commit:file:rule:line — so each entry silences ONE finding in ONE
+# commit and nothing else. No rule in .gitleaks.toml is relaxed by this file.
+#
+# L-150: test lines that stored an AI model NAME in browser storage by passing
+# the storage-key constant and a literal side by side. The default
+# generic-api-key rule reads that shape as a credential. The tests now write
+# through a helper, so no line on main has that shape.
+#
+# Three are in commit 3d23f3f, on the closed PR #226. The history scan reads
+# every branch (fetch-depth 0), so they stay listed while that branch exists.
+3d23f3fe834f54d441cf28fce73d2b5a3e07e315:apps/light/src/features/analysis/customService.test.ts:generic-api-key:91
+3d23f3fe834f54d441cf28fce73d2b5a3e07e315:apps/light/src/features/analysis/customService.test.ts:generic-api-key:125
+3d23f3fe834f54d441cf28fce73d2b5a3e07e315:apps/light/src/features/settings/keys/CustomServiceCard.test.tsx:generic-api-key:278
+# One is in commit bf3b33d, which merges into main with PR #227: the first
+# version of THIS file quoted one of those lines in its own comment.
+bf3b33d7d2995e2f4e975fb876d7345f4b8bbe02:.gitleaksignore:generic-api-key:6

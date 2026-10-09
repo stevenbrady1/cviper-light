@@ -6,7 +6,7 @@ import { ATS_BAND_HINT, VERDICT_HINT } from '../../app/hints';
 import { displayTerms } from './acronyms';
 import { ATS_BAND_TONE, ATS_BAND_WORD } from './atsBandWords';
 import { BandScale } from './BandScale';
-import { providerLabel } from './model';
+import { providerInSentence } from './model';
 
 /**
  * One finished analysis, drawn the same way whichever engine produced it.
@@ -151,7 +151,7 @@ export function AnalysisResult({
     ? aiAvailable
       ? 'Basic match — a word-list scan, not an AI reading of your CV.'
       : 'Basic match — add an AI key for a full analysis.'
-    : `Read by ${providerLabel(provider)} · ${model}`;
+    : `Read by ${providerInSentence(provider)} · ${model}`;
 
   return (
     <section data-testid="analysis-result" className="space-y-5">

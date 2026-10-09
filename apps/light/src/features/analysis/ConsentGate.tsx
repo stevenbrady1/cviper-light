@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 
 import { type ConsentProviderKind } from './consent';
-import { providerLabel } from './model';
+import { providerInSentence, providerLabel } from './model';
 
 /**
  * The consent dialog (Apple 5.1.2(i)): shown once per provider, before the
@@ -35,7 +35,12 @@ interface ConsentGateProps {
 
 export function ConsentGate({ kind, onAccept, onDecline }: ConsentGateProps) {
   const declineRef = useRef<HTMLButtonElement>(null);
-  const label = providerLabel(kind);
+  const label = providerInSentence(kind);
+  // L-150: CViper cannot name the typed-address service, and one on the
+  // user's own network may have no key — so it says where the address came
+  // from rather than claiming a key was used.
+  const how =
+    kind === 'custom' ? 'at the address you added in Settings' : 'using the API key you added';
 
   useEffect(() => {
     declineRef.current?.focus();
@@ -66,7 +71,7 @@ export function ConsentGate({ kind, onAccept, onDecline }: ConsentGateProps) {
         </h2>
         <p className="mt-1 text-ink-muted">
           {`Checking it this way sends the text of your CV and the job advert to ${label}, ` +
-            'using the API key you added. This is the moment your CV leaves this machine — ' +
+            `${how}. This is the moment your CV leaves this machine — ` +
             'nothing is sent until you say so, and you can withdraw this any time.'}
         </p>
 

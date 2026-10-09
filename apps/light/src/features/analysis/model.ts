@@ -293,3 +293,12 @@ const PROVIDER_LABELS: Readonly<Record<string, string>> = {
 export function providerLabel(provider: string): string {
   return PROVIDER_LABELS[provider] ?? provider;
 }
+
+/**
+ * The same name, for the middle of a sentence: "Sending your CV to your AI
+ * service", not "… to Your AI service". Every named provider is a proper noun
+ * and reads the same either way; only L-150's service is not.
+ */
+export function providerInSentence(provider: string): string {
+  return provider === 'custom' ? 'your AI service' : providerLabel(provider);
+}

@@ -16,7 +16,7 @@ const requestLog = vi.hoisted(() => ({ recordRequest: vi.fn() }));
 
 vi.mock('../status/requestLog', () => ({ recordRequest: requestLog.recordRequest }));
 
-const { createTauriTransport, probeOllama } = await import('./transport');
+const { createTauriTransport, listCustomModels, probeOllama } = await import('./transport');
 
 beforeEach(() => {
   tauri.invoke.mockReset();
@@ -146,6 +146,24 @@ describe('createTauriTransport — the typed-address service (L-150)', () => {
       error: { provider: 'custom', kind: 'no-key', message: 'No AI service address is saved.' },
     });
     expect(requestLog.recordRequest).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('listCustomModels — the Settings card’s one call (L-150)', () => {
+  it('lists through custom_provider_models with no arguments, and counts the request', async () => {
+    tauri.invoke.mockResolvedValue(envelope(200, '{"data":[]}'));
+
+    const listed = await listCustomModels();
+
+    expect(listed).toEqual({ ok: true, value: { status: 200, body: '{"data":[]}' } });
+    expect(tauri.invoke).toHaveBeenCalledWith('custom_provider_models', {});
+    expect(requestLog.recordRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('negative: a failure is a typed error, never a throw', async () => {
+    tauri.invoke.mockRejectedValue(new Error('IPC gone'));
+    const listed = await listCustomModels();
+    expect(listed.ok).toBe(false);
   });
 });
 

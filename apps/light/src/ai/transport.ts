@@ -165,6 +165,20 @@ export function createTauriTransport(): ChatTransport {
 }
 
 /**
+ * The saved typed-address service's model list (L-150), for its Settings card.
+ *
+ * A narrow export rather than the whole transport, on purpose: the card may
+ * ask the service what it serves — no CV, no advert, nothing of the user's —
+ * but it must never hold a factory that could send a chat. That is the line
+ * `ai-call-sites-consent.contract.test.ts` draws, and the same shape as
+ * `probeOllama` below. Counted, like any listing: it is a request to the
+ * service.
+ */
+export function listCustomModels(): Promise<Result<ProviderHttpResponse, ProviderError>> {
+  return call('custom', CUSTOM_LIST_MODELS_COMMAND, {});
+}
+
+/**
  * Is Ollama running? Returns the raw `/api/tags` body, or `null`.
  *
  * `null` is NOT an error. Most people will never install Ollama, and the ones

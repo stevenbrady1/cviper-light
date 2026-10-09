@@ -169,8 +169,9 @@ product that exists (L-114).
   outcome worth avoiding.
 - **A pasted advert is read by a model, then checked by a human before anything
   is saved.** Paste the text of an advert and the configured provider
-  (Anthropic, OpenAI, Google Gemini, Mistral, xAI Grok, OpenRouter, or a local
-  Ollama model) returns nine flat nullable fields
+  (Anthropic, OpenAI, Google Gemini, Mistral, xAI Grok, OpenRouter, a local
+  Ollama model, or any OpenAI-compatible service the user adds at its own
+  address — L-150) returns nine flat nullable fields
   — `title`, `company`, `location`, `url`, `description`, `posted_date`,
   `salary_currency`, `salary_min`, `salary_max`. Each one lands in an editable
   box, a `null` renders as an EMPTY box rather than a plausible guess, and

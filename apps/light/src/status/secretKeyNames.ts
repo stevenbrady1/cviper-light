@@ -30,3 +30,7 @@ export const GOOGLE_SECRET_KEY = 'google_api_key';
 export const MISTRAL_SECRET_KEY = 'mistral_api_key';
 export const GROK_SECRET_KEY = 'grok_api_key';
 export const OPENROUTER_SECRET_KEY = 'openrouter_api_key';
+// L-150: the typed-address service — its address, tick and key in ONE entry,
+// written only by `custom_provider_save`. Named here so "delete everything"
+// removes it; `secret_set` refuses it.
+export const CUSTOM_PROVIDER_SECRET_KEY = 'custom_provider';
