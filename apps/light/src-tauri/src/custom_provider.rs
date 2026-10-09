@@ -1279,6 +1279,20 @@ mod tests {
     }
 
     #[test]
+    fn the_frontend_calls_chat_and_models_by_these_names() {
+        // A renamed command or argument fails nowhere but at runtime, in a
+        // built app. The body is one word, so Tauri's camelCase conversion
+        // cannot change it; the model list takes no argument at all.
+        const TRANSPORT_TS: &str = include_str!("../../src/ai/transport.ts");
+        assert!(TRANSPORT_TS.contains("'custom_provider_chat'"));
+        assert!(TRANSPORT_TS.contains("'custom_provider_models'"));
+        assert!(TRANSPORT_TS.contains("call(provider, CUSTOM_CHAT_COMMAND, { body })"));
+        assert!(TRANSPORT_TS.contains("call(provider, CUSTOM_LIST_MODELS_COMMAND, {})"));
+        // Anti-inert: the haystack is the real transport.
+        assert!(TRANSPORT_TS.contains("createTauriTransport"));
+    }
+
+    #[test]
     fn every_command_is_registered_for_javascript() {
         let handler = without_comments(include_str!("lib.rs"));
         for command in [

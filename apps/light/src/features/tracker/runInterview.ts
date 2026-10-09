@@ -79,7 +79,9 @@ function providerFor(option: ProviderOption, transport: ChatTransport): AiProvid
     case 'mistral':
     case 'grok':
     case 'openrouter':
-      // L-177: one chat-completions adapter, routed by the kind itself.
+    case 'custom':
+      // L-177: one chat-completions adapter, routed by the kind itself. L-150's
+      // typed-address service speaks the same dialect.
       return createChatCompletionsProvider(option.kind, transport);
     case 'keyword':
       // Unreachable: the panel filters this out before a user can pick it.

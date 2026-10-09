@@ -7,8 +7,12 @@
  * `@cviper/ai-providers` builds request bodies and reads response bodies and
  * has no idea how they travel. This module supplies the how, and the how is
  * deliberately incapable of choosing a destination: it passes a provider name
- * from a three-value union and a body, and Rust decides the URL, the method and
- * the `Authorization` header.
+ * from a closed union and a body, and Rust decides the URL, the method and the
+ * `Authorization` header.
+ *
+ * L-150's `custom` provider is no exception. Its address was typed by the user,
+ * but it is saved in Rust bound to its key (`custom_provider.rs`), so the
+ * commands for it take no address at all — only the body.
  *
  * That is why there is no base URL in this file and no API key anywhere in
  * JavaScript. See `src-tauri/src/providers.rs`.
@@ -31,6 +35,9 @@ import { recordRequest } from '../status/requestLog';
 const CHAT_COMMAND = 'provider_chat';
 const LIST_MODELS_COMMAND = 'provider_list_models';
 const PROBE_COMMAND = 'ollama_probe';
+/** L-150: the saved typed-address service. No provider argument: there is one. */
+const CUSTOM_CHAT_COMMAND = 'custom_provider_chat';
+const CUSTOM_LIST_MODELS_COMMAND = 'custom_provider_models';
 
 /**
  * Error kinds Rust is allowed to name.
@@ -145,10 +152,14 @@ async function call(
 export function createTauriTransport(): ChatTransport {
   return {
     chat(provider, body) {
-      return call(provider, CHAT_COMMAND, { provider, body });
+      return provider === 'custom'
+        ? call(provider, CUSTOM_CHAT_COMMAND, { body })
+        : call(provider, CHAT_COMMAND, { provider, body });
     },
     listModels(provider) {
-      return call(provider, LIST_MODELS_COMMAND, { provider });
+      return provider === 'custom'
+        ? call(provider, CUSTOM_LIST_MODELS_COMMAND, {})
+        : call(provider, LIST_MODELS_COMMAND, { provider });
     },
   };
 }

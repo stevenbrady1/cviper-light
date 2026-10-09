@@ -286,6 +286,8 @@ const PROVIDER_LABELS: Readonly<Record<string, string>> = {
   mistral: 'Mistral',
   grok: 'xAI Grok',
   openrouter: 'OpenRouter',
+  // L-150: CViper cannot name the service at an address the user typed.
+  custom: 'Your AI service',
 };
 
 export function providerLabel(provider: string): string {

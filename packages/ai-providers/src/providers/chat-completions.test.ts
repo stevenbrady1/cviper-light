@@ -190,6 +190,39 @@ describe.each(NEW_PROVIDERS.map((id) => [id] as const))('%s — the response env
   });
 });
 
+describe('custom — the typed-address service (L-150)', () => {
+  it('routes the call to the custom id, so Rust sends it to the saved address', async () => {
+    const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
+    const provider = createChatCompletionsProvider('custom', transport);
+
+    const result = await provider.chatJson(REQUEST);
+
+    expect(provider.id).toBe('custom');
+    expect(transport.chatCalls).toEqual(['custom']);
+    expect(result.ok).toBe(true);
+  });
+
+  it('sends the output cap as max_tokens, the name every compatible server takes', () => {
+    const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
+    void createChatCompletionsProvider('custom', transport).chatJson(REQUEST);
+    const body = sentBody(transport);
+    expect(body['max_tokens']).toBe(wireOutputCap(REQUEST.maxOutputTokens));
+    expect(body).not.toHaveProperty('max_completion_tokens');
+  });
+
+  it('negative: a 401 from the service is auth, without quoting what it said', async () => {
+    const transport = fakeTransport({
+      chat: { status: 401, body: '{"error":{"message":"bad key sk-abc…xyz"}}' },
+    });
+    const result = await createChatCompletionsProvider('custom', transport).chatJson(REQUEST);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.kind).toBe('auth');
+      expect(result.error.message).not.toContain('sk-abc');
+    }
+  });
+});
+
 describe('listModels across the four', () => {
   it('reads ids and, where the API offers one, a display name', async () => {
     const transport = fakeTransport({
