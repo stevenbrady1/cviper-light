@@ -173,11 +173,18 @@ that premise.
 
 ## TestFlight
 
-1. Upload the signed build (`RELEASE-SIGNING.md`).
+1. Upload the signed build (`RELEASE-SIGNING.md`). The export-compliance
+   question ("Does your app use encryption?") is already answered:
+   `ITSAppUsesNonExemptEncryption` is `false` in `src-tauri/Info.ios.plist`,
+   because the app's only cryptography is exempt HTTPS and Apple's keychain.
+   Since 2026-04-28 the signed build must be made with Xcode 26 (the iOS 26
+   SDK) or newer.
 2. TestFlight → the build → **Test Information**: paste the reviewer notes
    above as "What to Test".
 3. **External Testing** → create a group `Beta` → **Enable Public Link**.
-   The link is what goes to the waitlist cohort (hosted H-60 / CV-1388).
+   Share the link wherever you choose (the landing page, communities). The
+   hosted waitlist it was once meant for no longer exists: it was deleted with
+   the hosted product's database when that was mothballed on 2026-09-10.
 4. The first external build needs Beta App Review; it uses the same notes.
 
 ## Submission checklist

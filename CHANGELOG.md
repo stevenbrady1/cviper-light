@@ -12,6 +12,8 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Changed
 
+- iPhone and iPad builds now answer App Store Connect's encryption question themselves (L-173). The app uses only standard HTTPS and Apple's keychain, so the honest answer is "no", and every upload no longer waits on it. A test fails if an encryption library is ever added, which would make that answer untrue.
+
 - Faint side-notes are now smaller as well as lighter, so they read as notes rather than as ordinary text (L-213). The faint and muted greys had to move close together to stay readable, so the colour alone no longer told them apart. This covers the "out of 100" beside a score and empty lines like "Nothing the advert asks for is missing", on Analysis, Profile and interview packs. A test now fails if faint text is added without a size or weight difference.
 
 - CViper no longer keeps where a CV file sits on your computer (its full path, which on Windows names your user account). Nothing ever used it. Paths kept before are cleared when the app updates, and the privacy policy no longer lists them (L-147).

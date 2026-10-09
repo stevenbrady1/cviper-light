@@ -16,9 +16,20 @@
   `LSSupportsOpeningDocumentsInPlace` is false on purpose: in-place access
   would mean holding a security-scoped reference to the user's original file,
   and this app reads a CV once and keeps only its text.
+  `ITSAppUsesNonExemptEncryption` is false, and that is the honest answer
+  (L-173): the only cryptography in this app is the TLS that HTTPS needs
+  (rustls with ring, inside reqwest) and Apple's own keychain for saved keys,
+  both exempt under the 5A992.c self-classification. The app does not encrypt
+  its database or anything else itself. Declaring it here answers App Store
+  Connect's export-compliance question for every upload, so no build waits on
+  it. `packaging/iosExportCompliance.contract.test.ts` holds the key in place
+  and fails if a cipher or crypto library is added, which would make `false`
+  untrue.
 -->
 <plist version="1.0">
 <dict>
+  <key>ITSAppUsesNonExemptEncryption</key>
+  <false/>
   <key>LSSupportsOpeningDocumentsInPlace</key>
   <false/>
   <key>CFBundleDocumentTypes</key>
