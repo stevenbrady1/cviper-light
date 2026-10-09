@@ -104,9 +104,15 @@ old address produced a failure message rather than a silent "you are current".
 Nothing about a release is automatic. The workflow produces a draft; a person
 decides everything after that.
 
-1. **Push a `light-v*` tag.** The `bundle` job in `release.yml` builds the
-   installers and uploads them to a **draft** release, with `latest.json`
-   beside them. Nothing is public, and no installed copy can see any of it.
+1. **Push a `light-v*` tag at a commit on `main`.** The `ci-passed` job in
+   `release.yml` runs first (L-221): it waits for `verify`, the WebKit check,
+   `secret-scan` and the real-binary smoke test to pass on that exact commit,
+   and refuses a commit that is not on `main`. It waits up to 90 minutes while
+   they run; if it gives up or refuses, nothing is bundled — fix `main`, or
+   press "Re-run failed jobs" once the checks are green. Only then does the
+   `bundle` job build the installers and upload them to a **draft** release,
+   with `latest.json` beside them. Nothing is public, and no installed copy can
+   see any of it.
 2. **Review the draft.** Download the installer, run it, check the version is
    what you expect. This is what the draft gate exists to make possible.
    `releaseDraft: true` is deliberate and is not a setting to flip: publishing

@@ -8,6 +8,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Added
 
+- A release is only built from a commit that has passed its checks (L-221). Before the installers are built, the release workflow now waits for the tests, the WebKit check, the secret scan and the real-app smoke test to pass on that exact commit, and refuses a commit that is not on `main`. Before this, a release could be built from a commit whose tests had failed.
 - Use any AI service that works like OpenAI's chat API (L-150). Settings → AI provider keys has a new card, "Your own AI service": type its address and key, press "Test and save", then pick a model from the service's own list (or type one). It works for LM Studio or llama.cpp on your own computer, a model server on your network, or a hosted service CViper doesn't list. An address on the internet must start with https://. Tick "This runs on my own computer or network" to use an http:// address and no key, and then the address must really be on your computer or home network. Some addresses are always refused, such as the one cloud servers use for their own secrets. The address and key are tested together and saved together in your computer's credential store, so the key can only ever be sent to that address. Like any provider, it asks before your CV is sent, and "Delete everything" removes it.
 
 ### Changed
