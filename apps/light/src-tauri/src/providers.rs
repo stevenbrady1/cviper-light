@@ -12,10 +12,16 @@
 //! credentials attached.
 //!
 //! So the commands here are narrow to the point of being boring. JavaScript
-//! chooses a provider from a THREE-VARIANT ENUM and supplies a request body.
+//! chooses a provider from a CLOSED ENUM and supplies a request body.
 //! Everything that decides *where the bytes go* — scheme, host, path, method —
 //! is a `&'static str` in this file. The worst a compromised frontend can do is
 //! send a malformed body to an API we were going to call anyway.
+//!
+//! The one service at an address the USER typed (L-150) is deliberately not
+//! here: it lives in `custom_provider.rs`, behind its own commands, where the
+//! address is vetted, resolved and pinned on every call and the key is saved
+//! bound to it. Keeping it out of this file is what lets the guard below stay
+//! absolute for every provider this file names.
 //!
 //! ============================================================================
 //! THE KEY IS FETCHED HERE AND DIES HERE
@@ -208,10 +214,13 @@ const MAX_CHAT_BODY_BYTES: usize = 1_048_576;
 /// in words worth showing the user. Collapsing that into an error string here
 /// would throw away the explanation and force the adapters to parse prose. So
 /// the status travels with the body and the TypeScript adapter classifies it.
+///
+/// `custom_provider.rs` sends its replies in the same envelope, so one adapter
+/// on the TypeScript side reads both.
 #[derive(Serialize)]
-struct HttpEnvelope {
-    status: u16,
-    body: String,
+pub(crate) struct HttpEnvelope {
+    pub(crate) status: u16,
+    pub(crate) body: String,
 }
 
 /// The `Err` payload of every command here: a JSON object, not a bare sentence.
@@ -238,7 +247,7 @@ struct TransportError {
     message: String,
 }
 
-fn transport_error(kind: &'static str, message: String) -> String {
+pub(crate) fn transport_error(kind: &'static str, message: String) -> String {
     serde_json::to_string(&TransportError { kind, message })
         .unwrap_or_else(|_| r#"{"kind":"network","message":"The request failed."}"#.to_string())
 }
@@ -371,7 +380,7 @@ pub(crate) fn client() -> Result<&'static reqwest::Client, String> {
 /// Everything checked before a body is put on the wire.
 ///
 /// Split out so the boundaries are testable without a socket.
-fn validate_chat_body(body: &str) -> Result<(), String> {
+pub(crate) fn validate_chat_body(body: &str) -> Result<(), String> {
     if body.trim().is_empty() {
         return Err("The request was empty.".to_string());
     }
@@ -505,7 +514,7 @@ pub(crate) enum KeyTestOutcome {
 /// Coarse on purpose, and the three the user can act on differently are the
 /// three the card names: a refused key is re-pasted, an unreachable provider is
 /// retried, and a rate limit is waited out.
-fn key_test_outcome(status: u16) -> Option<KeyTestOutcome> {
+pub(crate) fn key_test_outcome(status: u16) -> Option<KeyTestOutcome> {
     match status {
         200..=299 => None,
         401 | 403 => Some(KeyTestOutcome::Refused),
@@ -516,7 +525,7 @@ fn key_test_outcome(status: u16) -> Option<KeyTestOutcome> {
 }
 
 /// Which `ProviderErrorKind` each outcome maps to.
-fn key_test_kind(outcome: KeyTestOutcome) -> &'static str {
+pub(crate) fn key_test_kind(outcome: KeyTestOutcome) -> &'static str {
     match outcome {
         KeyTestOutcome::Refused => "auth",
         KeyTestOutcome::RateLimited => "rate-limit",
@@ -1191,8 +1200,10 @@ mod tests {
 
     #[test]
     fn there_is_no_generic_url_taking_command() {
-        // The SSRF guard, as a test rather than a comment. If a command ever
-        // accepts a caller-supplied URL, this fails.
+        // The SSRF guard, as a test rather than a comment. If a command in
+        // THIS file ever accepts a caller-supplied URL, this fails. The typed
+        // address of L-150 is in `custom_provider.rs`, under that module's
+        // own vetting and its own tests — not an exception to this one.
         //
         // Scanned up to `#[cfg(test)]` only. The test module below names the
         // forbidden patterns as string literals, and `without_comments` does
