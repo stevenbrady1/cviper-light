@@ -27,6 +27,17 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 /// ==========================================================================
 pub const DB_URL: &str = "sqlite:cviper.db";
 
+/// The database's filename in the data folder: `DB_URL` without the driver.
+pub fn db_file() -> &'static str {
+    DB_URL.trim_start_matches("sqlite:")
+}
+
+/// The newest schema version this build ships — the version a database will be
+/// at once this launch's migrations have run.
+pub fn latest_version() -> i64 {
+    migrations().iter().map(|m| m.version).max().unwrap_or(0)
+}
+
 /// The migration list, oldest first.
 ///
 /// ==========================================================================

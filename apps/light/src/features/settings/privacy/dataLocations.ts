@@ -12,7 +12,7 @@
 import { CONSENT_STORE_FILE } from '../../analysis/consent';
 import { BOARD_STORE_FILE } from '../../boards/port';
 import { WORKFLOW_STORE_FILE } from '../../tailor/persistence';
-import { DB_URL } from '../../../db/constants';
+import { DB_URL, SAFETY_COPY_SUFFIX } from '../../../db/constants';
 
 export type EraseStep = 'database' | 'keys' | 'preferences';
 
@@ -38,6 +38,13 @@ export const DATA_LOCATIONS: readonly DataLocation[] = [
     // backup — what the user keeps is saved to the application as a document.
     what: 'Tailoring you have not saved yet: the advert, the draft CV, its review and the letter, for each job',
     where: `the same database file, on this computer only — an export always leaves it out`,
+    erasedBy: 'database',
+  },
+  {
+    // L-227: made on the first launch after an update that changes how the
+    // data is stored, before the change runs. One copy, replaced each time.
+    what: 'A safety copy of that database, made just before an update changes how it is stored, so an update that goes wrong cannot lose your data',
+    where: `${DB_FILENAME}${SAFETY_COPY_SUFFIX} in the same data folder — only ever one, replaced at the next such update`,
     erasedBy: 'database',
   },
   {

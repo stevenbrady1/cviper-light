@@ -5,6 +5,7 @@ mod files;
 mod jobs;
 mod keyless;
 mod providers;
+mod safety_copy;
 mod secrets;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -95,6 +96,16 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
 
     builder
+        // Before the window opens, so before the frontend can open the database
+        // and run a migration: one safety copy of the file, made only on the
+        // launch where the shipped schema is newer than the last one seen
+        // (L-227). A failed copy never blocks startup. See safety_copy.rs.
+        .setup(|app| {
+            if let Some(dir) = safety_copy::data_dir(app.handle()) {
+                let _ = safety_copy::make_safety_copy(&dir, db::db_file(), db::latest_version());
+            }
+            Ok(())
+        })
         // Custom commands are allow-by-default: only PLUGIN commands are
         // gated by capabilities/default.json, so the secret commands need no
         // entry there. They do need to be listed here.
@@ -107,6 +118,9 @@ pub fn run() {
             secrets::secret_set,
             secrets::secret_delete,
             secrets::secret_status,
+            // "Delete everything" removes the safety copy as well (L-227). It
+            // takes no path: the folder and the name are fixed in Rust.
+            safety_copy::safety_copy_delete,
             // The provider transport. Rust owns every base URL and injects the
             // API key from the keyring, so a compromised frontend can still
             // only reach the APIs named in providers.rs.
