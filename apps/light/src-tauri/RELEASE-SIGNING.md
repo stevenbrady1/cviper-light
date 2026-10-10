@@ -46,6 +46,31 @@ ever. A signing key in version control is a signing key that lets a stranger
 ship a signed binary to every user this app has, and there is no revocation
 story for an app that checks one hardcoded public key.
 
+## 1a. Back the key up — the GitHub secret cannot be read back
+
+GitHub Actions secrets can be USED by a workflow but never READ by anyone,
+including the repository owner. So the copy in GitHub is not a backup: if the
+file on the operator's machine is lost, the key is gone, and so is every
+install's ability to update (§1). Keep two copies outside GitHub (L-228):
+
+1. **A password manager.** One secure note holding the full text of
+   `~/.tauri/cviper-light.key` and, as a separate field, its password.
+2. **An offline copy.** The same file on a USB stick kept somewhere safe,
+   inside an encrypted archive or encrypted volume. The password does NOT go on
+   the same stick.
+
+Then check the backup actually works, from the backup and not the original:
+
+```
+pnpm tauri signer sign -f <backup copy of cviper-light.key> -p '<password>' some-file.txt
+```
+
+A `some-file.txt.sig` appearing means the key and the password both work. Delete
+the test file and its signature afterwards. Repeat the check once a year.
+
+If the key is ever lost or leaks, `docs/BAD-RELEASE.md` says what is and is not
+possible.
+
 ## 2. The endpoint is a FIXED tag, and `/releases/latest/` is a trap
 
 `plugins.updater.endpoints` points at `stevenbrady1/cviper-light`, set at the
