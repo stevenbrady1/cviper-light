@@ -26,3 +26,11 @@
  *     Linux    ~/.config/com.cviper.light/cviper.db
  */
 export const DB_URL = 'sqlite:cviper.db';
+
+/**
+ * Appended to the database filename for the one safety copy made just before
+ * an update changes the database (L-227) — `cviper.db.before-update`, in the
+ * same folder. MUST byte-match `SAFETY_COPY_SUFFIX` in
+ * `src-tauri/src/safety_copy.rs`; a Rust test checks.
+ */
+export const SAFETY_COPY_SUFFIX = '.before-update';

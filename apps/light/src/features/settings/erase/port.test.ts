@@ -71,6 +71,11 @@ const tauriCore = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauriCore.invoke }));
 
+const database = vi.hoisted(() => ({
+  wipeAll: vi.fn<() => Promise<{ ok: true } | { ok: false; error: { message: string } }>>(),
+}));
+vi.mock('../../../db', () => ({ wipeAll: database.wipeAll }));
+
 const { BOARD_STORE_FILE, BOARD_STORE_KEY } = await import('../../boards/port');
 const { CONSENT_STORE_FILE, CONSENT_STORE_KEY } = await import('../../analysis/consent');
 const { WORKFLOW_STORE_FILE } = await import('../../tailor/persistence');
@@ -102,6 +107,8 @@ beforeEach(() => {
   plugin.load.mockClear();
   tauriCore.invoke.mockReset();
   tauriCore.invoke.mockResolvedValue(undefined);
+  database.wipeAll.mockReset();
+  database.wipeAll.mockResolvedValue({ ok: true });
 });
 
 describe('forgetPreferences empties every preferences file', () => {
@@ -252,5 +259,29 @@ describe('forgetKeys deletes every credential this app can hold', () => {
       .filter(([command]) => command === 'secret_delete')
       .map(([, args]) => args?.['key']);
     expect(deletedKeys).toEqual([...SECRET_KEYS]);
+  });
+});
+
+describe('wipeDatabase also removes the safety copy (L-227)', () => {
+  it('empties the database, then deletes the copy made before the last update', async () => {
+    const result = await createTauriErasePort().wipeDatabase();
+    expect(result.ok).toBe(true);
+    expect(database.wipeAll).toHaveBeenCalledOnce();
+    expect(tauriCore.invoke).toHaveBeenCalledWith('safety_copy_delete');
+  });
+
+  it('still deletes the copy when emptying the database refused, and reports the refusal', async () => {
+    database.wipeAll.mockResolvedValue({ ok: false, error: { message: 'database is locked' } });
+    const result = await createTauriErasePort().wipeDatabase();
+    expect(tauriCore.invoke).toHaveBeenCalledWith('safety_copy_delete');
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.error.message).toBe('database is locked');
+  });
+
+  it('reports a copy that would not delete, in words a person can read', async () => {
+    tauriCore.invoke.mockRejectedValue('The safety copy of your data could not be deleted.');
+    const result = await createTauriErasePort().wipeDatabase();
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.error.message).toMatch(/safety copy/);
   });
 });

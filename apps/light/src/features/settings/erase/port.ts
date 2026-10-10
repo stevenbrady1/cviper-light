@@ -109,7 +109,17 @@ export function createTauriErasePort(): ErasePort {
   return {
     async wipeDatabase() {
       const wiped = await wipeAll();
-      return wiped.ok ? ok(undefined) : err({ message: wiped.error.message });
+      // The safety copy made before the last update holds the same data
+      // (L-227), so it goes with the rows. Attempted even when the wipe
+      // refused, and the FIRST refusal is the one reported, as in forgetKeys.
+      let copyRefusal: EraseProblem | null = null;
+      try {
+        await invoke('safety_copy_delete');
+      } catch (cause) {
+        copyRefusal = { message: describeThrown(cause) };
+      }
+      if (!wiped.ok) return err({ message: wiped.error.message });
+      return copyRefusal === null ? ok(undefined) : err(copyRefusal);
     },
 
     async forgetKeys() {
