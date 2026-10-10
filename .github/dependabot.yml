@@ -1,0 +1,45 @@
+# Keeps the SHA pins and the dependencies current (L-222).
+#
+# Every GitHub Action is pinned to a full commit SHA, so a moved tag cannot
+# change what runs with the release signing key. Pins nobody updates rot into
+# known-vulnerable versions, so Dependabot proposes the updates — weekly,
+# grouped into one PR per ecosystem, at most two open at a time, so a phone
+# can keep up with them. The cooldown matches pnpm's minimum release age: a
+# release has to have been public for a week before it is proposed.
+#
+# `actions-pinned-by-sha.contract.test.ts` fails if any of the three
+# ecosystems below disappears.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 2
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 2
+    groups:
+      npm:
+        patterns: ['*']
+
+  - package-ecosystem: cargo
+    directory: /apps/light/src-tauri
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 2
+    groups:
+      cargo:
+        patterns: ['*']
