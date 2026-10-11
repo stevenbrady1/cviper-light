@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-10-11
+
+The first published release since 0.5.0. Versions 0.6.0, 0.7.0 and 0.8.0 were built but never published, so updating from 0.5.0 brings in everything listed under them as well.
+
 ### Added
 
 - A safety copy of your data before an update changes how it is stored (L-227). On the first launch after such an update, before anything is changed, the app copies its database to `cviper.db.before-update` in the same folder. There is only ever one copy, each such update replaces it, the privacy notice lists it, and "Delete everything" removes it with the rest.
@@ -330,7 +334,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.8.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.9.0...main
+[0.9.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.8.0...light-v0.9.0
 [0.8.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.7.0...light-v0.8.0
 [0.7.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.6.0...light-v0.7.0
 [0.6.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.5.0...light-v0.6.0
