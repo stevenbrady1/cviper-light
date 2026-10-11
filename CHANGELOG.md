@@ -14,6 +14,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Changed
 
+- Every outside tool the build and release workflows use is now locked to an exact, unchangeable version, and Dependabot proposes updates to them weekly (L-222). Before this, the tool that signs app updates was named by a label its owner could move, so a hijacked label could have put someone else's code next to the signing key.
 - iPhone and iPad builds now answer App Store Connect's encryption question themselves (L-173). The app uses only standard HTTPS and Apple's keychain, so the honest answer is "no", and every upload no longer waits on it. A test fails if an encryption library is ever added, which would make that answer untrue.
 
 - Faint side-notes are now smaller as well as lighter, so they read as notes rather than as ordinary text (L-213). The faint and muted greys had to move close together to stay readable, so the colour alone no longer told them apart. This covers the "out of 100" beside a score and empty lines like "Nothing the advert asks for is missing", on Analysis, Profile and interview packs. A test now fails if faint text is added without a size or weight difference.

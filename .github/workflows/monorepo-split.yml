@@ -53,12 +53,12 @@ jobs:
       # rewrites history for one subdirectory, and a shallow clone gives it one
       # commit to rewrite — the split repository then arrives with no history at
       # all, which is silent and permanent.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
 
       - if: "!startsWith(github.ref, 'refs/tags/')"
-        uses: danharrin/monorepo-split-github-action@v2.3.0
+        uses: danharrin/monorepo-split-github-action@ac9845270ef47266435b4f124b133a323619e738 # v2.3.0
         env:
           # A personal access token with push rights to the split repository.
           # Named here and set in the repository secrets; never a value in a
@@ -77,7 +77,7 @@ jobs:
       # than one conditional set of inputs, because passing an empty `tag`
       # makes the action tag the split commit with an empty string.
       - if: "startsWith(github.ref, 'refs/tags/')"
-        uses: danharrin/monorepo-split-github-action@v2.3.0
+        uses: danharrin/monorepo-split-github-action@ac9845270ef47266435b4f124b133a323619e738 # v2.3.0
         env:
           GITHUB_TOKEN: ${{ secrets.MONOREPO_SPLIT_TOKEN }}
         with:
