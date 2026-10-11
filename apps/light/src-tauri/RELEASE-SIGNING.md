@@ -135,9 +135,11 @@ decides everything after that.
    and refuses a commit that is not on `main`. It waits up to 90 minutes while
    they run; if it gives up or refuses, nothing is bundled — fix `main`, or
    press "Re-run failed jobs" once the checks are green. Only then does the
-   `bundle` job build the installers and upload them to a **draft** release,
-   with `latest.json` beside them. Nothing is public, and no installed copy can
-   see any of it.
+   `bundle` job build the installers and upload them to a **draft** release.
+   It builds **without** the signing key (L-223). The `sign` job then
+   downloads the updater bundles from the draft, signs them, writes
+   `latest.json`, checks it with the same verifier as step 4, and uploads both
+   to the draft. Nothing is public, and no installed copy can see any of it.
 2. **Review the draft.** Download the installer, run it, check the version is
    what you expect. This is what the draft gate exists to make possible.
    `releaseDraft: true` is deliberate and is not a setting to flip: publishing
@@ -221,13 +223,14 @@ DOWNLOAD path, after the bytes are in hand. `Builder::build()` merely clones the
 config into managed state, and `UpdaterBuilder::build()` validates the endpoint
 list and the architecture but never touches the key.
 
-| Operation                            | What the key does there                                                  |
-| ------------------------------------ | ------------------------------------------------------------------------ |
-| `cargo check`, `cargo test`          | Nothing. The pubkey is an opaque string to the build.                    |
-| `pnpm tauri dev`                     | Nothing. Nothing parses the key at startup.                              |
-| **Check for updates** in Settings    | Nothing. A check compares versions only.                                 |
-| **Install** that update              | Verifies the downloaded bundle. A signature that fails installs nothing. |
-| `tauri build` with updater artifacts | Signs the bundle with the private key from the Actions secrets.          |
+| Operation                         | What the key does there                                                  |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| `cargo check`, `cargo test`       | Nothing. The pubkey is an opaque string to the build.                    |
+| `pnpm tauri dev`                  | Nothing. Nothing parses the key at startup.                              |
+| **Check for updates** in Settings | Nothing. A check compares versions only.                                 |
+| **Install** that update           | Verifies the downloaded bundle. A signature that fails installs nothing. |
+| `tauri build` in `release.yml`    | Nothing. The release build runs without the private key (L-223).         |
+| The `sign` job in `release.yml`   | Signs the bundles on the draft with the private key from the secrets.    |
 
 The consequence worth knowing: a build whose baked-in public key does not match
 the private key a release was signed with can OFFER an update it cannot install.
@@ -247,6 +250,28 @@ bar and asks nothing.
 Without it a release builds installers that no existing install can ever see.
 The omission is invisible until the first user fails to receive an update, which
 is months later and looks like the updater is broken rather than absent.
+
+### Why the release build turns it off anyway, and signs in a job of its own
+
+With it on, `tauri build` signs the bundles itself, so the private key has to be
+in the build's environment — where `beforeBuildCommand`, every Vite plugin and
+every crate's `build.rs` can read it. A leaked updater key cannot be revoked
+(§1), so it is kept away from all of them (L-223):
+
+- The release build passes `--config src-tauri/tauri.release-build.conf.json`,
+  which turns `createUpdaterArtifacts` off. Losing that override fails the
+  build loudly ("a public key has been found, but no private key") rather than
+  shipping unsigned bundles.
+- The MSI and the NSIS `-setup.exe` are themselves the Windows updater bundles,
+  so nothing changes for them. On a Mac, the `bundle` job packs the
+  `.app.tar.gz` that `tauri build` would have made.
+- The `sign` job runs on a fresh runner, builds nothing, and installs
+  dependencies with `--ignore-scripts`. Its one step with the key runs
+  `tauri signer sign` and nothing else.
+  `signing-key-only-on-signing-step.contract.test.ts` fails the build if the
+  key reaches any other step.
+
+The key itself did not change. Same secrets, same public key, same signatures.
 
 ## iOS — what CI does, and what only a person can do
 

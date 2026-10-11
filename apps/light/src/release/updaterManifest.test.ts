@@ -18,7 +18,8 @@
  * ============================================================================
  * THE KEYS IN THIS FILE ARE THROWAWAY AND GENERATED IN-TEST
  * ============================================================================
- * Every keypair below is created by `throwawayMinisignKeypair()` at run time
+ * Every keypair below is created by `throwawayMinisignKeypair()`
+ * (`throwawayMinisign.testkit.ts`) at run time
  * with `node:crypto`, used for the length of one assertion, and discarded. They
  * are labelled THROWAWAY in their own comment fields so that a key appearing in
  * a log or a failure message cannot be mistaken for the real one.
@@ -46,7 +47,6 @@
  *   * A key id is STORED little-endian and DISPLAYED reversed: the real key is
  *     `8F154F6BBCFC2970` on the wire and `7029FCBC6B4F158F` in every document.
  */
-import { createHash, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -60,63 +60,10 @@ import {
   displayKeyId,
   type ManifestProblem,
 } from './updaterManifest.ts';
+import { throwawayMinisignKeypair } from './throwawayMinisign.testkit.ts';
 
 /** The documented id of the live updater key. Public information. */
 const REAL_KEY_ID = '7029FCBC6B4F158F';
-
-interface Throwaway {
-  readonly pubkeyBase64: string;
-  readonly keyIdHex: string;
-  /** A `latest.json` `signature` value over `data`. */
-  readonly signatureFor: (data: Uint8Array, fileName?: string) => string;
-  /** The same, but with the trusted comment rewritten AFTER signing. */
-  readonly forgedCommentFor: (data: Uint8Array) => string;
-}
-
-/**
- * A complete, disposable minisign keypair.
- *
- * Labelled THROWAWAY inside the key's own comment fields so it can never be
- * confused with the live key in a log.
- */
-function throwawayMinisignKeypair(): Throwaway {
-  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
-  const rawPublic = Buffer.from(publicKey.export({ type: 'spki', format: 'der' })).subarray(-32);
-  const keyId = randomBytes(8);
-
-  const publicBinary = Buffer.concat([Buffer.from('Ed', 'latin1'), keyId, rawPublic]);
-  const publicDocument =
-    `untrusted comment: THROWAWAY TEST KEY - minisign public key: ${displayKeyId(keyId)}\n` +
-    `${publicBinary.toString('base64')}\n`;
-
-  const build = (data: Uint8Array, fileName: string, commentOverride: string | null): string => {
-    const prehashed = createHash('blake2b512').update(data).digest();
-    const signature = sign(null, prehashed, privateKey);
-    const signatureBinary = Buffer.concat([Buffer.from('ED', 'latin1'), keyId, signature]);
-
-    const signedComment = `timestamp:0\tfile:${fileName}`;
-    const globalSignature = sign(
-      null,
-      Buffer.concat([signature, Buffer.from(signedComment, 'utf8')]),
-      privateKey,
-    );
-
-    const document =
-      'untrusted comment: THROWAWAY TEST SIGNATURE\n' +
-      `${signatureBinary.toString('base64')}\n` +
-      `trusted comment: ${commentOverride ?? signedComment}\n` +
-      `${globalSignature.toString('base64')}\n`;
-    return Buffer.from(document, 'utf8').toString('base64');
-  };
-
-  return {
-    pubkeyBase64: Buffer.from(publicDocument, 'utf8').toString('base64'),
-    keyIdHex: displayKeyId(keyId),
-    signatureFor: (data, fileName = 'installer.exe') => build(data, fileName, null),
-    forgedCommentFor: (data) =>
-      build(data, 'installer.exe', 'timestamp:0\tfile:something-else.exe'),
-  };
-}
 
 const BUNDLE = Buffer.from('pretend this is an installer', 'utf8');
 

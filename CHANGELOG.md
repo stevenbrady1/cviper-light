@@ -14,6 +14,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Changed
 
+- The key that signs app updates is no longer visible to the tools that build the app (L-223). The app is now built without it, and a separate step that builds nothing signs the finished installers. Before this, any outside code the build runs could have read the key. The key itself is unchanged, so installed copies keep updating as before.
 - Every outside tool the build and release workflows use is now locked to an exact, unchangeable version, and Dependabot proposes updates to them weekly (L-222). Before this, the tool that signs app updates was named by a label its owner could move, so a hijacked label could have put someone else's code next to the signing key.
 - iPhone and iPad builds now answer App Store Connect's encryption question themselves (L-173). The app uses only standard HTTPS and Apple's keychain, so the honest answer is "no", and every upload no longer waits on it. A test fails if an encryption library is ever added, which would make that answer untrue.
 
