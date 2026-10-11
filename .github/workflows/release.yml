@@ -125,11 +125,11 @@ jobs:
       GATE_SHA: ${{ github.sha }}
 
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # No pnpm: the script imports nothing but Node builtins and its own
       # judge, as in release-admin.yml.
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           package-manager-cache: false
@@ -288,7 +288,7 @@ jobs:
             echo 'APPLE_PASSWORD and APPLE_TEAM_ID as repository secrets.'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # ======================================================================
       # THE TAG AND THE VERSION HAVE TO BE THE SAME NUMBER.
@@ -327,7 +327,7 @@ jobs:
       - name: Enable pnpm through corepack
         run: corepack enable pnpm
 
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: pnpm
@@ -351,7 +351,7 @@ jobs:
       # of wasted minutes in the one case where nothing ships anyway, and it is
       # preferred to putting the same `if:` on seven steps, where the cost of
       # getting one of them wrong is a build that signs when it should not.
-      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         # Windows always. macOS ONLY when the classifier found all five secrets
         # — never on a partial set, which has already failed the job above, and
         # never on none, which skipped with a notice.
@@ -473,12 +473,12 @@ jobs:
               ;;
           esac
 
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Enable pnpm through corepack
         run: corepack enable pnpm
 
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: pnpm
