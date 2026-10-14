@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { cardClasses, SectionHeading } from '../../ui';
 import { type FilePort } from '../../platform/files';
 
 import {
@@ -93,8 +94,8 @@ export function ImportAiJobSearch({ filePort, onApply }: ImportAiJobSearchProps)
   const cancel = useCallback(() => setPanel({ kind: 'idle' }), []);
 
   return (
-    <section data-testid="profile-import" className="max-w-2xl border-t border-line pt-6">
-      <h2 className="font-medium text-ink">Bring a profile in</h2>
+    <section data-testid="profile-import" className={`mt-5 max-w-2xl ${cardClasses()}`}>
+      <SectionHeading title="Bring a profile in" />
       <p className="mt-1 text-ink-muted">
         If you already keep a candidate profile in an ai-job-search folder, the parts this view has
         a box for can be read in and added to what is here.
@@ -145,7 +146,7 @@ function ReviewPanel({ imported, onApply, onCancel }: ReviewPanelProps) {
   return (
     <div
       data-testid="profile-import-review"
-      className="mt-3 rounded-card border border-line bg-card p-4 shadow-raised"
+      className="mt-3 rounded-card border border-line bg-canvas p-4"
     >
       <h3 className="font-medium text-ink">Found in that folder</h3>
 

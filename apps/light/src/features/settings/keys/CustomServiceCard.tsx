@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type ModelInfo } from '@cviper/ai-providers';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
+import { cardClasses, StatusPill } from '../../../ui';
 import { type KeyState } from '../../../status/environment';
 import {
   chooseCustomModel,
@@ -155,19 +156,19 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
     <article
       data-testid="custom-service-card"
       aria-labelledby="custom-service-heading"
-      className="rounded-card border border-line bg-card p-4 shadow-raised"
+      className={cardClasses()}
     >
       <header className="flex items-baseline justify-between gap-3">
         <h3 id="custom-service-heading" className="font-medium text-ink">
           Your own AI service
         </h3>
-        <span
+        <StatusPill
           data-testid="custom-service-state"
           data-state={state}
-          className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-medium ${KEY_STATE_TONE[state]}`}
+          tone={KEY_STATE_TONE[state]}
         >
           {STATE_LABEL[state]}
-        </span>
+        </StatusPill>
       </header>
 
       <p className="mt-1 text-ink-muted">

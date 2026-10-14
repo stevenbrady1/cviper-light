@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { SECONDARY_BUTTON } from '../../../app/buttons';
+import { SectionHeading } from '../../../ui';
 import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 
 import { reportUrl } from './model';
@@ -58,7 +59,7 @@ export function ReportProblem({ browser, port }: ReportProblemProps = {}) {
 
   return (
     <section data-testid="settings-report">
-      <h2 className="font-medium text-ink">Report a problem</h2>
+      <SectionHeading icon="flag" title="Report a problem" />
       <p className="mt-1 text-ink-muted">
         Opens a new issue on this app’s public GitHub page, in your own browser, with the box
         already headed. You write what happened and press submit — or close the tab, and nothing has

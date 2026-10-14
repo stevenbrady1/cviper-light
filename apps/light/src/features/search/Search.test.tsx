@@ -241,6 +241,8 @@ describe('the results', () => {
     expect(text).toContain('Permanent');
     expect(screen.getByTestId('result-source-job-adzuna').textContent).toBe('Adzuna');
     expect(screen.getByTestId('result-posted-job-adzuna').textContent).toBe('Posted 5 days ago');
+    // The card itself is not clickable — its buttons are — so it has no hover.
+    expect(card.className).not.toContain('hover:');
   });
 
   it('shows the Adzuna attribution wherever Adzuna data appears', async () => {

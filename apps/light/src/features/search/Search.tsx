@@ -18,6 +18,7 @@ import {
 import { PRIMARY_BUTTON, QUIET_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
+import { IconTile } from '../../ui';
 import { SHIPPED_BOARDS } from '../boards/defaults';
 import { ANALYSE_DISCLOSURE, isPreviewAdvert } from '../flow/advert';
 import { type AnalyseHandoff } from '../flow/handoff';
@@ -589,7 +590,7 @@ export function Search({
         it submits, next to the sentence explaining why it cannot be pressed —
         a Search button in the corner is a button nobody connects to anything.
       */}
-      <ViewHeader title={view.label} summary={view.summary} />
+      <ViewHeader view={view.id} title={view.label} summary={view.summary} />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         <div className="max-w-3xl space-y-5">
@@ -861,6 +862,9 @@ export function Search({
               data-testid="search-empty"
               className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
             >
+              <div className="mb-3 flex justify-center">
+                <IconTile icon="search" />
+              </div>
               <p className="font-medium text-ink">Nothing looked at yet.</p>
               <p className="mt-1 text-ink-muted">
                 Type a job title and press Search: the free feeds need no key at all. Or search a

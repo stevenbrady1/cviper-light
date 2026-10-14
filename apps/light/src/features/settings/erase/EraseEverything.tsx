@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { DESTRUCTIVE_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
+import { SectionHeading } from '../../../ui';
 import { countBackup, describeCounts, type BackupCounts, type BackupPort } from '../backup';
 import { DATA_LOCATIONS } from '../privacy/dataLocations';
 
@@ -85,7 +86,7 @@ export function EraseEverything({ port, backupPort, onErased }: EraseEverythingP
 
   return (
     <section data-testid="settings-erase-section">
-      <h2 className="font-medium text-ink">Delete everything</h2>
+      <SectionHeading icon="trash" tone="danger" title="Delete everything" />
       <p className="mt-1 text-ink-muted">
         Removes every trace of CViper Light from this computer except the program itself: the
         database, every API key it saved, and every preference. There is no account to close because

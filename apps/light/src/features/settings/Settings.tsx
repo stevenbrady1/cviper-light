@@ -11,6 +11,7 @@ import {
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
+import { cardClasses, SectionHeading } from '../../ui';
 import { BoardSettings } from '../boards/BoardSettings';
 import { type BoardPreferencesPort } from '../boards/port';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
@@ -307,6 +308,7 @@ export function Settings({
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-settings">
       <ViewHeader
+        view={view.id}
         title={view.label}
         summary={view.summary}
         /*
@@ -340,7 +342,7 @@ export function Settings({
           <AiKeySetup ports={aiKeyPorts} browser={browserPort} />
 
           <section>
-            <h2 className="font-medium text-ink">Your data</h2>
+            <SectionHeading icon="data" title="Your data" />
             <p className="mt-1 text-ink-muted">
               Everything CViper Light knows lives in one file on this computer: the jobs you have
               saved, the applications you are chasing, the text of your CVs, every check you have
@@ -389,10 +391,7 @@ export function Settings({
           )}
 
           {stage.kind === 'confirm' ? (
-            <div
-              data-testid="settings-confirm"
-              className="rounded-card border border-line bg-card p-4 shadow-raised"
-            >
+            <div data-testid="settings-confirm" className={cardClasses()}>
               <h3 className="font-medium text-ink">Import from {stage.from}?</h3>
 
               {/*
@@ -475,10 +474,9 @@ export function Settings({
           )}
 
           <section>
-            <h2 className="font-medium text-ink">Getting started</h2>
+            <SectionHeading icon="start" title="Getting started" />
             <p className="mt-1 text-ink-muted">
-              The three-card introduction that appears the first time you open CViper Light. It
-              lists what each part of the app needs before it works.
+              The short introduction that appears the first time you open CViper Light.
             </p>
 
             <button
@@ -502,7 +500,7 @@ export function Settings({
             claim checkable rather than merely written down.
           */}
           <section>
-            <h2 className="font-medium text-ink">Privacy</h2>
+            <SectionHeading icon="shield" title="Privacy" />
 
             {/*
               The owner's own paragraph, first, before the switch and before the

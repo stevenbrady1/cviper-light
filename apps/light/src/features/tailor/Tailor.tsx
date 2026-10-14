@@ -21,6 +21,7 @@ import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/button
 import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
+import { cardClasses, IconTile } from '../../ui';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
 
 import { readAvailability } from '../analysis/availability';
@@ -947,7 +948,7 @@ export function Tailor({
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-tailor">
-      <ViewHeader title={view.label} summary={view.summary} />
+      <ViewHeader view={view.id} title={view.label} summary={view.summary} />
 
       {selectedJob === null ? null : (
         <JobStepBar
@@ -1276,6 +1277,9 @@ export function Tailor({
             data-testid="tailor-empty"
             className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
           >
+            <div className="mb-3 flex justify-center">
+              <IconTile icon="tailor" />
+            </div>
             <p className="font-medium text-ink">Nothing tailored yet.</p>
             <p className="mt-1 text-ink-muted">
               Pick a CV and an advert, then press the button. Every employer, date, figure and
@@ -1324,12 +1328,12 @@ export function Tailor({
 
             <pre
               data-testid="tailor-cv"
-              className="rounded-card border border-line bg-card px-4 py-3 font-sans text-ink whitespace-pre-wrap"
+              className={`${cardClasses({ padding: 'none' })} px-4 py-3 font-sans text-ink whitespace-pre-wrap`}
             >
               {result.text}
             </pre>
 
-            <details className="rounded-card border border-line bg-card px-4 py-3">
+            <details className={`${cardClasses({ padding: 'none' })} px-4 py-3`}>
               <summary className="cursor-pointer font-medium text-ink">
                 What changed against your original
               </summary>
@@ -1426,7 +1430,7 @@ export function Tailor({
               <div
                 data-testid="tailor-review"
                 data-verdict={review.verdict}
-                className="rounded-card border border-line bg-card px-4 py-3"
+                className={`${cardClasses({ padding: 'none' })} px-4 py-3`}
               >
                 <p className="font-medium text-ink">
                   {review.verdict === 'ready'
@@ -1470,7 +1474,7 @@ export function Tailor({
                 )}
                 <pre
                   data-testid="tailor-letter"
-                  className="rounded-card border border-line bg-card px-4 py-3 font-sans text-ink whitespace-pre-wrap"
+                  className={`${cardClasses({ padding: 'none' })} px-4 py-3 font-sans text-ink whitespace-pre-wrap`}
                 >
                   {letter.text}
                 </pre>

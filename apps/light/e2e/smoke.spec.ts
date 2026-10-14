@@ -184,7 +184,7 @@ const WINDOW_STARTUP_TIMEOUT = 60_000;
  * proves the React bundle inside the installer actually rendered, rather than
  * the window merely existing with a title the OS took from the manifest.
  */
-const WELCOME_HEADING = 'Three things this does.';
+const WELCOME_HEADING = 'Your job hunt, organised.';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 

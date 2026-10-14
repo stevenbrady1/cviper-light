@@ -1,4 +1,5 @@
 import { QUIET_BUTTON } from '../../../app/buttons';
+import { SectionHeading } from '../../../ui';
 import { type BrowserPort } from '../../../platform/browser';
 import { LIGHT_PAGE_URL, LIGHT_SOURCE_URL } from '../../signposts/links';
 import { APP_VERSION } from '../backup';
@@ -19,7 +20,7 @@ export interface AboutProps {
 export function About({ browser }: AboutProps) {
   return (
     <section data-testid="settings-about">
-      <h2 className="font-medium text-ink">About</h2>
+      <SectionHeading icon="info" title="About" />
       <p className="mt-1 text-ink-muted">
         Light is free, MIT-licensed, made in the UK, and never sends us anything.
       </p>

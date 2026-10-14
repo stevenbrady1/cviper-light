@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { SECONDARY_BUTTON } from '../../../app/buttons';
+import { SectionHeading } from '../../../ui';
 import { APP_VERSION } from '../backup';
 
 import { setUpdateCheckOnLaunch, updateCheckOnLaunchEnabled } from './launchCheck';
@@ -90,7 +91,7 @@ export function UpdateCheck({ port, version }: UpdateCheckProps = {}) {
 
   return (
     <section>
-      <h2 className="font-medium text-ink">Updates</h2>
+      <SectionHeading icon="refresh" title="Updates" />
 
       <p data-testid="settings-update-note" className="mt-1 text-ink-muted">
         {updateCheckNote(checksOnLaunch)}
