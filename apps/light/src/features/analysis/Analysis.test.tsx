@@ -34,6 +34,8 @@ vi.mock('@cviper/cv-parsing', () => ({ extractText: parsing.extractText }));
 const { Analysis } = await import('./Analysis');
 const { createFakeAnalysisPort } = await import('./test/fakePort');
 const { createFakeFilePort } = await import('../../platform/test/fakeFilePort');
+const { createFakeBrowserPort } = await import('../../platform/test/fakeBrowserPort');
+const { OLLAMA_DOWNLOAD_URL } = await import('./providers');
 
 type FakeAnalysisPort = ReturnType<typeof createFakeAnalysisPort>;
 type FakeFilePort = ReturnType<typeof createFakeFilePort>;
@@ -434,16 +436,38 @@ describe('when Ollama is running but has nothing that can chat', () => {
     });
   }
 
-  it('names the command that fixes it, rather than showing an empty picker', async () => {
+  it('says in plain words what fixes it, rather than showing an empty picker', async () => {
     embedderOnly();
     await renderView();
 
     const hint = await screen.findByTestId('analysis-ollama-hint');
-    expect(hint.textContent).toContain('ollama pull llama3.2');
+    // L-240: a plain sentence and a link, not a terminal command.
+    expect(hint.textContent).toContain('add a chat model in it');
+    expect(hint.textContent).not.toContain('ollama pull');
+    expect(within(hint).getByRole('button', { name: 'Open Ollama’s download page' })).toBeTruthy();
 
     // And the embedder is still not offered as somewhere to send a CV.
     const picker = screen.getByTestId('analysis-provider') as HTMLSelectElement;
     expect([...picker.options].map((option) => option.value)).toEqual(['keyword']);
+  });
+
+  it('the link opens Ollama’s download page in the browser (L-240)', async () => {
+    embedderOnly();
+    const user = userEvent.setup();
+    const browser = createFakeBrowserPort();
+    render(
+      <Analysis
+        port={createFakeAnalysisPort()}
+        filePort={createFakeFilePort()}
+        browser={browser}
+        now={NOW}
+      />,
+    );
+
+    const hint = await screen.findByTestId('analysis-ollama-hint');
+    await user.click(within(hint).getByRole('button', { name: 'Open Ollama’s download page' }));
+
+    expect(browser.opened()).toEqual([OLLAMA_DOWNLOAD_URL]);
   });
 
   it('negative: says nothing on the ordinary machine with no Ollama at all', async () => {

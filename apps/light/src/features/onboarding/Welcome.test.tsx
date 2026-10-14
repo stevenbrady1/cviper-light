@@ -12,7 +12,8 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type Availability } from '../analysis/providers';
+import { OLLAMA_DOWNLOAD_URL, type Availability } from '../analysis/providers';
+import { createFakeBrowserPort } from '../../platform/test/fakeBrowserPort';
 
 import { Welcome } from './Welcome';
 
@@ -239,8 +240,56 @@ describe('the live Ollama detection on the CV card', () => {
     );
 
     const line = (await screen.findByTestId('welcome-local-model')).textContent ?? '';
-    expect(line).toContain('ollama pull');
+    // L-240: plain words and a link, not a terminal command.
+    expect(line).toContain('add a chat model in it');
+    expect(line).not.toContain('ollama pull');
     expect(screen.getByTestId('welcome').textContent).not.toContain('local AI found');
+  });
+
+  it('Ollama running with no chat model: the link opens the download page (L-240)', async () => {
+    const user = userEvent.setup();
+    const browser = createFakeBrowserPort();
+    render(
+      <Welcome
+        onDismiss={() => undefined}
+        browser={browser}
+        detect={() => Promise.resolve({ ...NOTHING, ollamaRunning: true })}
+      />,
+    );
+
+    const link = await screen.findByRole('button', { name: 'Open Ollama’s download page' });
+    await user.click(link);
+
+    expect(browser.opened()).toEqual([OLLAMA_DOWNLOAD_URL]);
+  });
+
+  it('negative: no Ollama link on a machine with no Ollama at all — no advert', async () => {
+    render(<Welcome onDismiss={() => undefined} detect={() => Promise.resolve(NOTHING)} />);
+
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('welcome-local-model').textContent).toContain('works with nothing'),
+    );
+    expect(screen.queryByRole('button', { name: 'Open Ollama’s download page' })).toBeNull();
+  });
+
+  it('boundary: no Ollama link once a chat model is found', async () => {
+    render(
+      <Welcome
+        onDismiss={() => undefined}
+        detect={() =>
+          Promise.resolve({
+            ...NOTHING,
+            ollamaRunning: true,
+            ollamaModels: [{ id: 'llama3.2:3b', label: 'llama3.2:3b (3.2B)' }],
+          })
+        }
+      />,
+    );
+
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('welcome-local-model').textContent).toContain('llama3.2:3b'),
+    );
+    expect(screen.queryByRole('button', { name: 'Open Ollama’s download page' })).toBeNull();
   });
 
   it('boundary: says it is still looking rather than claiming anything', async () => {

@@ -22,6 +22,7 @@ import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { cardClasses, IconTile } from '../../ui';
+import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
 
 import { readAvailability } from '../analysis/availability';
@@ -35,6 +36,7 @@ import {
   type ConsentState,
 } from '../analysis/consent';
 import { jobAdvertText, providerInSentence } from '../analysis/model';
+import { OllamaDownloadLink } from '../analysis/OllamaDownloadLink';
 import { CvUpload } from '../cv/CvUpload';
 import {
   ollamaHint,
@@ -151,6 +153,11 @@ export interface TailorProps {
    */
   readonly onOpenSettings?: (() => void) | undefined;
   /**
+   * Opens Ollama's download page beside the Ollama hint (L-240). Injected by
+   * tests; defaults to the real one, which hands the address to the browser.
+   */
+  readonly browser?: BrowserPort | undefined;
+  /**
    * A job, CV and option handed over from Analysis or the tracker (L-190).
    *
    * Applied ONCE, when the CVs, the saved jobs and this machine's options
@@ -213,6 +220,7 @@ export function Tailor({
   consentPort,
   now,
   onOpenSettings,
+  browser,
   handoff,
   onHandoffHandled,
   jobSessions,
@@ -223,6 +231,7 @@ export function Tailor({
 }: TailorProps = {}) {
   const tailorPort = useMemo(() => port ?? createDbTailorPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
+  const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
   const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
   const sessions = useMemo(() => jobSessions ?? createJobSessions(), [jobSessions]);
   const progress = useMemo<JobProgressPort>(
@@ -1224,6 +1233,7 @@ export function Tailor({
               className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
             >
               {localModelHint}
+              <OllamaDownloadLink idPrefix="tailor" browser={browserPort} />
             </p>
           )}
 

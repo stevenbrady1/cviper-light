@@ -26,10 +26,13 @@ import { ingestCv, uploadCv, type IngestedCv, type IngestProblem } from '../cv/i
 import { createDbProfilePort, type ProfilePort } from '../profile/port';
 import { APP_NAME } from '../settings/backup';
 
+import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
+
 import { AnalysisResult } from './AnalysisResult';
 import { readAvailability } from './availability';
 import { ConsentGate, ConsentStatus } from './ConsentGate';
 import { GateNotice } from './GateNotice';
+import { OllamaDownloadLink } from './OllamaDownloadLink';
 import {
   createTauriConsentPort,
   isCloudKind,
@@ -129,6 +132,11 @@ export interface AnalysisProps {
   readonly incomingCv?: Result<PickedCv, FileError> | null | undefined;
   readonly onIncomingCvHandled?: (() => void) | undefined;
   /**
+   * Opens Ollama's download page beside the Ollama hint (L-240). Injected by
+   * tests; defaults to the real one, which hands the address to the browser.
+   */
+  readonly browser?: BrowserPort | undefined;
+  /**
    * Injected by tests. Defaults to the real `tauri-plugin-store`-backed port
    * (Apple 5.1.2(i)) — see `consent.ts`.
    */
@@ -206,6 +214,7 @@ export function Analysis({
   now,
   incomingCv,
   onIncomingCvHandled,
+  browser,
   consentPort,
   profilePort,
   session: sessionProp,
@@ -227,6 +236,7 @@ export function Analysis({
     [port, progressPort],
   );
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
+  const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
   const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
   const profiles = useMemo(() => profilePort ?? createDbProfilePort(), [profilePort]);
   const session = useMemo(() => sessionProp ?? createAnalysisSession(), [sessionProp]);
@@ -1005,8 +1015,9 @@ export function Analysis({
             {/*
               Shown in ONE state only: the daemon answered and nothing in it can
               chat. Not an error — gold, because it is something the user can
-              act on — and it carries the exact command, because "no chat models
-              found" on its own is a dead end in an app with no support inbox.
+              act on — and it says what to do, with a link to Ollama's download
+              page (L-240), because "no chat models found" on its own is a dead
+              end in an app with no support inbox.
             */}
             {localModelHint === null ? null : (
               <p
@@ -1014,6 +1025,7 @@ export function Analysis({
                 className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
               >
                 {localModelHint}
+                <OllamaDownloadLink idPrefix="analysis" browser={browserPort} />
               </p>
             )}
 
