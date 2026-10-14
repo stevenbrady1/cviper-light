@@ -47,4 +47,4 @@ export const TELEMETRY_ENABLED: TelemetryEnabled = false;
  * the reader wondering whether something else is collecting instead.
  */
 export const TELEMETRY_NOTE =
-  'Anonymous usage statistics — not implemented. CViper Light sends no data.';
+  'Anonymous usage statistics — not implemented. CViper Light sends no usage data to us.';

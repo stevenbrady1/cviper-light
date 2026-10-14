@@ -127,7 +127,7 @@ describe('the telemetry flag', () => {
     // The exact promise, asserted so a future copy edit cannot soften it into
     // "we may collect anonymous statistics".
     expect(TELEMETRY_NOTE).toBe(
-      'Anonymous usage statistics — not implemented. CViper Light sends no data.',
+      'Anonymous usage statistics — not implemented. CViper Light sends no usage data to us.',
     );
   });
 });

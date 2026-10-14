@@ -45,7 +45,8 @@ describe('the telemetry switch', () => {
 
     const label = (await screen.findByTestId('settings-telemetry-note')).textContent ?? '';
     expect(label).toContain('not implemented');
-    expect(label).toContain('sends no data');
+    // L-233: no USAGE data, to US — the app does send a CV to the AI you pick.
+    expect(label).toContain('sends no usage data to us');
   });
 
   it('negative: clicking it changes nothing', async () => {

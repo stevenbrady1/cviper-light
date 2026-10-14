@@ -79,8 +79,10 @@ export function renderPrivacyPolicy(inputs: PolicyInputs): string {
       'Settings; and it asks this same computer whether Ollama is running, a request that ' +
       'never leaves it.',
     '',
-    'We — the people who make CViper Light — receive nothing from it. Not your CV, not your ' +
-      'searches, not your keys, not whether you use it at all. The one address on this page ' +
+    'We — the people who make CViper Light — receive nothing from the app itself. Not your ' +
+      'CV, not your searches, not your keys. The places that hand it out — an app store, or ' +
+      'GitHub, where the update check looks — may show us totals, such as how many times it ' +
+      'was downloaded, without saying who you are. The one address on this page ' +
       'that is ours, cviper.ai, is only ever opened in your own browser when you tap a line ' +
       'that names it; the app never contacts it, and what that site sees is what your ' +
       'browser shows it.',
