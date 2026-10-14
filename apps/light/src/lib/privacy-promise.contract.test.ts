@@ -290,6 +290,14 @@ const RULES: readonly Rule[] = [
       'downloads — which the update check is one of. Promise what the APP does not send, not ' +
       'what nobody can count.',
   },
+  {
+    id: 'we-collect-nothing',
+    pattern: String.raw`\b(?:we${ADVERBS}\s+collect|collects)${ADVERBS}\s+nothing\b${EXCEPTION}`,
+    why:
+      'true of the app, but GitHub counts release downloads (the update check is one) and an ' +
+      'app store gives the developer install totals. Say what the APP does: "The app sends us ' +
+      'nothing."',
+  },
 ];
 
 /**
@@ -915,6 +923,17 @@ describe('privacy promise — the scanner can actually fail', () => {
       'a.ts',
       `export const N = 'Not your CV, not your ' +\n  'searches, not your keys, not whether you use it at all.';`,
     ],
+    [
+      'the old README headline, minus its first claim',
+      'README.md',
+      `**Your data is stored on your machine. No accounts. We collect nothing.**\n`,
+    ],
+    [
+      'we collect nothing, split over two lines',
+      'a.md',
+      `No accounts, and we\ncollect nothing at all.\n`,
+    ],
+    ['the app collects nothing', 'a.tsx', `<p>CViper Light collects nothing.</p>`],
   ];
 
   it.each(regressions)('catches %s', (_name, file, source) => {
@@ -1035,6 +1054,16 @@ describe('privacy promise — the copy that is still true walks through', () => 
       'the Profile wording from L-240',
       'a.tsx',
       `<p>The file is read on this computer. Its text only goes to an AI you choose, and only when you ask it to read your CV.</p>`,
+    ],
+    [
+      'the new README headline',
+      'README.md',
+      `**Your data is stored on your machine. No accounts. The app sends us nothing.**\n`,
+    ],
+    [
+      'collect with a stated exception',
+      'a.md',
+      `We collect nothing except what you choose to send us in a bug report.\n`,
     ],
     [
       'a comment quoting the old phrases',
