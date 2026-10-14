@@ -13,7 +13,7 @@ packages:
 #
 # A catalog removes the second string rather than adding a test to police it.
 catalog:
-  typescript: '~6.0.3'
+  typescript: '~7.0.2'
 
 minimumReleaseAgeExclude:
   - '@turbo/darwin-64@2.10.11'
