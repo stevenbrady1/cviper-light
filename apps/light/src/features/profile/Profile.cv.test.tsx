@@ -60,6 +60,19 @@ async function renderView(
 }
 
 describe('Your CV, on Profile', () => {
+  it('negative: the card does not claim the CV never leaves the computer (L-233 class)', async () => {
+    // The FILE is read here, but a CV checked with a cloud AI is sent to that
+    // provider. "Never uploaded anywhere" reads as "my CV never leaves", which
+    // is the over-claim L-233 exists to remove. A forbid-list on the shape,
+    // not a required wording.
+    await renderView({ cvPort: createFakeAnalysisPort({ cvs: [SAVED_CV] }) });
+
+    const copy = (screen.getByTestId('profile-cv').textContent ?? '').toLowerCase();
+    for (const claim of ['never uploaded', 'never leaves', 'nowhere']) {
+      expect(copy).not.toContain(claim);
+    }
+  });
+
   it('names the CV the app already has', async () => {
     await renderView({ cvPort: createFakeAnalysisPort({ cvs: [SAVED_CV] }) });
 

@@ -400,7 +400,8 @@ function YourCv({ store, files, now }: YourCvProps) {
         <SectionHeading title="Your CV" />
         <p className="mt-1 text-ink-muted">
           Upload it once — here, on Analysis or on Tailor — and every screen can use it. The file is
-          read on this computer and never uploaded anywhere.
+          read on this computer. Its text only goes to an AI you choose, and only when you ask it to
+          read your CV.
         </p>
 
         <p data-testid="profile-cv-current" className="mt-3 text-ink">

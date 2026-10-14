@@ -1282,9 +1282,9 @@ export function Tailor({
                 <span>Your own key, from the AI company you choose.</span>
               </li>
               <li data-testid="tailor-free-local">
-                <span className="font-medium text-ink">Use a free AI on your own PC.</span> Your CV
-                stays on this computer. If one is already running, come back to this screen and
-                CViper will find it. You can also add one in Settings.
+                <span className="font-medium text-ink">Use a free AI on your own PC.</span> A model
+                running on this PC keeps your CV on this computer. If one is already running, come
+                back to this screen and CViper will find it. You can also add one in Settings.
               </li>
             </ul>
           </div>
