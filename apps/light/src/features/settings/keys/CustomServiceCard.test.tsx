@@ -15,6 +15,8 @@ import { type ModelInfo } from '@cviper/ai-providers';
 
 import { CUSTOM_MODEL_STORAGE_KEY, readCustomModel } from '../../analysis/customModel';
 
+import { SECONDARY_BUTTON } from '../../../app/buttons';
+
 import { CustomServiceCard } from './CustomServiceCard';
 import {
   type CustomServiceInput,
@@ -313,5 +315,34 @@ describe('a saved service', () => {
     await waitFor(() =>
       expect(screen.getByTestId('custom-service-state').textContent).toBe('Could not be read'),
     );
+  });
+});
+
+describe('"Remove this service" sits with what it removes (0.10.1)', () => {
+  it('is a real button in the same row as the "Saved:" line, not beside "Test and save"', async () => {
+    const user = userEvent.setup();
+    const port = fakePort({
+      address: 'https://api.example.com/v1',
+      ownNetwork: false,
+      key: SENTINEL_KEY,
+    });
+    render(<CustomServiceCard port={port} />);
+
+    const saved = await screen.findByTestId('custom-service-saved');
+    const row = screen.getByTestId('custom-service-saved-row');
+    expect(row.contains(saved)).toBe(true);
+
+    const remove = screen.getByTestId('custom-service-remove');
+    expect(row.contains(remove)).toBe(true);
+    expect(remove.className).toBe(SECONDARY_BUTTON);
+    expect(screen.getByTestId('custom-service-save').parentElement?.contains(remove)).toBe(false);
+
+    await waitFor(() => expect((remove as HTMLButtonElement).disabled).toBe(false));
+    await user.click(remove);
+    await waitFor(() =>
+      expect(screen.getByTestId('custom-service-state').textContent).toBe('Not set up'),
+    );
+    expect(port.saved).toBeNull();
+    expect(screen.queryByTestId('custom-service-saved')).toBeNull();
   });
 });

@@ -180,13 +180,29 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
         agree.
       </p>
 
-      {saved === undefined || saved === null ? null : (
-        <p data-testid="custom-service-saved" className="mt-2 text-xs text-ink-muted">
-          Saved: <span className="font-mono break-all">{saved.address}</span>
-          {saved.ownNetwork ? ' · on your own computer or network' : ''}
-          {saved.hasKey ? ' · key saved' : ' · no key'}
-        </p>
-      )}
+      {/* "Remove this service" sits beside what it removes (0.10.1). */}
+      <div
+        data-testid="custom-service-saved-row"
+        className="mt-2 flex flex-wrap items-center gap-2"
+      >
+        {saved === undefined || saved === null ? null : (
+          <p data-testid="custom-service-saved" className="min-w-0 text-xs text-ink-muted">
+            Saved: <span className="font-mono break-all">{saved.address}</span>
+            {saved.ownNetwork ? ' · on your own computer or network' : ''}
+            {saved.hasKey ? ' · key saved' : ' · no key'}
+          </p>
+        )}
+        <button
+          type="button"
+          data-testid="custom-service-remove"
+          // Disabled, never hidden: a control that comes and goes cannot be learned.
+          disabled={busy || saved === undefined || saved === null}
+          onClick={() => void onRemove()}
+          className={SECONDARY_BUTTON}
+        >
+          Remove this service
+        </button>
+      </div>
 
       <div className="mt-3">
         <label
@@ -297,16 +313,6 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
           className={SECONDARY_BUTTON}
         >
           {busy ? 'Checking…' : 'Test and save'}
-        </button>
-        <button
-          type="button"
-          data-testid="custom-service-remove"
-          // Disabled, never hidden: a control that comes and goes cannot be learned.
-          disabled={busy || saved === undefined || saved === null}
-          onClick={() => void onRemove()}
-          className={QUIET_BUTTON}
-        >
-          Remove this service
         </button>
       </div>
 

@@ -134,6 +134,14 @@ export type AiKeySecret =
 export const AI_KEY_SAVED_MASK = '••••';
 
 /**
+ * "Test and save this key" pressed on an empty box while a key is saved
+ * (0.10.1). The saved key is fine and still in use; this is not an error, so
+ * it is said as a status, not in red.
+ */
+export const AI_KEY_STILL_SAVED =
+  'Your key is still saved and still in use. To replace it, paste the new key here first.';
+
+/**
  * The byte limit, borrowed rather than redeclared.
  *
  * `model.ts` already pins this to `MAX_SECRET_BYTES` in `secrets.rs` with a
