@@ -23,6 +23,8 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Fixed
 
+- With an Anthropic key, Claude Opus 5 (the default), Claude Opus 5.5 and Claude Sonnet 5.5 refused every request — CV checks, tailoring, cover letters, everything — because the app sent a setting ("temperature") those models no longer accept. Testing the key in Settings still showed it as working, because that test only lists the models and never asks one a question. The app no longer sends that setting to Anthropic, and a test fails if it ever does again.
+- The model lists for xAI Grok and OpenRouter no longer offer models their providers have retired or are about to retire. xAI retired `grok-4` and `grok-4-fast-non-reasoning` in May and now quietly runs `grok-4.3` in their place, at `grok-4.3`'s price; they are replaced by `grok-4.7` and `grok-4.20-non-reasoning`. On OpenRouter, `google/gemini-2.5-flash` stops working on 20 October 2026 and becomes `google/gemini-3.8-flash`, and `anthropic/claude-sonnet-4.5` becomes `anthropic/claude-sonnet-4.6`. If you had chosen one of the old models, the app goes back to that provider's default until you choose again.
 - A release is now signed even if one platform's build fails (L-223). For 0.9.0, a failed macOS step left the finished Windows build without the update signature and update file that installed copies need. Signing now covers whatever was built, and still fails loudly if nothing was.
 
 ## [0.9.0] — 2026-10-11

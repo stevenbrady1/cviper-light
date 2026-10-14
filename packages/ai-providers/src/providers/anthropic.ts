@@ -88,7 +88,17 @@ export function createAnthropicProvider(transport: ChatTransport): AiProvider {
         model: request.model,
         // Budget plus room to think (L-185); see `wireOutputCap`.
         max_tokens: wireOutputCap(request.maxOutputTokens),
-        temperature: request.temperature,
+        // NO `temperature` — nor `top_p`, `top_k` or `thinking`. Claude Opus 5
+        // (the default) and Opus 5.5 removed the sampling parameters and answer
+        // a 400 to any of them; Sonnet 5.5 400s on any non-default value, and
+        // `ChatJsonRequest` pins 0. Omitting it is the one shape every Claude
+        // accepts, including ones not released yet, so there is no per-model
+        // list to fall behind. The cost is small and only on the older models
+        // that still take it (Haiku 4.5, the 4.6s): they run at their default
+        // temperature, so two runs of the same check can word things a little
+        // differently. The JSON shape is held by `output_config` and Zod either
+        // way. `thinking` is left to each model's default for the same reason:
+        // `{type: "disabled"}` is a 400 on Opus 5.5 and Sonnet 5.5.
         // Top-level, not a message. Anthropic has no "system" message role.
         system: request.system,
         messages: [{ role: 'user', content: request.user }],

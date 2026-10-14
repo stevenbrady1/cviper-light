@@ -93,13 +93,22 @@ export const AI_MODEL_CHOICES: Readonly<Record<AiKeyProviderId, readonly ModelCh
     { id: 'mistral-medium-latest' },
     { id: 'mistral-large-latest' },
   ],
-  grok: [{ id: GROK_DEFAULT_MODEL }, { id: 'grok-4' }, { id: 'grok-4-fast-non-reasoning' }],
+  // xAI retired `grok-4` (grok-4-0709) and `grok-4-fast-non-reasoning` on
+  // 2026-05-15 and serves them as grok-4.3, at grok-4.3's price. Both
+  // replacements are on docs.x.ai/docs/models with structured outputs, and
+  // temperature is not among what xAI says reasoning models refuse
+  // (presencePenalty, frequencyPenalty, stop).
+  grok: [{ id: GROK_DEFAULT_MODEL }, { id: 'grok-4.7' }, { id: 'grok-4.20-non-reasoning' }],
   // OpenRouter passes the request on to the company named before the slash.
+  // Each id is on OpenRouter's /models with no expiration_date and with
+  // temperature, response_format and structured_outputs among its
+  // supported_parameters — every job sends all three. (Anthropic's 4.7 and
+  // later list no temperature there, so Sonnet 4.6 is the newest that fits.)
   openrouter: [
     { id: OPENROUTER_DEFAULT_MODEL },
     { id: 'openai/gpt-4o' },
-    { id: 'anthropic/claude-sonnet-4.5' },
-    { id: 'google/gemini-2.5-flash' },
+    { id: 'anthropic/claude-sonnet-4.6' },
+    { id: 'google/gemini-3.8-flash' },
   ],
 };
 

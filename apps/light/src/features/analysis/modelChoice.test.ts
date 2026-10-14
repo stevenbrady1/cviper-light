@@ -10,6 +10,8 @@ import {
   GROK_DEFAULT_MODEL,
   MISTRAL_DEFAULT_MODEL,
   OPENROUTER_DEFAULT_MODEL,
+  createAnthropicProvider,
+  type ChatTransport,
 } from '@cviper/ai-providers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -110,6 +112,39 @@ describe('choosing and reading back', () => {
     expect(chosenModel('grok')).toBe(AI_MODEL_CHOICES.grok[1]?.id);
   });
 
+  it('negative: models the providers retired fall back to the default, not to a silent redirect', () => {
+    // OpenRouter lists google/gemini-2.5-flash with expiration_date 2026-10-20;
+    // xAI retired grok-4-fast-non-reasoning and grok-4 (grok-4-0709) on
+    // 2026-05-15 and serves them as grok-4.3 at grok-4.3's price. Anybody who
+    // chose one keeps a stored id that must read as the default.
+    localStorage.setItem(
+      MODEL_CHOICE_STORAGE_KEY,
+      JSON.stringify({ openrouter: 'google/gemini-2.5-flash', grok: 'grok-4-fast-non-reasoning' }),
+    );
+    expect(chosenModel('openrouter')).toBe(OPENROUTER_DEFAULT_MODEL);
+    expect(chosenModel('grok')).toBe(GROK_DEFAULT_MODEL);
+
+    for (const retired of ['grok-4', 'anthropic/claude-sonnet-4.5']) {
+      const provider = retired.includes('/') ? 'openrouter' : 'grok';
+      localStorage.setItem(MODEL_CHOICE_STORAGE_KEY, JSON.stringify({ [provider]: retired }));
+      expect(chosenModel(provider)).toBe(
+        provider === 'grok' ? GROK_DEFAULT_MODEL : OPENROUTER_DEFAULT_MODEL,
+      );
+    }
+  });
+
+  it('negative: none of the retired or retiring ids is offered', () => {
+    const offered = Object.values(AI_MODEL_CHOICES).flatMap((list) => list.map((c) => c.id));
+    for (const retired of [
+      'google/gemini-2.5-flash',
+      'anthropic/claude-sonnet-4.5',
+      'grok-4-fast-non-reasoning',
+      'grok-4',
+    ]) {
+      expect(offered).not.toContain(retired);
+    }
+  });
+
   it('negative: garbage in storage, or storage that throws, reads as the defaults', () => {
     localStorage.setItem(MODEL_CHOICE_STORAGE_KEY, '{not json');
     expect(chosenModel('openai')).toBe(OPENAI_DEFAULT_MODEL);
@@ -149,4 +184,39 @@ describe('every AI feature runs the chosen model', () => {
       expect(options.find((candidate) => candidate.kind === id)?.model).toBe(defaultModelFor(id));
     }
   });
+});
+
+describe('every Anthropic model on the Settings card is sent a request it accepts', () => {
+  // Opus 5 (the default) and Opus 5.5 removed temperature; Sonnet 5.5 refuses
+  // any value but its own. Sending `temperature: 0` was a 400 on every call,
+  // and the key test (a GET of /v1/models) could not see it.
+  it.each(AI_MODEL_CHOICES.anthropic.map((choice) => choice.id))(
+    '%s: no temperature in the body',
+    async (model) => {
+      const bodies: string[] = [];
+      const transport: ChatTransport = {
+        chat: async (_provider, body) => {
+          bodies.push(body);
+          return {
+            ok: true,
+            value: { status: 200, body: '{"content":[{"type":"text","text":"{}"}]}' },
+          };
+        },
+        listModels: async () => ({ ok: true, value: { status: 200, body: '{"data":[]}' } }),
+      };
+
+      await createAnthropicProvider(transport).chatJson({
+        model,
+        system: 's',
+        user: 'u',
+        schema: { type: 'object' },
+        temperature: 0,
+        maxOutputTokens: 1024,
+      });
+
+      const sent = JSON.parse(bodies[0] ?? '{}') as Record<string, unknown>;
+      expect(sent['model']).toBe(model);
+      expect(sent).not.toHaveProperty('temperature');
+    },
+  );
 });
