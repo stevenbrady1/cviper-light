@@ -1,11 +1,13 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { CViperMark } from '../../app/CViperMark';
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { type ViewId } from '../../app/views';
 import { Card, Icon, IconTile, PageHeader, StatusPill, type IconName } from '../../ui';
 import { readAvailability } from '../analysis/availability';
-import { type Availability } from '../analysis/providers';
+import { OllamaDownloadLink } from '../analysis/OllamaDownloadLink';
+import { ollamaNeedsChatModel, type Availability } from '../analysis/providers';
+import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 
 import { ONBOARDING_CARDS, localModelLine, type OnboardingCard } from './cards';
 
@@ -62,6 +64,12 @@ export interface WelcomeProps {
    * detection in the app, not two that can disagree on screen.
    */
   readonly detect?: (() => Promise<Availability>) | undefined;
+  /**
+   * Opens Ollama's download page from the CV card, in the one state where
+   * Ollama is running with no chat model (L-240). Injected by tests; defaults
+   * to the real one, which hands the address to the browser.
+   */
+  readonly browser?: BrowserPort | undefined;
 }
 
 const CARD_ICON: Record<OnboardingCard['id'], IconName> = {
@@ -81,8 +89,9 @@ function localAiFound(availability: Availability | null): boolean {
   return availability !== null && availability.ollamaModels.length > 0;
 }
 
-export function Welcome({ onDismiss, detect }: WelcomeProps) {
+export function Welcome({ onDismiss, detect, browser }: WelcomeProps) {
   const [availability, setAvailability] = useState<Availability | null>(null);
+  const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,6 +183,7 @@ export function Welcome({ onDismiss, detect }: WelcomeProps) {
             key={card.id}
             card={card}
             availability={availability}
+            browser={browserPort}
             onDismiss={onDismiss}
           />
         ))}
@@ -217,10 +227,11 @@ export function Welcome({ onDismiss, detect }: WelcomeProps) {
 interface WelcomeCardProps {
   readonly card: OnboardingCard;
   readonly availability: Availability | null;
+  readonly browser: BrowserPort;
   readonly onDismiss: (view: ViewId | null) => void;
 }
 
-function WelcomeCard({ card, availability, onDismiss }: WelcomeCardProps) {
+function WelcomeCard({ card, availability, browser, onDismiss }: WelcomeCardProps) {
   const featured = card.id === 'analysis';
   const status =
     card.id === 'analysis' && localAiFound(availability)
@@ -264,6 +275,9 @@ function WelcomeCard({ card, availability, onDismiss }: WelcomeCardProps) {
           {availability === null
             ? 'Looking for a local model on this machine…'
             : localModelLine(availability)}
+          {availability !== null && ollamaNeedsChatModel(availability) ? (
+            <OllamaDownloadLink idPrefix="welcome" browser={browser} />
+          ) : null}
         </p>
       ) : null}
 

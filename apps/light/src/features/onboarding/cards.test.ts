@@ -84,9 +84,11 @@ describe('localModelLine — the live detection shown on the analysis card', () 
     expect(line.toLowerCase()).toContain('found');
   });
 
-  it('names the command when Ollama is running with nothing that can chat', () => {
+  it('says what to do when Ollama is running with nothing that can chat', () => {
     const line = localModelLine({ ...NOTHING, ollamaRunning: true });
-    expect(line).toContain('ollama pull llama3.2');
+    // L-240: plain words, not a terminal command.
+    expect(line).toContain('add a chat model in it');
+    expect(line).not.toContain('ollama pull');
   });
 
   it('says the basic match still works when nothing at all is installed', () => {

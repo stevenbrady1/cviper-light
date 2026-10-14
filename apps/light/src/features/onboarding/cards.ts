@@ -26,7 +26,7 @@
  * "Start here" marker: it is the quickest way to get something useful back.
  */
 import { providerLabel } from '../analysis/model';
-import { SUGGESTED_OLLAMA_MODEL, providerOptions, type Availability } from '../analysis/providers';
+import { providerOptions, type Availability } from '../analysis/providers';
 
 import { type ViewId } from '../../app/views';
 
@@ -143,7 +143,7 @@ export function localModelLine(availability: Availability): string {
   if (availability.ollamaRunning) {
     return (
       'Ollama is running, but none of its models can hold a conversation. ' +
-      `Run \`ollama pull ${SUGGESTED_OLLAMA_MODEL}\` to get one.`
+      'Open the Ollama app and add a chat model in it.'
     );
   }
 

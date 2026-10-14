@@ -275,11 +275,10 @@ and tests a key before it saves it.
 
 ### Using a free local model
 
-Install [Ollama](https://ollama.com), then in a terminal:
-
-```
-ollama pull llama3.2
-```
+Ollama is a free app that runs an AI on your own PC.
+[Download Ollama](https://ollama.com/download), install it, add a chat model
+in it, then come back to CViper Light. If you are comfortable with a terminal,
+`ollama pull llama3.2` does the same thing.
 
 CViper Light finds it by itself — the analysis screen and the introduction both
 show what they detected. Nothing you check leaves your PC. The first run after
