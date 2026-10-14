@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
 import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 import { combineKeyState, type KeyState } from '../../../status/environment';
-import { SectionHeading } from '../../../ui';
+import { cardClasses, SectionHeading, StatusPill } from '../../../ui';
 import { AI_COST_LINE } from '../../onboarding/cards';
 import {
   AI_MODEL_CHOICES,
@@ -255,19 +255,19 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
     <article
       data-testid={`ai-key-card-${provider.id}`}
       aria-labelledby={headingId}
-      className="rounded-card border border-line bg-card p-4 shadow-raised"
+      className={cardClasses()}
     >
       <header className="flex items-baseline justify-between gap-3">
         <h3 id={headingId} className="font-medium text-ink">
           {provider.label}
         </h3>
-        <span
+        <StatusPill
           data-testid={`ai-key-state-${provider.id}`}
           data-state={state}
-          className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-medium ${KEY_STATE_TONE[state]}`}
+          tone={KEY_STATE_TONE[state]}
         >
           {KEY_STATE_LABEL[state]}
-        </span>
+        </StatusPill>
       </header>
 
       <p className="mt-1 text-ink-muted">{provider.unlocks}</p>

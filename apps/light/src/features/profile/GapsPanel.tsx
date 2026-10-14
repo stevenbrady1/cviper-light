@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import { cardClasses, SectionHeading } from '../../ui';
 import { displayTerm } from '../analysis/acronyms';
 
 import { describeGaps, describedJobs, skillGaps, type SkillGap } from './gaps';
@@ -70,8 +71,8 @@ export function GapsPanel({ port }: GapsPanelProps) {
   }, [port]);
 
   return (
-    <section data-testid="profile-gaps" className="mt-8 max-w-2xl border-t border-line pt-6">
-      <h2 className="font-medium text-ink">Across your applications</h2>
+    <section data-testid="profile-gaps" className={`mt-5 max-w-2xl ${cardClasses()}`}>
+      <SectionHeading title="Across your applications" />
       <Body state={state} />
     </section>
   );

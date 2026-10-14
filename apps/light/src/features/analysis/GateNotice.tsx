@@ -1,5 +1,7 @@
 import { type GateResult, type GateVerdict } from '@cviper/keyword-scoring';
 
+import { cardClasses, StatusPill, type PillTone } from '../../ui';
+
 /**
  * The gate verdicts, drawn ABOVE the analysis result (L-156).
  *
@@ -36,10 +38,10 @@ const VERDICT_LABEL: Record<GateVerdict, string> = {
   fail: 'Hard stop',
 };
 
-const VERDICT_TONE: Record<GateVerdict, string> = {
-  pass: 'bg-teal/10 text-teal-ink',
-  flag: 'bg-gold/10 text-gold-ink',
-  fail: 'bg-danger/10 text-danger',
+const VERDICT_TONE: Record<GateVerdict, PillTone> = {
+  pass: 'ready',
+  flag: 'attention',
+  fail: 'danger',
 };
 
 interface GateNoticeProps {
@@ -76,18 +78,15 @@ export function GateNotice({ results }: GateNoticeProps) {
             key={`${result.kind}-${index}`}
             data-testid={`analysis-gate-${result.kind}-${index}`}
             data-verdict={result.verdict}
-            className="rounded-card border border-line bg-card px-3 py-2"
+            className={`${cardClasses({ padding: 'none' })} px-3 py-2`}
           >
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase">
                 {labelOf(result)}
               </h3>
-              <span
-                data-testid="analysis-gate-verdict"
-                className={`rounded-pill px-2 py-0.5 text-xs font-medium ${VERDICT_TONE[result.verdict]}`}
-              >
+              <StatusPill data-testid="analysis-gate-verdict" tone={VERDICT_TONE[result.verdict]}>
                 {VERDICT_LABEL[result.verdict]}
-              </span>
+              </StatusPill>
             </div>
             <p className="mt-1 text-ink">{result.reason}</p>
             {result.quote === null ? null : (

@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type HTMLAttributes, type ReactNode } from 'react';
 
 /**
  * A small rounded label that says what state something is in.
@@ -34,20 +34,23 @@ const TONE: Record<PillTone, string> = {
   danger: 'bg-danger/10 text-danger',
 };
 
-export interface StatusPillProps {
+export interface StatusPillProps extends Omit<
+  HTMLAttributes<HTMLSpanElement>,
+  'className' | 'children'
+> {
   readonly tone: PillTone;
   readonly children: ReactNode;
   readonly 'data-testid'?: string;
 }
 
-export function StatusPill({ tone, children, 'data-testid': testId }: StatusPillProps) {
+export function StatusPill({ tone, children, ...rest }: StatusPillProps) {
   const safe: PillTone = PILL_TONES.includes(tone) ? tone : 'neutral';
 
   return (
     <span
-      data-testid={testId}
+      {...rest}
       data-tone={safe}
-      className={`inline-flex w-fit items-center gap-1 rounded-pill px-2 py-0.5 text-xs font-medium ${TONE[safe]}`}
+      className={`inline-flex w-fit shrink-0 items-center gap-1 rounded-pill px-2 py-0.5 text-xs font-medium ${TONE[safe]}`}
     >
       {children}
     </span>

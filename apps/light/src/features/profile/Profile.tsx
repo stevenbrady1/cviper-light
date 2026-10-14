@@ -10,6 +10,7 @@ import {
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
+import { cardClasses, SectionHeading } from '../../ui';
 import { useDebouncedField } from '../../lib/useDebouncedField';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
 
@@ -279,7 +280,7 @@ export function Profile({ port, now, gapsPort, filePort }: ProfileProps) {
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-profile">
-      <ViewHeader title={view.label} summary={view.summary} />
+      <ViewHeader view={view.id} title={view.label} summary={view.summary} />
 
       {error === null ? null : (
         <p
@@ -399,9 +400,9 @@ function ProfileForm({
   );
 
   return (
-    <div className="max-w-2xl space-y-8">
-      <section data-testid="profile-about">
-        <h2 className="font-medium text-ink">About you</h2>
+    <div className="max-w-2xl space-y-5">
+      <section data-testid="profile-about" className={cardClasses()}>
+        <SectionHeading title="About you" />
         <p className="mt-1 text-ink-muted">
           The short version of who you are. Everything written for you starts from here.
         </p>
@@ -456,8 +457,8 @@ function ProfileForm({
         </div>
       </section>
 
-      <section data-testid="profile-languages">
-        <h2 className="font-medium text-ink">Languages</h2>
+      <section data-testid="profile-languages" className={cardClasses()}>
+        <SectionHeading title="Languages" />
         <p className="mt-1 text-ink-muted">Each one, and how well you speak it.</p>
 
         {languageKeys.length === 0 ? (
@@ -492,8 +493,8 @@ function ProfileForm({
         </button>
       </section>
 
-      <section data-testid="profile-wants">
-        <h2 className="font-medium text-ink">What you are looking for</h2>
+      <section data-testid="profile-wants" className={cardClasses()}>
+        <SectionHeading title="What you are looking for" />
         <p className="mt-1 text-ink-muted">One per line.</p>
 
         <div className="mt-3 space-y-4">
@@ -547,8 +548,8 @@ function ProfileForm({
         </div>
       </section>
 
-      <section data-testid="profile-energy">
-        <h2 className="font-medium text-ink">What energises you, what drains you</h2>
+      <section data-testid="profile-energy" className={cardClasses()}>
+        <SectionHeading title="What energises you, what drains you" />
         <p className="mt-1 text-ink-muted">
           One per line. Honest answers here keep you out of jobs you would hate.
         </p>
@@ -588,8 +589,8 @@ function ProfileForm({
         </div>
       </section>
 
-      <section data-testid="profile-star">
-        <h2 className="font-medium text-ink">STAR examples</h2>
+      <section data-testid="profile-star" className={cardClasses()}>
+        <SectionHeading title="STAR examples" />
         <p className="mt-1 text-ink-muted">
           Worked examples in the shape interviewers ask for them: the situation, the task, what you
           did, and what came of it.
@@ -717,7 +718,7 @@ function StarCard({ index, example, onChange, onRemove }: StarCardProps) {
   return (
     <li
       data-testid={`profile-star-${index}`}
-      className="rounded-card border border-line bg-card p-4 shadow-raised"
+      className="rounded-card border border-line bg-canvas p-4"
     >
       <div className="space-y-3">
         {STAR_PARTS.map((part) => (

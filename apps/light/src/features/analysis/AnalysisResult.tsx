@@ -2,6 +2,7 @@ import { type CvAnalysis, type SuggestionPriority, type Verdict } from '@cviper/
 import { atsBand } from '@cviper/keyword-scoring';
 
 import { Hint } from '../../app/Hint';
+import { cardClasses } from '../../ui';
 import { ATS_BAND_HINT, VERDICT_HINT } from '../../app/hints';
 import { displayTerms } from './acronyms';
 import { ATS_BAND_TONE, ATS_BAND_WORD } from './atsBandWords';
@@ -203,7 +204,7 @@ export function AnalysisResult({
         <div
           data-testid="analysis-ats-score"
           data-band={ats.band}
-          className="rounded-card border border-line bg-card p-3"
+          className={cardClasses({ padding: 'none' }) + ' p-3'}
         >
           <Eyebrow>Screening-software keyword check</Eyebrow>
           <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -294,7 +295,7 @@ export function AnalysisResult({
                   <li
                     key={`${priority}-${index}-${suggestion.section}`}
                     data-testid={`analysis-suggestion-${priority}`}
-                    className="rounded-card border border-line bg-card p-3"
+                    className={cardClasses({ padding: 'none' }) + ' p-3'}
                   >
                     <div className="flex items-center gap-2">
                       <span

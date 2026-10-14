@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
+import { cardClasses, SectionHeading, StatusPill } from '../../../ui';
 import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 import { type KeyState, type SecretKeyName } from '../../../status/environment';
 
@@ -80,7 +81,7 @@ export function KeySetup({ port, browser }: KeySetupProps = {}) {
 
   return (
     <section data-testid="key-setup">
-      <h2 className="font-medium text-ink">API keys</h2>
+      <SectionHeading icon="key" title="API keys" />
       <p className="mt-1 text-ink-muted">
         CViper Light works without any of these. The tracker is entirely offline, the analysis
         screen has a keyword match that needs no account, and the search screen can always hand a
@@ -215,23 +216,20 @@ function KeyCard({ provider, port, browser }: KeyCardProps) {
   }, [port, provider.id, provider.label, refresh]);
 
   return (
-    <article
-      data-testid={`key-card-${provider.id}`}
-      className="rounded-card border border-line bg-card p-4 shadow-raised"
-    >
+    <article data-testid={`key-card-${provider.id}`} className={cardClasses()}>
       <header className="flex items-baseline justify-between gap-3">
         <h3 className="font-medium text-ink">{provider.label}</h3>
         {/*
           The state, in words. The dot in the rail is the same fact in colour;
           neither is ever the only telling of it.
         */}
-        <span
+        <StatusPill
           data-testid={`key-state-${provider.id}`}
           data-state={state}
-          className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-medium ${KEY_STATE_TONE[state]}`}
+          tone={KEY_STATE_TONE[state]}
         >
           {KEY_STATE_LABEL[state]}
-        </span>
+        </StatusPill>
       </header>
 
       <p className="mt-1 text-ink-muted">{provider.unlocks}</p>

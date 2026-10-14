@@ -1,6 +1,7 @@
 import { APP_VERSION } from '../backup';
 
 import type { MobileOs } from '../../../platform/os';
+import { SectionHeading } from '../../../ui';
 
 /**
  * The Updates section wherever updates are not ours to deliver.
@@ -45,7 +46,7 @@ export interface StoreUpdatesProps {
 export function StoreUpdates({ os, version }: StoreUpdatesProps) {
   return (
     <section>
-      <h2 className="font-medium text-ink">Updates</h2>
+      <SectionHeading icon="refresh" title="Updates" />
 
       <p data-testid="settings-store-updates" className="mt-1 text-ink-muted">
         On this device, updates come from {STORE_NAME[os]}. CViper Light does not check for them

@@ -2,6 +2,7 @@ import { type Verdict } from '@cviper/core-types';
 import { SOURCE_LABEL, type SearchResultJob } from '@cviper/job-apis';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { cardClasses, StatusPill, type PillTone } from '../../ui';
 
 import { describeCluster, postedLabel } from './model';
 import { type RankBand } from './rank';
@@ -59,10 +60,10 @@ import { describeSalary, formatSalary } from './salary';
  */
 
 /** The verdict pill's tones — the same three the Analysis screen uses. */
-const RANK_TONE: Readonly<Record<Verdict, string>> = {
-  strong: 'bg-teal/10 text-teal-ink',
-  possible: 'bg-gold/10 text-gold-ink',
-  weak: 'bg-sunken text-ink-muted',
+const RANK_TONE: Readonly<Record<Verdict, PillTone>> = {
+  strong: 'ready',
+  possible: 'attention',
+  weak: 'neutral',
 };
 
 const RANK_LABEL: Readonly<Record<Verdict, string>> = {
@@ -122,20 +123,20 @@ export function ResultCard({
     <article
       data-testid={`result-${job.id}`}
       data-source={job.source}
-      className="rounded-card border border-line bg-card px-4 py-3 shadow-raised"
+      className={`${cardClasses({ padding: 'none', interactive: true })} px-4 py-3`}
     >
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="min-w-0 font-medium text-ink">{job.title}</h3>
         <div className="flex shrink-0 items-baseline gap-2">
           {rank === null ? null : (
-            <span
+            <StatusPill
               data-testid={`result-rank-${job.id}`}
               data-verdict={rank.verdict}
-              className={`rounded-pill px-2 py-0.5 text-[11px] font-medium ${RANK_TONE[rank.verdict]}`}
+              tone={RANK_TONE[rank.verdict]}
             >
               {RANK_LABEL[rank.verdict]} ·{' '}
               <span className="font-mono tabular-nums">{rank.score}</span>
-            </span>
+            </StatusPill>
           )}
           {/*
             The board this advert came from. Named on every card — Adzuna's API
@@ -166,9 +167,7 @@ export function ResultCard({
           {salary ?? 'Salary not stated'}
         </span>
 
-        <span className="rounded-pill bg-sunken px-2 py-0.5 text-[11px] font-medium text-ink-muted">
-          {contractType}
-        </span>
+        <StatusPill tone="neutral">{contractType}</StatusPill>
 
         {posted === null ? null : (
           <span
@@ -183,13 +182,13 @@ export function ResultCard({
       {dealBreakers.length === 0 ? null : (
         <div className="mt-2 flex flex-wrap gap-2">
           {dealBreakers.map((text, index) => (
-            <span
+            <StatusPill
               key={text}
               data-testid={`result-dealbreaker-${job.id}-${index}`}
-              className="rounded-pill bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold-ink"
+              tone="attention"
             >
               Deal-breaker: {text}
-            </span>
+            </StatusPill>
           ))}
         </div>
       )}

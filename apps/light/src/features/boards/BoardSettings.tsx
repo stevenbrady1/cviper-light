@@ -4,6 +4,7 @@ import { buildBoardUrl } from '@cviper/job-apis';
 import { BOARD_ENCODINGS, type BoardEncoding } from '@cviper/core-types';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { cardClasses, SectionHeading, StatusPill } from '../../ui';
 
 import { SHIPPED_BOARDS } from './defaults';
 import {
@@ -155,7 +156,7 @@ export function BoardSettings({ port }: BoardSettingsProps = {}) {
 
   return (
     <section data-testid="boards-settings">
-      <h2 className="font-medium text-ink">Job boards</h2>
+      <SectionHeading icon="boards" title="Job boards" />
       <p className="mt-1 text-ink-muted">
         The buttons under the search box send whatever you have typed to one of these sites, opened
         in your own browser. No key and no account is needed for any of them. Untick the ones you
@@ -181,11 +182,7 @@ export function BoardSettings({ port }: BoardSettingsProps = {}) {
               <span className="min-w-0 truncate text-ink">{board.label}</span>
             </label>
 
-            {board.userAdded ? (
-              <span className="rounded-pill border border-line px-2 py-0.5 text-xs text-ink-faint">
-                yours
-              </span>
-            ) : null}
+            {board.userAdded ? <StatusPill tone="neutral">yours</StatusPill> : null}
 
             {/*
               Disabled at the ends, never hidden. A button that comes and goes
@@ -244,11 +241,7 @@ export function BoardSettings({ port }: BoardSettingsProps = {}) {
       )}
 
       {adding ? (
-        <form
-          data-testid="boards-add-form"
-          onSubmit={onAdd}
-          className="mt-3 rounded-card border border-line bg-card p-4"
-        >
+        <form data-testid="boards-add-form" onSubmit={onAdd} className={`mt-3 ${cardClasses()}`}>
           <h3 className="font-medium text-ink">Add a job board</h3>
           <p className="mt-1 text-ink-muted">
             Run a search on the site you want, copy the address out of your browser, and paste it

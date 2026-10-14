@@ -26,6 +26,7 @@
 import { PROVIDER_LABEL, type JobApiErrorKind, type JobProviderId } from '@cviper/job-apis';
 
 import { combineKeyState, type KeyState, type SecretKeyName } from '../../../status/environment';
+import type { PillTone } from '../../../ui';
 
 /**
  * The largest credential this app will try to save, in UTF-8 BYTES.
@@ -182,11 +183,11 @@ export const KEY_STATE_LABEL: Record<KeyState, string> = {
  * Nothing here is ever red: red is destructive and the `rejected` status, and
  * none of these four is either.
  */
-export const KEY_STATE_TONE: Record<KeyState, string> = {
-  configured: 'bg-teal/10 text-teal-ink',
-  incomplete: 'bg-gold/10 text-gold-ink',
-  missing: 'bg-sunken text-ink-muted',
-  unreadable: 'bg-gold/10 text-gold-ink',
+export const KEY_STATE_TONE: Record<KeyState, PillTone> = {
+  configured: 'ready',
+  incomplete: 'attention',
+  missing: 'neutral',
+  unreadable: 'attention',
 };
 
 /**

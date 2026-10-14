@@ -14,6 +14,7 @@ import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { DetailPane } from '../../app/DetailPane';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
+import { IconTile } from '../../ui';
 import { createTauriTransport } from '../../ai/transport';
 import {
   createTauriFilePort,
@@ -777,7 +778,7 @@ export function Analysis({
         — a Run button in the corner, four inches from the advert box and from
         its own reason, is a button nobody connects to anything.
       */}
-      <ViewHeader title={view.label} summary={view.summary} />
+      <ViewHeader view={view.id} title={view.label} summary={view.summary} />
 
       {stepJob === null ? null : (
         <JobStepBar
@@ -1094,6 +1095,9 @@ export function Analysis({
               data-testid="analysis-empty"
               className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
             >
+              <div className="mb-3 flex justify-center">
+                <IconTile icon="analysis" />
+              </div>
               <p className="font-medium text-ink">Nothing checked yet.</p>
               {/* cviper-allow-absolute-privacy-claim: the sentence names its own
                   subject — "The basic match" — which is the keyword scorer in

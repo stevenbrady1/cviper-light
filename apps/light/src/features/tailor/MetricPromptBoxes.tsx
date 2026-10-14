@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { cardClasses } from '../../ui';
 
 import {
   MAX_METRIC_CHARS,
@@ -45,7 +46,7 @@ export function MetricPromptBoxes({
 
   return (
     <div data-testid="tailor-metric-prompts" className="mt-2">
-      <details className="rounded-card border border-line bg-card px-4 py-3">
+      <details className={`${cardClasses({ padding: 'none' })} px-4 py-3`}>
         <summary className="cursor-pointer text-sm font-medium text-ink">
           {`Add a number or result for your gaps (optional, ${added} of ${prompts.length} added)`}
         </summary>

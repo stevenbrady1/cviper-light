@@ -2,6 +2,7 @@ import { type CheckStatus } from '@cviper/ats-checks';
 import { atsBand } from '@cviper/keyword-scoring';
 
 import { Hint } from '../../app/Hint';
+import { cardClasses } from '../../ui';
 import {
   ATS_BAND_HINT,
   ATS_CHECK_HINT,
@@ -88,7 +89,7 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
     <section
       data-testid="tailor-ats"
       aria-labelledby="tailor-ats-heading"
-      className="space-y-3 rounded-card border border-line bg-card px-4 py-3"
+      className={`space-y-3 ${cardClasses({ padding: 'none' })} px-4 py-3`}
     >
       <div>
         <h3
