@@ -26,6 +26,8 @@ import {
   type FakeBrowserPort,
 } from '../../../platform/test/fakeBrowserPort';
 
+import { SECONDARY_BUTTON } from '../../../app/buttons';
+
 import { KeySetup } from './KeySetup';
 import { MAX_KEY_BYTES } from './model';
 import { createFakeKeyPort, rejectedKey, type FakeKeyPort } from './test/fakeKeyPort';
@@ -434,6 +436,14 @@ describe('removing a key', () => {
     expect((await screen.findByTestId('key-state-adzuna')).getAttribute('data-state')).toBe(
       'missing',
     );
+  });
+
+  it('"Remove saved key" looks like a button, not plain text (0.10.1)', async () => {
+    renderKeys(createFakeKeyPort({ reed_api_key: 'saved' }));
+
+    const remove = await screen.findByTestId('key-remove-reed');
+    expect(remove.className).toBe(SECONDARY_BUTTON);
+    expect(remove.hasAttribute('data-primary')).toBe(false);
   });
 
   it('offers nothing to remove when there is nothing saved', async () => {

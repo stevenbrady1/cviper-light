@@ -16,6 +16,7 @@ import {
   AI_KEY_PROVIDERS,
   AI_KEY_SAVED_MASK,
   AI_KEY_SAVE_REFUSED,
+  AI_KEY_STILL_SAVED,
   normaliseAiKey,
   validateAiKey,
   type AiKeyProvider,
@@ -188,6 +189,16 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
   const onTest = useCallback(async () => {
     setOutcome(NOTHING);
 
+    // A blank box with a key already saved is not a mistake (0.10.1): the
+    // saved key is fine and still in use, so say that, in neutral words, and
+    // leave the box un-flagged. With nothing saved, a blank box is still the
+    // error below.
+    if (answer === true && normaliseAiKey(value) === '') {
+      setFieldError(null);
+      setOutcome({ passed: AI_KEY_STILL_SAVED, problem: null });
+      return;
+    }
+
     // Checked here first, so a blank box never costs a round trip to the
     // provider to find out it was blank.
     const problem = validateAiKey(value, provider.label);
@@ -228,7 +239,7 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
     setBusy(false);
     setOutcome({ passed: provider.passMessage, problem: null });
     await refresh();
-  }, [keyPort, provider.label, provider.passMessage, refresh, value]);
+  }, [answer, keyPort, provider.label, provider.passMessage, refresh, value]);
 
   const onRemove = useCallback(async () => {
     setOutcome(NOTHING);
@@ -287,13 +298,33 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
 
       {/*
         A saved key, said without showing any of it. Fixed bullets from a
-        bool — nothing here has ever seen the value.
+        bool — nothing here has ever seen the value. "Remove saved key" sits
+        beside it, the thing it removes (0.10.1); it used to sit beside the
+        Test button, styled so quietly it read as plain text.
       */}
-      {answer === true ? (
-        <p data-testid={`ai-key-saved-${provider.id}`} className="mt-2 text-xs text-ink-muted">
-          Saved <span className="font-mono">{AI_KEY_SAVED_MASK}</span>
-        </p>
-      ) : null}
+      <div
+        data-testid={`ai-key-saved-row-${provider.id}`}
+        className="mt-2 flex flex-wrap items-center gap-2"
+      >
+        {answer === true ? (
+          <p data-testid={`ai-key-saved-${provider.id}`} className="text-xs text-ink-muted">
+            Saved <span className="font-mono">{AI_KEY_SAVED_MASK}</span>
+          </p>
+        ) : null}
+        <button
+          type="button"
+          data-testid={`ai-key-remove-${provider.id}`}
+          /*
+            Disabled, never hidden. A control that appears and disappears is a
+            control the user cannot learn.
+          */
+          disabled={busy || answer !== true}
+          onClick={() => void onRemove()}
+          className={SECONDARY_BUTTON}
+        >
+          Remove saved key
+        </button>
+      </div>
 
       <div className="mt-3">
         <label htmlFor={inputId} className="block text-xs font-medium text-ink-muted">
@@ -353,20 +384,6 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
           className={SECONDARY_BUTTON}
         >
           {busy ? 'Checking…' : 'Test and save this key'}
-        </button>
-
-        <button
-          type="button"
-          data-testid={`ai-key-remove-${provider.id}`}
-          /*
-            Disabled, never hidden. A control that appears and disappears is a
-            control the user cannot learn.
-          */
-          disabled={busy || answer !== true}
-          onClick={() => void onRemove()}
-          className={QUIET_BUTTON}
-        >
-          Remove saved key
         </button>
       </div>
 

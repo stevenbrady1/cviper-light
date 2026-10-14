@@ -9,6 +9,8 @@ All notable changes to CViper Light are recorded here. The format follows
 ### Fixed
 
 - Uninstalling on Windows with "Delete the application data" ticked now also removes the API and job-board keys you saved. They are kept in Windows Credential Manager, not in the app's folders, so they used to stay behind. The uninstaller removes only CViper Light's own entries, by their exact names, and leaves them alone when the box is not ticked or when the app is updating. The Microsoft Store version cannot run this step, so there, as on every system, Settings → Delete everything is the way to remove your keys before you uninstall.
+- "Remove saved key" on each AI key card now sits next to "Saved ••••", the thing it removes, and looks like a button. It used to sit beside "Test and save this key" in a style that read as plain text. "Remove this service" on the "Your own AI service" card moved the same way, and the job-board cards' "Remove saved key" now looks like a button too.
+- With a key already saved, pressing "Test and save this key" on an empty box no longer turns the box red with "Paste your … API key before testing it." Your saved key is fine and still in use, and the card now says so. With no key saved, an empty box is still pointed out as before.
 
 ## [0.10.0] — 2026-10-14
 

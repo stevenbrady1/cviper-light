@@ -324,7 +324,8 @@ function KeyCard({ provider, port, browser }: KeyCardProps) {
           */
           disabled={busy || !anySaved}
           onClick={() => void onRemove()}
-          className={QUIET_BUTTON}
+          // A real button (0.10.1): the quiet style read as plain text.
+          className={SECONDARY_BUTTON}
         >
           Remove saved key
         </button>
