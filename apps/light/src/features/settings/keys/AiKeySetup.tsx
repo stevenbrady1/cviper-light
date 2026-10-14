@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
 import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 import { combineKeyState, type KeyState } from '../../../status/environment';
+import { SectionHeading } from '../../../ui';
+import { AI_COST_LINE } from '../../onboarding/cards';
 import {
   AI_MODEL_CHOICES,
   chooseModel,
@@ -97,11 +99,24 @@ export function AiKeySetup({ ports, browser, customServicePort }: AiKeySetupProp
 
   return (
     <section data-testid="ai-key-setup">
-      <h2 className="font-medium text-ink">AI provider keys</h2>
-      <p className="mt-1 text-ink-muted">
-        Optional. The analysis screen already has a keyword match that needs no account, and the
-        tracker is entirely offline. A key adds one thing: a full reading of your CV against an
-        advert by a model that understands both.
+      <SectionHeading
+        icon="key"
+        title="AI provider keys"
+        description="Optional. The analysis screen already has a keyword match that needs no account, and the tracker is entirely offline. A key adds one thing: a full reading of your CV against an advert by a model that understands both."
+      />
+
+      {/*
+        What a typical check costs, before the first key box (moved here from
+        the welcome screen in the refresh, whose "Add a key →" link lands on
+        this section). "Bring your own key" is only an honest offer if the
+        price is visible BEFORE somebody goes and gets one — see
+        `AI_COST_LINE` in `onboarding/cards.ts` for the wording's history.
+      */}
+      <p
+        data-testid="ai-keys-cost"
+        className="mt-3 rounded-control bg-sunken px-3 py-2 text-xs text-ink-muted"
+      >
+        {AI_COST_LINE}
       </p>
 
       <div className="mt-4 space-y-4">

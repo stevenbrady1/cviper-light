@@ -1,24 +1,29 @@
 /**
- * The three things this app does, and what each one actually needs.
+ * The three things this app does, and whether each one works yet.
  *
  * ============================================================================
- * THE REQUIREMENT IS A FIELD, NOT A SENTENCE SOMEBODY REMEMBERED TO WRITE.
+ * EVERY CARD SAYS WHETHER IT WORKS NOW — AND ALL THREE DO.
  * ============================================================================
  * A welcome screen showing three equal-looking features, two of which turn out
  * to need an API key, is worse than no welcome screen at all: the user tries
  * whichever caught their eye, hits a wall, and concludes the app is broken
  * rather than unconfigured.
  *
- * So every card carries its cost up front, in its own field, and
- * `cards.test.ts` asserts all three are populated and distinct.
+ * The first version of this screen answered that with a `requirement` sentence
+ * per card. The refresh (the approved "Your job hunt, organised." mockup) says
+ * it shorter: a "Ready now" pill — honest for all three, because the tracker is
+ * offline, the CV check has a keyword match that needs no account, and search
+ * has keyless browser links — plus a body that says what a free key adds. The
+ * CV card's pill also reports the live Ollama detection (see `Welcome.tsx`).
+ * `cards.test.ts` holds both halves.
  *
  * ============================================================================
  * THE TRACKER GOES FIRST, WHICH IS NOT THE RAIL'S ORDER.
  * ============================================================================
  * The rail runs Search → Tracker → Analysis, because that is the order a job
- * hunt happens in. A first impression is a different question: the first thing
- * a new user should meet is the feature that works before they have configured
- * anything. Leading with job search would lead with "you need two API keys".
+ * hunt happens in. A first impression is a different question. The CV check
+ * sits in the middle and carries the screen's one primary button and its
+ * "Start here" marker: it is the quickest way to get something useful back.
  */
 import { providerLabel } from '../analysis/model';
 import { SUGGESTED_OLLAMA_MODEL, providerOptions, type Availability } from '../analysis/providers';
@@ -28,8 +33,11 @@ import { type ViewId } from '../../app/views';
 export interface OnboardingCard {
   readonly id: 'tracker' | 'analysis' | 'search';
   readonly title: string;
-  /** What this costs the user before it works. Stated, never implied. */
-  readonly requirement: string;
+  /** One line under the title, in muted ink: why you would open it. */
+  readonly hook: string;
+  /** The pill. Stated, never implied — see the docblock above. */
+  readonly status: 'Ready now';
+  /** One sentence: what it does, and — where it applies — what a key adds. */
   readonly body: string;
   /** Where the card's button goes. Every card has one. */
   readonly view: ViewId;
@@ -40,36 +48,27 @@ export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
   {
     id: 'tracker',
     title: 'Track applications',
-    // Unconditionally true, on every machine, with nothing installed. It is the
-    // only one of the three that can say this, so it says it first.
-    requirement: 'Works now, no setup.',
-    body:
-      'A board of everything you have applied for, with a mark down the side of ' +
-      'each card showing how long it has sat still. The thing a job hunt loses ' +
-      'track of is age, and age is what tells you who to chase.',
+    hook: 'See who to chase next.',
+    status: 'Ready now',
+    body: 'Every job you applied for on one board. Old ones stand out.',
     view: 'tracker',
-    actionLabel: 'Open the tracker',
+    actionLabel: 'Open my board',
   },
   {
     id: 'analysis',
-    title: 'Analyse your CV',
-    requirement:
-      'Needs nothing to start; a free local model or your own API key makes it much better.',
-    body:
-      'Paste a job advert next to your CV and see which of its words you already ' +
-      'use and which you are missing. The basic match is a word comparison and ' +
-      'runs instantly. A model reads it properly and explains itself.',
+    title: 'Check your CV',
+    hook: "Find the words you're missing.",
+    status: 'Ready now',
+    body: "Paste a job advert. See which key words your CV has and which it doesn't.",
     view: 'analysis',
-    actionLabel: 'Check a CV',
+    actionLabel: 'Check my CV',
   },
   {
     id: 'search',
-    title: 'Search jobs',
-    requirement: 'Needs free Adzuna/Reed keys — or use the browser links, no key needed.',
-    body:
-      'Search two UK job boards from inside the app and save what is worth ' +
-      'chasing straight onto the board. Without keys, the same search opens in ' +
-      'your own browser in one click.',
+    title: 'Find jobs',
+    hook: 'Search UK jobs in one place.',
+    status: 'Ready now',
+    body: 'Save the good ones straight to your board. Free keys add more results.',
     view: 'search',
     actionLabel: 'Find jobs',
   },
@@ -88,6 +87,12 @@ export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
  * what a typical CV costs", and a card that said only "you pay your provider"
  * with no figure at all would send somebody off to read a pricing page to work
  * out an answer we already know roughly.
+ *
+ * WHERE IT IS SHOWN: since the welcome refresh, at the top of Settings → AI
+ * provider keys (`AiKeySetup`), which is where the welcome's "Add a key →" link
+ * lands — so the welcome still leads to the figure in one click, and the
+ * figure sits beside the box the key is pasted into.
+ * `AiKeySetup.cost.test.tsx` pins it there.
  *
  * ============================================================================
  * WHY THIS NO LONGER NAMES A PROVIDER OR A BAND (L-148)
