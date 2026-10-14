@@ -78,13 +78,15 @@ issue and report it the way [SECURITY.md](SECURITY.md) asks.
 
 ## Your privacy, in plain words
 
-**Your data stays on your machine. No accounts. We collect nothing.**
+**Your data is stored on your machine. No accounts. The app sends us nothing.**
 
 There is no sign-up, no login and no server belonging to us. Your CVs, your
 applications and your notes are in one database file on your own disk. Nobody
-else can read it, including us — there is nowhere for it to go.
+else can read that file, including us — the app has no server to copy it to.
+The text of your CV only goes to an AI you choose, and only when you ask it to
+read your CV.
 
-Five more things worth saying out loud:
+A few more things worth saying out loud:
 
 - **No telemetry.** Not "anonymous statistics", not "crash reports", none. The
   Settings screen has a switch showing this, permanently off, and there is a
@@ -107,10 +109,12 @@ Five more things worth saying out loud:
   added to a job advert's URL when you click it.
 - **"Fetch" opens one page, and only when you press it.** See below.
 
-The only requests this app ever makes are ones you start or switched on: a job
-search, a CV check against a provider you chose, a job advert you ask it to
-fetch, and an update check — when you press the button, and once at startup
-unless you turn that off in Settings → Updates.
+The requests this app makes to other services are ones you start or switched
+on: a job search, a CV check or a tailored CV with an AI you chose, a job advert
+you ask it to fetch, a key you paste and test, and an update check — when you
+press the button, and once at startup unless you turn that off in Settings →
+Updates. On its own, it also asks this same computer whether Ollama is running.
+Settings → Privacy lists every address it can contact.
 
 ### When you press "Fetch" on a job advert
 

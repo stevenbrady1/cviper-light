@@ -6,7 +6,7 @@ _For CViper Light 0.9.0. This page is generated from the app's own list of the a
 
 CViper Light has no account to create, no server of ours behind it and no analytics in it. Your CV text, your saved jobs and your applications are stored on your own device, in a database that belongs to the app. The app contacts another service only when you press a button that says it will, or switched it on — and only the services listed on this page. Two things happen on their own: when the app starts it reads this app’s GitHub releases to see whether there is a newer version, unless you switch that off in Settings; and it asks this same computer whether Ollama is running, a request that never leaves it.
 
-We — the people who make CViper Light — receive nothing from it. Not your CV, not your searches, not your keys, not whether you use it at all. The one address on this page that is ours, cviper.ai, is only ever opened in your own browser when you tap a line that names it; the app never contacts it, and what that site sees is what your browser shows it.
+We — the people who make CViper Light — receive nothing from the app itself. Not your CV, not your searches, not your keys. The places that hand it out — an app store, or GitHub, where the update check looks — may show us totals, such as how many times it was downloaded, without saying who you are. The one address on this page that is ours, cviper.ai, is only ever opened in your own browser when you tap a line that names it; the app never contacts it, and what that site sees is what your browser shows it.
 
 ## What the app keeps, and where
 

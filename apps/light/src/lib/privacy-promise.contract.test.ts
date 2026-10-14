@@ -219,6 +219,13 @@ interface Rule {
  *   * `works offline` / `runs locally` — per-feature statements of fact, true
  *     of the tracker and the keyword match, and not claims about the whole app.
  */
+/**
+ * After "never sent" / "never uploaded": a scope that makes it honest — an
+ * exception, or "anywhere ELSE" (a key is sent to the one service it is for,
+ * and nowhere else). L-233.
+ */
+const NEVER_SCOPE = String.raw`(?!(?:\s+anywhere)?\s*[,;]?\s+(?:else|until|unless|except|other\s+than|apart\s+from|besides|save\s+for))`;
+
 const RULES: readonly Rule[] = [
   {
     id: 'everything-stays-here',
@@ -250,6 +257,46 @@ const RULES: readonly Rule[] = [
     why:
       'the same absolute claim in different words. "Nothing is sent off your machine" is not ' +
       'true of an app with a Fetch button, a job search and a cloud analysis option.',
+  },
+  // ── L-233 ────────────────────────────────────────────────────────────────
+  {
+    id: 'sends-no-data',
+    pattern: String.raw`\bsends?\s+(?:no|zero)\s+(?:data|information)\b${EXCEPTION}`,
+    why:
+      'the app sends a CV to the AI the user picks, a search to a job board and a request to ' +
+      'GitHub for updates. Say WHAT is not sent and to WHOM — "sends no usage data to us".',
+  },
+  {
+    id: 'never-uploaded',
+    pattern: String.raw`\bnever${ADVERBS}\s+(?:be(?:en)?\s+)?(?:uploaded|sent|transmitted)\b${NEVER_SCOPE}`,
+    why:
+      'a CV file is read on this machine, but its TEXT goes to a cloud AI when the user asks ' +
+      'one to read it. "Never uploaded anywhere" reads as "my CV never leaves". Say where it ' +
+      'does go, and when: "Its text only goes to an AI you choose, and only when you ask".',
+  },
+  {
+    id: 'never-leaves',
+    pattern: String.raw`\bnever${ADVERBS}\s+${LEAVES}(?:\s+(?:from\s+)?${PLACE}|\s+anywhere\b|(?=\s*[.!]))${EXCEPTION}`,
+    why:
+      'the same claim as "nothing leaves", made about one thing. Unless it states its ' +
+      'exception ("except to Anthropic"), it promises more than an app with cloud AI and ' +
+      'job search can keep. "A request that never leaves it" (a named, local request) is fine.',
+  },
+  {
+    id: 'not-whether-you-use-it',
+    pattern: String.raw`\bnot\s+(?:even\s+)?whether\s+you\s+(?:use|have|installed?)\s+it\b`,
+    why:
+      'an app store gives the developer install and usage totals, and GitHub counts release ' +
+      'downloads — which the update check is one of. Promise what the APP does not send, not ' +
+      'what nobody can count.',
+  },
+  {
+    id: 'we-collect-nothing',
+    pattern: String.raw`\b(?:we${ADVERBS}\s+collect|collects)${ADVERBS}\s+nothing\b${EXCEPTION}`,
+    why:
+      'true of the app, but GitHub counts release downloads (the update check is one) and an ' +
+      'app store gives the developer install totals. Say what the APP does: "The app sends us ' +
+      'nothing."',
   },
 ];
 
@@ -840,6 +887,53 @@ describe('privacy promise — the scanner can actually fail', () => {
       'a.md',
       `- **Everything stays on your machine.** Promise.\n`,
     ],
+    // ── L-233 ──────────────────────────────────────────────────────────────
+    [
+      'the old telemetry note',
+      'a.ts',
+      `export const N = 'Anonymous usage statistics — not implemented. CViper Light sends no data.';`,
+    ],
+    ['sends no information', 'a.tsx', `<p>The app sends no information.</p>`],
+    [
+      'the Analysis upload help, split over two JSX lines',
+      'a.tsx',
+      `<p className="mt-1">
+              PDF or Word. The file is read on this machine and never
+              uploaded anywhere. A CV can be saved back out.
+            </p>`,
+    ],
+    [
+      'never uploaded, split across a two-line concatenation',
+      'a.ts',
+      `export const N = 'The file is never ' +\n  'uploaded.';`,
+    ],
+    ['never sent anywhere', 'a.tsx', `<p>Your CV is never sent anywhere.</p>`],
+    ['never been uploaded', 'a.md', `Your CV has never been uploaded.\n`],
+    ['your CV never leaves your PC', 'a.tsx', `<p>Your CV never leaves your PC.</p>`],
+    [
+      'never leaves, split over two JSX lines',
+      'a.tsx',
+      `<p>Your CV never
+          leaves this computer.</p>`,
+    ],
+    ['never leaves, at the end of a sentence', 'a.ts', `export const N = 'Your CV never leaves.';`],
+    ['never leaves anywhere', 'a.md', `It never leaves anywhere.\n`],
+    [
+      'the old policy sentence, split across a concatenation',
+      'a.ts',
+      `export const N = 'Not your CV, not your ' +\n  'searches, not your keys, not whether you use it at all.';`,
+    ],
+    [
+      'the old README headline, minus its first claim',
+      'README.md',
+      `**Your data is stored on your machine. No accounts. We collect nothing.**\n`,
+    ],
+    [
+      'we collect nothing, split over two lines',
+      'a.md',
+      `No accounts, and we\ncollect nothing at all.\n`,
+    ],
+    ['the app collects nothing', 'a.tsx', `<p>CViper Light collects nothing.</p>`],
   ];
 
   it.each(regressions)('catches %s', (_name, file, source) => {
@@ -935,6 +1029,47 @@ describe('privacy promise — the copy that is still true walks through', () => 
       `<p>{/* This app tells people everything stays on their machine. */}Fetch</p>`,
     ],
     ['a fenced code block', 'a.md', 'Text.\n\n```\nEverything stays on your machine\n```\n'],
+    // ── L-233 ──────────────────────────────────────────────────────────────
+    [
+      'the honest telemetry note',
+      'a.ts',
+      `export const N = 'Anonymous usage statistics — not implemented. CViper Light sends no usage data to us.';`,
+    ],
+    [
+      'a key never sent anywhere except to its service',
+      'a.ts',
+      `export const N = 'never put in your backup, and never sent anywhere except to Adzuna.';`,
+    ],
+    [
+      'a key never sent anywhere else',
+      'a.ts',
+      `export const N = 'Its key is kept with that address and is never sent anywhere else.';`,
+    ],
+    [
+      'a request that never leaves it',
+      'a.ts',
+      `export const N = 'it asks this same computer whether Ollama is running, a request that never leaves it.';`,
+    ],
+    [
+      'the Profile wording from L-240',
+      'a.tsx',
+      `<p>The file is read on this computer. Its text only goes to an AI you choose, and only when you ask it to read your CV.</p>`,
+    ],
+    [
+      'the new README headline',
+      'README.md',
+      `**Your data is stored on your machine. No accounts. The app sends us nothing.**\n`,
+    ],
+    [
+      'collect with a stated exception',
+      'a.md',
+      `We collect nothing except what you choose to send us in a bug report.\n`,
+    ],
+    [
+      'a comment quoting the old phrases',
+      'a.ts',
+      `// The note used to say "sends no data" and "never uploaded anywhere".\nexport const x = 1;`,
+    ],
     [
       'a className that happens to contain the words',
       'a.tsx',
