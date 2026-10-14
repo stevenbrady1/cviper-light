@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   emptyProfile,
+  ok,
+  type Cv,
   type Profile as CandidateProfile,
   type ProfileLanguage,
   type StarExample,
@@ -30,7 +32,9 @@ import { createDbGapsPort, type GapsPort } from './gapsPort';
 import { ImportAiJobSearch } from './ImportAiJobSearchPanel';
 import { detectMobileOs } from '../../platform/os';
 import { mergeImportedProfile, type ImportedProfile } from './importAiJobSearch';
-import { createDbProfilePort, type ProfilePort } from './port';
+import { createDbProfileCvPort, createDbProfilePort, type ProfilePort } from './port';
+import { CvUpload } from '../cv/CvUpload';
+import { type CvStorePort } from '../cv/ingestCv';
 
 /**
  * The candidate profile: who you are, what you want, what you will not take.
@@ -90,7 +94,19 @@ export interface ProfileProps {
    * Injected by tests; defaults to the real Tauri-backed port.
    */
   readonly filePort?: FilePort | undefined;
+  /**
+   * The CVs, for "Your CV" (L-240). Injected by tests. Defaults to the real
+   * SQLite-backed one — unless `port` was injected, when a test that faked the
+   * data layer gets an empty list rather than real reads behind it.
+   */
+  readonly cvPort?: CvStorePort | undefined;
 }
+
+/** What a test that faked `port` but not `cvPort` gets: no CVs, and nowhere real to write. */
+const NO_CV_STORE: CvStorePort = {
+  loadCvs: async () => ok([]),
+  saveCv: async () => ok(undefined),
+};
 
 /** The loaded profile plus the stable keys for its two lists of rows. */
 interface Loaded {
@@ -102,9 +118,13 @@ interface Loaded {
 const FIELD = 'mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink';
 const LABEL = 'block text-xs font-medium text-ink-muted';
 
-export function Profile({ port, now, gapsPort, filePort }: ProfileProps) {
+export function Profile({ port, now, gapsPort, filePort, cvPort }: ProfileProps) {
   // Created once. A new port object every render would restart the load.
   const profilePort = useMemo(() => port ?? createDbProfilePort(), [port]);
+  const cvStore = useMemo(
+    () => cvPort ?? (port === undefined ? createDbProfileCvPort() : NO_CV_STORE),
+    [cvPort, port],
+  );
   const skillsPort = useMemo(() => gapsPort ?? createDbGapsPort(), [gapsPort]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
   // Bumped by an import, which changes fields from OUTSIDE their boxes. Every
@@ -299,6 +319,8 @@ export function Profile({ port, now, gapsPort, filePort }: ProfileProps) {
           </p>
         ) : null}
 
+        <YourCv store={cvStore} files={files} now={now} />
+
         {loaded === null ? null : (
           <ProfileForm
             key={formGeneration}
@@ -326,6 +348,94 @@ export function Profile({ port, now, gapsPort, filePort }: ProfileProps) {
         )}
       </div>
     </section>
+  );
+}
+
+// --- Your CV (L-240) --------------------------------------------------------
+//
+// Which CV the app has, and the same upload as Analysis and Tailor. Its own
+// load, separate from the profile's: a CV list that will not read must not
+// stop the profile form from opening, and the reverse.
+
+interface YourCvProps {
+  readonly store: CvStorePort;
+  readonly files: FilePort;
+  readonly now: Date | undefined;
+}
+
+function YourCv({ store, files, now }: YourCvProps) {
+  const [cvs, setCvs] = useState<readonly Cv[]>([]);
+  const [cvsLoaded, setCvsLoaded] = useState(false);
+  const [cvError, setCvError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void store.loadCvs().then((loaded) => {
+      if (cancelled) return;
+      setCvsLoaded(true);
+      if (!loaded.ok) {
+        setCvError(
+          `Your CVs could not be read: ${loaded.error.message} They are still on this machine.`,
+        );
+        return;
+      }
+      setCvs(loaded.value);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [store]);
+
+  const onUploaded = useCallback((cv: Cv) => {
+    setCvs((current) => [cv, ...current.filter((existing) => existing.id !== cv.id)]);
+  }, []);
+
+  // Newest first, as every screen lists them — the one Tailor and Analysis
+  // start on.
+  const newest = cvs[0] ?? null;
+
+  return (
+    <div className="mb-5 max-w-2xl">
+      <section data-testid="profile-cv" className={cardClasses()}>
+        <SectionHeading title="Your CV" />
+        <p className="mt-1 text-ink-muted">
+          Upload it once — here, on Analysis or on Tailor — and every screen can use it. The file is
+          read on this computer and never uploaded anywhere.
+        </p>
+
+        <p data-testid="profile-cv-current" className="mt-3 text-ink">
+          {!cvsLoaded ? (
+            'Reading your CVs…'
+          ) : newest === null ? (
+            'No CV uploaded yet.'
+          ) : (
+            <>
+              Newest: <span className="font-medium">{newest.name}</span>
+            </>
+          )}
+        </p>
+
+        {cvError === null ? null : (
+          <p
+            role="alert"
+            data-testid="profile-cv-error"
+            className="mt-2 rounded-control bg-danger/5 px-3 py-2 text-danger"
+          >
+            {cvError}
+          </p>
+        )}
+
+        <div className="mt-3">
+          <CvUpload
+            idPrefix="profile"
+            files={files}
+            saveCv={(cv) => store.saveCv(cv)}
+            now={now}
+            onUploaded={onUploaded}
+          />
+        </div>
+      </section>
+    </div>
   );
 }
 
