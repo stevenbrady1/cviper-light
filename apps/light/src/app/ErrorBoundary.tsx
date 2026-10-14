@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from './buttons';
+import { cardClasses } from '../ui';
 
 /**
  * The crash safety net around the whole app (L-226).
@@ -54,10 +55,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     return (
       <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
-        <section
-          role="alert"
-          className="max-w-md rounded-card border border-line bg-card p-6 shadow-raised"
-        >
+        <section role="alert" className={`max-w-md ${cardClasses({ padding: 'none' })} p-6`}>
           <h1 className="text-lg font-semibold text-ink">Something went wrong</h1>
           <p className="mt-2 text-ink-muted">
             Part of the app stopped working. Your data is safe: your CVs, jobs and applications are

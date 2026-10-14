@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   KEYWORD_KEY,
+  OLLAMA_DOWNLOAD_URL,
   defaultOptionKey,
   ollamaHint,
   optionByKey,
@@ -236,11 +237,17 @@ describe('optionByKey', () => {
  * earned being told which command.
  */
 describe('ollamaHint', () => {
-  it('names the command when the daemon is running with no chat model', () => {
+  it('says in plain words what to do when the daemon is running with no chat model', () => {
     const hint = ollamaHint({ ...NOTHING, ollamaRunning: true });
 
     expect(hint).not.toBeNull();
-    expect(hint).toContain('ollama pull llama3.2');
+    // L-240: a sentence a non-technical user can follow, not a terminal command.
+    expect(hint).toContain('add a chat model in it');
+    expect(hint).not.toContain('ollama pull');
+  });
+
+  it('the download link is Ollama’s own download page, over https', () => {
+    expect(OLLAMA_DOWNLOAD_URL).toBe('https://ollama.com/download');
   });
 
   it('says nothing when a chat model is already installed', () => {

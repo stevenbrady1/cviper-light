@@ -56,6 +56,7 @@ The app hands the address to your own browser and is not involved from then on. 
 - `aistudio.google.com` — The page where you create your own Google Gemini API key. The Google Gemini card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.
 - `console.mistral.ai` — The page where you create your own Mistral API key. The Mistral card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.
 - `console.x.ai` — The page where you create your own xAI API key. The xAI Grok card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.
+- `ollama.com` — Ollama’s download page. When Ollama is running on your computer but has no model that can chat, the CV check, the tailor screen and the welcome screen offer this link, which hands the address to your browser when you tap it; the app never loads the page, and nothing is added to the link.
 - `www.linkedin.com` — A keyless search link for LinkedIn, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `uk.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.totaljobs.com` — A keyless search link for Totaljobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.

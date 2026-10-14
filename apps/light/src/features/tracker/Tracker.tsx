@@ -16,6 +16,7 @@ import { ViewHeader } from '../../app/ViewHeader';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { todayIsoDate } from '../../lib/dates';
 import { viewById } from '../../app/views';
+import { IconTile } from '../../ui';
 
 import { readAvailability as readRealAvailability } from '../analysis/availability';
 import { type ConsentPort } from '../analysis/consent';
@@ -584,6 +585,7 @@ export function Tracker({
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-tracker">
       <ViewHeader
+        view={view.id}
         title={view.label}
         summary={view.summary}
         /*
@@ -967,6 +969,9 @@ function EmptyBoard({
       className="flex h-full items-center justify-center rounded-card border border-line border-dashed bg-card"
     >
       <div className="max-w-sm px-6 text-center">
+        <div className="mb-3 flex justify-center">
+          <IconTile icon="tracker" />
+        </div>
         <p className="font-medium text-ink">Start with the last job you applied to.</p>
         <p className="mt-1 text-ink-muted">
           The board keeps every application in one place and shows you which ones have gone quiet.

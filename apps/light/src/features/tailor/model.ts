@@ -36,8 +36,13 @@ export const LETTER_WORD_LIMIT = 400;
  * needs, in generic words — a local model or the user's own key — and point
  * at the screen where either is set up. No provider is named: the product
  * does not read as tied to one (L-148).
+ *
+ * L-240: the reason says WHY in the user's words (it writes text) before what
+ * to do, and the screen follows it with the two ways forward and an upload
+ * that works without a model — so the reason is never the end of the road.
  */
-export const NO_AI_REASON = 'Needs a local model or your own key. Set one up in Settings.';
+export const NO_AI_REASON =
+  'Tailoring writes new text, so it needs an AI. Add your own key in Settings, or use a free one on your own PC.';
 
 /**
  * The options this screen offers: everything the analysis picker offers
@@ -77,7 +82,7 @@ export function runDisabledReason(state: TailorRunState): string | null {
   }
 
   if (state.cv === null) {
-    return 'Choose a CV first. Upload one on the Analysis screen if there is none here.';
+    return 'Choose a CV first, or upload one above.';
   }
 
   const cvText = (state.cv.extracted_text ?? '').trim();

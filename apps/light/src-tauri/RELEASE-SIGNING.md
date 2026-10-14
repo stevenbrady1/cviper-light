@@ -139,7 +139,11 @@ decides everything after that.
    It builds **without** the signing key (L-223). The `sign` job then
    downloads the updater bundles from the draft, signs them, writes
    `latest.json`, checks it with the same verifier as step 4, and uploads both
-   to the draft. Nothing is public, and no installed copy can see any of it.
+   to the draft. The `stable-download` job also copies the setup installer to
+   `CViper-Light-Windows-x64.exe` on the draft (L-245): that unsigned copy is
+   the file cviper.ai's Download button fetches through
+   `/releases/latest/download/`, and it is never listed in `latest.json`.
+   Nothing is public, and no installed copy can see any of it.
 2. **Review the draft.** Download the installer, run it, check the version is
    what you expect. This is what the draft gate exists to make possible.
    `releaseDraft: true` is deliberate and is not a setting to flip: publishing

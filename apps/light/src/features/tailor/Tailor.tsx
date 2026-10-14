@@ -21,6 +21,8 @@ import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/button
 import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
+import { cardClasses, IconTile } from '../../ui';
+import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
 
 import { readAvailability } from '../analysis/availability';
@@ -34,6 +36,8 @@ import {
   type ConsentState,
 } from '../analysis/consent';
 import { jobAdvertText, providerInSentence } from '../analysis/model';
+import { OllamaDownloadLink } from '../analysis/OllamaDownloadLink';
+import { CvUpload } from '../cv/CvUpload';
 import {
   ollamaHint,
   optionByKey,
@@ -149,6 +153,11 @@ export interface TailorProps {
    */
   readonly onOpenSettings?: (() => void) | undefined;
   /**
+   * Opens Ollama's download page beside the Ollama hint (L-240). Injected by
+   * tests; defaults to the real one, which hands the address to the browser.
+   */
+  readonly browser?: BrowserPort | undefined;
+  /**
    * A job, CV and option handed over from Analysis or the tracker (L-190).
    *
    * Applied ONCE, when the CVs, the saved jobs and this machine's options
@@ -211,6 +220,7 @@ export function Tailor({
   consentPort,
   now,
   onOpenSettings,
+  browser,
   handoff,
   onHandoffHandled,
   jobSessions,
@@ -221,6 +231,7 @@ export function Tailor({
 }: TailorProps = {}) {
   const tailorPort = useMemo(() => port ?? createDbTailorPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
+  const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
   const consentStore = useMemo(() => consentPort ?? createTauriConsentPort(), [consentPort]);
   const sessions = useMemo(() => jobSessions ?? createJobSessions(), [jobSessions]);
   const progress = useMemo<JobProgressPort>(
@@ -288,6 +299,19 @@ export function Tailor({
   /** A failed read or save on this screen, else why this job's last run failed. */
   const shownError = error ?? work.error;
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  /**
+   * A CV uploaded on this screen (L-240): stored by `CvUpload` in the same
+   * table every screen reads, so here it only has to join the list and be
+   * chosen — exactly what picking it from the list would do.
+   */
+  const onCvUploaded = useCallback(
+    (cv: Cv) => {
+      setCvs((current) => [cv, ...current.filter((existing) => existing.id !== cv.id)]);
+      patchActive({ cvId: cv.id, result: null, review: null, letter: null, error: null });
+      setSaveMessage(null);
+    },
+    [patchActive],
+  );
   /**
    * Which save is running, if any: one at a time. A file save is mostly the
    * user choosing a place in the save window, so the screen says that rather
@@ -947,7 +971,7 @@ export function Tailor({
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-tailor">
-      <ViewHeader title={view.label} summary={view.summary} />
+      <ViewHeader view={view.id} title={view.label} summary={view.summary} />
 
       {selectedJob === null ? null : (
         <JobStepBar
@@ -1016,9 +1040,23 @@ export function Tailor({
             ))}
           </select>
           <p className="mt-1 text-xs text-ink-faint">
-            The CVs you have uploaded on the Analysis screen. The rewrite uses only what is written
-            in the one you choose.
+            The CVs you have uploaded here, on Analysis or on Profile. The rewrite uses only what is
+            written in the one you choose.
           </p>
+          {/*
+           * Here too, not only on Analysis (L-240) — and never disabled for
+           * want of a model: a first run with nothing set up can still get
+           * its CV ready, and it lands in the one store every screen reads.
+           */}
+          <div className="mt-2">
+            <CvUpload
+              idPrefix="tailor"
+              files={files}
+              saveCv={(cv) => tailorPort.saveCv(cv)}
+              now={now}
+              onUploaded={onCvUploaded}
+            />
+          </div>
 
           {/*
            * The chosen CV, as the rewrite will read it (L-192): the stored
@@ -1195,6 +1233,7 @@ export function Tailor({
               className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
             >
               {localModelHint}
+              <OllamaDownloadLink idPrefix="tailor" browser={browserPort} />
             </p>
           )}
 
@@ -1222,18 +1261,44 @@ export function Tailor({
               {disabledReason}
             </p>
           )}
-
-          {disabledReason === NO_AI_REASON && onOpenSettings !== undefined ? (
-            <button
-              type="button"
-              data-testid="tailor-open-settings"
-              onClick={onOpenSettings}
-              className={SECONDARY_BUTTON}
-            >
-              Open Settings
-            </button>
-          ) : null}
         </div>
+
+        {/*
+          Not a dead end (L-175, L-240). Tailoring writes new text, so it
+          needs an AI and there is no keyword fallback to offer. What there
+          is: two ways forward, in plain words, and a note that the CV can go
+          in now. No provider is named (L-148).
+        */}
+        {disabledReason === NO_AI_REASON ? (
+          <div
+            data-testid="tailor-no-ai"
+            className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
+          >
+            <p>You can still upload your CV now, so it is ready. Then choose one of these:</p>
+            <ul className="mt-2 space-y-3">
+              <li className="flex flex-wrap items-center gap-2">
+                {onOpenSettings === undefined ? (
+                  <span className="font-medium text-ink">Add an AI key in Settings.</span>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="tailor-open-settings"
+                    onClick={onOpenSettings}
+                    className={SECONDARY_BUTTON}
+                  >
+                    Add an AI key
+                  </button>
+                )}
+                <span>Your own key, from the AI company you choose.</span>
+              </li>
+              <li data-testid="tailor-free-local">
+                <span className="font-medium text-ink">Use a free AI on your own PC.</span> A model
+                running on this PC keeps your CV on this computer. If one is already running, come
+                back to this screen and CViper will find it. You can also add one in Settings.
+              </li>
+            </ul>
+          </div>
+        ) : null}
 
         {running && selectedOption !== null ? (
           <p
@@ -1276,6 +1341,9 @@ export function Tailor({
             data-testid="tailor-empty"
             className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
           >
+            <div className="mb-3 flex justify-center">
+              <IconTile icon="tailor" />
+            </div>
             <p className="font-medium text-ink">Nothing tailored yet.</p>
             <p className="mt-1 text-ink-muted">
               Pick a CV and an advert, then press the button. Every employer, date, figure and
@@ -1324,12 +1392,12 @@ export function Tailor({
 
             <pre
               data-testid="tailor-cv"
-              className="rounded-card border border-line bg-card px-4 py-3 font-sans text-ink whitespace-pre-wrap"
+              className={`${cardClasses({ padding: 'none' })} px-4 py-3 font-sans text-ink whitespace-pre-wrap`}
             >
               {result.text}
             </pre>
 
-            <details className="rounded-card border border-line bg-card px-4 py-3">
+            <details className={`${cardClasses({ padding: 'none' })} px-4 py-3`}>
               <summary className="cursor-pointer font-medium text-ink">
                 What changed against your original
               </summary>
@@ -1426,7 +1494,7 @@ export function Tailor({
               <div
                 data-testid="tailor-review"
                 data-verdict={review.verdict}
-                className="rounded-card border border-line bg-card px-4 py-3"
+                className={`${cardClasses({ padding: 'none' })} px-4 py-3`}
               >
                 <p className="font-medium text-ink">
                   {review.verdict === 'ready'
@@ -1470,7 +1538,7 @@ export function Tailor({
                 )}
                 <pre
                   data-testid="tailor-letter"
-                  className="rounded-card border border-line bg-card px-4 py-3 font-sans text-ink whitespace-pre-wrap"
+                  className={`${cardClasses({ padding: 'none' })} px-4 py-3 font-sans text-ink whitespace-pre-wrap`}
                 >
                   {letter.text}
                 </pre>

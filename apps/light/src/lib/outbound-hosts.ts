@@ -202,6 +202,13 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     why: 'The page where you create your own xAI API key. The xAI Grok card in Settings hands the address to your browser when you tap it; the app never loads it, and nothing is added to the link.',
   },
   {
+    host: 'ollama.com',
+    purpose: 'opened-in-your-browser',
+    // L-240: replaces a terminal command in the Ollama hint. Shown only when
+    // Ollama is already running with no chat model — never as an advert.
+    why: 'Ollama’s download page. When Ollama is running on your computer but has no model that can chat, the CV check, the tailor screen and the welcome screen offer this link, which hands the address to your browser when you tap it; the app never loads the page, and nothing is added to the link.',
+  },
+  {
     host: 'www.linkedin.com',
     purpose: 'opened-in-your-browser',
     why: 'A keyless search link for LinkedIn, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.',

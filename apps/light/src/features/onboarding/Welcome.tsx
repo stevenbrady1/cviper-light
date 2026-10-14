@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { CViperMark } from '../../app/CViperMark';
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { type ViewId } from '../../app/views';
+import { Card, Icon, IconTile, PageHeader, StatusPill, type IconName } from '../../ui';
 import { readAvailability } from '../analysis/availability';
-import { type Availability } from '../analysis/providers';
+import { OllamaDownloadLink } from '../analysis/OllamaDownloadLink';
+import { ollamaNeedsChatModel, type Availability } from '../analysis/providers';
+import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 
-import { AI_COST_LINE, ONBOARDING_CARDS, localModelLine } from './cards';
+import { ONBOARDING_CARDS, localModelLine, type OnboardingCard } from './cards';
 
 /**
  * The first screen, and the only one that ever explains the whole product.
@@ -24,23 +28,35 @@ import { AI_COST_LINE, ONBOARDING_CARDS, localModelLine } from './cards';
  * the rule about one primary action holds without a special case.
  *
  * ============================================================================
+ * THREE CARDS OF EQUAL WEIGHT, ONE OF THEM MARKED "START HERE".
+ * ============================================================================
+ * Every card is built in the same order — icon tile, title and hook, status
+ * pill, a small example, one sentence, a button pinned to the bottom — so the
+ * eye compares like with like. The CV card carries the screen's one blue
+ * button and the action-coloured border: it is the quickest way to get
+ * something useful back. The other two buttons are secondary.
+ *
+ * ============================================================================
+ * THE EXAMPLES ARE EXAMPLES.
+ * ============================================================================
+ * "Acme Ltd · 2 days" and "72%" are illustrations, not the user's data. Each
+ * preview is `aria-hidden` (a screen reader skips it; the sentence under it
+ * says the same thing in words) and carries a visible "Example" caption, so
+ * nobody sighted takes a made-up score for a real one.
+ *
+ * ============================================================================
  * THE FIRST CARD IS NEVER WAITING ON ANYTHING.
  * ============================================================================
- * Card one needs no key, no model and no network, and its button is enabled
- * from the first paint — before the Ollama probe has answered, and whatever it
- * answers. A zero-setup product whose welcome screen makes you wait has already
- * broken its promise on the first screen.
- *
- * The detection line on card two is the opposite case: it is a fact about THIS
- * machine, so it is read live rather than described. "Install Ollama for a
- * better analysis" is a leaflet; "llama3.2:3b found on this machine" is an
- * answer.
+ * No button here waits on the Ollama probe. The detection is a fact about THIS
+ * machine, so it is read live rather than described: the CV card's pill says
+ * "local AI found" only when a model that can actually chat is there, and the
+ * line under the body (`localModelLine`) gives the honest fallback otherwise.
  */
 
 export interface WelcomeProps {
   /**
    * Close it. A `ViewId` means the user chose that card and wants to go there;
-   * `null` means they skipped.
+   * `null` means they chose to look around themselves.
    */
   readonly onDismiss: (view: ViewId | null) => void;
   /**
@@ -48,10 +64,34 @@ export interface WelcomeProps {
    * detection in the app, not two that can disagree on screen.
    */
   readonly detect?: (() => Promise<Availability>) | undefined;
+  /**
+   * Opens Ollama's download page from the CV card, in the one state where
+   * Ollama is running with no chat model (L-240). Injected by tests; defaults
+   * to the real one, which hands the address to the browser.
+   */
+  readonly browser?: BrowserPort | undefined;
 }
 
-export function Welcome({ onDismiss, detect }: WelcomeProps) {
+const CARD_ICON: Record<OnboardingCard['id'], IconName> = {
+  tracker: 'tracker',
+  analysis: 'analysis',
+  search: 'search',
+};
+
+const TRUST: ReadonlyArray<{ readonly icon: IconName; readonly label: string }> = [
+  { icon: 'computer', label: 'Saved on your device' },
+  { icon: 'noAccount', label: 'No account' },
+  { icon: 'free', label: 'Free to use' },
+];
+
+/** True only when a model that can hold a conversation was found. */
+function localAiFound(availability: Availability | null): boolean {
+  return availability !== null && availability.ollamaModels.length > 0;
+}
+
+export function Welcome({ onDismiss, detect, browser }: WelcomeProps) {
   const [availability, setAvailability] = useState<Availability | null>(null);
+  const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,17 +135,70 @@ export function Welcome({ onDismiss, detect }: WelcomeProps) {
     <section
       aria-label="Welcome to CViper Light"
       data-testid="welcome"
-      className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-canvas px-4 py-6 md:px-8 md:py-8"
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-canvas px-4 py-6 md:px-8 md:py-10"
     >
-      <header className="mx-auto w-full max-w-5xl">
-        <p className="font-mono text-xs font-medium tracking-[0.14em] text-ink-faint uppercase">
-          CViper Light
-        </p>
-        <h1 className="mt-1 text-2xl font-bold text-ink">Three things this does.</h1>
-        <p className="mt-1 max-w-2xl text-ink-muted">
-          Your data stays on this computer. There is no account and nothing to sign up for. Two of
-          these work better with a free key, and the page says which — you can start without one.
-        </p>
+      <div className="mx-auto w-full max-w-5xl">
+        <PageHeader
+          variant="hero"
+          eyebrow={
+            <div data-testid="welcome-brand" className="flex items-center gap-2">
+              <span className="inline-flex size-8 items-center justify-center rounded-control bg-navy/10">
+                <CViperMark size={22} />
+              </span>
+              <span className="font-semibold text-ink">CViper Light</span>
+            </div>
+          }
+          title="Your job hunt, organised."
+          subtitle="Pick where to start. You can try all three today."
+        />
+
+        {/*
+          The trust row replaces the old privacy paragraph. "Saved on your
+          device" is about where the user's things are KEPT, not a claim that
+          nothing ever leaves — the absolute claim ("everything stays") is what
+          `privacy-promise.contract.test.ts` forbids, and the launch update
+          check below is the reason. The list is named for a screen reader;
+          the icons are `aria-hidden` (see `ui/Icon.tsx`), so only the words
+          are read.
+        */}
+        <ul
+          data-testid="welcome-trust"
+          aria-label="What to know"
+          className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-ink-muted"
+        >
+          {TRUST.map((item) => (
+            <li key={item.label} className="flex items-center gap-1.5">
+              <span className="text-teal-ink">
+                <Icon name={item.icon} size={16} />
+              </span>
+              {item.label}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="mx-auto mt-8 grid w-full max-w-5xl items-stretch gap-4 lg:grid-cols-3">
+        {ONBOARDING_CARDS.map((card) => (
+          <WelcomeCard
+            key={card.id}
+            card={card}
+            availability={availability}
+            browser={browserPort}
+            onDismiss={onDismiss}
+          />
+        ))}
+      </div>
+
+      <footer className="mx-auto mt-8 flex w-full max-w-5xl flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <button
+          type="button"
+          data-testid="welcome-skip"
+          onClick={() => onDismiss(null)}
+          className={`${QUIET_BUTTON} self-start`}
+        >
+          I&apos;ll look around myself →
+          <span className="sr-only"> (closes this introduction; Escape also works)</span>
+        </button>
 
         {/*
           The one request this reader has not been told about (L-108).
@@ -113,148 +206,176 @@ export function Welcome({ onDismiss, detect }: WelcomeProps) {
           `App.tsx` runs the update check in a mount effect and `launchCheck.ts`
           resolves an unconfigured machine to ON, so on a first run the app asks
           github.com for a version number while this screen is still the only
-          thing anybody has read. The disclosure existed, in Settings → Privacy
-          — a screen a first-run user has not opened yet. A promise that is only
-          kept somewhere the reader has not been is not kept.
+          thing anybody has read. A promise that is only kept somewhere the
+          reader has not been is not kept.
 
-          Stated, not apologised for: the launch check is how a security fix
-          reaches a direct-download build at all, and the default is deliberate
-          (`launchCheck.ts` sets out the whole argument). The wording is the
-          README's, so the front page of the repo and the first screen of the
-          app say the same thing in the same words.
-
-          `launchCheckDisclosure.contract.test.tsx` holds this to the
-          `github.com` row of `lib/outbound-hosts.ts` and to the live default,
-          so it cannot quietly go false — and stands down on its own if the app
-          ever stops checking on launch.
+          Shortened for the welcome refresh, but every fact
+          `launchCheckDisclosure.contract.test.tsx` requires is still in it:
+          who is asked (GitHub), when (start-up), what for (a version number),
+          what it carries (nothing about you) and where it is switched off
+          (Settings). That contract was not touched to make this fit.
         */}
-        <p data-testid="welcome-update-check" className="mt-2 max-w-2xl text-xs text-ink-faint">
-          When CViper Light starts it asks GitHub whether there is a newer version — a request for a
-          version number, carrying nothing about you. Settings → Updates switches it off.
+        <p data-testid="welcome-update-check" className="text-sm text-ink-muted md:text-right">
+          Checks GitHub for a newer version number at start-up, sending nothing about you. Turn off
+          in Settings.
         </p>
-      </header>
-
-      <div className="mx-auto mt-6 grid w-full max-w-5xl gap-4 lg:grid-cols-3">
-        {ONBOARDING_CARDS.map((card, index) => (
-          <article
-            key={card.id}
-            data-testid={`welcome-card-${card.id}`}
-            className="flex flex-col rounded-card border border-line bg-card p-5 shadow-raised"
-          >
-            <h2 className="font-semibold text-ink">{card.title}</h2>
-
-            {/*
-              The cost, up front, in its own element. Teal on the card that
-              needs nothing and gold on the two that want something — the app's
-              colour grammar, applied to the one fact a new user most needs.
-            */}
-            <p
-              data-testid={`welcome-requirement-${card.id}`}
-              className={
-                card.id === 'tracker'
-                  ? 'mt-1 rounded-pill bg-teal/10 px-2 py-0.5 text-xs font-medium text-teal-ink'
-                  : 'mt-1 rounded-pill bg-gold/10 px-2 py-0.5 text-xs font-medium text-gold-ink'
-              }
-            >
-              {card.requirement}
-            </p>
-
-            <p className="mt-2 flex-1 text-ink-muted">{card.body}</p>
-
-            {card.id === 'analysis' ? (
-              <p
-                data-testid="welcome-local-model"
-                className="mt-2 rounded-control bg-sunken px-3 py-2 text-xs text-ink-muted"
-              >
-                {availability === null
-                  ? 'Looking for a local model on this machine…'
-                  : localModelLine(availability)}
-              </p>
-            ) : null}
-
-            {/*
-              The key, priced and signposted — and deliberately BELOW the live
-              detection above, which is the free answer. A reader who already
-              has Ollama never needs any of this; a reader who does not gets the
-              cost before the link, so "where do I get one" is a question they
-              ask having already seen what it costs.
-
-              Neither control is primary. Blue means "the thing this screen is
-              for" exactly once per view (`app/buttons.ts`), the welcome spends
-              it on the tracker card, and a link that took it would make the
-              zero-setup product look like it was selling something.
-            */}
-            {card.id === 'analysis' ? (
-              <div data-testid="welcome-key-help" className="mt-2">
-                <p data-testid="welcome-cost" className="text-xs text-ink-muted">
-                  {AI_COST_LINE}
-                </p>
-
-                {/*
-                  Routes into the app, never out to a browser (C1, coordinator
-                  review of #96). This used to open OpenAI's own signup page
-                  directly with `browserPort.open(OPENAI_KEY_PROVIDER
-                  .signupUrl)` — a per-provider action on a screen whose cost
-                  line, since L-148, deliberately says "the provider you
-                  choose" and names none. Naming one here by sending the user
-                  straight to its signup page was the same defect in a
-                  different shape. Which provider to sign up with, and that
-                  provider's own "where do I get a key?" link, now live
-                  entirely on its card in Settings → AI provider keys — the
-                  same destination "Paste a key in Settings →" below already
-                  uses, so both buttons agree on where "get a key" actually
-                  happens.
-
-                  No new routing: `onDismiss` already takes any `ViewId` and
-                  `App.onDismissWelcome` already calls `setActiveView` with it.
-                */}
-                <button
-                  type="button"
-                  data-testid="welcome-key-link"
-                  onClick={() => onDismiss('settings')}
-                  className={`${QUIET_BUTTON} mt-1 px-0 text-blue hover:bg-card hover:text-navy`}
-                >
-                  Choose a provider and get a key →
-                </button>
-
-                <button
-                  type="button"
-                  data-testid="welcome-key-settings"
-                  onClick={() => onDismiss('settings')}
-                  className={`${QUIET_BUTTON} mt-1 px-0 text-blue hover:bg-card hover:text-navy`}
-                >
-                  Paste a key in Settings →
-                </button>
-              </div>
-            ) : null}
-
-            <button
-              type="button"
-              data-testid={`welcome-action-${card.id}`}
-              {...(index === 0 ? { 'data-primary': 'true' } : {})}
-              onClick={() => onDismiss(card.view)}
-              className={`mt-4 ${index === 0 ? PRIMARY_BUTTON : SECONDARY_BUTTON}`}
-            >
-              {card.actionLabel}
-            </button>
-          </article>
-        ))}
-      </div>
-
-      <footer className="mx-auto mt-6 flex w-full max-w-5xl flex-wrap items-center gap-3">
-        <button
-          type="button"
-          data-testid="welcome-skip"
-          onClick={() => onDismiss(null)}
-          className={QUIET_BUTTON}
-        >
-          Skip
-          <span className="sr-only"> this introduction (Escape)</span>
-        </button>
-        <span className="text-xs text-ink-faint">
-          You can open this again from Settings at any time.
-        </span>
       </footer>
     </section>
+  );
+}
+
+interface WelcomeCardProps {
+  readonly card: OnboardingCard;
+  readonly availability: Availability | null;
+  readonly browser: BrowserPort;
+  readonly onDismiss: (view: ViewId | null) => void;
+}
+
+function WelcomeCard({ card, availability, browser, onDismiss }: WelcomeCardProps) {
+  const featured = card.id === 'analysis';
+  const status =
+    card.id === 'analysis' && localAiFound(availability)
+      ? `${card.status} · local AI found`
+      : card.status;
+
+  return (
+    <Card
+      as="article"
+      featured={featured}
+      padding="roomy"
+      data-testid={`welcome-card-${card.id}`}
+      className="relative flex h-full flex-col"
+    >
+      {featured ? (
+        <span
+          data-testid="welcome-start-here"
+          className="absolute -top-3 left-5 rounded-pill bg-blue px-2.5 py-0.5 text-xs font-semibold text-ink-inverse"
+        >
+          Start here
+        </span>
+      ) : null}
+
+      <IconTile icon={CARD_ICON[card.id]} tone={featured ? 'blue' : 'navy'} />
+
+      <h2 className="mt-4 text-base font-semibold text-ink">{card.title}</h2>
+      <p className="text-ink-muted">{card.hook}</p>
+
+      <div className="mt-3">
+        <StatusPill tone="ready" data-testid={`welcome-status-${card.id}`}>
+          {status}
+        </StatusPill>
+      </div>
+
+      <Preview id={card.id} />
+
+      <p className="mt-4 text-ink">{card.body}</p>
+
+      {card.id === 'analysis' ? (
+        <p data-testid="welcome-local-model" className="mt-2 text-xs text-ink-muted">
+          {availability === null
+            ? 'Looking for a local model on this machine…'
+            : localModelLine(availability)}
+          {availability !== null && ollamaNeedsChatModel(availability) ? (
+            <OllamaDownloadLink idPrefix="welcome" browser={browser} />
+          ) : null}
+        </p>
+      ) : null}
+
+      {/* `mt-auto` pins the button to the bottom so all three line up. */}
+      <div className="mt-auto pt-5">
+        <button
+          type="button"
+          data-testid={`welcome-action-${card.id}`}
+          {...(featured ? { 'data-primary': 'true' } : {})}
+          onClick={() => onDismiss(card.view)}
+          className={`w-full ${featured ? PRIMARY_BUTTON : SECONDARY_BUTTON}`}
+        >
+          {card.actionLabel}
+        </button>
+
+        {/*
+          The way to a sharper answer, deliberately small and BELOW the button:
+          the keyword match works with nothing, and a reader who already has
+          Ollama never needs this. It routes into the app — never out to a
+          browser, never to one provider's signup page (C1) — to Settings → AI
+          provider keys, where the provider is chosen and, since the refresh,
+          where the cost of a typical check is stated (`AiKeySetup`).
+          A link, not a button: the screen's one blue button is above it.
+        */}
+        {featured ? (
+          <button
+            type="button"
+            data-testid="welcome-key-link"
+            onClick={() => onDismiss('settings')}
+            className="mt-1 inline-flex min-h-11 w-full items-center justify-center text-center text-xs font-medium text-blue hover:text-navy hover:underline"
+          >
+            Want sharper AI? Add a key →
+          </button>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+/** The small illustration on each card. Decorative, captioned, never real data. */
+function Preview({ id }: { readonly id: OnboardingCard['id'] }) {
+  let body: ReactNode;
+
+  if (id === 'tracker') {
+    body = (
+      <ul className="space-y-1.5">
+        <PreviewRow edge="border-l-teal" text="Acme Ltd" meta="2 days" />
+        <PreviewRow edge="border-l-gold" text="Northwind" meta="12 days" />
+      </ul>
+    );
+  } else if (id === 'analysis') {
+    body = (
+      <div className="flex items-baseline gap-2 px-1">
+        <span
+          data-testid="welcome-preview-score"
+          className="font-display text-3xl leading-none font-normal text-ink lining-nums tabular-nums"
+        >
+          72%
+        </span>
+        <span className="text-xs text-ink-muted">match</span>
+      </div>
+    );
+  } else {
+    body = (
+      <ul className="space-y-1.5">
+        <PreviewRow edge="border-l-line" text="Data analyst" meta="Leeds" />
+        <PreviewRow edge="border-l-line" text="BI developer" meta="Remote" />
+      </ul>
+    );
+  }
+
+  return (
+    <div
+      data-testid={`welcome-preview-${id}`}
+      aria-hidden="true"
+      className="mt-4 rounded-control bg-sunken p-2.5"
+    >
+      {body}
+      <p className="mt-2 text-right text-xs text-ink-faint">Example</p>
+    </div>
+  );
+}
+
+function PreviewRow({
+  edge,
+  text,
+  meta,
+}: {
+  readonly edge: string;
+  readonly text: string;
+  readonly meta: string;
+}) {
+  return (
+    <li
+      className={`flex items-center justify-between rounded-control border-l-2 bg-card px-2.5 py-1.5 text-xs ${edge}`}
+    >
+      <span className="font-medium text-ink">{text}</span>
+      <span className="text-ink-muted tabular-nums">{meta}</span>
+    </li>
   );
 }

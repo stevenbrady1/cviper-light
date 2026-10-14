@@ -9,8 +9,9 @@
  * one that catches their eye, hits a wall, and concludes the app is broken
  * rather than unconfigured.
  *
- * So the requirement is a FIELD, not a sentence somebody remembered to write,
- * and the tests below assert it is populated and specific for all three.
+ * The refresh states it as a status pill ("Ready now") plus a body that says
+ * what a key adds — and every card can say "Ready now" only because all three
+ * genuinely work with nothing configured. The tests below hold that.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -30,34 +31,37 @@ describe('the cards', () => {
     expect(ONBOARDING_CARDS.map((card) => card.id)).toEqual(['tracker', 'analysis', 'search']);
   });
 
-  it('puts the one that needs nothing first', () => {
-    // Deliberate, and the opposite of the rail's order. The first impression a
-    // zero-setup product should make is a feature that works before anything
-    // has been configured — not the one that needs two API keys.
-    expect(ONBOARDING_CARDS[0]?.requirement).toBe('Works now, no setup.');
+  it('gives every card its own title, hook and body', () => {
+    // Re-pinned for the welcome refresh: the long `requirement` sentence became
+    // a short hook plus a status pill. Three identical hooks would be three
+    // cards saying nothing, so they must still differ.
+    for (const card of ONBOARDING_CARDS) {
+      expect(card.title.length, card.id).toBeGreaterThan(3);
+      expect(card.hook.length, card.id).toBeGreaterThan(10);
+      expect(card.body.length, card.id).toBeGreaterThan(20);
+    }
+    expect(new Set(ONBOARDING_CARDS.map((card) => card.hook)).size).toBe(3);
   });
 
-  it('gives every card a requirement of its own', () => {
-    const requirements = ONBOARDING_CARDS.map((card) => card.requirement);
-
-    for (const requirement of requirements) expect(requirement.length).toBeGreaterThan(10);
-    // Three identical reassurances would be three cards saying nothing.
-    expect(new Set(requirements).size).toBe(3);
+  it('says every card is ready now — because every one of them works with nothing set up', () => {
+    // The tracker is offline, the CV check has a keyword match that needs no
+    // account, and search has keyless browser links. "Ready now" is only
+    // honest because all three are true; the bodies say what a key adds.
+    for (const card of ONBOARDING_CARDS) expect(card.status, card.id).toBe('Ready now');
   });
 
-  it('says the analysis card needs nothing to start but is better with a model', () => {
-    const analysis = ONBOARDING_CARDS.find((card) => card.id === 'analysis');
-
-    expect(analysis?.requirement).toContain('Needs nothing to start');
-    expect(analysis?.requirement.toLowerCase()).toContain('much better');
-  });
-
-  it('says the search card needs keys AND names the keyless way round it', () => {
+  it('says on the search card that free keys add more, rather than hiding that keys exist', () => {
     const search = ONBOARDING_CARDS.find((card) => card.id === 'search');
 
-    expect(search?.requirement).toContain('Adzuna');
-    expect(search?.requirement).toContain('Reed');
-    expect(search?.requirement.toLowerCase()).toContain('no key needed');
+    expect(search?.body.toLowerCase()).toContain('free keys');
+    expect(search?.body.toLowerCase()).toContain('more results');
+  });
+
+  it('negative: no card says a key is required', () => {
+    for (const card of ONBOARDING_CARDS) {
+      const copy = `${card.hook} ${card.body}`.toLowerCase();
+      expect(copy, card.id).not.toMatch(/\b(requires?|needs?) (an? )?(api )?key/);
+    }
   });
 
   it('gives every card somewhere to go, so none of them is a poster', () => {
@@ -80,9 +84,11 @@ describe('localModelLine — the live detection shown on the analysis card', () 
     expect(line.toLowerCase()).toContain('found');
   });
 
-  it('names the command when Ollama is running with nothing that can chat', () => {
+  it('says what to do when Ollama is running with nothing that can chat', () => {
     const line = localModelLine({ ...NOTHING, ollamaRunning: true });
-    expect(line).toContain('ollama pull llama3.2');
+    // L-240: plain words, not a terminal command.
+    expect(line).toContain('add a chat model in it');
+    expect(line).not.toContain('ollama pull');
   });
 
   it('says the basic match still works when nothing at all is installed', () => {

@@ -11,6 +11,7 @@ import {
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
+import { cardClasses, SectionHeading } from '../../ui';
 import { BoardSettings } from '../boards/BoardSettings';
 import { type BoardPreferencesPort } from '../boards/port';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
@@ -307,6 +308,7 @@ export function Settings({
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-settings">
       <ViewHeader
+        view={view.id}
         title={view.label}
         summary={view.summary}
         /*
@@ -333,14 +335,23 @@ export function Settings({
         <div className="max-w-2xl space-y-6">
           {/*
             First, because it is what most people open Settings for (L-176).
-            The job-board keys used to lead; they are the advanced step now,
+            The job-board keys used to lead; they are an optional step now,
             folded away below Job boards, and the AI keys take the top slot
             the way the hosted product's settings page orders them.
+
+            Above them, one line saying what needs no key at all (L-240), so
+            the first thing on the page is not a request for one. Each feature
+            it names works on a machine with nothing set up: the tracker, the
+            basic match (`KEYWORD_OPTION`) and keyless search.
           */}
+          <p data-testid="settings-free-note" className="text-ink-muted">
+            The tracker, the basic CV match and job search work with no key. Add one only when you
+            want an AI to read or rewrite your CV.
+          </p>
           <AiKeySetup ports={aiKeyPorts} browser={browserPort} />
 
           <section>
-            <h2 className="font-medium text-ink">Your data</h2>
+            <SectionHeading icon="data" title="Your data" />
             <p className="mt-1 text-ink-muted">
               Everything CViper Light knows lives in one file on this computer: the jobs you have
               saved, the applications you are chasing, the text of your CVs, every check you have
@@ -389,10 +400,7 @@ export function Settings({
           )}
 
           {stage.kind === 'confirm' ? (
-            <div
-              data-testid="settings-confirm"
-              className="rounded-card border border-line bg-card p-4 shadow-raised"
-            >
+            <div data-testid="settings-confirm" className={cardClasses()}>
               <h3 className="font-medium text-ink">Import from {stage.from}?</h3>
 
               {/*
@@ -436,9 +444,10 @@ export function Settings({
           {/*
             The job-board keys, behind a fold (L-176). Both are optional and
             both are free, but they are the one part of Settings that asks for
-            two registrations on two other sites, so they read as an advanced
-            step rather than the first thing on the page. A native <details>
-            rather than component state: it needs no JavaScript to open, the
+            two registrations on two other sites, so they read as an optional
+            step rather than the first thing on the page. The fold says so in
+            its label (L-240): "Job-board keys (optional)", not "Advanced".
+            A native <details> rather than component state: it needs no JavaScript to open, the
             cards stay in the tree for a screen reader, and nothing here has to
             remember whether it was open.
 
@@ -448,7 +457,9 @@ export function Settings({
             credential by design — see the note in `aiKeyModel.ts`.
           */}
           <details data-testid="settings-advanced" className="group">
-            <summary className="cursor-pointer font-medium text-ink">Advanced</summary>
+            <summary className="cursor-pointer font-medium text-ink">
+              Job-board keys (optional)
+            </summary>
             <div className="mt-4">
               <KeySetup port={keyPort} browser={browserPort} />
             </div>
@@ -475,10 +486,9 @@ export function Settings({
           )}
 
           <section>
-            <h2 className="font-medium text-ink">Getting started</h2>
+            <SectionHeading icon="start" title="Getting started" />
             <p className="mt-1 text-ink-muted">
-              The three-card introduction that appears the first time you open CViper Light. It
-              lists what each part of the app needs before it works.
+              The short introduction that appears the first time you open CViper Light.
             </p>
 
             <button
@@ -502,7 +512,7 @@ export function Settings({
             claim checkable rather than merely written down.
           */}
           <section>
-            <h2 className="font-medium text-ink">Privacy</h2>
+            <SectionHeading icon="shield" title="Privacy" />
 
             {/*
               The owner's own paragraph, first, before the switch and before the
