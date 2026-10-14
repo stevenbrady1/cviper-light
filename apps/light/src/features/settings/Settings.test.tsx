@@ -12,7 +12,7 @@
  * hand-written JSON, nothing that could be right in the test and wrong in the
  * app.
  */
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -573,7 +573,7 @@ describe('layout (L-176): the AI keys lead, the job-board keys are an advanced s
     );
   });
 
-  it('the Adzuna and Reed key cards sit inside an Advanced section that starts closed', () => {
+  it('the Adzuna and Reed key cards sit inside a "Job-board keys (optional)" section that starts closed', () => {
     renderSettings();
 
     const advanced = screen.getByTestId('settings-advanced') as HTMLDetailsElement;
@@ -586,10 +586,10 @@ describe('layout (L-176): the AI keys lead, the job-board keys are an advanced s
     expect(advanced.contains(jobKeys)).toBe(true);
   });
 
-  it('opening Advanced reveals the job-board key cards, with both boards named', async () => {
+  it('opening "Job-board keys (optional)" reveals the job-board key cards, with both boards named', async () => {
     const { user } = renderSettings();
 
-    await user.click(screen.getByText('Advanced'));
+    await user.click(screen.getByText('Job-board keys (optional)'));
 
     const advanced = screen.getByTestId('settings-advanced') as HTMLDetailsElement;
     expect(advanced.open).toBe(true);
@@ -598,10 +598,62 @@ describe('layout (L-176): the AI keys lead, the job-board keys are an advanced s
     expect(jobKeys.textContent).toContain('Reed');
   });
 
-  it('negative: the AI keys are never behind the Advanced fold', () => {
+  it('negative: the AI keys are never behind the job-board keys fold', () => {
     renderSettings();
 
     const advanced = screen.getByTestId('settings-advanced');
     expect(advanced.contains(screen.getByTestId('ai-key-setup'))).toBe(false);
+  });
+});
+
+describe('L-240: Settings leads with what is free', () => {
+  const FREE_LINE =
+    'The tracker, the basic CV match and job search work with no key. Add one only when you want an AI to read or rewrite your CV.';
+
+  it('says what works with no key, above the AI key setup', () => {
+    renderSettings();
+
+    const note = screen.getByTestId('settings-free-note');
+    expect(note.textContent).toBe(FREE_LINE);
+    expect(
+      note.compareDocumentPosition(screen.getByTestId('ai-key-setup')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('negative: the line makes no privacy claim', () => {
+    renderSettings();
+
+    const note = (screen.getByTestId('settings-free-note').textContent ?? '').toLowerCase();
+    for (const claim of ['never', 'nothing', 'stays', 'leaves', 'private', 'only on']) {
+      expect(note).not.toContain(claim);
+    }
+  });
+
+  it('the old "Advanced" label is gone', () => {
+    renderSettings();
+    expect(screen.queryByText('Advanced')).toBeNull();
+  });
+
+  it('the job-board keys summary opens on click and shows the key fields', async () => {
+    const { user } = renderSettings();
+    const fold = screen.getByTestId('settings-advanced') as HTMLDetailsElement;
+    const summary = within(fold).getByText('Job-board keys (optional)');
+    expect(summary.tagName).toBe('SUMMARY');
+
+    await user.click(summary);
+
+    expect(fold.open).toBe(true);
+    // The key fields themselves, each with a visible label naming it.
+    const fields = within(fold).getAllByTestId(/^key-input-/);
+    expect(fields.length).toBeGreaterThan(1);
+    for (const field of fields) {
+      expect(fold.querySelector(`label[for="${field.id}"]`)?.textContent).toBeTruthy();
+    }
+    expect(within(fold).getByTestId('key-card-adzuna')).toBeTruthy();
+    expect(within(fold).getByTestId('key-card-reed')).toBeTruthy();
+
+    await user.click(summary);
+    expect(fold.open).toBe(false);
   });
 });
