@@ -120,11 +120,59 @@ describe('anthropic chatJson — the request it builds', () => {
     expect(JSON.stringify(body['messages'])).not.toContain('system');
   });
 
-  it('sends temperature 0 and max_tokens', () => {
+  it('sends max_tokens, and NO temperature (Opus 5, Opus 5.5 and Sonnet 5.5 answer 400)', () => {
     const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
     void createAnthropicProvider(transport).chatJson(REQUEST);
 
-    expect(sentBody(transport)).toMatchObject({ temperature: 0, max_tokens: wireOutputCap(2048) });
+    const body = sentBody(transport);
+    expect(body).toMatchObject({ max_tokens: wireOutputCap(2048) });
+    expect(body).not.toHaveProperty('temperature');
+  });
+
+  // Every model the Settings card offers (apps/light `modelChoice.ts`), plus
+  // ids nobody has shipped yet: a new Claude must not get temperature back.
+  it.each([
+    'claude-opus-5',
+    'claude-opus-5-5',
+    'claude-sonnet-5-5',
+    'claude-haiku-4-5',
+    'claude-sonnet-4-6',
+    'claude-opus-6',
+    'claude-some-future-model',
+  ])('negative: %s is sent no temperature, top_p or top_k', (model) => {
+    const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
+    void createAnthropicProvider(transport).chatJson({ ...REQUEST, model });
+
+    const body = sentBody(transport);
+    expect(body['model']).toBe(model);
+    expect(body).not.toHaveProperty('temperature');
+    expect(body).not.toHaveProperty('top_p');
+    expect(body).not.toHaveProperty('top_k');
+  });
+
+  it('negative: sends no thinking settings, which Opus 5.5 and Sonnet 5.5 refuse when disabled', () => {
+    // `thinking: {type: "disabled"}` is a 400 on Opus 5.5 and Sonnet 5.5, and
+    // `budget_tokens` on Opus 5.5. Leaving thinking to the model's own default
+    // (adaptive on Opus 5 and later) is the only shape every model accepts.
+    const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
+    void createAnthropicProvider(transport).chatJson(REQUEST);
+
+    const body = sentBody(transport);
+    expect(body).not.toHaveProperty('thinking');
+    expect(JSON.stringify(body)).not.toContain('budget_tokens');
+  });
+
+  it('exactly these top-level fields, so nothing new reaches the wire unreviewed', () => {
+    const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
+    void createAnthropicProvider(transport).chatJson(REQUEST);
+
+    expect(Object.keys(sentBody(transport)).sort()).toEqual([
+      'max_tokens',
+      'messages',
+      'model',
+      'output_config',
+      'system',
+    ]);
   });
 
   it('defaults to claude-opus-5', () => {

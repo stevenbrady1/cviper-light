@@ -10,6 +10,8 @@ import {
   GROK_DEFAULT_MODEL,
   MISTRAL_DEFAULT_MODEL,
   OPENROUTER_DEFAULT_MODEL,
+  createAnthropicProvider,
+  type ChatTransport,
 } from '@cviper/ai-providers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -182,4 +184,39 @@ describe('every AI feature runs the chosen model', () => {
       expect(options.find((candidate) => candidate.kind === id)?.model).toBe(defaultModelFor(id));
     }
   });
+});
+
+describe('every Anthropic model on the Settings card is sent a request it accepts', () => {
+  // Opus 5 (the default) and Opus 5.5 removed temperature; Sonnet 5.5 refuses
+  // any value but its own. Sending `temperature: 0` was a 400 on every call,
+  // and the key test (a GET of /v1/models) could not see it.
+  it.each(AI_MODEL_CHOICES.anthropic.map((choice) => choice.id))(
+    '%s: no temperature in the body',
+    async (model) => {
+      const bodies: string[] = [];
+      const transport: ChatTransport = {
+        chat: async (_provider, body) => {
+          bodies.push(body);
+          return {
+            ok: true,
+            value: { status: 200, body: '{"content":[{"type":"text","text":"{}"}]}' },
+          };
+        },
+        listModels: async () => ({ ok: true, value: { status: 200, body: '{"data":[]}' } }),
+      };
+
+      await createAnthropicProvider(transport).chatJson({
+        model,
+        system: 's',
+        user: 'u',
+        schema: { type: 'object' },
+        temperature: 0,
+        maxOutputTokens: 1024,
+      });
+
+      const sent = JSON.parse(bodies[0] ?? '{}') as Record<string, unknown>;
+      expect(sent['model']).toBe(model);
+      expect(sent).not.toHaveProperty('temperature');
+    },
+  );
 });
