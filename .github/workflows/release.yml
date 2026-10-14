@@ -521,6 +521,60 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ==========================================================================
+  # ONE INSTALLER NAME THAT NEVER CHANGES, FOR THE WEBSITE (L-245).
+  # ==========================================================================
+  # The setup installer is named after its version, so cviper.ai cannot link
+  # to it without going stale at every release. This copies it, on the draft,
+  # to `CViper-Light-Windows-x64.exe`, and the site links to
+  # /releases/latest/download/CViper-Light-Windows-x64.exe — one click, and it
+  # moves to the new version the moment the draft is published.
+  #
+  # The name deliberately matches none of the `sign` job's patterns, so the
+  # copy is never signed into `latest.json`. Updates still come only from the
+  # files the manifest names. Held by stable-download-name.contract.test.ts.
+  stable-download:
+    needs: bundle
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Uploads one asset to the draft.
+    permissions:
+      contents: write
+
+    env:
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.ref_name }}
+
+    steps:
+      - name: Copy the setup installer to its stable name on the draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          draft=$(gh release view "$TAG" --json isDraft --jq .isDraft)
+          if [ "$draft" != "true" ]; then
+            echo "::error title=Not a draft::$TAG is not a draft release (isDraft=$draft). The stable name is only ever added before publishing."
+            exit 1
+          fi
+          mkdir -p stable
+          gh release download "$TAG" --dir stable --clobber --pattern '*-setup.exe'
+          shopt -s nullglob
+          found=(stable/*-setup.exe)
+          if [ "${#found[@]}" -ne 1 ]; then
+            echo "::error title=Expected one setup installer::$TAG has ${#found[@]} files matching *-setup.exe. Refusing to guess which one the website should download."
+            exit 1
+          fi
+          cp "${found[0]}" stable/CViper-Light-Windows-x64.exe
+          gh release upload "$TAG" stable/CViper-Light-Windows-x64.exe --clobber
+          {
+            echo '### Stable download name'
+            echo ''
+            echo "\`$(basename "${found[0]}")\` is also on the **$TAG** draft as \`CViper-Light-Windows-x64.exe\`, the file cviper.ai's Download button fetches."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ==========================================================================
   # PROMOTE THE MANIFEST. THE SECOND PRESS, AFTER A PERSON HAS LOOKED.
   # ==========================================================================
   # THE HUMAN STEPS, IN ORDER. Nothing below happens on its own.
