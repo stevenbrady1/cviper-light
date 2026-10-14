@@ -110,6 +110,39 @@ describe('choosing and reading back', () => {
     expect(chosenModel('grok')).toBe(AI_MODEL_CHOICES.grok[1]?.id);
   });
 
+  it('negative: models the providers retired fall back to the default, not to a silent redirect', () => {
+    // OpenRouter lists google/gemini-2.5-flash with expiration_date 2026-10-20;
+    // xAI retired grok-4-fast-non-reasoning and grok-4 (grok-4-0709) on
+    // 2026-05-15 and serves them as grok-4.3 at grok-4.3's price. Anybody who
+    // chose one keeps a stored id that must read as the default.
+    localStorage.setItem(
+      MODEL_CHOICE_STORAGE_KEY,
+      JSON.stringify({ openrouter: 'google/gemini-2.5-flash', grok: 'grok-4-fast-non-reasoning' }),
+    );
+    expect(chosenModel('openrouter')).toBe(OPENROUTER_DEFAULT_MODEL);
+    expect(chosenModel('grok')).toBe(GROK_DEFAULT_MODEL);
+
+    for (const retired of ['grok-4', 'anthropic/claude-sonnet-4.5']) {
+      const provider = retired.includes('/') ? 'openrouter' : 'grok';
+      localStorage.setItem(MODEL_CHOICE_STORAGE_KEY, JSON.stringify({ [provider]: retired }));
+      expect(chosenModel(provider)).toBe(
+        provider === 'grok' ? GROK_DEFAULT_MODEL : OPENROUTER_DEFAULT_MODEL,
+      );
+    }
+  });
+
+  it('negative: none of the retired or retiring ids is offered', () => {
+    const offered = Object.values(AI_MODEL_CHOICES).flatMap((list) => list.map((c) => c.id));
+    for (const retired of [
+      'google/gemini-2.5-flash',
+      'anthropic/claude-sonnet-4.5',
+      'grok-4-fast-non-reasoning',
+      'grok-4',
+    ]) {
+      expect(offered).not.toContain(retired);
+    }
+  });
+
   it('negative: garbage in storage, or storage that throws, reads as the defaults', () => {
     localStorage.setItem(MODEL_CHOICE_STORAGE_KEY, '{not json');
     expect(chosenModel('openai')).toBe(OPENAI_DEFAULT_MODEL);

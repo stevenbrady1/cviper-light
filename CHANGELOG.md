@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The model lists for xAI Grok and OpenRouter no longer offer models their providers have retired or are about to retire. xAI retired `grok-4` and `grok-4-fast-non-reasoning` in May and now quietly runs `grok-4.3` in their place, at `grok-4.3`'s price; they are replaced by `grok-4.7` and `grok-4.20-non-reasoning`. On OpenRouter, `google/gemini-2.5-flash` stops working on 20 October 2026 and becomes `google/gemini-3.8-flash`, and `anthropic/claude-sonnet-4.5` becomes `anthropic/claude-sonnet-4.6`. If you had chosen one of the old models, the app goes back to that provider's default until you choose again.
+
 ## [0.10.0] — 2026-10-14
 
 ### Added
