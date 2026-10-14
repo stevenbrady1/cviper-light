@@ -99,7 +99,7 @@ function stableDownloadOffences(workflow: string): string[] {
     offences.push(`\`${JOB}\` does not refuse when there is not exactly one setup installer.`);
   if (
     !new RegExp(
-      `gh release upload[^\\n]*${STABLE_NAME.replace(/\./g, '\\.')}[^\\n]*--clobber`,
+      `gh release upload[^\\n]*${STABLE_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^\\n]*--clobber`,
     ).test(job)
   )
     offences.push(`\`${JOB}\` does not upload ${STABLE_NAME} with --clobber.`);
