@@ -12,7 +12,10 @@ import { type HTMLAttributes, type ReactNode } from 'react';
  *
  * `interactive` adds the only hover this app allows a card: the border
  * strengthens a little. No lift, no shadow change, no scale — the motion
- * budget in `theme.css` is spent elsewhere.
+ * budget in `theme.css` is spent elsewhere. It is ONLY for a card that is
+ * itself clickable: a hover on a card whose buttons are the click targets
+ * promises an action the card does not have. No card is clickable today,
+ * so nothing passes it.
  */
 
 const PADDING = {

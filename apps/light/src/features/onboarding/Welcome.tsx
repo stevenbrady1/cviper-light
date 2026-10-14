@@ -71,9 +71,9 @@ const CARD_ICON: Record<OnboardingCard['id'], IconName> = {
 };
 
 const TRUST: ReadonlyArray<{ readonly icon: IconName; readonly label: string }> = [
-  { icon: 'computer', label: 'Stays on your PC' },
+  { icon: 'computer', label: 'Saved on your device' },
   { icon: 'noAccount', label: 'No account' },
-  { icon: 'free', label: 'Free to start' },
+  { icon: 'free', label: 'Free to use' },
 ];
 
 /** True only when a model that can hold a conversation was found. */
@@ -144,13 +144,17 @@ export function Welcome({ onDismiss, detect }: WelcomeProps) {
         />
 
         {/*
-          The trust row replaces the old privacy paragraph. "Stays on your PC"
-          is scoped to the user's data for a screen reader — the absolute claim
-          ("everything stays") is what `privacy-promise.contract.test.ts`
-          forbids, and the launch update check below is the reason.
+          The trust row replaces the old privacy paragraph. "Saved on your
+          device" is about where the user's things are KEPT, not a claim that
+          nothing ever leaves — the absolute claim ("everything stays") is what
+          `privacy-promise.contract.test.ts` forbids, and the launch update
+          check below is the reason. The list is named for a screen reader;
+          the icons are `aria-hidden` (see `ui/Icon.tsx`), so only the words
+          are read.
         */}
         <ul
           data-testid="welcome-trust"
+          aria-label="What to know"
           className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-ink-muted"
         >
           {TRUST.map((item) => (
@@ -201,7 +205,7 @@ export function Welcome({ onDismiss, detect }: WelcomeProps) {
           what it carries (nothing about you) and where it is switched off
           (Settings). That contract was not touched to make this fit.
         */}
-        <p data-testid="welcome-update-check" className="text-xs text-ink-faint md:text-right">
+        <p data-testid="welcome-update-check" className="text-sm text-ink-muted md:text-right">
           Checks GitHub for a newer version number at start-up, sending nothing about you. Turn off
           in Settings.
         </p>
@@ -227,7 +231,6 @@ function WelcomeCard({ card, availability, onDismiss }: WelcomeCardProps) {
     <Card
       as="article"
       featured={featured}
-      interactive
       padding="roomy"
       data-testid={`welcome-card-${card.id}`}
       className="relative flex h-full flex-col"
@@ -290,7 +293,7 @@ function WelcomeCard({ card, availability, onDismiss }: WelcomeCardProps) {
             type="button"
             data-testid="welcome-key-link"
             onClick={() => onDismiss('settings')}
-            className="mt-2 w-full text-center text-xs font-medium text-blue hover:text-navy hover:underline"
+            className="mt-1 inline-flex min-h-11 w-full items-center justify-center text-center text-xs font-medium text-blue hover:text-navy hover:underline"
           >
             Want sharper AI? Add a key →
           </button>
@@ -320,7 +323,7 @@ function Preview({ id }: { readonly id: OnboardingCard['id'] }) {
         >
           72%
         </span>
-        <span className="text-xs text-ink-muted">match · 4 key words missing</span>
+        <span className="text-xs text-ink-muted">match</span>
       </div>
     );
   } else {
@@ -339,7 +342,7 @@ function Preview({ id }: { readonly id: OnboardingCard['id'] }) {
       className="mt-4 rounded-control bg-sunken p-2.5"
     >
       {body}
-      <p className="mt-2 text-right text-[11px] text-ink-faint">Example</p>
+      <p className="mt-2 text-right text-xs text-ink-faint">Example</p>
     </div>
   );
 }

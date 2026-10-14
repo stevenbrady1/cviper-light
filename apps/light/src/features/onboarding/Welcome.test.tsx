@@ -53,16 +53,36 @@ describe('the top of the page', () => {
   it('shows the three trust items, in order', async () => {
     render(<Welcome onDismiss={() => undefined} detect={() => Promise.resolve(NOTHING)} />);
 
-    const items = within(await screen.findByTestId('welcome-trust')).getAllByRole('listitem');
+    const list = await screen.findByTestId('welcome-trust');
+    const items = within(list).getAllByRole('listitem');
     expect(items.map((item) => item.textContent?.trim())).toEqual([
-      'Stays on your PC',
+      'Saved on your device',
       'No account',
-      'Free to start',
+      'Free to use',
     ]);
+  });
+
+  it('names the trust row for a screen reader, and keeps its icons silent', async () => {
+    render(<Welcome onDismiss={() => undefined} detect={() => Promise.resolve(NOTHING)} />);
+
+    const list = await screen.findByTestId('welcome-trust');
+    expect(list.getAttribute('aria-label')).toBe('What to know');
+    const icons = list.querySelectorAll('svg');
+    expect(icons.length).toBe(3);
+    for (const icon of icons) expect(icon.getAttribute('aria-hidden')).toBe('true');
   });
 });
 
 describe('the three cards', () => {
+  it('negative: no card has a hover state, because no card is itself clickable', async () => {
+    render(<Welcome onDismiss={() => undefined} detect={() => Promise.resolve(NOTHING)} />);
+    await screen.findByTestId('welcome');
+
+    for (const id of ['tracker', 'analysis', 'search']) {
+      expect(screen.getByTestId(`welcome-card-${id}`).className, id).not.toContain('hover:');
+    }
+  });
+
   it('shows all three, each with a title, a hook and a status', async () => {
     render(<Welcome onDismiss={() => undefined} detect={() => Promise.resolve(NOTHING)} />);
 
@@ -149,6 +169,26 @@ describe('the examples on each card are examples, not the user’s data', () => 
     }
   });
 
+  it('captions each example at the smallest text token, not an arbitrary size', async () => {
+    render(<Welcome onDismiss={() => undefined} detect={() => Promise.resolve(NOTHING)} />);
+    await screen.findByTestId('welcome');
+
+    for (const id of ['tracker', 'analysis', 'search']) {
+      const caption = within(screen.getByTestId(`welcome-preview-${id}`)).getByText('Example');
+      expect(caption.className, id).toContain('text-xs');
+      expect(caption.className, id).not.toContain('text-[11px]');
+    }
+  });
+
+  it('the CV example shows a match score and nothing more', async () => {
+    render(<Welcome onDismiss={() => undefined} detect={() => Promise.resolve(NOTHING)} />);
+
+    const preview = await screen.findByTestId('welcome-preview-analysis');
+    // Two spans side by side, spaced by a flex gap rather than a text space.
+    expect(preview.textContent).toMatch(/72%\s*match/);
+    expect(preview.textContent).not.toContain('key words missing');
+  });
+
   it('shows the score in the display numeral convention', async () => {
     render(<Welcome onDismiss={() => undefined} detect={() => Promise.resolve(NOTHING)} />);
 
@@ -229,6 +269,16 @@ describe('the footer', () => {
     const disclosure = await screen.findByTestId('welcome-update-check');
     expect(disclosure.textContent).toContain('GitHub');
     expect(disclosure.textContent).toContain('Settings');
+  });
+
+  it('sets the disclosure at body-adjacent size in muted ink, not small faint print', async () => {
+    render(<Welcome onDismiss={() => undefined} detect={() => Promise.resolve(NOTHING)} />);
+
+    const disclosure = await screen.findByTestId('welcome-update-check');
+    expect(disclosure.className).toContain('text-sm');
+    expect(disclosure.className).toContain('text-ink-muted');
+    expect(disclosure.className).not.toContain('text-xs');
+    expect(disclosure.className).not.toContain('text-ink-faint');
   });
 });
 

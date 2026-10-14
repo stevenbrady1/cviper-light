@@ -123,7 +123,7 @@ export function ResultCard({
     <article
       data-testid={`result-${job.id}`}
       data-source={job.source}
-      className={`${cardClasses({ padding: 'none', interactive: true })} px-4 py-3`}
+      className={`${cardClasses({ padding: 'none' })} px-4 py-3`}
     >
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="min-w-0 font-medium text-ink">{job.title}</h3>

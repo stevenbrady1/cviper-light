@@ -99,6 +99,16 @@ describe('IconTile', () => {
       expect(container.querySelector('svg')?.childElementCount, name).toBeGreaterThan(0);
     }
   });
+
+  it('every icon is hidden from assistive tech and never takes focus', () => {
+    for (const name of ICON_NAMES) {
+      cleanup();
+      const { container } = render(<Icon name={name} />);
+      const svg = container.querySelector('svg');
+      expect(svg?.getAttribute('aria-hidden'), name).toBe('true');
+      expect(svg?.getAttribute('focusable'), name).toBe('false');
+    }
+  });
 });
 
 describe('Card', () => {

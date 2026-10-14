@@ -90,6 +90,14 @@ describe('where do I get a key', () => {
     expect(control.getAttribute('data-primary')).toBeNull();
     expect(control.className).not.toContain('bg-blue');
   });
+
+  it('boundary: is small text but a full-size hit target (44px tall)', async () => {
+    renderWelcome();
+
+    const control = await screen.findByTestId('welcome-key-link');
+    expect(control.className).toContain('min-h-11');
+    expect(control.className).toContain('text-blue');
+  });
 });
 
 describe('the free story survives all of it', () => {

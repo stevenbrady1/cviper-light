@@ -476,8 +476,7 @@ export function Settings({
           <section>
             <SectionHeading icon="start" title="Getting started" />
             <p className="mt-1 text-ink-muted">
-              The three-card introduction that appears the first time you open CViper Light. It
-              lists what each part of the app needs before it works.
+              The short introduction that appears the first time you open CViper Light.
             </p>
 
             <button

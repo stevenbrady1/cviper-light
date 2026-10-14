@@ -94,6 +94,19 @@ describe('every launch after the first', () => {
 });
 
 describe('opening it again from Settings', () => {
+  it('describes the introduction as it is now, not as it used to be', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(await screen.findByTestId('welcome-skip'));
+    await user.click(await screen.findByTestId('nav-settings'));
+
+    const settings = await screen.findByTestId('view-settings');
+    expect(settings.textContent).toContain(
+      'The short introduction that appears the first time you open CViper Light.',
+    );
+    expect(settings.textContent).not.toContain('lists what each part of the app needs');
+  });
+
   it('brings the introduction back', async () => {
     const user = userEvent.setup();
     renderApp();
