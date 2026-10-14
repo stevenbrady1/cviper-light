@@ -35,6 +35,7 @@ import {
   type ConsentState,
 } from '../analysis/consent';
 import { jobAdvertText, providerInSentence } from '../analysis/model';
+import { CvUpload } from '../cv/CvUpload';
 import {
   ollamaHint,
   optionByKey,
@@ -289,6 +290,19 @@ export function Tailor({
   /** A failed read or save on this screen, else why this job's last run failed. */
   const shownError = error ?? work.error;
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  /**
+   * A CV uploaded on this screen (L-240): stored by `CvUpload` in the same
+   * table every screen reads, so here it only has to join the list and be
+   * chosen — exactly what picking it from the list would do.
+   */
+  const onCvUploaded = useCallback(
+    (cv: Cv) => {
+      setCvs((current) => [cv, ...current.filter((existing) => existing.id !== cv.id)]);
+      patchActive({ cvId: cv.id, result: null, review: null, letter: null, error: null });
+      setSaveMessage(null);
+    },
+    [patchActive],
+  );
   /**
    * Which save is running, if any: one at a time. A file save is mostly the
    * user choosing a place in the save window, so the screen says that rather
@@ -1017,9 +1031,23 @@ export function Tailor({
             ))}
           </select>
           <p className="mt-1 text-xs text-ink-faint">
-            The CVs you have uploaded on the Analysis screen. The rewrite uses only what is written
-            in the one you choose.
+            The CVs you have uploaded here, on Analysis or on Profile. The rewrite uses only what is
+            written in the one you choose.
           </p>
+          {/*
+           * Here too, not only on Analysis (L-240) — and never disabled for
+           * want of a model: a first run with nothing set up can still get
+           * its CV ready, and it lands in the one store every screen reads.
+           */}
+          <div className="mt-2">
+            <CvUpload
+              idPrefix="tailor"
+              files={files}
+              saveCv={(cv) => tailorPort.saveCv(cv)}
+              now={now}
+              onUploaded={onCvUploaded}
+            />
+          </div>
 
           {/*
            * The chosen CV, as the rewrite will read it (L-192): the stored
@@ -1223,18 +1251,44 @@ export function Tailor({
               {disabledReason}
             </p>
           )}
-
-          {disabledReason === NO_AI_REASON && onOpenSettings !== undefined ? (
-            <button
-              type="button"
-              data-testid="tailor-open-settings"
-              onClick={onOpenSettings}
-              className={SECONDARY_BUTTON}
-            >
-              Open Settings
-            </button>
-          ) : null}
         </div>
+
+        {/*
+          Not a dead end (L-175, L-240). Tailoring writes new text, so it
+          needs an AI and there is no keyword fallback to offer. What there
+          is: two ways forward, in plain words, and a note that the CV can go
+          in now. No provider is named (L-148).
+        */}
+        {disabledReason === NO_AI_REASON ? (
+          <div
+            data-testid="tailor-no-ai"
+            className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
+          >
+            <p>You can still upload your CV now, so it is ready. Then choose one of these:</p>
+            <ul className="mt-2 space-y-3">
+              <li className="flex flex-wrap items-center gap-2">
+                {onOpenSettings === undefined ? (
+                  <span className="font-medium text-ink">Add an AI key in Settings.</span>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="tailor-open-settings"
+                    onClick={onOpenSettings}
+                    className={SECONDARY_BUTTON}
+                  >
+                    Add an AI key
+                  </button>
+                )}
+                <span>Your own key, from the AI company you choose.</span>
+              </li>
+              <li data-testid="tailor-free-local">
+                <span className="font-medium text-ink">Use a free AI on your own PC.</span> A model
+                running on this PC keeps your CV on this computer. If one is already running, come
+                back to this screen and CViper will find it. You can also add one in Settings.
+              </li>
+            </ul>
+          </div>
+        ) : null}
 
         {running && selectedOption !== null ? (
           <p

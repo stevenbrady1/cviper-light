@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
-import { extractText } from '@cviper/cv-parsing';
 import {
   type Analysis as AnalysisRow,
   type Cv,
@@ -23,6 +22,7 @@ import {
   type PickedCv,
 } from '../../platform/files';
 
+import { ingestCv, uploadCv, type IngestedCv, type IngestProblem } from '../cv/ingestCv';
 import { createDbProfilePort, type ProfilePort } from '../profile/port';
 import { APP_NAME } from '../settings/backup';
 
@@ -43,8 +43,6 @@ import {
   jobAdvertText,
   jsonResumeFileName,
   newAnalysisRecord,
-  newCvRecord,
-  originalJsonResume,
   providerInSentence,
   providerLabel,
   runDisabledReason,
@@ -426,40 +424,27 @@ export function Analysis({
 
   const selectedCv = cvs.find((cv) => cv.id === selectedCvId) ?? null;
 
-  /**
-   * A file's bytes, wherever they came from — the dialog or the share sheet —
-   * become a CV row, or a message.
-   */
-  const ingest = useCallback(
-    async (picked: PickedCv) => {
-      const extracted = await extractText(picked.name, picked.bytes);
-      if (!extracted.ok) {
+  /** What an upload came to — a stored CV, a message, or (cancelled) nothing — on screen. */
+  const settle = useCallback(
+    (ingested: Result<IngestedCv | null, IngestProblem>) => {
+      if (!ingested.ok) {
+        if (ingested.error.kind === 'not-saved') {
+          setError(ingested.error.message);
+          return;
+        }
         // VERBATIM. Every message in `@cviper/cv-parsing` says what happened,
         // why, and what to do — "that PDF has 2 pages but no readable text at
         // all, which means it is almost certainly a scan". Replacing that with
         // "could not read file" throws away the only useful thing on the
         // screen.
-        setUploadProblem(extracted.error.message);
+        setUploadProblem(ingested.error.message);
         session.update({ warnings: [] });
         return;
       }
+      // Cancelled. Nothing happened, and nothing is said about it.
+      if (ingested.value === null) return;
 
-      const cv = newCvRecord({
-        id: crypto.randomUUID(),
-        name: picked.name,
-        text: extracted.value.text,
-        now: (now ?? new Date()).toISOString(),
-        // Kept verbatim when the file WAS a JSON Resume, so "Save as JSON
-        // Resume" can return exactly it (L-20b). `null` for everything else.
-        jsonResume: originalJsonResume(picked.name, picked.bytes),
-      });
-
-      const saved = await analysisPort.saveCv(cv);
-      if (!saved.ok) {
-        setError(`That CV could not be saved: ${saved.error.message} Try again.`);
-        return;
-      }
-
+      const { cv, warnings: cvWarnings } = ingested.value;
       setCvs((current) => [cv, ...current]);
       // A run still in flight was for the previous CV: its answer is dropped.
       session.supersede();
@@ -470,11 +455,26 @@ export function Analysis({
         // Warnings ride along with a SUCCESSFUL extraction — some pages were
         // images and their contents are missing from the text. The user has to
         // be told, because the analysis below is about to be run on a partial CV.
-        warnings: extracted.value.warnings,
+        warnings: cvWarnings,
       });
       setExportMessage(null);
     },
-    [analysisPort, now, session],
+    [session],
+  );
+
+  /** The same CV store, the same parser, as every other screen's upload (L-240). */
+  const ingestDeps = useMemo(
+    () => ({ saveCv: (cv: Cv) => analysisPort.saveCv(cv), now: now ?? new Date() }),
+    [analysisPort, now],
+  );
+
+  /**
+   * A file's bytes, wherever they came from — the dialog or the share sheet —
+   * become a CV row, or a message.
+   */
+  const ingest = useCallback(
+    async (picked: PickedCv) => settle(await ingestCv(picked, ingestDeps)),
+    [ingestDeps, settle],
   );
 
   /**
@@ -518,17 +518,8 @@ export function Analysis({
   const onUpload = useCallback(async () => {
     setError(null);
     setUploadProblem(null);
-
-    const picked = await files.pickCv();
-    if (!picked.ok) {
-      setUploadProblem(picked.error.message);
-      return;
-    }
-    // Cancelled. Nothing happened, and nothing is said about it.
-    if (picked.value === null) return;
-
-    await ingest(picked.value);
-  }, [files, ingest]);
+    settle(await uploadCv(files, ingestDeps));
+  }, [files, ingestDeps, settle]);
 
   // A file the OS opened for us (L-83). Same path as a pick from here on.
   useEffect(() => {

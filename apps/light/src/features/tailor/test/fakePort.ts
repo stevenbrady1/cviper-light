@@ -98,7 +98,11 @@ export function createFakeTailorPort(
       calls.saveCv += 1;
       const refused = failure('saveCv');
       if (refused !== null) return refused;
-      cvs = cvs.map((candidate) => (candidate.id === cv.id ? cv : candidate));
+      // An UPSERT, like the real `upsertCv`: a corrected CV replaces its row
+      // in place (L-218), and a CV uploaded on this screen (L-240) is new.
+      cvs = cvs.some((candidate) => candidate.id === cv.id)
+        ? cvs.map((candidate) => (candidate.id === cv.id ? cv : candidate))
+        : [cv, ...cvs];
       return ok(undefined);
     },
 

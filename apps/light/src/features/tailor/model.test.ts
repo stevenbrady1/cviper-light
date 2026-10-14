@@ -70,7 +70,9 @@ describe('runDisabledReason', () => {
     expect(
       runDisabledReason({ ...ready, cv: null, jobText: '', option: null, aiAvailable: false }),
     ).toBe(NO_AI_REASON);
-    expect(NO_AI_REASON).toBe('Needs a local model or your own key. Set one up in Settings.');
+    expect(NO_AI_REASON).toBe(
+      'Tailoring writes new text, so it needs an AI. Add your own key in Settings, or use a free one on your own PC.',
+    );
     // Generic: no provider is named on this surface (L-148).
     for (const brand of ['OpenAI', 'Anthropic', 'Ollama']) {
       expect(NO_AI_REASON).not.toContain(brand);
@@ -85,7 +87,9 @@ describe('runDisabledReason', () => {
 
   it('asks for a CV, and points at where one is uploaded', () => {
     expect(runDisabledReason({ ...ready, cv: null })).toContain('Choose a CV first');
-    expect(runDisabledReason({ ...ready, cv: null })).toContain('Analysis');
+    // L-240: the upload is on this screen now, just above — not only on Analysis.
+    expect(runDisabledReason({ ...ready, cv: null })).toContain('upload one above');
+    expect(runDisabledReason({ ...ready, cv: null })).not.toContain('Analysis');
   });
 
   it('negative: a CV with no readable text cannot be rewritten from', () => {
