@@ -107,11 +107,10 @@ export function AiKeySetup({ ports, browser, customServicePort }: AiKeySetupProp
       />
 
       {/*
-        What a typical check costs, before the first key box (moved here from
-        the welcome screen in the refresh, whose "Add a key →" link lands on
-        this section). "Bring your own key" is only an honest offer if the
-        price is visible BEFORE somebody goes and gets one — see
-        `AI_COST_LINE` in `onboarding/cards.ts` for the wording's history.
+        Who pays for AI, and how, before the first key box — with no figure
+        (L-249): the provider bills the user's own account at its own rates.
+        See `AI_COST_LINE` in `onboarding/cards.ts` for why there is no
+        amount.
       */}
       <p
         data-testid="ai-keys-cost"

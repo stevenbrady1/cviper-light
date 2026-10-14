@@ -39,11 +39,13 @@ describe('what a typical CV check costs, on the screen where keys are added', ()
     expect(screen.getByTestId('ai-key-setup').contains(line)).toBe(true);
   });
 
-  it('names a figure and says who is paid — generically, never one provider', () => {
+  it('says who is paid, with no figure — generically, never one provider (L-249)', () => {
     renderSetup();
 
     const line = screen.getByTestId('ai-keys-cost').textContent ?? '';
-    expect(line).toContain('a few pence');
+    // No estimate: CViper cannot know what a provider charges.
+    expect(line).not.toMatch(/pence|penny|[£$€]\s?\d|\d+p\b|typical/i);
+    expect(line).toContain('bills your own account at its published rates');
     expect(line).toContain('the AI provider you choose');
     for (const brand of ['OpenAI', 'Anthropic']) expect(line, brand).not.toContain(brand);
   });

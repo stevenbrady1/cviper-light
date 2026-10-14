@@ -75,51 +75,28 @@ export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
 ];
 
 /**
- * What one AI-read analysis costs, and who is paid for it.
+ * What a user should know about paying for AI before adding a key — with no
+ * figure in it (L-249).
  *
- * ============================================================================
- * A FIGURE, NOT A SHRUG — AND, SINCE L-148, NOT TIED TO ONE PROVIDER'S RATES
- * ============================================================================
- * "Bring your own key" is only an honest offer if the user can find out what
- * the key will cost them BEFORE they go and get one. This app's OWN landing
- * page at cviper.ai — not the hosted CViper, which was mothballed in September
- * 2026 and whose site cviper.ai replaced — promises that this screen "shows
- * what a typical CV costs", and a card that said only "you pay your provider"
- * with no figure at all would send somebody off to read a pricing page to work
- * out an answer we already know roughly.
+ * It used to say "A typical CV check costs a few pence". CViper cannot know
+ * that: prices are each provider's, they change, they differ by model, and a
+ * long CV costs more than a short one. An estimate is a promise somebody else
+ * keeps. So this says only what is TRUE: what the AI is for, who bills whom
+ * (the provider, the user's own account, at its published rates), that a model
+ * on the user's own PC is free, that CViper takes no cut, and that prices can
+ * change. `no-cost-estimates.contract.test.ts` fails the build if an amount or
+ * "pence" comes back into any copy.
  *
- * WHERE IT IS SHOWN: since the welcome refresh, at the top of Settings → AI
- * provider keys (`AiKeySetup`), which is where the welcome's "Add a key →" link
- * lands — so the welcome still leads to the figure in one click, and the
- * figure sits beside the box the key is pasted into.
+ * No provider is named (L-148): each key card says who bills, in `aiKeyModel.ts`.
+ *
+ * WHERE IT IS SHOWN: at the top of Settings → AI provider keys (`AiKeySetup`),
+ * where the welcome's "Add a key →" link lands, before the first key box.
  * `AiKeySetup.cost.test.tsx` pins it there.
- *
- * ============================================================================
- * WHY THIS NO LONGER NAMES A PROVIDER OR A BAND (L-148)
- * ============================================================================
- * The line used to be derived from one specific model's published per-token
- * rate (`OPENAI_DEFAULT_MODEL`, at the time `gpt-4o`) and said "about 2–3p,
- * paid straight to OpenAI". That was an honest number for the one provider a
- * user could actually choose — but the owner's decision on L-148 is that the
- * product must not read as tied to one AI provider, and a precise band derived
- * from one provider's rate card is exactly that: correct for OpenAI, silent
- * about Anthropic (whose card shipped in L-149, at different published rates),
- * and one repricing away from being quietly wrong for the provider it names.
- *
- * "A few pence" is the looser, provider-agnostic shape of the same fact — both
- * shipped providers land in that range for one CV-and-advert exchange — and it
- * still agrees with the landing page's own "a few pence, about 2–3p for a CV
- * check" without repeating the precise band that only ever described one of
- * them. The per-provider cost REMAINS on each key card (`aiKeyModel.ts`'s
- * `billing` field), where naming a provider and its rate is exactly what that
- * card is for.
- *
- * "Prices can change" survives for the same reason it always existed: this is
- * still an estimate of someone else's price list, not a live meter.
  */
 export const AI_COST_LINE =
-  'A typical CV check costs a few pence, paid to the AI provider you choose on your own ' +
-  'account. A model running on your own PC is free. CViper takes no cut, and prices can change.';
+  'Some features use AI to help generate results. When you use the AI provider you choose, it ' +
+  'bills your own account at its published rates, and prices can change. A model running on ' +
+  'your own PC is free. CViper takes no cut.';
 
 /**
  * What this machine can do for a CV check, in one line, read live.
