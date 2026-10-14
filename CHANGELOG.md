@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Uninstalling on Windows with "Delete the application data" ticked now also removes the API and job-board keys you saved. They are kept in Windows Credential Manager, not in the app's folders, so they used to stay behind. The uninstaller removes only CViper Light's own entries, by their exact names, and leaves them alone when the box is not ticked or when the app is updating. The Microsoft Store version cannot run this step, so there, as on every system, Settings → Delete everything is the way to remove your keys before you uninstall.
+
 ## [0.10.0] — 2026-10-14
 
 ### Added
