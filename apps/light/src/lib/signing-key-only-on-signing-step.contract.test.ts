@@ -352,3 +352,71 @@ describe('a correct layout walks through', () => {
     expect(keyOffences('ci.yml', workflow(job('verify', ['      - run: pnpm build'])))).toEqual([]);
   });
 });
+
+// ── One failed platform must not hold back the others' update file ─────────
+//
+// `bundle` is a matrix, and a job that `needs:` it sees ONE result for all of
+// its legs: a single failed leg is `failure`, and a plain `needs:` skips the
+// job. light-v0.9.0 showed it — the macOS leg failed on a half-set group of
+// Apple secrets in one second, and the Windows installers sat on the draft
+// with nothing to sign them. Before L-223 tauri-action wrote each leg's
+// manifest itself, so Windows shipped regardless.
+//
+// So the job that signs must run whenever bundling was ATTEMPTED — `!cancelled()`
+// in its condition, and still the push-and-tag conjuncts. It then signs what
+// actually reached the draft, and fails loudly if nothing did.
+
+/** Every way the signing job could be skipped by one failed platform leg. */
+export function legOffences(workflow: string): string[] {
+  const { jobs } = parse(workflow);
+  const offences: string[] = [];
+  for (const job of jobs) {
+    if (!job.steps.some((step) => KEY.test(step.text) && SIGNS.test(step.text))) continue;
+    const condition = /^\s*if:\s*(.+)$/m.exec(job.own)?.[1] ?? '';
+    if (!/!\s*cancelled\(\)|\balways\(\)/.test(condition)) {
+      offences.push(
+        `job "${job.id}": signs, but its \`if:\` has no \`!cancelled()\`, so one failed platform ` +
+          'leg skips it and no other platform gets an update file.',
+      );
+    }
+    for (const conjunct of ["github.event_name == 'push'", "github.ref_type == 'tag'"]) {
+      if (!condition.includes(conjunct)) {
+        offences.push(`job "${job.id}": signs without requiring ${conjunct} in its \`if:\`.`);
+      }
+    }
+  }
+  return offences;
+}
+
+describe('a failed platform leg does not stop the others being signed', () => {
+  it('release.yml is clean', () => {
+    expect(legOffences(read(RELEASE))).toEqual([]);
+  });
+
+  it('flags the plain needs that skipped signing on light-v0.9.0', () => {
+    const text = workflow(
+      job('sign', SIGN_STEP, [
+        '    needs: bundle',
+        "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+      ]),
+    );
+    expect(legOffences(text).join('\n')).toMatch(/!cancelled\(\)/);
+  });
+
+  it('flags a signing job that runs on anything but a pushed tag', () => {
+    const text = workflow(
+      job('sign', SIGN_STEP, ['    needs: bundle', '    if: ${{ !cancelled() }}']),
+    );
+    expect(legOffences(text).join('\n')).toMatch(/event_name/);
+  });
+
+  it('accepts !cancelled() alongside the push-and-tag conjuncts', () => {
+    const text = workflow(
+      job('sign', SIGN_STEP, [
+        '    needs: bundle',
+        "    if: \"!cancelled() && github.event_name == 'push' && github.ref_type == 'tag'\"",
+      ]),
+    );
+    expect(legOffences(text)).toEqual([]);
+  });
+});

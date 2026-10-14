@@ -438,7 +438,14 @@ jobs:
   # signatures to the draft.
   sign:
     needs: bundle
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    # `!cancelled()` because `bundle` is a matrix: ONE failed leg makes its
+    # result `failure`, and a plain `needs:` would then skip this job and
+    # leave every other platform's installers unsigned. light-v0.9.0's macOS
+    # leg failed on half-set Apple secrets and held Windows back exactly so.
+    # This signs whatever reached the draft, and fails loudly if nothing did.
+    # A `ci-passed` failure still stops it: `bundle` is then skipped, never
+    # attempted, and there is no draft to download from.
+    if: ${{ !cancelled() && needs.bundle.result != 'skipped' && github.event_name == 'push' && github.ref_type == 'tag' }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
