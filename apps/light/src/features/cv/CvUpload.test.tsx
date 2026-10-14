@@ -40,7 +40,9 @@ function setup() {
   return { port, files, onUploaded, user: userEvent.setup() };
 }
 
-beforeEach(() => parsing.extractText.mockReset());
+beforeEach(() => {
+  parsing.extractText.mockReset();
+});
 afterEach(() => cleanup());
 
 describe('CvUpload', () => {

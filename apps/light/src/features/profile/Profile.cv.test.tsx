@@ -38,7 +38,9 @@ const SAVED_CV: Cv = {
 /** Keeps the skills-gap panel off the database, as `Profile.test.tsx` does. */
 const GAPS: GapsPort = { load: async () => ok({ cvText: null, jobs: [] }) };
 
-beforeEach(() => parsing.extractText.mockReset());
+beforeEach(() => {
+  parsing.extractText.mockReset();
+});
 afterEach(() => cleanup());
 
 async function renderView(
