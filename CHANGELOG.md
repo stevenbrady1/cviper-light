@@ -6,6 +6,25 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-10-14
+
+### Added
+
+- Upload a CV on Tailor and on Profile, not only on Analysis (L-240). All three use the same reader and save to the same place, so a CV uploaded on one screen is ready on the others. Profile has a new "Your CV" section that names your newest CV. On Tailor the upload works before any AI is set up, so your CV is ready when you are.
+- The Windows installer is also published under a name that never changes, `CViper-Light-Windows-x64.exe`, so the Download button on cviper.ai can start the download in one click instead of opening the release page (L-245).
+
+### Changed
+
+- A refreshed welcome screen: "Your job hunt, organised.", three cards — track applications, check your CV, find jobs — each with an example and one button. The CV card says "local AI found" only when the app detects a local model it can use. Screens across the app now share the same headers, section headings, cards and status labels (#270).
+- Tailor with no AI set up is no longer a dead end (L-240). It says plainly that tailoring writes new text and so needs an AI, and offers two ways forward: add your own key in Settings, or use a free AI on your own PC.
+- Settings now opens by saying what works with no key: the tracker, the basic CV match and job search (L-240). The job-board keys section is called "Job-board keys (optional)" instead of "Advanced".
+- When Ollama is running but has no model that can chat, the hint now says what to do in plain words — open the Ollama app and add a chat model in it — with a link to Ollama's download page, which opens in your browser (L-240). It used to give a terminal command. The hint still appears only in that one case. The privacy policy now lists ollama.com as an address opened in your browser.
+- Privacy wording says exactly what is and is not sent (L-233). The telemetry switch now says the app "sends no usage data to us" rather than "sends no data", because it does send your CV to an AI you choose when you ask. The upload help says the file is read on this computer and its text only goes to an AI you choose, and only when you ask. The privacy policy no longer promises that we cannot tell whether you use the app: the app itself sends us nothing, but an app store, or GitHub where the update check looks, may show us totals such as download counts. A test now fails if those old phrases come back.
+
+### Fixed
+
+- A release is now signed even if one platform's build fails (L-223). For 0.9.0, a failed macOS step left the finished Windows build without the update signature and update file that installed copies need. Signing now covers whatever was built, and still fails loudly if nothing was.
+
 ## [0.9.0] — 2026-10-11
 
 The first published release since 0.5.0. Versions 0.6.0, 0.7.0 and 0.8.0 were built but never published, so updating from 0.5.0 brings in everything listed under them as well.
@@ -334,7 +353,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.9.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.0...main
+[0.10.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.9.0...light-v0.10.0
 [0.9.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.8.0...light-v0.9.0
 [0.8.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.7.0...light-v0.8.0
 [0.7.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.6.0...light-v0.7.0
