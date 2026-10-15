@@ -313,7 +313,7 @@ interface AiKeyProviderCopy {
   readonly secret: AiKeySecret;
   readonly defaultModel: string;
   readonly signupUrl: string;
-  /** The billing sentence: who pays, and — where it is known — what it costs. */
+  /** The billing sentence: who pays, and at whose rates. Never an amount (L-249). */
   readonly billing: string;
 }
 
@@ -367,29 +367,11 @@ export const OPENAI_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
 });
 
 /**
- * ============================================================================
- * WHERE ANTHROPIC'S "A FEW PENCE" COMES FROM (W6, coordinator review of PR #96)
- * ============================================================================
- * `AI_COST_LINE` in `onboarding/cards.ts` deliberately stopped deriving its
- * figure from one provider's rate card (L-148) — but the card BELOW that
- * screen is exactly the place a per-provider number belongs, and the OpenAI
- * card had a derivation for its own (now-removed) figure that this one
- * lacked.
- *
- * `ANTHROPIC_DEFAULT_MODEL` is `claude-opus-5`. Using the same shape of
- * estimate as OpenAI's — a CV plus an advert, asking for a structured reading
- * back, roughly 6,000 input tokens and 1,500 output tokens — at Anthropic's
- * published rates of $5.00 per million input tokens and $25.00 per million
- * output tokens:
- *
- *     input    6,000 / 1,000,000 x $5.00  = $0.030
- *     output   1,500 / 1,000,000 x $25.00 = $0.0375
- *     total                               = $0.0675  (~5p at $1.27/£)
- *
- * So "a few pence" is honest for Anthropic too — a touch more than OpenAI's
- * own ~2.4p at the rates `AI_COST_LINE`'s history recorded, both comfortably
- * inside the phrase, neither claiming false precision now that the welcome
- * screen states the figure generically rather than per-provider.
+ * No figure (L-249). This card used to say "a typical CV check costs a few
+ * pence", worked out from Anthropic's published rates for one default model
+ * and one size of CV. Rates change, models differ and CVs vary, so the card now
+ * says what every other card says: who bills, at whose rates, and that CViper
+ * takes nothing.
  */
 export const ANTHROPIC_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   id: 'anthropic',
@@ -399,7 +381,7 @@ export const ANTHROPIC_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   defaultModel: ANTHROPIC_DEFAULT_MODEL,
   signupUrl: 'https://console.anthropic.com/settings/keys',
   billing:
-    'Anthropic bills your own account; a typical CV check costs a few pence. CViper adds ' +
+    'Anthropic bills your own account for what you use, at their published rates. CViper adds ' +
     'nothing to that, takes no cut, and never sees your bill.',
 });
 
@@ -421,9 +403,8 @@ export const ANTHROPIC_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
  *     company runs the model, so the card names who that is for the default
  *     model, rather than letting "sent to OpenRouter" imply it stops there.
  *   * Mistral and xAI bill the user's own account at published rates. No
- *     figure is quoted: neither rate card was measured here the way
- *     Anthropic's "a few pence" was, and an invented number would be wrong on
- *     screen for ever.
+ *     figure is quoted — no card quotes one (L-249): a figure would be wrong on
+ *     screen the day a price changed.
  */
 export const GOOGLE_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   id: 'google',

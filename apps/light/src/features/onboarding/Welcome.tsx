@@ -299,7 +299,7 @@ function WelcomeCard({ card, availability, browser, onDismiss }: WelcomeCardProp
           Ollama never needs this. It routes into the app — never out to a
           browser, never to one provider's signup page (C1) — to Settings → AI
           provider keys, where the provider is chosen and, since the refresh,
-          where the cost of a typical check is stated (`AiKeySetup`).
+          where who pays for AI, and how, is stated (`AiKeySetup`).
           A link, not a button: the screen's one blue button is above it.
         */}
         {featured ? (
