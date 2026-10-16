@@ -114,11 +114,15 @@ describe('changing the board list and using it', () => {
     await user.paste('business analyst');
     await user.click(screen.getByTestId('search-location'));
     await user.paste('Milton Keynes');
+    // L-219 part 4: ticked, then opened by the page's one Search.
     await user.click(await screen.findByTestId('keyless-custom-my-board'));
+    await user.click(screen.getByTestId('search-submit'));
 
-    expect(browser.opened()).toEqual([
-      'https://www.example.com/business-analyst-jobs-in-Milton-Keynes',
-    ]);
+    await vi.waitFor(() =>
+      expect(browser.opened()).toEqual([
+        'https://www.example.com/business-analyst-jobs-in-Milton-Keynes',
+      ]),
+    );
     expect(contactedAnyBoard()).toEqual([]);
   });
 });

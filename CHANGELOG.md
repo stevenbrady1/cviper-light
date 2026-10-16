@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Tick several job boards and open them all with one Search (L-219). Under "Search job boards with these filters", each board you have switched on, including ones you added in Settings, now has a checkbox. Tick the ones you want, press Search, and each opens in its own browser tab with your words and filters filled in, alongside CViper's own search. The button says how many boards it will open, your ticks are remembered for next time, and if a board does not open the page says which.
+
 ### Fixed
 
 - The Windows setup no longer goes "Not Responding" on its last page (L-253). The desktop shortcut is now made while the app installs, rather than when you press Finish, and "Run CViper Light" starts the app without making the setup window wait for it. The "Create desktop shortcut" box is gone from the last page, because the shortcut has already been made.

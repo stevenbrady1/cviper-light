@@ -75,9 +75,10 @@ async function searchFor(count: number) {
 }
 
 function boardIds(container: HTMLElement): string[] {
-  return within(container)
-    .getAllByRole('button')
-    .map((button) => button.getAttribute('data-board') ?? '')
+  // Checkboxes in the boards box since L-219 part 4; still buttons in the
+  // few-results offer. Both carry `data-board`.
+  return [...container.querySelectorAll('[data-board]')]
+    .map((element) => element.getAttribute('data-board') ?? '')
     .filter((id) => id !== '');
 }
 
@@ -140,7 +141,7 @@ describe('job boards, right under the form (L-219)', () => {
     expect(indeed).toContain('set those on the site');
   });
 
-  it('a board button opens that board with the form’s filters', async () => {
+  it('a ticked board opens with the form’s filters when Search is pressed', async () => {
     const { user, browser } = renderSearch();
     await screen.findByTestId('keyless-bar');
     await user.type(screen.getByTestId('search-keywords'), 'software tester');
@@ -149,9 +150,12 @@ describe('job boards, right under the form (L-219)', () => {
     await user.type(screen.getByTestId('search-salary'), '60000');
     await user.selectOptions(screen.getByTestId('search-contract'), 'Permanent');
     await user.click(screen.getByTestId('keyless-reed'));
-    expect(browser.opened()).toEqual([
-      'https://www.reed.co.uk/jobs/software-tester-jobs-in-London?proximity=10&salaryFrom=60000&perm=true',
-    ]);
+    await user.click(screen.getByTestId('search-submit'));
+    await vi.waitFor(() =>
+      expect(browser.opened()).toEqual([
+        'https://www.reed.co.uk/jobs/software-tester-jobs-in-London?proximity=10&salaryFrom=60000&perm=true',
+      ]),
+    );
   });
 });
 
