@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Settings → About now links the terms of use, at cviper.ai/terms (L-232). They say in plain words that the app is free and provided as it is, that AI can get things wrong so you should check what it writes before you send it, that nothing in the app is careers, legal or financial advice, and that the laws of England and Wales apply. The link opens in your browser, like the other two.
+
 ## [0.10.3] — 2026-10-16
 
 0.10.1 and 0.10.2 were both tagged but not released, so this release also brings everything listed under 0.10.2 and 0.10.1 below.
@@ -13,7 +17,6 @@ All notable changes to CViper Light are recorded here. The format follows
 ### Added
 
 - Tick several job boards and open them all with one Search (L-219). Under "Search job boards with these filters", each board you have switched on, including ones you added in Settings, now has a checkbox. Tick the ones you want, press Search, and each opens in its own browser tab with your words and filters filled in, alongside CViper's own search. The button says how many boards it will open, your ticks are remembered for next time, and if a board does not open the page says which.
-- Settings → About now links the terms of use, at cviper.ai/terms (L-232). They say in plain words that the app is free and provided as it is, that AI can get things wrong so you should check what it writes before you send it, that nothing in the app is careers, legal or financial advice, and that the laws of England and Wales apply. The link opens in your browser, like the other two.
 
 ### Changed
 
