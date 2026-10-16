@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Settings → About now links the terms of use, at cviper.ai/terms (L-232). They say in plain words that the app is free and provided as it is, that AI can get things wrong so you should check what it writes before you send it, that nothing in the app is careers, legal or financial advice, and that the laws of England and Wales apply. The link opens in your browser, like the other two.
+
 ### Fixed
 
 - On every Adzuna advert in Search, the word "Adzuna" is now a link to adzuna.co.uk that opens in your browser, as Adzuna's API terms ask (L-239). It used to be a plain label. Reed and Guardian Jobs adverts keep their plain labels: neither asks for more. The privacy policy's line for adzuna.co.uk now names this link too.
