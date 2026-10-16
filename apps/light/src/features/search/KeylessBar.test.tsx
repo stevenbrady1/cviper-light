@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The row of browser buttons, driven entirely by the board list it is given.
+ * The row of board checkboxes, driven entirely by the board list it is given
+ * (L-219 part 4: ticked here, opened by the page's Search through `openBoards`).
  *
  * Every board used below is INVENTED. Not one of them is in
  * `job-boards.json`, which is the point: if this component knew any board's
@@ -9,13 +10,14 @@
  */
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createFakeBrowserPort } from '../../platform/test/fakeBrowserPort';
 import { type Board } from '../boards/model';
 
+import { openBoards, tickedBoards } from './boardChoice';
 import { KeylessBar } from './KeylessBar';
-import { EMPTY_FORM, type SearchForm } from './model';
+import { EMPTY_FORM, boardSearchInput, type SearchForm } from './model';
 
 const MADE_UP: readonly Board[] = [
   {
@@ -46,59 +48,70 @@ const MADE_UP: readonly Board[] = [
 
 const FORM: SearchForm = { ...EMPTY_FORM, keywords: 'business analyst', location: 'Milton Keynes' };
 
-function renderBar(boards: readonly Board[], form: SearchForm = FORM) {
+function renderBar(boards: readonly Board[], ticked: readonly string[] = []) {
+  const onToggle = vi.fn<(id: string, on: boolean) => void>();
+  render(<KeylessBar boards={boards} ticked={new Set(ticked)} onToggle={onToggle} />);
+  return { onToggle, user: userEvent.setup() };
+}
+
+/** What a Search opens for these boards, ticked as given: the page's own path. */
+async function openFor(
+  ids: readonly string[],
+  form: SearchForm = FORM,
+): Promise<readonly string[]> {
   const browser = createFakeBrowserPort();
-  render(<KeylessBar form={form} browser={browser} boards={boards} />);
-  return { browser, user: userEvent.setup() };
+  await openBoards(browser, tickedBoards(MADE_UP, ids), boardSearchInput(form));
+  return browser.opened();
 }
 
 afterEach(() => {
   cleanup();
 });
 
-describe('the keyless button row', () => {
-  it('renders one button per ENABLED board, in the order it was given', () => {
+describe('the keyless board checkboxes', () => {
+  it('renders one checkbox per ENABLED board, in the order it was given', () => {
     renderBar(MADE_UP);
 
-    const labels = [...screen.getByTestId('keyless-bar').querySelectorAll('button')].map(
-      (button) => button.textContent,
-    );
+    const labels = screen.getAllByRole('checkbox').map((box) => box.closest('label')?.textContent);
 
     expect(labels).toEqual(['First Board', 'Second Board']);
   });
 
-  it('hands the browser the exact URL for the board that was pressed', async () => {
-    const { browser, user } = renderBar(MADE_UP);
+  it('ticking a board tells the page which one, and nothing is opened by the tick', async () => {
+    const { onToggle, user } = renderBar(MADE_UP);
 
     await user.click(screen.getByTestId('keyless-second-board'));
 
-    expect(browser.opened()).toEqual([
+    expect(onToggle).toHaveBeenCalledWith('second-board', true);
+  });
+
+  it('shows what is ticked', () => {
+    renderBar(MADE_UP, ['second-board']);
+    expect((screen.getByTestId('keyless-second-board') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId('keyless-first-board') as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('opens the exact URL for the board that was ticked', async () => {
+    expect(await openFor(['second-board'])).toEqual([
       'https://second.invalid/business-analyst-jobs-in-Milton-Keynes',
     ]);
   });
 
   it('uses the same form state the real search would', async () => {
-    const { browser, user } = renderBar(MADE_UP);
-
-    await user.click(screen.getByTestId('keyless-first-board'));
-
-    expect(browser.opened()).toEqual([
+    expect(await openFor(['first-board'])).toEqual([
       'https://first.invalid/jobs?q=business+analyst&where=Milton+Keynes',
     ]);
   });
 
-  it('negative: a board that is switched off has no button at all', () => {
+  it('negative: a board that is switched off has no checkbox, and is never opened', async () => {
     renderBar(MADE_UP);
 
     expect(screen.queryByTestId('keyless-third-board')).toBeNull();
+    expect(await openFor(['third-board'])).toEqual([]);
   });
 
   it('negative: never adds anything to the link', async () => {
-    const { browser, user } = renderBar(MADE_UP);
-
-    await user.click(screen.getByTestId('keyless-first-board'));
-
-    expect(browser.opened()[0]).not.toMatch(/utm_|cviper|affiliate/i);
+    expect((await openFor(['first-board']))[0]).not.toMatch(/utm_|cviper|affiliate/i);
   });
 
   it('boundary: with every board switched off it says so, rather than showing nothing', () => {
@@ -106,17 +119,13 @@ describe('the keyless button row', () => {
     // say WHERE the switch is, because the user is looking at the search view.
     renderBar(MADE_UP.map((board) => ({ ...board, enabled: false })));
 
-    expect(screen.queryAllByRole('button')).toEqual([]);
+    expect(screen.queryAllByRole('checkbox')).toEqual([]);
     expect(screen.getByTestId('keyless-none').textContent).toContain('Settings');
   });
 
-  it('boundary: the buttons work before a single character is typed', async () => {
-    const { browser, user } = renderBar(MADE_UP, EMPTY_FORM);
-
-    await user.click(screen.getByTestId('keyless-second-board'));
-
+  it('boundary: a board opens before a single character is typed', async () => {
     // No dangling connector, and still a URL the browser port will accept.
-    expect(browser.opened()).toEqual(['https://second.invalid/jobs']);
+    expect(await openFor(['second-board'], EMPTY_FORM)).toEqual(['https://second.invalid/jobs']);
   });
 
   it('boundary: an empty board list is not a crash', () => {

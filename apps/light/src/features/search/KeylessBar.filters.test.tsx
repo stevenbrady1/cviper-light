@@ -4,14 +4,13 @@
  * the board can take — distance, minimum salary and contract type as well as
  * the keyword and location — and nothing for a filter left empty.
  */
-import { cleanup, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { cleanup } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createFakeBrowserPort } from '../../platform/test/fakeBrowserPort';
 import { type Board } from '../boards/model';
 
-import { KeylessBar } from './KeylessBar';
+import { openBoards } from './boardChoice';
 import { EMPTY_FORM, boardSearchInput, type SearchForm } from './model';
 
 const BOARD: Board = {
@@ -35,10 +34,14 @@ const FILLED: SearchForm = {
 
 afterEach(cleanup);
 
+/**
+ * What opening this board for this form sends. Since L-219 part 4 a board is
+ * ticked and opened by the page's Search through `openBoards`, so that is what
+ * this drives (it used to click the board's own button).
+ */
 async function opened(form: SearchForm): Promise<Record<string, string>> {
   const browser = createFakeBrowserPort();
-  render(<KeylessBar form={form} browser={browser} boards={[BOARD]} />);
-  await userEvent.setup().click(screen.getByTestId('keyless-full'));
+  await openBoards(browser, [BOARD], boardSearchInput(form));
   const url = browser.opened().at(-1);
   if (url === undefined) throw new Error('nothing was opened');
   return Object.fromEntries(new URL(url).searchParams.entries());
@@ -64,7 +67,7 @@ describe('boardSearchInput (L-219)', () => {
   });
 });
 
-describe('the job-board buttons (L-219)', () => {
+describe('opening a job board (L-219)', () => {
   it('happy: every filter on the form reaches the board', async () => {
     expect(await opened(FILLED)).toEqual({
       q: 'software tester',
