@@ -21,6 +21,7 @@ All notable changes to CViper Light are recorded here. The format follows
 ### Changed
 
 - New two-colour icons beside each item in the navigation, on the desktop sidebar and the phone's bottom bar: Profile, Search, Tracker, Analysis, Tailor, and a key for Settings (L-254). The main lines follow the item's text colour; the accent is CViper Light's teal.
+- The same style of two-colour icon for the Settings sections: Your data, Job boards, Updates, Getting started, Privacy, About, Report a problem and Delete everything (L-256).
 
 ### Fixed
 

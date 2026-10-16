@@ -87,6 +87,16 @@
    */
   --color-nav-accent: #17a2b8;
 
+  /*
+   * The Settings section icons' accent (L-256): the owner's teal again, but its
+   * OWN token, because these icons sit on light tiles (navy or danger at 10%
+   * over the page), where #17a2b8 measures about 2.4-2.6:1 — under the 3:1 WCAG
+   * 1.4.11 asks of non-text. Left at the owner's colour by decision; darker
+   * shades of the same hue that clear 3:1 and 4.5:1 on every tile are #148da0
+   * and #106f7e (`sectionIconAccent.contract.test.ts` reports the numbers).
+   */
+  --color-section-icon-accent: #17a2b8;
+
   /* --- Surfaces --------------------------------------------------------- */
   /* canvas is the page, sunken is a well cut into it, card sits on top. */
   --color-canvas: #f7f8fa;
