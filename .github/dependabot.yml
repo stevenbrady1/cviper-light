@@ -32,6 +32,17 @@ updates:
     groups:
       npm:
         patterns: ['*']
+    # Majors that break the build are planned migrations, not weekly bumps.
+    # One breaking major turns the whole grouped PR red and blocks every safe
+    # update behind it (#286). TypeScript 7 drops the compiler API that
+    # src/lib/copy-text.ts imports; Vitest 5 is a major for the test runner.
+    # Remove an entry in the PR that does that migration.
+    # dependabot-holds-breaking-majors.contract.test.ts holds these here.
+    ignore:
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      - dependency-name: vitest
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: cargo
     directory: /apps/light/src-tauri
