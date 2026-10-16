@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Settings → About now links the terms of use, at cviper.ai/terms (L-232). They say in plain words that the app is free and provided as it is, that AI can get things wrong so you should check what it writes before you send it, that nothing in the app is careers, legal or financial advice, and that the laws of England and Wales apply. The link opens in your browser, like the other two.
+
 ### Fixed
 
 - Keyboard focus stays where it should around dialogs (L-236). While "Delete this application?" or "Send this CV to …?" is open, Tab now cycles through its own buttons instead of reaching the page behind it, and when it closes, focus goes back to the button that opened it. On a phone, a card's details cover the whole screen, so they behave the same way: focus moves into them, stays there, and goes back to the card when you close them. On a wider window the details sit beside the board, and Tab can move between the two as before.
