@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Tracker cards now show the keyboard focus ring (L-235). Tabbing through the tracker, the app's first screen, used to show no sign of where you were: each card's own shadow painted over the ring. The ring now sits where no component style can replace it, and a test fails if it is ever moved back.
+
 ## [0.10.3] — 2026-10-16
 
 0.10.1 and 0.10.2 were both tagged but not released, so this release also brings everything listed under 0.10.2 and 0.10.1 below.
@@ -17,10 +21,6 @@ All notable changes to CViper Light are recorded here. The format follows
 ### Changed
 
 - New two-colour icons beside each item in the navigation, on the desktop sidebar and the phone's bottom bar: Profile, Search, Tracker, Analysis, Tailor, and a key for Settings (L-254). The main lines follow the item's text colour; the accent is CViper Light's teal.
-
-### Fixed
-
-- Tracker cards now show the keyboard focus ring (L-235). Tabbing through the tracker, the app's first screen, used to show no sign of where you were: each card's own shadow painted over the ring. The ring now sits where no component style can replace it, and a test fails if it is ever moved back.
 
 ### Fixed
 
