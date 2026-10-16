@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Settings → About now links the terms of use, at cviper.ai/terms (L-232). They say in plain words that the app is free and provided as it is, that AI can get things wrong so you should check what it writes before you send it, that nothing in the app is careers, legal or financial advice, and that the laws of England and Wales apply. The link opens in your browser, like the other two.
+
 ### Fixed
 
 - Tracker cards now show the keyboard focus ring (L-235). Tabbing through the tracker, the app's first screen, used to show no sign of where you were: each card's own shadow painted over the ring. The ring now sits where no component style can replace it, and a test fails if it is ever moved back.
