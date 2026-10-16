@@ -61,7 +61,7 @@ The app hands the address to your own browser and is not involved from then on. 
 - `uk.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.totaljobs.com` — A keyless search link for Totaljobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.cv-library.co.uk` — A keyless search link for CV-Library, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
-- `www.adzuna.co.uk` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `www.adzuna.co.uk` — A keyless search link for Adzuna’s public search, from job-boards.json, and the word “Adzuna” on each Adzuna advert, which Adzuna’s API terms ask to link to their site. Pressing either hands the address to your own browser; the app never loads the page.
 - `www.google.com` — A keyless search link for Google Jobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.jobserve.com` — A keyless search link for Jobserve, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page, and it never scrapes Jobserve.
 - `cviper.ai` — This app’s own website: its download page and the privacy policy, opened in your browser when you tap a line that names it. The app never contacts it, and nothing is added to the link.

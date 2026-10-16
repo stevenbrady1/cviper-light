@@ -231,7 +231,7 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
   {
     host: 'www.adzuna.co.uk',
     purpose: 'opened-in-your-browser',
-    why: 'A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.',
+    why: 'A keyless search link for Adzuna’s public search, from job-boards.json, and the word “Adzuna” on each Adzuna advert, which Adzuna’s API terms ask to link to their site. Pressing either hands the address to your own browser; the app never loads the page.',
   },
   {
     host: 'www.google.com',

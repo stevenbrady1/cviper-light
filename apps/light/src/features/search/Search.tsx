@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import {
+  ADZUNA_ATTRIBUTION_URL,
   ARBEITNOW_ATTRIBUTION,
   JOB_PROVIDER_IDS,
   KEYLESS_SOURCE_IDS,
@@ -940,6 +941,11 @@ export function Search({
                       dealBreakers={dealBreakersIn(dealBreakers, entry.job)}
                       onSave={() => void onSave(entry.job.id)}
                       onOpen={() => onOpen(entry.job.url)}
+                      onOpenSource={
+                        entry.job.source === 'adzuna'
+                          ? () => onOpen(ADZUNA_ATTRIBUTION_URL)
+                          : undefined
+                      }
                       onAnalyse={
                         onAnalyse === undefined ? undefined : () => void onAnalyseJob(entry.job.id)
                       }

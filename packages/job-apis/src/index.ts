@@ -145,7 +145,7 @@ export {
 
 // ── What each source is called on screen ─────────────────────────────────
 
-export { SOURCE_LABEL } from './sources';
+export { ADZUNA_ATTRIBUTION_URL, SOURCE_LABEL } from './sources';
 
 // ── Keyless browser links: no key, no scraper, no account ────────────────────
 

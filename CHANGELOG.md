@@ -8,6 +8,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Fixed
 
+- On every Adzuna advert in Search, the word "Adzuna" is now a link to adzuna.co.uk that opens in your browser, as Adzuna's API terms ask (L-239). It used to be a plain label. Reed and Guardian Jobs adverts keep their plain labels: neither asks for more. The privacy policy's line for adzuna.co.uk now names this link too.
+
+### Fixed
+
 - The Windows setup no longer goes "Not Responding" on its last page (L-253). The desktop shortcut is now made while the app installs, rather than when you press Finish, and "Run CViper Light" starts the app without making the setup window wait for it. The "Create desktop shortcut" box is gone from the last page, because the shortcut has already been made.
 - Installing a newer version over an older one by hand no longer opens the old version's uninstaller with its "Delete the application data" box (L-253). The old version is now replaced quietly, keeping your data and saved keys, the same way the in-app update does. If CViper Light is open, the setup asks before closing it.
 
