@@ -10,5 +10,15 @@
 export { Card, cardClasses, type CardProps } from './Card';
 export { Icon, ICON_NAMES, type IconName } from './Icon';
 export { IconTile, type IconTileTone } from './IconTile';
+export {
+  AiKeyIcon,
+  AnalysisIcon,
+  NAV_ACCENT,
+  ProfileIcon,
+  SearchIcon,
+  TailorIcon,
+  TrackerIcon,
+  type NavIconProps,
+} from './NavIcons';
 export { PageHeader, SectionHeading } from './PageHeader';
 export { PILL_TONES, StatusPill, type PillTone } from './StatusPill';

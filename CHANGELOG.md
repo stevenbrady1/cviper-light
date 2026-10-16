@@ -8,7 +8,13 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Changed
 
+- New two-colour icons beside each item in the navigation, on the desktop sidebar and the phone's bottom bar: Profile, Search, Tracker, Analysis, Tailor, and a key for Settings (L-254). The main lines follow the item's text colour; the accent is CViper Light's teal.
 - The privacy policy now says who is responsible and how to reach them privately (L-231). CViper Light is made by Steven Brady, a sole trader in the UK, and privacy questions go to privacy@cviper.ai instead of only the public issue tracker, where anything you write is visible to everyone. New sections cover the lawful basis for the little we handle ourselves (emails to that address), your rights and how to complain to the ICO, international transfers (a service you choose may be outside the UK), how long things are kept, and our website, naming GitHub Pages and the Cloudflare redirect from cviper.uk. The policy carries a "Last updated" date and says it is for people aged 16 and over, replacing the US "under 13" wording. A test fails if any of these sections goes missing (#240).
+
+### Fixed
+
+- The Windows setup no longer goes "Not Responding" on its last page (L-253). The desktop shortcut is now made while the app installs, rather than when you press Finish, and "Run CViper Light" starts the app without making the setup window wait for it. The "Create desktop shortcut" box is gone from the last page, because the shortcut has already been made.
+- Installing a newer version over an older one by hand no longer opens the old version's uninstaller with its "Delete the application data" box (L-253). The old version is now replaced quietly, keeping your data and saved keys, the same way the in-app update does. If CViper Light is open, the setup asks before closing it.
 
 ## [0.10.2] — 2026-10-16
 
