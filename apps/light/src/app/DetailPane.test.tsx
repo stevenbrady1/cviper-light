@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DetailPane } from './DetailPane';
@@ -170,5 +171,91 @@ describe('DetailPane', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
 
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe('DetailPane on a phone keeps focus while it covers the screen (L-236)', () => {
+  /** A `matchMedia` that says the window is phone-narrow or desktop-wide. */
+  function installViewport(wide: boolean) {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: wide,
+        media: query,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }),
+    });
+  }
+
+  afterEach(() => {
+    delete (window as { matchMedia?: unknown }).matchMedia;
+  });
+
+  function Host() {
+    const [open, setOpen] = useState(false);
+    return (
+      <div>
+        <button type="button" data-testid="opener" onClick={() => setOpen(true)}>
+          Open card
+        </button>
+        <button type="button" data-testid="behind">
+          Behind
+        </button>
+        {open ? (
+          <DetailPane title="Quant Developer" onClose={() => setOpen(false)}>
+            <button type="button" data-testid="inside">
+              Inside
+            </button>
+          </DetailPane>
+        ) : null}
+      </div>
+    );
+  }
+
+  it('narrow: focus moves into the pane when it opens', async () => {
+    installViewport(false);
+    const user = userEvent.setup();
+    render(<Host />);
+
+    await user.click(screen.getByTestId('opener'));
+
+    expect(screen.getByTestId('detail-pane').contains(document.activeElement)).toBe(true);
+  });
+
+  it('narrow: Tab from the last control wraps inside the pane', async () => {
+    installViewport(false);
+    const user = userEvent.setup();
+    render(<Host />);
+    await user.click(screen.getByTestId('opener'));
+    screen.getByTestId('inside').focus();
+
+    await user.tab();
+
+    expect(document.activeElement).toBe(screen.getByTestId('detail-pane-close'));
+  });
+
+  it('narrow: closing returns focus to what opened it', async () => {
+    installViewport(false);
+    const user = userEvent.setup();
+    render(<Host />);
+    await user.click(screen.getByTestId('opener'));
+
+    await user.click(screen.getByTestId('detail-pane-close'));
+
+    expect(document.activeElement).toBe(screen.getByTestId('opener'));
+  });
+
+  it('negative, wide: the pane sits beside the view, so Tab may leave it', async () => {
+    installViewport(true);
+    const user = userEvent.setup();
+    render(<Host />);
+    await user.click(screen.getByTestId('opener'));
+    screen.getByTestId('inside').focus();
+
+    await user.tab();
+
+    expect(screen.getByTestId('detail-pane').contains(document.activeElement)).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { useFocusTrap } from '../../lib/useFocusTrap';
 
 import { type ConsentProviderKind } from './consent';
 import { providerInSentence, providerLabel } from './model';
@@ -35,6 +36,10 @@ interface ConsentGateProps {
 
 export function ConsentGate({ kind, onAccept, onDecline }: ConsentGateProps) {
   const declineRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Tab stays inside; focus goes back to the opener on close (L-236). Before
+  // the focus effect below, so the opener is read first.
+  useFocusTrap(dialogRef);
   const label = providerInSentence(kind);
   // L-150: CViper cannot name the typed-address service, and one on the
   // user's own network may have no key — so it says where the address came
@@ -60,6 +65,7 @@ export function ConsentGate({ kind, onAccept, onDecline }: ConsentGateProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 p-6">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="consent-gate-title"

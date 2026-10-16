@@ -1,4 +1,8 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
+
+import { useFocusTrap } from '../lib/useFocusTrap';
+
+import { useViewportClass } from './viewport';
 
 /**
  * The right-hand detail pane. 380px, persistent, NOT a modal — and on a phone,
@@ -76,6 +80,20 @@ interface DetailPaneProps {
 }
 
 export function DetailPane({ title, subtitle = null, onClose, children }: DetailPaneProps) {
+  // On a phone the pane covers the whole screen, so it behaves like a modal
+  // for focus (L-236): focus moves in, Tab stays in, and closing hands focus
+  // back. On a desktop it sits beside the view, and Tab may leave it.
+  const covers = useViewportClass() === 'narrow';
+  const paneRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useFocusTrap(paneRef, covers);
+
+  useEffect(() => {
+    if (!covers) return;
+    const pane = paneRef.current;
+    if (pane !== null && !pane.contains(document.activeElement)) closeRef.current?.focus();
+  }, [covers]);
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
       if (event.key !== 'Escape') return;
@@ -95,6 +113,7 @@ export function DetailPane({ title, subtitle = null, onClose, children }: Detail
 
   return (
     <aside
+      ref={paneRef}
       aria-label={title}
       data-testid="detail-pane"
       className={[
@@ -121,6 +140,7 @@ export function DetailPane({ title, subtitle = null, onClose, children }: Detail
           comes and goes is a close affordance the user cannot rely on.
         */}
         <button
+          ref={closeRef}
           type="button"
           onClick={onClose}
           data-testid="detail-pane-close"
