@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- New two-colour icons beside each item in the navigation, on the desktop sidebar and the phone's bottom bar: Profile, Search, Tracker, Analysis, Tailor, and a key for Settings (L-254). The main lines follow the item's text colour; the accent is CViper Light's teal.
+
 ### Fixed
 
 - The Windows setup no longer goes "Not Responding" on its last page (L-253). The desktop shortcut is now made while the app installs, rather than when you press Finish, and "Run CViper Light" starts the app without making the setup window wait for it. The "Create desktop shortcut" box is gone from the last page, because the shortcut has already been made.
