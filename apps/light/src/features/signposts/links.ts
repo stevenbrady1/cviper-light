@@ -18,6 +18,13 @@
  */
 export const CVIPER_PRIVACY_URL = 'https://cviper.ai/privacy/';
 
+/**
+ * This app's terms of use (L-232): free and as-is, check AI output before you
+ * send it, not advice, England and Wales law. Where the About entry points.
+ * Served by the `cviper-landing` repository, like the privacy policy.
+ */
+export const CVIPER_TERMS_URL = 'https://cviper.ai/terms/';
+
 /** The page about this app: downloads, the generated policy, the source. */
 export const LIGHT_PAGE_URL = 'https://cviper.ai/light';
 
