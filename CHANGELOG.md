@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.10.3] — 2026-10-16
+
+0.10.1 and 0.10.2 were both tagged but not released, so this release also brings everything listed under 0.10.2 and 0.10.1 below.
+
 ### Added
 
 - Tick several job boards and open them all with one Search (L-219). Under "Search job boards with these filters", each board you have switched on, including ones you added in Settings, now has a checkbox. Tick the ones you want, press Search, and each opens in its own browser tab with your words and filters filled in, alongside CViper's own search. The button says how many boards it will open, your ticks are remembered for next time, and if a board does not open the page says which.
@@ -391,7 +395,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.2...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.3...main
+[0.10.3]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.2...light-v0.10.3
 [0.10.2]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.1...light-v0.10.2
 [0.10.1]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.0...light-v0.10.1
 [0.10.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.9.0...light-v0.10.0
