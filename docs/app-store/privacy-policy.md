@@ -1,6 +1,6 @@
 # CViper Light privacy policy
 
-_For CViper Light 0.10.2. This page is generated from the app's own list of the addresses it may contact — the same list the app shows under Settings → Privacy, and the one a test holds the code to. It changes when that list changes and not otherwise._
+_For CViper Light 0.10.2. This page is generated from the app's own list of the addresses it may contact — the same list the app shows under Settings → Privacy, and the one a test holds the code to. It changes when that list changes. Last updated: 16 October 2026._
 
 ## The short version
 
@@ -91,10 +91,38 @@ A keyless job-board link is handed to your own browser. What that site sees is w
 
 Settings → Delete everything removes the database, every saved key and the preferences, and the app returns to its first-run state. Do that before uninstalling if you want the keys gone as well: on some systems the credential store keeps an app's entries after the app itself is removed.
 
-## Children
+## Our website
 
-CViper Light is a job-application tool and is not directed at children under 13. It collects no data from anyone.
+cviper.ai is served by GitHub Pages, and cviper.uk and www.cviper.uk are redirected to it by Cloudflare. The site sets no cookies and loads no analytics script. The app itself never contacts it; its pages open in your own browser when you tap a line that names them. Like any web host, GitHub and Cloudflare see your IP address and keep server logs of the requests they handle, under their own privacy policies, and may show us traffic totals. We do not use them to identify anyone, and they cannot be connected to anything in the app.
+
+## Who is responsible
+
+CViper Light is made by Steven Brady, a sole trader in the United Kingdom. For the little personal data described here that we handle ourselves, he is the controller under UK data-protection law. You can reach him privately at privacy@cviper.ai.
+
+## Our lawful basis
+
+The app sends us nothing, so there is nothing from the app for us to need a lawful basis for. What you keep in it stays on your own device, under your control. When you send a request to a service you chose, that service handles it under its own terms.
+
+We handle personal data ourselves in one case: when you email privacy@cviper.ai, we read your message and reply to it. Under the UK GDPR we do that on the basis of legitimate interests — yours and ours, in answering what you asked — or, when you are using one of your rights below, because the law requires us to respond. The server logs kept by our website’s hosts rest on legitimate interests too: keeping a website working and secure.
+
+## Your rights
+
+Under UK data-protection law you have the right to access the personal data we hold about you, to correct it, to delete it, to restrict or object to how we use it, and to have a copy in a portable form. The data the app keeps is on your own device, so you can see, export, change or delete it yourself at any time. For an email you sent us, write to privacy@cviper.ai and we will reply within one month. For what a service you chose received, ask that service: it is the one that holds it.
+
+If you are unhappy with how we have handled your data, please tell us first so we can put it right. You also have the right to complain to the Information Commissioner’s Office (ICO), the UK’s data-protection regulator, at ico.org.uk/make-a-complaint or on 0303 123 1113.
+
+## International transfers
+
+We transfer nothing, because the app sends nothing to us. If you choose an AI service or a job board, your request goes straight from your device to that service, which may be outside the UK — many are in the United States. That is your choice, made when you press the button, and the service handles what it receives under its own terms and safeguards. A program on your own computer, such as Ollama, keeps the request on that computer. GitHub and Cloudflare, who host our website, may keep their server logs outside the UK under their own safeguards.
+
+## How long things are kept
+
+What the app keeps on your device stays there until you delete it. Settings → Delete everything removes all of it at once; we cannot delete it for you, because we never have it. A service you chose keeps what it received for as long as its own policy says. An email to privacy@cviper.ai is kept only for as long as we need it to answer you, and then deleted.
+
+## Age
+
+CViper Light is a tool for finding work, meant for people aged 16 and over. The app sends us nothing, so we collect no data through it from anyone, of any age.
 
 ## Questions
 
-Ask on the public issue tracker: https://github.com/stevenbrady1/cviper-light/issues. The source code is public under the MIT licence, so every statement on this page can be checked against it.
+For anything about your own data, email privacy@cviper.ai. General questions about how the app works are welcome on the issue tracker, https://github.com/stevenbrady1/cviper-light/issues, but everything posted there is public, so please leave out anything personal. The source code is public under the MIT licence, so every statement about the app on this page can be checked against it.
