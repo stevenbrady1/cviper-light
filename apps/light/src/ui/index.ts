@@ -20,5 +20,17 @@ export {
   TrackerIcon,
   type NavIconProps,
 } from './NavIcons';
+export {
+  AboutIcon,
+  DeleteEverythingIcon,
+  GettingStartedIcon,
+  JobBoardsIcon,
+  PrivacyIcon,
+  ReportProblemIcon,
+  SECTION_ACCENT,
+  UpdatesIcon,
+  YourDataIcon,
+  type SettingsIconProps,
+} from './SettingsIcons';
 export { PageHeader, SectionHeading } from './PageHeader';
 export { PILL_TONES, StatusPill, type PillTone } from './StatusPill';
