@@ -90,6 +90,47 @@ describe.each(NEW_PROVIDERS.map((id) => [id] as const))('%s — the request it b
   });
 });
 
+describe('openrouter — models it passes on to OpenAI (L-248)', () => {
+  // OpenRouter's /models lists openai/gpt-6-luna with supported_parameters that
+  // include max_tokens, response_format and structured_outputs but NOT
+  // temperature, and OpenAI's GPT-6 guide says to remove it at any reasoning
+  // effort but `none`. The request is passed on to the company before the slash.
+  it.each(['openai/gpt-6-luna', OPENROUTER_DEFAULT_MODEL, 'openai/some-future-model'])(
+    'negative: %s is sent no temperature, and still max_tokens and strict json_schema',
+    (model) => {
+      const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
+      void createChatCompletionsProvider('openrouter', transport).chatJson({ ...REQUEST, model });
+
+      const body = sentBody(transport);
+      expect(body['model']).toBe(model);
+      expect(body).not.toHaveProperty('temperature');
+      expect(body['max_tokens']).toBe(wireOutputCap(REQUEST.maxOutputTokens));
+      expect(body).not.toHaveProperty('max_completion_tokens');
+      expect(body['response_format']).toMatchObject({
+        type: 'json_schema',
+        json_schema: { strict: true },
+      });
+    },
+  );
+
+  it.each([
+    'anthropic/claude-sonnet-4.6',
+    'google/gemini-3.8-flash',
+    // Boundary: the rule is the vendor before the slash, not a substring.
+    'openaix/model',
+    'not-openai/gpt-6-luna',
+    'gpt-6-luna',
+  ])('boundary: %s keeps temperature 0', (model) => {
+    const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
+    void createChatCompletionsProvider('openrouter', transport).chatJson({ ...REQUEST, model });
+    expect(sentBody(transport)['temperature']).toBe(0);
+  });
+
+  it('negative: the shipped OpenRouter default is not one OpenAI retires on 2027-01-14', () => {
+    expect(OPENROUTER_DEFAULT_MODEL).not.toMatch(/^openai\/gpt-4(o|\.1)/);
+  });
+});
+
 describe.each(NEW_PROVIDERS.map((id) => [id] as const))('%s — the response envelope', (id) => {
   it('returns the first choice message content', async () => {
     const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
