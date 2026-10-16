@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- On the first run of a fresh install, if the app finds API or job-board keys saved by an earlier CViper Light install, the welcome screen names them and asks: Keep them, or Remove them from this computer (L-251). It asks once, only when the app has no data yet, and never deletes anything unless you choose Remove.
+
 ## [0.10.1] — 2026-10-15
 
 ### Fixed
