@@ -13,7 +13,14 @@ import { describe, expect, it } from 'vitest';
 import { OUTBOUND_HOSTS } from '../../../lib/outbound-hosts';
 
 import { DATA_LOCATIONS } from './dataLocations';
-import { PRIVACY_CONTACT_URL, currentPrivacyPolicy, renderPrivacyPolicy } from './policyDocument';
+import {
+  POLICY_LAST_UPDATED,
+  PRIVACY_CONTACT_EMAIL,
+  PRIVACY_CONTACT_URL,
+  currentPrivacyPolicy,
+  formatPolicyDate,
+  renderPrivacyPolicy,
+} from './policyDocument';
 
 describe('the privacy policy document', () => {
   it('is the committed file, byte for byte', async () => {
@@ -41,16 +48,22 @@ describe('the privacy policy document', () => {
     expect(currentPrivacyPolicy()).toBe(currentPrivacyPolicy());
   });
 
-  it('carries no date and no hand-typed statistic', () => {
-    // A generated document is as current as its source. A date would be the
-    // one stale thing in it.
+  it('carries exactly one date, the last-updated one, and no hand-typed statistic', () => {
+    // L-231 (#240) asked for a "Last updated" date. It is the ONE date in the
+    // document, rendered from POLICY_LAST_UPDATED; no ISO date leaks into the
+    // prose and nothing else claims to be a date.
     const text = currentPrivacyPolicy();
     expect(text).not.toMatch(/\b20\d\d-\d\d-\d\d\b/);
-    expect(text).not.toMatch(/\b(?:last|effective)\s+(?:updated|date)/i);
+    expect(text.match(/\b(?:last|effective)\s+(?:updated|date)/gi)).toEqual(['Last updated']);
+    expect(text).toContain(`Last updated: ${formatPolicyDate(POLICY_LAST_UPDATED)}`);
   });
 
-  it('points questions at the public tracker, not at an inbox', () => {
-    expect(currentPrivacyPolicy()).toContain(PRIVACY_CONTACT_URL);
+  it('points personal questions at a private inbox, and general ones at the public tracker', () => {
+    // L-231: the tracker used to be the only contact, so a personal question
+    // could only be asked in public.
+    const text = currentPrivacyPolicy();
+    expect(text).toContain(PRIVACY_CONTACT_EMAIL);
+    expect(text).toContain(PRIVACY_CONTACT_URL);
     expect(PRIVACY_CONTACT_URL).toMatch(/^https:\/\/github\.com\/.+\/issues$/);
   });
 
