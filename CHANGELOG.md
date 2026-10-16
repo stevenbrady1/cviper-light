@@ -14,6 +14,7 @@ All notable changes to CViper Light are recorded here. The format follows
 ### Changed
 
 - When no key is saved, each AI key card now says "No key saved" beside its greyed-out "Remove saved key" button, and the "Your own AI service" card says "No service saved", so the button no longer sits there on its own (L-251).
+- The Windows setup installer now shows CViper Light's own art: a navy side panel with the logo on its first and last pages, and the logo in the header of the pages between (L-251).
 
 ## [0.10.1] — 2026-10-15
 
