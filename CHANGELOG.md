@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The privacy policy now says who is responsible and how to reach them privately (L-231). CViper Light is made by Steven Brady, a sole trader in the UK, and privacy questions go to privacy@cviper.ai instead of only the public issue tracker, where anything you write is visible to everyone. New sections cover the lawful basis for the little we handle ourselves (emails to that address), your rights and how to complain to the ICO, international transfers (a service you choose may be outside the UK), how long things are kept, and our website, naming GitHub Pages and the Cloudflare redirect from cviper.uk. The policy carries a "Last updated" date and says it is for people aged 16 and over, replacing the US "under 13" wording. A test fails if any of these sections goes missing (#240).
+
 ## [0.10.3] — 2026-10-16
 
 0.10.1 and 0.10.2 were both tagged but not released, so this release also brings everything listed under 0.10.2 and 0.10.1 below.
@@ -17,7 +21,6 @@ All notable changes to CViper Light are recorded here. The format follows
 ### Changed
 
 - New two-colour icons beside each item in the navigation, on the desktop sidebar and the phone's bottom bar: Profile, Search, Tracker, Analysis, Tailor, and a key for Settings (L-254). The main lines follow the item's text colour; the accent is CViper Light's teal.
-- The privacy policy now says who is responsible and how to reach them privately (L-231). CViper Light is made by Steven Brady, a sole trader in the UK, and privacy questions go to privacy@cviper.ai instead of only the public issue tracker, where anything you write is visible to everyone. New sections cover the lawful basis for the little we handle ourselves (emails to that address), your rights and how to complain to the ICO, international transfers (a service you choose may be outside the UK), how long things are kept, and our website, naming GitHub Pages and the Cloudflare redirect from cviper.uk. The policy carries a "Last updated" date and says it is for people aged 16 and over, replacing the US "under 13" wording. A test fails if any of these sections goes missing (#240).
 
 ### Fixed
 
