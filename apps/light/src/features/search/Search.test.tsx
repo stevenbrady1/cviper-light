@@ -272,6 +272,54 @@ describe('the results', () => {
     expect(screen.queryByTestId('adzuna-attribution')).toBeNull();
   });
 
+  it('labels every Adzuna advert with the word "Adzuna", linked to adzuna.co.uk (L-239)', async () => {
+    // Adzuna's API terms ("Publishing Adzuna ad listings"): label each
+    // displayed advert with "Adzuna", hyperlinked to the main or local site.
+    const port = createFakeSearchPort();
+    port.nextOutcome(outcomeOf([ADZUNA_PERMANENT], emptyQuota(TODAY)));
+    const { user, browser } = renderSearch({ port });
+    await screen.findByTestId('search-empty');
+
+    await search(user);
+    const label = await screen.findByTestId('result-source-job-adzuna');
+
+    expect(label.tagName).toBe('BUTTON');
+    expect(label.textContent).toBe('Adzuna');
+    await user.click(label);
+    // Byte for byte, and only that.
+    expect(browser.opened()).toEqual(['https://www.adzuna.co.uk']);
+  });
+
+  it('boundary: the Adzuna label is at least the 116 x 23 pixels their terms ask for (L-239)', async () => {
+    const port = createFakeSearchPort();
+    port.nextOutcome(outcomeOf([ADZUNA_PERMANENT], emptyQuota(TODAY)));
+    const { user } = renderSearch({ port });
+    await screen.findByTestId('search-empty');
+
+    await search(user);
+    const label = await screen.findByTestId('result-source-job-adzuna');
+
+    // jsdom does no layout, so the guard is the sizing classes themselves.
+    expect(label.className).toContain('min-w-[116px]');
+    expect(label.className).toContain('min-h-[23px]');
+  });
+
+  it('negative: a Reed advert keeps a plain label that opens nothing (L-239)', async () => {
+    // Reed's Jobseeker API page asks for no attribution, so its label stays a
+    // name, not a link: nothing hands reed.co.uk to the browser unasked.
+    const port = createFakeSearchPort();
+    port.nextOutcome(outcomeOf([REED_DAY_RATE], emptyQuota(TODAY)));
+    const { user, browser } = renderSearch({ port });
+    await screen.findByTestId('search-empty');
+
+    await search(user);
+    const label = await screen.findByTestId('result-source-job-day-rate');
+
+    expect(label.tagName).not.toBe('BUTTON');
+    await user.click(label);
+    expect(browser.opened()).toEqual([]);
+  });
+
   it('opens the original advert in the real browser', async () => {
     const port = createFakeSearchPort();
     port.nextOutcome(outcomeOf([REED_DAY_RATE], emptyQuota(TODAY)));
