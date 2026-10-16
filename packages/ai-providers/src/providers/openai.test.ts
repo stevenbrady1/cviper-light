@@ -73,15 +73,50 @@ describe('openai chatJson — the request it builds', () => {
     ]);
   });
 
-  it('sends temperature 0 and max_completion_tokens', () => {
+  it('sends max_completion_tokens, and NO temperature (GPT-6 refuses it at its default reasoning effort)', () => {
     // `max_tokens` is deprecated for chat completions and rejected outright by
     // the newer reasoning models, so the modern name is the only safe one.
+    // `temperature` (L-248): OpenAI's GPT-6 guide says "When reasoning effort
+    // is not `none`, remove `temperature`, `top_p`, and `top_logprobs`", and
+    // every GPT-6 model defaults to `medium`. Same class as #277 on Anthropic.
     const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
     void createOpenAiProvider(transport).chatJson(REQUEST);
 
     const body = sentBody(transport);
-    expect(body).toMatchObject({ temperature: 0, max_completion_tokens: wireOutputCap(2048) });
+    expect(body).toMatchObject({ max_completion_tokens: wireOutputCap(2048) });
     expect(body).not.toHaveProperty('max_tokens');
+    expect(body).not.toHaveProperty('temperature');
+  });
+
+  // The GPT-6 replacements named by OpenAI's 2026-10-14 deprecation notice, the
+  // GPT-4 models it retires on 2027-01-14 (still callable until then), and an
+  // id nobody has shipped yet: none of them may get temperature back.
+  it.each([
+    'gpt-6-luna',
+    'gpt-6.1-sol',
+    'gpt-6-astra',
+    'gpt-4o',
+    'gpt-4.1-mini',
+    'gpt-7-some-future-model',
+  ])('negative: %s is sent no temperature, top_p or logprobs', (model) => {
+    const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
+    void createOpenAiProvider(transport).chatJson({ ...REQUEST, model });
+
+    const body = sentBody(transport);
+    expect(body['model']).toBe(model);
+    expect(body).not.toHaveProperty('temperature');
+    expect(body).not.toHaveProperty('top_p');
+    expect(body).not.toHaveProperty('logprobs');
+    expect(body['max_completion_tokens']).toBe(wireOutputCap(REQUEST.maxOutputTokens));
+  });
+
+  it('boundary: the largest cap ever sent stays inside GPT-6’s documented 128,000 output tokens', () => {
+    const transport = fakeTransport({ chat: { status: 200, body: CHAT_OK } });
+    void createOpenAiProvider(transport).chatJson({ ...REQUEST, maxOutputTokens: 16_384 });
+
+    const cap = sentBody(transport)['max_completion_tokens'];
+    expect(cap).toBe(16_384);
+    expect(cap).toBeLessThanOrEqual(128_000);
   });
 });
 

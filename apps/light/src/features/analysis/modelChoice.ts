@@ -16,9 +16,11 @@
  * publish them, because a desktop app may go a year without an update and a
  * dated snapshot is the kind of name that gets retired underneath it.
  *
- * Deliberately absent: OpenAI's reasoning models (the o-series, gpt-5). Every
- * job in this app sends `temperature: 0` — a literal the type system pins, see
- * `ChatJsonRequest` — and those models refuse any temperature but their own.
+ * OpenAI's list was GPT-4 only, because every job sends `temperature: 0` — a
+ * literal the type system pins, see `ChatJsonRequest` — and OpenAI's reasoning
+ * models refuse it. OpenAI shuts every one of those GPT-4 models down on
+ * 2027-01-14 (L-248), so the OpenAI adapter no longer sends `temperature` at
+ * all (`chat-completions.ts`, `omitsTemperature`) and the list is GPT-6.
  *
  * ============================================================================
  * READ WHERE THE OPTIONS ARE BUILT, SO EVERY FEATURE GETS IT
@@ -52,14 +54,16 @@ import type { AiKeyProviderId } from '../settings/keys/aiKeyModel';
  * The OpenAI model used when the user has an OpenAI key and has not chosen
  * another.
  *
- * `gpt-4o` is chosen for longevity rather than ambition: it has been generally
- * available and stable for a long time, which is the property that matters for
- * a desktop app a user may not update for a year. It lived in `providers.ts`
- * as the only answer until L-183; it is now the fallback, and lives here with
- * the list it heads. `providers.ts` re-exports it for the files that import it
- * from there.
+ * `gpt-6-luna` since L-248. It was `gpt-4o`, chosen for longevity; OpenAI
+ * deprecated gpt-4o, gpt-4o-mini, gpt-4.1 and gpt-4.1-mini on 2026-10-14, shuts
+ * them down on 2027-01-14, and names `gpt-6-luna` as the replacement for all
+ * four (developers.openai.com/api/docs/deprecations). Its model page lists
+ * Chat Completions, structured outputs and 128,000 max output tokens. It lived
+ * in `providers.ts` as the only answer until L-183; it is now the fallback, and
+ * lives here with the list it heads. `providers.ts` re-exports it for the files
+ * that import it from there.
  */
-export const OPENAI_DEFAULT_MODEL = 'gpt-4o';
+export const OPENAI_DEFAULT_MODEL = 'gpt-6-luna';
 
 export interface ModelChoice {
   /** The exact model string sent to the provider. */
@@ -68,12 +72,11 @@ export interface ModelChoice {
 
 /** Every provider's list, default first. */
 export const AI_MODEL_CHOICES: Readonly<Record<AiKeyProviderId, readonly ModelChoice[]>> = {
-  openai: [
-    { id: OPENAI_DEFAULT_MODEL },
-    { id: 'gpt-4o-mini' },
-    { id: 'gpt-4.1' },
-    { id: 'gpt-4.1-mini' },
-  ],
+  // Each is on developers.openai.com/api/docs/models with Chat Completions,
+  // structured outputs and 128,000 max output tokens, and none has a
+  // deprecation notice. A stored GPT-4 choice is off the list, so it reads as
+  // the default (L-248).
+  openai: [{ id: OPENAI_DEFAULT_MODEL }, { id: 'gpt-6.1-sol' }, { id: 'gpt-6-astra' }],
   anthropic: [
     { id: ANTHROPIC_DEFAULT_MODEL },
     { id: 'claude-opus-5-5' },
@@ -101,12 +104,13 @@ export const AI_MODEL_CHOICES: Readonly<Record<AiKeyProviderId, readonly ModelCh
   grok: [{ id: GROK_DEFAULT_MODEL }, { id: 'grok-4.7' }, { id: 'grok-4.20-non-reasoning' }],
   // OpenRouter passes the request on to the company named before the slash.
   // Each id is on OpenRouter's /models with no expiration_date and with
-  // temperature, response_format and structured_outputs among its
-  // supported_parameters — every job sends all three. (Anthropic's 4.7 and
-  // later list no temperature there, so Sonnet 4.6 is the newest that fits.)
+  // response_format and structured_outputs among its supported_parameters.
+  // Every job sends both, and `temperature` too unless the id starts
+  // `openai/` (L-248) — those list none. (Anthropic's 4.7 and later list no
+  // temperature there either, so Sonnet 4.6 is the newest that fits.)
   openrouter: [
     { id: OPENROUTER_DEFAULT_MODEL },
-    { id: 'openai/gpt-4o' },
+    { id: 'openai/gpt-6.1-sol' },
     { id: 'anthropic/claude-sonnet-4.6' },
     { id: 'google/gemini-3.8-flash' },
   ],
