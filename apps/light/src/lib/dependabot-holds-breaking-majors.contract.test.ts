@@ -42,13 +42,16 @@ function npmBlock(text: string): string {
   return next === -1 ? rest : rest.slice(0, next);
 }
 
-/** True when `block` ignores semver-major updates for `name`. */
-function holdsMajor(block: string, name: string): boolean {
+/** True when `block` ignores `kind` updates (major, minor) for `name`. */
+function holds(block: string, name: string, kind: 'major' | 'minor'): boolean {
   const entry = new RegExp(
-    String.raw`-\s*dependency-name:\s*['"]?${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]?\s*\n\s*update-types:\s*\[[^\]]*['"]version-update:semver-major['"][^\]]*\]`,
+    String.raw`-\s*dependency-name:\s*['"]?${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]?\s*\n\s*update-types:\s*\[[^\]]*['"]version-update:semver-${kind}['"][^\]]*\]`,
   );
   return entry.test(block);
 }
+
+/** True when `block` ignores semver-major updates for `name`. */
+const holdsMajor = (block: string, name: string): boolean => holds(block, name, 'major');
 
 describe('dependabot.yml holds back the npm majors that break the build', () => {
   const block = npmBlock(readFileSync(DEPENDABOT, 'utf8'));
@@ -60,6 +63,27 @@ describe('dependabot.yml holds back the npm majors that break the build', () => 
   for (const name of ['typescript', 'vitest']) {
     it(`ignores ${name} major updates`, () => {
       expect(holdsMajor(block, name)).toBe(true);
+    });
+  }
+});
+
+/**
+ * Zod is held on 4.4.x for the launch (#308, 16 Oct 2026).
+ *
+ * Zod 4.6 moved `util.allowsEval` from a self-replacing getter onto a class
+ * (`Cached`), so `packages/{core-types,resume-schema}/src/zod.test.ts` can no
+ * longer read whether the `new Function("")` probe ran: it throws, by design,
+ * rather than guess. The app is not less safe — `jitless` still short-circuits
+ * the probe in 4.6.5 — but a guard that cannot see is not a guard, and the
+ * grouped npm PR went red over it. Patches (4.4.x) still flow. Remove both
+ * entries in the PR that teaches the detector to read zod 4.6.
+ */
+describe('dependabot.yml holds zod on 4.4.x', () => {
+  const block = npmBlock(readFileSync(DEPENDABOT, 'utf8'));
+
+  for (const kind of ['minor', 'major'] as const) {
+    it(`ignores zod ${kind} updates`, () => {
+      expect(holds(block, 'zod', kind)).toBe(true);
     });
   }
 });
@@ -88,6 +112,18 @@ describe('the guard itself', () => {
     const text =
       "version: 2\nupdates:\n  - package-ecosystem: npm\n    directory: /\n  - package-ecosystem: cargo\n    ignore:\n      - dependency-name: typescript\n        update-types: ['version-update:semver-major']\n";
     expect(holdsMajor(npmBlock(text), 'typescript')).toBe(false);
+  });
+
+  it('boundary: holding majors is not holding minors', () => {
+    const major =
+      "    ignore:\n      - dependency-name: zod\n        update-types: ['version-update:semver-major']";
+    expect(holds(npmBlock(yml(major)), 'zod', 'minor')).toBe(false);
+  });
+
+  it('negative: a hold on one package does not cover another', () => {
+    const held =
+      "    ignore:\n      - dependency-name: zod-mini\n        update-types: ['version-update:semver-minor']";
+    expect(holds(npmBlock(yml(held)), 'zod', 'minor')).toBe(false);
   });
 
   it('happy: a real entry counts', () => {

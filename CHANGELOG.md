@@ -13,6 +13,7 @@ All notable changes to CViper Light are recorded here. The format follows
 ### Changed
 
 - The privacy policy now says who is responsible and how to reach them privately (L-231). CViper Light is made by Steven Brady, a sole trader in the UK, and privacy questions go to cviperuk@gmail.com instead of only the public issue tracker, where anything you write is visible to everyone. New sections cover the lawful basis for the little we handle ourselves (emails to that address), your rights and how to complain to the ICO, international transfers (a service you choose may be outside the UK), how long things are kept, and our website, naming GitHub Pages and the Cloudflare redirect from cviper.uk. The policy carries a "Last updated" date and says it is for people aged 16 and over, replacing the US "under 13" wording. A test fails if any of these sections goes missing (#240).
+- Dependabot now keeps zod on 4.4.x (#308). Zod 4.6 changed the internal that the zod guard reads to prove zod never asks to run generated code, so the guard could no longer tell, and the weekly npm update went red with 29 safe updates stuck behind it. The app's protection itself still works on 4.6; only the check that proves it does not. Patch releases of 4.4 still come through, and a test fails if the hold is removed before the guard is taught to read 4.6.
 
 ### Fixed
 
