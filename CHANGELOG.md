@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- New two-colour icons beside each item in the navigation, on the desktop sidebar and the phone's bottom bar: Profile, Search, Tracker, Analysis, Tailor, and a key for Settings (L-254). The main lines follow the item's text colour; the accent is CViper Light's teal.
+
 ## [0.10.2] — 2026-10-16
 
 0.10.1 was tagged but not released on its own, so this release also brings everything listed under 0.10.1 below.
