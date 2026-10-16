@@ -310,6 +310,16 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
             Saved <span className="font-mono">{AI_KEY_SAVED_MASK}</span>
           </p>
         ) : null}
+        {/*
+          The other half (L-251), so the disabled button never floats alone.
+          Only once the store has ANSWERED no: before that, or when it cannot
+          be read, the card claims neither.
+        */}
+        {answer === false ? (
+          <p data-testid={`ai-key-none-${provider.id}`} className="text-xs text-ink-muted">
+            No key saved
+          </p>
+        ) : null}
         <button
           type="button"
           data-testid={`ai-key-remove-${provider.id}`}

@@ -4,6 +4,8 @@ import { type EnvironmentStatus } from '../status/environment';
 
 import { CViperMark } from './CViperMark';
 import { StatusStrip } from './StatusStrip';
+import { APP_VERSION } from '../features/settings/backup';
+
 import { PINNED_VIEWS, SEQUENCE_VIEWS, type ViewDefinition, type ViewId } from './views';
 
 /**
@@ -121,6 +123,15 @@ export function Sidebar({ activeView, onSelect, status }: SidebarProps) {
           </li>
         ))}
       </ul>
+
+      {/*
+        Which version this is, without opening Settings → About (L-251). The
+        same constant About shows. Plain text: nothing to press, nothing to
+        tab to.
+      */}
+      <p data-testid="sidebar-version" className="px-4 pb-3 text-xs text-ink-inverse-muted">
+        CViper Light {APP_VERSION}
+      </p>
 
       <StatusStrip status={status} onOpenSettings={() => onSelect('settings')} />
     </nav>

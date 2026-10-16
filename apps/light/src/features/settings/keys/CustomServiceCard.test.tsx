@@ -346,3 +346,39 @@ describe('"Remove this service" sits with what it removes (0.10.1)', () => {
     expect(screen.queryByTestId('custom-service-saved')).toBeNull();
   });
 });
+
+describe('"No service saved" beside the disabled Remove button (L-251)', () => {
+  it('with nothing saved: says so in the same row as the disabled button', async () => {
+    render(<CustomServiceCard port={fakePort()} />);
+
+    const none = await screen.findByTestId('custom-service-none');
+    expect(none.textContent).toBe('No service saved');
+    const row = screen.getByTestId('custom-service-saved-row');
+    expect(row.contains(none)).toBe(true);
+    expect((screen.getByTestId('custom-service-remove') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('negative: a store that will not answer is not "no service saved"', async () => {
+    const port = fakePort();
+    port.statusFails = true;
+    render(<CustomServiceCard port={port} />);
+    await waitFor(() =>
+      expect(screen.getByTestId('custom-service-state').textContent).toBe('Could not be read'),
+    );
+    expect(screen.queryByTestId('custom-service-none')).toBeNull();
+  });
+
+  it('with a service saved: the "Saved:" line instead', async () => {
+    render(
+      <CustomServiceCard
+        port={fakePort({
+          address: 'https://api.example.com/v1',
+          ownNetwork: false,
+          key: SENTINEL_KEY,
+        })}
+      />,
+    );
+    await screen.findByTestId('custom-service-saved');
+    expect(screen.queryByTestId('custom-service-none')).toBeNull();
+  });
+});

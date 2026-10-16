@@ -6,6 +6,16 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- On the first run of a fresh install, if the app finds API or job-board keys saved by an earlier CViper Light install, the welcome screen names them and asks: Keep them, or Remove them from this computer (L-251). It asks once, only when the app has no data yet, and never deletes anything unless you choose Remove.
+- The sidebar shows which version you are running, "CViper Light 0.10.x", just below Settings (L-251).
+
+### Changed
+
+- When no key is saved, each AI key card now says "No key saved" beside its greyed-out "Remove saved key" button, and the "Your own AI service" card says "No service saved", so the button no longer sits there on its own (L-251).
+- The Windows setup installer now shows CViper Light's own art: a navy side panel with the logo on its first and last pages, and the logo in the header of the pages between (L-251).
+
 ## [0.10.1] — 2026-10-15
 
 ### Fixed
