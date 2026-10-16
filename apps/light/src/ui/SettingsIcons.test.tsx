@@ -108,6 +108,17 @@ describe('the drawings are the owner’s, exactly', () => {
     expect(container.querySelectorAll(`path[stroke="${SECTION_ACCENT}"]`)).toHaveLength(2);
   });
 
+  it('monochrome: every accent stroke becomes currentColor, and nothing else changes', () => {
+    for (const [, Component] of ICONS) {
+      const plain = render(<Component />).container.innerHTML;
+      cleanup();
+      const mono = render(<Component monochrome />).container.innerHTML;
+      cleanup();
+      expect(mono).not.toContain(SECTION_ACCENT);
+      expect(mono).toBe(plain.replaceAll(SECTION_ACCENT, 'currentColor'));
+    }
+  });
+
   it('delete everything: the two accent lines', () => {
     const { container } = render(<DeleteEverythingIcon />);
     expect(container.querySelectorAll(`line[stroke="${SECTION_ACCENT}"]`)).toHaveLength(2);

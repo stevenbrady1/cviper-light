@@ -1,17 +1,13 @@
 /**
  * The Settings section icons' accent (L-256): its own token, declared once,
- * and its contrast against the tiles it is drawn on — REPORTED, because the
- * owner's colour (#17a2b8) is below 3:1 on those light tiles and the owner
- * chooses whether to darken it.
+ * and at least 3:1 (WCAG 1.4.11) against every tile it is drawn on.
  *
  * The icons sit in `SectionHeading`'s small tile: `bg-navy/10` (or
  * `bg-danger/10` for Delete everything) over the page canvas or a card. The
  * accent is the one stroke the text-contrast check cannot see, so it is
- * measured here against each of those composited backgrounds.
- *
- * What fails: the token removed, or declared twice. What does NOT fail yet:
- * the ratio itself, which is printed for the owner. Darker shades of the same
- * hue that clear the bars on every tile: #148da0 (3:1), #106f7e (4.5:1).
+ * measured here against each of those composited backgrounds. The owner's
+ * first choice, #17a2b8, measured 2.35-2.62:1; on 2026-10-16 the owner chose
+ * #148da0, the same hue darkened to clear 3:1 on all four.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -66,7 +62,7 @@ describe('the Settings section icon accent', () => {
     expect(tokens('nav-accent')).toHaveLength(1);
   });
 
-  it('reports its contrast on every tile it is drawn on (owner to decide on darkening)', () => {
+  it('clears 3:1 (WCAG 1.4.11) on every tile it is drawn on', () => {
     const accent = token('section-icon-accent');
     const canvas = token('canvas');
     const card = token('card');
@@ -80,10 +76,21 @@ describe('the Settings section icon accent', () => {
       ([name, background]) => `${name} ${background}: ${contrast(accent, background).toFixed(2)}:1`,
     );
     console.info(`section icon accent ${accent} — ${report.join('; ')}`);
-    for (const background of Object.values(tiles)) {
-      // A real number, not NaN: the guard read real colours.
-      expect(contrast(accent, background)).toBeGreaterThan(1);
+    for (const [name, background] of Object.entries(tiles)) {
+      // WCAG 1.4.11: a meaningful mark needs 3:1 against what is behind it.
+      expect(contrast(accent, background), name).toBeGreaterThanOrEqual(3);
     }
+  });
+
+  it('the tiles are the real ones', () => {
+    const canvas = token('canvas');
+    const card = token('card');
+    expect([
+      over(token('navy'), 0.1, canvas),
+      over(token('navy'), 0.1, card),
+      over(token('danger'), 0.1, canvas),
+      over(token('danger'), 0.1, card),
+    ]).toEqual(['#e0e2e8', '#e7e9ec', '#f0e4e5', '#f8ebea']);
   });
 
   it('the maths is right (black on white 21:1; 10% navy over white)', () => {

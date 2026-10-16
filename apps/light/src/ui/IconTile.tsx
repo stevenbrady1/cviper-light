@@ -44,7 +44,8 @@ export function IconTile({ icon, tone = 'navy', size = 'md' }: IconTileProps) {
       aria-hidden="true"
       className={`inline-flex shrink-0 items-center justify-center rounded-control ${SIZE[size].box} ${TONE[tone] ?? TONE.navy}`}
     >
-      <Icon name={icon} size={SIZE[size].icon} />
+      {/* A danger tile is one colour: no teal accent inside it (L-256). */}
+      <Icon name={icon} size={SIZE[size].icon} monochrome={tone === 'danger'} />
     </span>
   );
 }

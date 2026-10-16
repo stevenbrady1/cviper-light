@@ -37,9 +37,14 @@ const SECTIONS: ReadonlyArray<readonly [string, ComponentType<SettingsIconProps>
   ['Delete everything', DeleteEverythingIcon],
 ];
 
-/** What the icon draws on its own, at the section tile's size. */
-function expected(Icon: ComponentType<SettingsIconProps>): string {
-  const { container, unmount } = render(<Icon size={16} className="shrink-0" />);
+/**
+ * What the icon draws on its own, at the section tile's size. Delete
+ * everything sits in a danger tile, which draws it in one colour (L-256).
+ */
+function expected(Icon: ComponentType<SettingsIconProps>, monochrome = false): string {
+  const { container, unmount } = render(
+    <Icon size={16} className="shrink-0" monochrome={monochrome} />,
+  );
   const html = container.querySelector('svg')?.outerHTML ?? '';
   unmount();
   return html;
@@ -51,7 +56,7 @@ function renderSettings() {
 
 describe('the Settings section icons', () => {
   it.each(SECTIONS)('%s shows its own icon in the heading tile', (label, Icon) => {
-    const markup = expected(Icon);
+    const markup = expected(Icon, label === 'Delete everything');
     renderSettings();
 
     const heading = screen.getByRole('heading', { name: label, level: 2 });
@@ -67,10 +72,32 @@ describe('the Settings section icons', () => {
     for (const [label] of SECTIONS) {
       const heading = screen.getByRole('heading', { name: label, level: 2 });
       const svg = heading.closest('div.flex.items-start')?.querySelector('svg');
-      // The old drawings had stroke-width 2 and no accent.
+      // The old drawings had stroke-width 2.
       expect(svg?.getAttribute('stroke-width'), label).toBe('1.75');
+    }
+  });
+
+  it('the seven non-danger headings draw their accent through the token', () => {
+    renderSettings();
+    for (const [label] of SECTIONS.filter(([name]) => name !== 'Delete everything')) {
+      const heading = screen.getByRole('heading', { name: label, level: 2 });
+      const svg = heading.closest('div.flex.items-start')?.querySelector('svg');
       expect(svg?.innerHTML, label).toContain('var(--color-section-icon-accent)');
     }
+  });
+
+  it('Delete everything draws the whole bin in the danger colour — no teal accent', () => {
+    renderSettings();
+    const heading = screen.getByRole('heading', { name: 'Delete everything', level: 2 });
+    const svg = heading.closest('div.flex.items-start')?.querySelector('svg');
+    expect(svg).not.toBeNull();
+    expect(svg?.querySelector('[stroke="var(--color-section-icon-accent)"]')).toBeNull();
+    expect(svg?.innerHTML).not.toContain('--color-section-icon-accent');
+    const lines = [...(svg?.querySelectorAll('line') ?? [])];
+    expect(lines).toHaveLength(2);
+    for (const line of lines) expect(line.getAttribute('stroke')).toBe('currentColor');
+    // The tile is the danger tone, so currentColor is the danger colour.
+    expect(svg?.closest('span')?.className).toContain('text-danger');
   });
 
   it('the headings’ accessible names are still just the labels', () => {

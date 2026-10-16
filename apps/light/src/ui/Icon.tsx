@@ -147,12 +147,17 @@ export interface IconProps {
   readonly name: IconName;
   /** Pixel size of the square. 16 inline with text, 20 inside a tile. */
   readonly size?: number;
+  /**
+   * One colour only: a two-colour icon draws its accent in the ink too. A
+   * danger tile asks for it (L-256). Single-colour icons ignore it.
+   */
+  readonly monochrome?: boolean;
 }
 
-export function Icon({ name, size = 20 }: IconProps) {
+export function Icon({ name, size = 20, monochrome = false }: IconProps) {
   if (isDuotone(name)) {
     const Duotone = DUOTONE[name];
-    return <Duotone size={size} className="shrink-0" />;
+    return <Duotone size={size} className="shrink-0" monochrome={monochrome} />;
   }
   return (
     <svg
