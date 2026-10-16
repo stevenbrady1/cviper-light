@@ -12,6 +12,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Fixed
 
+- With an OpenAI key, the app now uses OpenAI's GPT-6 models (L-248). OpenAI is switching off all four models the OpenAI card offered — `gpt-4o`, `gpt-4o-mini`, `gpt-4.1` and `gpt-4.1-mini` — on 14 January 2027, and names `gpt-6-luna` as the replacement. The card now offers `gpt-6-luna` (the new default), `gpt-6.1-sol` and `gpt-6-astra`. On OpenRouter, the default `openai/gpt-4o-mini` becomes `openai/gpt-6-luna`, and `openai/gpt-4o` becomes `openai/gpt-6.1-sol`. These models refuse a setting ("temperature") the app used to send to OpenAI, so the app no longer sends it to OpenAI, directly or through OpenRouter, and a test fails if it ever does again. If you had chosen one of the old models, the app goes back to that provider's default until you choose again.
 - Keyboard focus stays where it should around dialogs (L-236). While "Delete this application?" or "Send this CV to …?" is open, Tab now cycles through its own buttons instead of reaching the page behind it, and when it closes, focus goes back to the button that opened it. On a phone, a card's details cover the whole screen, so they behave the same way: focus moves into them, stays there, and goes back to the card when you close them. On a wider window the details sit beside the board, and Tab can move between the two as before.
 
 ## [0.10.3] — 2026-10-16

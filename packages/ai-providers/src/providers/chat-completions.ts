@@ -60,7 +60,10 @@ export type ChatCompletionsProviderId = Exclude<ProviderId, 'anthropic' | 'ollam
 export const GOOGLE_DEFAULT_MODEL = 'gemini-3.5-flash';
 export const MISTRAL_DEFAULT_MODEL = 'mistral-small-latest';
 export const GROK_DEFAULT_MODEL = 'grok-4.3';
-export const OPENROUTER_DEFAULT_MODEL = 'openai/gpt-4o-mini';
+// L-248: was `openai/gpt-4o-mini`, which OpenAI shuts down on 2027-01-14. OpenAI
+// names gpt-6-luna as its replacement, and OpenRouter lists `openai/gpt-6-luna`
+// with no expiration_date and with response_format and structured_outputs.
+export const OPENROUTER_DEFAULT_MODEL = 'openai/gpt-6-luna';
 
 /**
  * Names the schema in the response format. Free-form, but must be present.
@@ -114,6 +117,28 @@ function maxTokensField(
 }
 
 /**
+ * Whether the request goes to OpenAI, which must not be sent `temperature`
+ * (L-248).
+ *
+ * OpenAI's GPT-6 migration guide: "When reasoning effort is not `none`, remove
+ * `temperature`, `top_p`, and `top_logprobs`" — and every GPT-6 model defaults
+ * to `medium`, gpt-6.1-sol and gpt-6-astra do not offer `none` at all. The
+ * GPT-4 models they replace shut down on 2027-01-14. It is the same class of
+ * bug as #277 on Anthropic and is fixed the same way: omit it for every OpenAI
+ * model, so there is no per-model list to fall behind. The cost is only on the
+ * GPT-4 models still callable until the shutdown: they run at their default
+ * temperature. The JSON shape is held by strict json_schema and Zod either way.
+ *
+ * Through OpenRouter, the vendor before the slash is who answers, and its
+ * /models lists no `temperature` for `openai/gpt-6-luna`. Every other route
+ * keeps `temperature: 0`: Google, Mistral, xAI and the user's own service are
+ * not documented to refuse it.
+ */
+function omitsTemperature(provider: ChatCompletionsProviderId, model: string): boolean {
+  return provider === 'openai' || (provider === 'openrouter' && model.startsWith('openai/'));
+}
+
+/**
  * `usage.completion_tokens_details.reasoning_tokens`, or 0 when not reported.
  *
  * OpenAI, xAI and OpenRouter report it; a provider that does not is simply
@@ -149,7 +174,7 @@ export function createChatCompletionsProvider(
         model: request.model,
         // Budget plus room to think (L-185); see `wireOutputCap`.
         [maxTokensField(provider)]: wireOutputCap(request.maxOutputTokens),
-        temperature: request.temperature,
+        ...(omitsTemperature(provider, request.model) ? {} : { temperature: request.temperature }),
         messages: [
           { role: 'system', content: request.system },
           { role: 'user', content: request.user },
