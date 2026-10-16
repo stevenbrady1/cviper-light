@@ -14,7 +14,7 @@
  * a US age threshold ("under 13").
  *
  * The owner's decision: the controller is Steven Brady, a sole trader in the
- * UK, reachable privately at privacy@cviper.ai; the audience is 16 and over.
+ * UK, reachable privately at cviperuk@gmail.com; the audience is 16 and over.
  *
  * `policyDocument.test.ts` keeps `docs/app-store/privacy-policy.md` byte-equal
  * to the render, and the website's daily drift check carries that file to
@@ -50,7 +50,7 @@ describe('the privacy policy names who is responsible and how to reach them priv
   });
 
   it('gives a private email address for privacy questions', () => {
-    expect(PRIVACY_CONTACT_EMAIL).toBe('privacy@cviper.ai');
+    expect(PRIVACY_CONTACT_EMAIL).toBe('cviperuk@gmail.com');
     expect(section('Who is responsible')).toContain(PRIVACY_CONTACT_EMAIL);
     expect(section('Questions')).toContain(PRIVACY_CONTACT_EMAIL);
   });
@@ -106,6 +106,12 @@ describe('the privacy policy carries every section UK GDPR expects', () => {
 });
 
 describe('negative: the old wording is gone', () => {
+  it('no longer names privacy@cviper.ai, which receives no mail (owner, 16 Oct 2026)', () => {
+    // cviper.ai has no mail records, so a message to it bounces. The owner
+    // chose the Gmail address over setting up forwarding.
+    expect(text).not.toContain('privacy@cviper.ai');
+  });
+
   it('no longer uses the US under-13 threshold', () => {
     expect(text).not.toMatch(/under[ -]13/i);
     expect(text).not.toContain('not directed at children');

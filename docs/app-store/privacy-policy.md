@@ -97,17 +97,17 @@ cviper.ai is served by GitHub Pages, and cviper.uk and www.cviper.uk are redirec
 
 ## Who is responsible
 
-CViper Light is made by Steven Brady, a sole trader in the United Kingdom. For the little personal data described here that we handle ourselves, he is the controller under UK data-protection law. You can reach him privately at privacy@cviper.ai.
+CViper Light is made by Steven Brady, a sole trader in the United Kingdom. For the little personal data described here that we handle ourselves, he is the controller under UK data-protection law. You can reach him privately at cviperuk@gmail.com.
 
 ## Our lawful basis
 
 The app sends us nothing, so there is nothing from the app for us to need a lawful basis for. What you keep in it stays on your own device, under your control. When you send a request to a service you chose, that service handles it under its own terms.
 
-We handle personal data ourselves in one case: when you email privacy@cviper.ai, we read your message and reply to it. Under the UK GDPR we do that on the basis of legitimate interests — yours and ours, in answering what you asked — or, when you are using one of your rights below, because the law requires us to respond. The server logs kept by our website’s hosts rest on legitimate interests too: keeping a website working and secure.
+We handle personal data ourselves in one case: when you email cviperuk@gmail.com, we read your message and reply to it. Under the UK GDPR we do that on the basis of legitimate interests — yours and ours, in answering what you asked — or, when you are using one of your rights below, because the law requires us to respond. The server logs kept by our website’s hosts rest on legitimate interests too: keeping a website working and secure.
 
 ## Your rights
 
-Under UK data-protection law you have the right to access the personal data we hold about you, to correct it, to delete it, to restrict or object to how we use it, and to have a copy in a portable form. The data the app keeps is on your own device, so you can see, export, change or delete it yourself at any time. For an email you sent us, write to privacy@cviper.ai and we will reply within one month. For what a service you chose received, ask that service: it is the one that holds it.
+Under UK data-protection law you have the right to access the personal data we hold about you, to correct it, to delete it, to restrict or object to how we use it, and to have a copy in a portable form. The data the app keeps is on your own device, so you can see, export, change or delete it yourself at any time. For an email you sent us, write to cviperuk@gmail.com and we will reply within one month. For what a service you chose received, ask that service: it is the one that holds it.
 
 If you are unhappy with how we have handled your data, please tell us first so we can put it right. You also have the right to complain to the Information Commissioner’s Office (ICO), the UK’s data-protection regulator, at ico.org.uk/make-a-complaint or on 0303 123 1113.
 
@@ -117,7 +117,7 @@ We transfer nothing, because the app sends nothing to us. If you choose an AI se
 
 ## How long things are kept
 
-What the app keeps on your device stays there until you delete it. Settings → Delete everything removes all of it at once; we cannot delete it for you, because we never have it. A service you chose keeps what it received for as long as its own policy says. An email to privacy@cviper.ai is kept only for as long as we need it to answer you, and then deleted.
+What the app keeps on your device stays there until you delete it. Settings → Delete everything removes all of it at once; we cannot delete it for you, because we never have it. A service you chose keeps what it received for as long as its own policy says. An email to cviperuk@gmail.com is kept only for as long as we need it to answer you, and then deleted.
 
 ## Age
 
@@ -125,4 +125,4 @@ CViper Light is a tool for finding work, meant for people aged 16 and over. The 
 
 ## Questions
 
-For anything about your own data, email privacy@cviper.ai. General questions about how the app works are welcome on the issue tracker, https://github.com/stevenbrady1/cviper-light/issues, but everything posted there is public, so please leave out anything personal. The source code is public under the MIT licence, so every statement about the app on this page can be checked against it.
+For anything about your own data, email cviperuk@gmail.com. General questions about how the app works are welcome on the issue tracker, https://github.com/stevenbrady1/cviper-light/issues, but everything posted there is public, so please leave out anything personal. The source code is public under the MIT licence, so every statement about the app on this page can be checked against it.
