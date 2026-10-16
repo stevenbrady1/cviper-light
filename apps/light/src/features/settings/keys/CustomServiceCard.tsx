@@ -192,6 +192,12 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
             {saved.hasKey ? ' · key saved' : ' · no key'}
           </p>
         )}
+        {/* The other half (L-251): only once the store has answered "nothing". */}
+        {saved === null && !unreadable ? (
+          <p data-testid="custom-service-none" className="text-xs text-ink-muted">
+            No service saved
+          </p>
+        ) : null}
         <button
           type="button"
           data-testid="custom-service-remove"

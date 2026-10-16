@@ -122,3 +122,43 @@ describe('no red error for a saved key and an empty box', () => {
     expect(port.saved()).toBe(SAVED);
   });
 });
+
+describe('"No key saved" beside the disabled Remove button (L-251)', () => {
+  it('with no key: says "No key saved" in the same row as the disabled button', async () => {
+    renderCard();
+    await screen.findByTestId('ai-key-card-openai');
+
+    const row = screen.getByTestId('ai-key-saved-row-openai');
+    await within(row).findByText('No key saved');
+    expect(screen.getByTestId('ai-key-none-openai').textContent).toBe('No key saved');
+    expect(within(row).getByTestId('ai-key-remove-openai')).toHaveProperty('disabled', true);
+    expect(screen.queryByTestId('ai-key-saved-openai')).toBeNull();
+  });
+
+  it('with a key: "Saved ••••" instead, and no "No key saved"', async () => {
+    renderCard(createFakeAiKeyPort(SAVED));
+    await screen.findByTestId('ai-key-saved-openai');
+
+    expect(screen.queryByTestId('ai-key-none-openai')).toBeNull();
+  });
+
+  it('boundary: while the store has not answered yet, it claims neither', () => {
+    renderCard(createFakeAiKeyPort(SAVED));
+    // Synchronously, before the first status read resolves.
+    expect(screen.queryByTestId('ai-key-none-openai')).toBeNull();
+    expect(screen.queryByTestId('ai-key-saved-openai')).toBeNull();
+  });
+});
+
+describe('"No key saved" is never said about a store that will not answer', () => {
+  it('negative: an unreadable store shows neither line', async () => {
+    const port = createFakeAiKeyPort(SAVED);
+    port.makeUnreadable();
+    renderCard(port);
+
+    await screen.findByTestId('ai-key-card-openai');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByTestId('ai-key-none-openai')).toBeNull();
+    expect(screen.queryByTestId('ai-key-saved-openai')).toBeNull();
+  });
+});
