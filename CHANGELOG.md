@@ -6,8 +6,14 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- New two-colour icons beside each item in the navigation, on the desktop sidebar and the phone's bottom bar: Profile, Search, Tracker, Analysis, Tailor, and a key for Settings (L-254). The main lines follow the item's text colour; the accent is CViper Light's teal.
+
 ### Fixed
 
+- The Windows setup no longer goes "Not Responding" on its last page (L-253). The desktop shortcut is now made while the app installs, rather than when you press Finish, and "Run CViper Light" starts the app without making the setup window wait for it. The "Create desktop shortcut" box is gone from the last page, because the shortcut has already been made.
+- Installing a newer version over an older one by hand no longer opens the old version's uninstaller with its "Delete the application data" box (L-253). The old version is now replaced quietly, keeping your data and saved keys, the same way the in-app update does. If CViper Light is open, the setup asks before closing it.
 - With an OpenAI key, the app now uses OpenAI's GPT-6 models (L-248). OpenAI is switching off all four models the OpenAI card offered — `gpt-4o`, `gpt-4o-mini`, `gpt-4.1` and `gpt-4.1-mini` — on 14 January 2027, and names `gpt-6-luna` as the replacement. The card now offers `gpt-6-luna` (the new default), `gpt-6.1-sol` and `gpt-6-astra`. On OpenRouter, the default `openai/gpt-4o-mini` becomes `openai/gpt-6-luna`, and `openai/gpt-4o` becomes `openai/gpt-6.1-sol`. These models refuse a setting ("temperature") the app used to send to OpenAI, so the app no longer sends it to OpenAI, directly or through OpenRouter, and a test fails if it ever does again. If you had chosen one of the old models, the app goes back to that provider's default until you choose again.
 
 ## [0.10.2] — 2026-10-16
