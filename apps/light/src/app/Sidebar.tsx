@@ -3,6 +3,7 @@ import { shortcutHint } from './hints';
 import { type EnvironmentStatus } from '../status/environment';
 
 import { CViperMark } from './CViperMark';
+import { NavIcon } from './NavIcon';
 import { StatusStrip } from './StatusStrip';
 import { APP_VERSION } from '../features/settings/backup';
 
@@ -72,7 +73,11 @@ function NavButtonBody({
           : 'border-l-transparent text-ink-inverse-muted hover:bg-canvas/5 hover:text-ink-inverse',
       ].join(' ')}
     >
-      <span>{view.label}</span>
+      {/* The duotone icon beside the label (L-254); the shortcut column stays right-aligned. */}
+      <span className="flex min-w-0 items-center gap-2.5">
+        <NavIcon id={view.id} />
+        <span>{view.label}</span>
+      </span>
       {view.shortcut === null ? null : (
         // Teaching the shortcut in place costs nothing and saves the user
         // finding it in a menu that does not exist.
