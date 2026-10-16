@@ -30,6 +30,7 @@
     "createUpdaterArtifacts": true,
     "windows": {
       "nsis": {
+        "template": "windows/installer.nsi",
         "installerHooks": "windows/hooks.nsh",
         "installerIcon": "icons/icon.ico",
         "sidebarImage": "windows/installer-sidebar.bmp",
