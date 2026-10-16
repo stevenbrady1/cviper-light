@@ -115,17 +115,70 @@ function BoardButtons({ boards, form, browser, prefix }: BoardButtonsProps) {
   );
 }
 
-interface KeylessBarProps {
-  readonly form: SearchForm;
-  readonly browser: BrowserPort;
-  /** Shipped defaults with the user's choices applied. Disabled boards included. */
+interface BoardCheckboxesProps {
   readonly boards: readonly Board[];
+  readonly ticked: ReadonlySet<string>;
+  readonly onToggle: (id: string, on: boolean) => void;
+  readonly disabled: boolean;
 }
 
-export function KeylessBar({ form, browser, boards }: KeylessBarProps) {
+/**
+ * One checkbox per board (L-219 part 4). Each still says, on hover or focus,
+ * which of the form's filters its link carries. The hint's handlers sit on the
+ * label (focus events bubble to it from the checkbox); its description is on
+ * the checkbox itself, where a screen reader reads it.
+ */
+function BoardCheckboxes({ boards, ticked, onToggle, disabled }: BoardCheckboxesProps) {
+  return (
+    <>
+      {boards.map((board) => (
+        <Hint
+          key={board.id}
+          text={boardHint(board.label, boardFilterSupport(board), board.filters)}
+        >
+          {({ 'aria-describedby': describedBy, ...trigger }) => (
+            <label
+              {...trigger}
+              className="inline-flex min-h-11 items-center gap-1.5 text-ink md:min-h-0"
+            >
+              <input
+                type="checkbox"
+                data-testid={`keyless-${board.id}`}
+                data-board={board.id}
+                aria-describedby={describedBy}
+                checked={ticked.has(board.id)}
+                disabled={disabled}
+                onChange={(event) => onToggle(board.id, event.currentTarget.checked)}
+                className="size-4 accent-blue"
+              />
+              {board.label}
+            </label>
+          )}
+        </Hint>
+      ))}
+    </>
+  );
+}
+
+interface KeylessBarProps {
+  /** Shipped defaults with the user's choices applied. Disabled boards included. */
+  readonly boards: readonly Board[];
+  /** The ticked board ids (the page owns them: its Search button opens them). */
+  readonly ticked: ReadonlySet<string>;
+  readonly onToggle: (id: string, on: boolean) => void;
+  /** While a search is running. */
+  readonly disabled?: boolean | undefined;
+}
+
+export function KeylessBar({ boards, ticked, onToggle, disabled = false }: KeylessBarProps) {
   const [showAll, setShowAll] = useState(false);
   const shown = boards.filter((board) => board.enabled);
   const { main, rest } = mainBoards(shown);
+  // A ticked board behind "More" stays on show, so nothing ticked is ever hidden.
+  const visible = showAll
+    ? shown
+    : shown.filter((board) => main.includes(board) || ticked.has(board.id));
+  const hiddenCount = shown.length - visible.length;
 
   return (
     <section
@@ -137,8 +190,9 @@ export function KeylessBar({ form, browser, boards }: KeylessBarProps) {
         Search job boards with these filters
       </h2>
       <p className="mt-0.5 text-xs text-ink-muted">
-        Opens the site in your browser, where you are already signed in, with the words and filters
-        above. Point at a board to see which filters it takes.
+        Tick the boards you want, then press Search. Each one opens in your browser, where you are
+        already signed in, with the words and filters above. Point at a board to see which filters
+        it takes.
       </p>
 
       {shown.length === 0 ? (
@@ -146,25 +200,28 @@ export function KeylessBar({ form, browser, boards }: KeylessBarProps) {
           Every board is switched off. Turn one back on under Job boards in Settings.
         </p>
       ) : (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <BoardButtons
-            boards={showAll ? shown : main}
-            form={form}
-            browser={browser}
-            prefix="keyless"
-          />
-          {rest.length === 0 ? null : (
-            <button
-              type="button"
-              data-testid="keyless-more"
-              aria-expanded={showAll}
-              onClick={() => setShowAll((was) => !was)}
-              className={QUIET_BUTTON}
-            >
-              {showAll ? 'Fewer boards' : `More boards (${rest.length})`}
-            </button>
-          )}
-        </div>
+        <fieldset data-testid="keyless-boards" className="mt-2 min-w-0">
+          <legend className="sr-only">Job boards to open</legend>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <BoardCheckboxes
+              boards={visible}
+              ticked={ticked}
+              onToggle={onToggle}
+              disabled={disabled}
+            />
+            {rest.length === 0 ? null : (
+              <button
+                type="button"
+                data-testid="keyless-more"
+                aria-expanded={showAll}
+                onClick={() => setShowAll((was) => !was)}
+                className={QUIET_BUTTON}
+              >
+                {showAll ? 'Fewer boards' : `More boards (${hiddenCount})`}
+              </button>
+            )}
+          </div>
+        </fieldset>
       )}
 
       <p className="mt-2 text-xs text-ink-faint">
