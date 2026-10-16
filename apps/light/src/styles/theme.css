@@ -77,6 +77,16 @@
   --color-teal-ink: #0a6c4b;
   --color-gold-ink: #8a5200;
 
+  /*
+   * The navigation icons' accent (L-254): the owner's teal for the second
+   * colour of the duotone nav icons, and nothing else. The icons' main strokes
+   * follow the item's text colour (`currentColor`); only the accent strokes use
+   * this, through `NAV_ACCENT` in `ui/NavIcons.tsx`. It is drawn only on the
+   * navy rail and phone bar, where it measures 5.3:1 (`navAccent.contract.test.ts`
+   * holds it to 3:1).
+   */
+  --color-nav-accent: #17a2b8;
+
   /* --- Surfaces --------------------------------------------------------- */
   /* canvas is the page, sunken is a well cut into it, card sits on top. */
   --color-canvas: #f7f8fa;

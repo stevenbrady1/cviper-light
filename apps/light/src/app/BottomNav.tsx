@@ -1,3 +1,4 @@
+import { NavIcon } from './NavIcon';
 import { VIEWS, type ViewDefinition, type ViewId } from './views';
 
 /**
@@ -37,7 +38,7 @@ function BottomNavButton({ view, active, onSelect }: BottomNavButtonProps) {
       data-testid={`nav-${view.id}`}
       onClick={() => onSelect(view.id)}
       className={[
-        'flex min-h-11 flex-1 flex-col items-center justify-center rounded-control px-1 py-1.5 text-xs',
+        'flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-control px-1 py-1.5 text-xs',
         // The 2px teal rule is the marker, as on the rail — on top here, where
         // the thumb is not covering it. Present in both states so nothing
         // shifts as the selection moves.
@@ -47,7 +48,9 @@ function BottomNavButton({ view, active, onSelect }: BottomNavButtonProps) {
           : 'border-t-transparent text-ink-inverse-muted',
       ].join(' ')}
     >
-      {view.label}
+      {/* The same icon as the rail (L-254), above the label. */}
+      <NavIcon id={view.id} />
+      <span>{view.label}</span>
     </button>
   );
 }
