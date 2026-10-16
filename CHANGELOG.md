@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- With an OpenAI key, the app now uses OpenAI's GPT-6 models (L-248). OpenAI is switching off all four models the OpenAI card offered — `gpt-4o`, `gpt-4o-mini`, `gpt-4.1` and `gpt-4.1-mini` — on 14 January 2027, and names `gpt-6-luna` as the replacement. The card now offers `gpt-6-luna` (the new default), `gpt-6.1-sol` and `gpt-6-astra`. On OpenRouter, the default `openai/gpt-4o-mini` becomes `openai/gpt-6-luna`, and `openai/gpt-4o` becomes `openai/gpt-6.1-sol`. These models refuse a setting ("temperature") the app used to send to OpenAI, so the app no longer sends it to OpenAI, directly or through OpenRouter, and a test fails if it ever does again. If you had chosen one of the old models, the app goes back to that provider's default until you choose again.
+
 ## [0.10.2] — 2026-10-16
 
 0.10.1 was tagged but not released on its own, so this release also brings everything listed under 0.10.1 below.
