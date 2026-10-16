@@ -11,6 +11,7 @@ import {
   MISTRAL_DEFAULT_MODEL,
   OPENROUTER_DEFAULT_MODEL,
   createAnthropicProvider,
+  createOpenAiProvider,
   type ChatTransport,
 } from '@cviper/ai-providers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -73,10 +74,26 @@ describe('the curated lists', () => {
     }
   });
 
-  it('negative: offers no OpenAI reasoning model — they refuse the temperature 0 every job sends', () => {
-    for (const choice of AI_MODEL_CHOICES.openai) {
-      expect(choice.id).not.toMatch(/^(o\d|gpt-5)/);
+  // L-248: OpenAI deprecated these on 2026-10-14 and shuts them down on
+  // 2027-01-14, naming gpt-6-luna as the replacement for all four
+  // (developers.openai.com/api/docs/deprecations).
+  const OPENAI_SHUTDOWN_2027_01_14 = ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini'];
+
+  it('defaults OpenAI to gpt-6-luna, the replacement OpenAI names for all four retiring models', () => {
+    expect(OPENAI_DEFAULT_MODEL).toBe('gpt-6-luna');
+    expect(OPENROUTER_DEFAULT_MODEL).toBe('openai/gpt-6-luna');
+  });
+
+  it('negative: offers no OpenAI model that shuts down on 2027-01-14, directly or through OpenRouter', () => {
+    const openai = AI_MODEL_CHOICES.openai.map((choice) => choice.id);
+    const openrouter = AI_MODEL_CHOICES.openrouter.map((choice) => choice.id);
+    for (const retiring of OPENAI_SHUTDOWN_2027_01_14) {
+      expect(openai).not.toContain(retiring);
+      expect(openrouter).not.toContain(`openai/${retiring}`);
     }
+    // Boundary: nothing from the GPT-4 family at all, not just these four ids.
+    for (const id of openai) expect(id).not.toMatch(/^gpt-4/);
+    for (const id of openrouter) expect(id).not.toMatch(/^openai\/gpt-4/);
   });
 });
 
@@ -133,6 +150,23 @@ describe('choosing and reading back', () => {
     }
   });
 
+  it('negative: a stored OpenAI model that shuts down on 2027-01-14 falls back to gpt-6-luna', () => {
+    for (const retiring of ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini']) {
+      localStorage.setItem(MODEL_CHOICE_STORAGE_KEY, JSON.stringify({ openai: retiring }));
+      expect(chosenModel('openai')).toBe('gpt-6-luna');
+      expect(readModelChoices().openai).toBe('gpt-6-luna');
+      // And the Settings select can no longer put one back.
+      expect(chooseModel('openai', retiring)).toBe(false);
+    }
+    localStorage.setItem(
+      MODEL_CHOICE_STORAGE_KEY,
+      JSON.stringify({ openrouter: 'openai/gpt-4o-mini' }),
+    );
+    expect(chosenModel('openrouter')).toBe('openai/gpt-6-luna');
+    localStorage.setItem(MODEL_CHOICE_STORAGE_KEY, JSON.stringify({ openrouter: 'openai/gpt-4o' }));
+    expect(chosenModel('openrouter')).toBe('openai/gpt-6-luna');
+  });
+
   it('negative: none of the retired or retiring ids is offered', () => {
     const offered = Object.values(AI_MODEL_CHOICES).flatMap((list) => list.map((c) => c.id));
     for (const retired of [
@@ -184,6 +218,51 @@ describe('every AI feature runs the chosen model', () => {
       expect(options.find((candidate) => candidate.kind === id)?.model).toBe(defaultModelFor(id));
     }
   });
+});
+
+describe('every OpenAI model on the Settings card is sent a request it accepts (L-248)', () => {
+  // OpenAI's GPT-6 guide: "When reasoning effort is not `none`, remove
+  // `temperature`, `top_p`, and `top_logprobs`", and GPT-6 defaults to medium.
+  // Like the Anthropic case below, the key test (a GET of /models) cannot see a
+  // 400 that only a real question would get.
+  it.each(AI_MODEL_CHOICES.openai.map((choice) => choice.id))(
+    '%s: no temperature, and max_completion_tokens with strict json_schema',
+    async (model) => {
+      const bodies: string[] = [];
+      const transport: ChatTransport = {
+        chat: async (_provider, body) => {
+          bodies.push(body);
+          return {
+            ok: true,
+            value: {
+              status: 200,
+              body: '{"choices":[{"message":{"content":"{}"},"finish_reason":"stop"}]}',
+            },
+          };
+        },
+        listModels: async () => ({ ok: true, value: { status: 200, body: '{"data":[]}' } }),
+      };
+
+      await createOpenAiProvider(transport).chatJson({
+        model,
+        system: 's',
+        user: 'u',
+        schema: { type: 'object' },
+        temperature: 0,
+        maxOutputTokens: 1024,
+      });
+
+      const sent = JSON.parse(bodies[0] ?? '{}') as Record<string, unknown>;
+      expect(sent['model']).toBe(model);
+      expect(sent).not.toHaveProperty('temperature');
+      expect(sent).not.toHaveProperty('max_tokens');
+      expect(typeof sent['max_completion_tokens']).toBe('number');
+      expect(sent['response_format']).toMatchObject({
+        type: 'json_schema',
+        json_schema: { strict: true },
+      });
+    },
+  );
 });
 
 describe('every Anthropic model on the Settings card is sent a request it accepts', () => {

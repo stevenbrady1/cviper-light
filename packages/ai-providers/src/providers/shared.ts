@@ -176,9 +176,10 @@ export const REASONING_HEADROOM_TOKENS = 8192;
  * The most any cloud request asks for.
  *
  * A cap above a model's own output limit is a 400, not a clamp, on OpenAI's
- * API (gpt-4o and gpt-4o-mini stop at 16,384). That is the smallest limit
+ * API (gpt-4o and gpt-4o-mini stop at 16,384). That was the smallest limit
  * among the default models, so a default request is never refused for asking
- * too much.
+ * too much. The GPT-6 models that replace them (L-248) allow 128,000, so the
+ * ceiling still fits and is left where it was.
  */
 export const MAX_WIRE_OUTPUT_TOKENS = 16_384;
 
