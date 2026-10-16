@@ -87,6 +87,16 @@
    */
   --color-nav-accent: #17a2b8;
 
+  /*
+   * The Settings section icons' accent (L-256): its OWN token, apart from the
+   * nav icons' #17a2b8, because these icons sit on light tiles (navy or danger
+   * at 10% over the page or a card). The owner's #17a2b8 measured 2.35-2.62:1
+   * there; on 2026-10-16 the owner chose #148da0, the same hue darkened just
+   * enough to clear WCAG 1.4.11's 3:1 on all four tiles.
+   * `sectionIconAccent.contract.test.ts` enforces it.
+   */
+  --color-section-icon-accent: #148da0;
+
   /* --- Surfaces --------------------------------------------------------- */
   /* canvas is the page, sunken is a well cut into it, card sits on top. */
   --color-canvas: #f7f8fa;

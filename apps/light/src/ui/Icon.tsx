@@ -1,4 +1,16 @@
-import { type ReactNode } from 'react';
+import { type ComponentType, type ReactNode } from 'react';
+
+import {
+  AboutIcon,
+  DeleteEverythingIcon,
+  GettingStartedIcon,
+  JobBoardsIcon,
+  PrivacyIcon,
+  ReportProblemIcon,
+  UpdatesIcon,
+  YourDataIcon,
+  type SettingsIconProps,
+} from './SettingsIcons';
 
 /**
  * The app's icons: a small, fixed set of line drawings, inline.
@@ -95,61 +107,6 @@ const PATHS = {
       <path d="m17 6 3 3" />
     </>
   ),
-  data: (
-    <>
-      <ellipse cx="12" cy="5" rx="8" ry="3" />
-      <path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
-      <path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
-    </>
-  ),
-  shield: (
-    <>
-      <path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z" />
-      <path d="m9 12 2 2 4-4" />
-    </>
-  ),
-  refresh: (
-    <>
-      <path d="M20 12a8 8 0 0 1-14 5.3" />
-      <path d="M4 12a8 8 0 0 1 14-5.3" />
-      <path d="M18 3v4h-4" />
-      <path d="M6 21v-4h4" />
-    </>
-  ),
-  info: (
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 11v5" />
-      <path d="M12 8h.01" />
-    </>
-  ),
-  trash: (
-    <>
-      <path d="M4 7h16" />
-      <path d="M9 7V4h6v3" />
-      <path d="M6 7l1 13h10l1-13" />
-    </>
-  ),
-  boards: (
-    <>
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </>
-  ),
-  flag: (
-    <>
-      <path d="M5 21V4" />
-      <path d="M5 4h11l-2 4 2 4H5" />
-    </>
-  ),
-  start: (
-    <>
-      <path d="M5 12h14" />
-      <path d="m13 6 6 6-6 6" />
-    </>
-  ),
   alert: (
     <>
       <path d="M12 3 2 20h20z" />
@@ -159,18 +116,49 @@ const PATHS = {
   ),
 } satisfies Record<string, ReactNode>;
 
-export type IconName = keyof typeof PATHS;
+/**
+ * The Settings section icons (L-256): the owner's duotone drawings, under the
+ * names the Settings headings already used, so every `SectionHeading` that
+ * asked for `data`, `boards`, … now draws the new icon. The old single-colour
+ * drawings for these eight names were removed — nothing else referenced them.
+ * See `SettingsIcons.tsx`.
+ */
+const DUOTONE = {
+  data: YourDataIcon,
+  boards: JobBoardsIcon,
+  refresh: UpdatesIcon,
+  start: GettingStartedIcon,
+  shield: PrivacyIcon,
+  info: AboutIcon,
+  flag: ReportProblemIcon,
+  trash: DeleteEverythingIcon,
+} satisfies Record<string, ComponentType<SettingsIconProps>>;
+
+export type IconName = keyof typeof PATHS | keyof typeof DUOTONE;
 
 /** Every icon there is. Exported so the tests can prove each one draws. */
-export const ICON_NAMES = Object.keys(PATHS) as readonly IconName[];
+export const ICON_NAMES = [...Object.keys(PATHS), ...Object.keys(DUOTONE)] as readonly IconName[];
+
+function isDuotone(name: IconName): name is keyof typeof DUOTONE {
+  return name in DUOTONE;
+}
 
 export interface IconProps {
   readonly name: IconName;
   /** Pixel size of the square. 16 inline with text, 20 inside a tile. */
   readonly size?: number;
+  /**
+   * One colour only: a two-colour icon draws its accent in the ink too. A
+   * danger tile asks for it (L-256). Single-colour icons ignore it.
+   */
+  readonly monochrome?: boolean;
 }
 
-export function Icon({ name, size = 20 }: IconProps) {
+export function Icon({ name, size = 20, monochrome = false }: IconProps) {
+  if (isDuotone(name)) {
+    const Duotone = DUOTONE[name];
+    return <Duotone size={size} className="shrink-0" monochrome={monochrome} />;
+  }
   return (
     <svg
       aria-hidden="true"
