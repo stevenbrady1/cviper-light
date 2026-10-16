@@ -1,14 +1,14 @@
 import { QUIET_BUTTON } from '../../../app/buttons';
 import { SectionHeading } from '../../../ui';
 import { type BrowserPort } from '../../../platform/browser';
-import { LIGHT_PAGE_URL, LIGHT_SOURCE_URL } from '../../signposts/links';
+import { CVIPER_TERMS_URL, LIGHT_PAGE_URL, LIGHT_SOURCE_URL } from '../../signposts/links';
 import { APP_VERSION } from '../backup';
 
 /**
  * About — where Light was made, what it costs, and which build this is (L-87).
  *
  * Stateless, like the signposts: the version is a compile-time constant and
- * the two links hand a fixed address to the user's browser. Nothing here is
+ * each link hands a fixed address to the user's browser. Nothing here is
  * checked, counted or fetched, and `signposts.stateless.contract.test.ts`
  * holds this folder to that.
  */
@@ -45,7 +45,15 @@ export function About({ browser }: AboutProps) {
         >
           Source and licence on GitHub →
         </button>
-        <span className="text-xs text-ink-faint">Both open in your browser.</span>
+        <button
+          type="button"
+          data-testid="about-open-terms"
+          onClick={() => void browser.open(CVIPER_TERMS_URL)}
+          className={`${QUIET_BUTTON} px-0 text-blue hover:bg-card hover:text-navy`}
+        >
+          Terms of use →
+        </button>
+        <span className="text-xs text-ink-faint">These open in your browser.</span>
       </div>
     </section>
   );
