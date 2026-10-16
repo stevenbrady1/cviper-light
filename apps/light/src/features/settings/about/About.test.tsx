@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createFakeBrowserPort } from '../../../platform/test/fakeBrowserPort';
-import { LIGHT_PAGE_URL, LIGHT_SOURCE_URL } from '../../signposts/links';
+import { CVIPER_TERMS_URL, LIGHT_PAGE_URL, LIGHT_SOURCE_URL } from '../../signposts/links';
 import { APP_VERSION } from '../backup';
 
 import { About } from './About';
@@ -35,6 +35,17 @@ describe('About', () => {
     render(<About browser={browser} />);
     fireEvent.click(screen.getByTestId('about-open-source'));
     expect(browser.opened()).toEqual([LIGHT_SOURCE_URL]);
+  });
+
+  it('happy: the terms link opens exactly the terms of use page (L-232)', () => {
+    const browser = createFakeBrowserPort();
+    render(<About browser={browser} />);
+    fireEvent.click(screen.getByTestId('about-open-terms'));
+    expect(browser.opened()).toEqual([CVIPER_TERMS_URL]);
+  });
+
+  it('boundary: the terms address is the canonical one, on our own site, with its trailing slash (L-232)', () => {
+    expect(CVIPER_TERMS_URL).toBe('https://cviper.ai/terms/');
   });
 
   it('negative: rendering opens nothing, and there is no primary button here', () => {

@@ -6,6 +6,14 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Settings → About now links the terms of use, at cviper.ai/terms (L-232). They say in plain words that the app is free and provided as it is, that AI can get things wrong so you should check what it writes before you send it, that nothing in the app is careers, legal or financial advice, and that the laws of England and Wales apply. The link opens in your browser, like the other two.
+
+### Added
+
+- Settings → About now links the terms of use, at cviper.ai/terms (L-232). They say in plain words that the app is free and provided as it is, that AI can get things wrong so you should check what it writes before you send it, that nothing in the app is careers, legal or financial advice, and that the laws of England and Wales apply. The link opens in your browser, like the other two.
+
 ## [0.10.1] — 2026-10-15
 
 ### Fixed
