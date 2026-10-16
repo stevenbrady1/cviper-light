@@ -66,13 +66,16 @@ describe('the accent token', () => {
 });
 
 describe('the drawings are the owner’s, exactly', () => {
-  it('profile: accent document at half opacity, user in currentColor', () => {
+  it('profile: accent document at full strength (owner, 2026-10-16), user in currentColor', () => {
     const { container } = render(<ProfileIcon />);
-    const doc = container.querySelector('path[stroke-opacity]');
-    expect(doc?.getAttribute('d')).toBe(
-      'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z',
+    const doc = container.querySelector(
+      'path[d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"]',
     );
-    expect(doc?.getAttribute('stroke-opacity')).toBe('0.5');
+    expect(doc).not.toBeNull();
+    expect(doc?.getAttribute('stroke')).toBe('var(--color-nav-accent)');
+    // The drawing had it at 0.5 (2.32:1 on navy, under WCAG 1.4.11's 3:1); the
+    // owner chose full strength, which is the accent's 5.26:1.
+    expect(doc?.hasAttribute('stroke-opacity')).toBe(false);
     expect(container.querySelector('circle')?.getAttribute('r')).toBe('3');
   });
 

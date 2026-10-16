@@ -49,11 +49,7 @@ function NavSvg({ className, children }: NavIconProps & { readonly children: Rea
 export function ProfileIcon({ className }: NavIconProps) {
   return (
     <NavSvg className={className}>
-      <path
-        d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-        stroke={NAV_ACCENT}
-        strokeOpacity="0.5"
-      />
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke={NAV_ACCENT} />
       <circle cx="12" cy="10" r="3" />
       <path d="M7 20v-2a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v2" />
     </NavSvg>
