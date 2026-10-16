@@ -210,32 +210,6 @@
   }
 
   /*
-   * The focus ring, once, globally. Blue, because focus is action.
-   *
-   * `outline: none` plus a box-shadow ring rather than a plain outline: the ring
-   * then follows the element's border-radius on every control, which a 3px
-   * outline does not do consistently across engines.
-   *
-   * Two rings, not one (L-212): a 2px `card` ring inside a 2px solid `blue`
-   * one. The old ring was blue at 25% opacity — about 1.5:1 against the page,
-   * far under the 3:1 WCAG asks of a focus indicator. Solid blue measures
-   * 5.4:1 or more on every light surface; on the navy rail, where blue alone
-   * is 2.6:1, the white inner ring carries it at over 12:1. The contract
-   * test reads these two colours from this rule and checks every surface.
-   *
-   * The cost, stated rather than discovered later: for the few focusable
-   * elements that also carry `shadow-raised`, the ring replaces the elevation
-   * while they are focused. On a card that is invisible; if it ever matters,
-   * the fix is a per-element ring, not a weaker global rule.
-   */
-  :focus-visible {
-    outline: none;
-    box-shadow:
-      0 0 0 2px var(--color-card),
-      0 0 0 4px var(--color-blue);
-  }
-
-  /*
    * The motion budget: ONE moment, and it is a card arriving in its new column.
    * Everything else in this app is still. `prefers-reduced-motion` removes even
    * that one.
@@ -289,4 +263,34 @@
       animation: none;
     }
   }
+}
+
+/*
+ * The focus ring, once, globally. Blue, because focus is action.
+ *
+ * `outline: none` plus a box-shadow ring rather than a plain outline: the ring
+ * then follows the element's border-radius on every control, which a 3px
+ * outline does not do consistently across engines.
+ *
+ * Two rings, not one (L-212): a 2px `card` ring inside a 2px solid `blue`
+ * one. The old ring was blue at 25% opacity — about 1.5:1 against the page,
+ * far under the 3:1 WCAG asks of a focus indicator. Solid blue measures
+ * 5.4:1 or more on every light surface; on the navy rail, where blue alone
+ * is 2.6:1, the white inner ring carries it at over 12:1. The contract
+ * test reads these two colours from this rule and checks every surface.
+ *
+ * OUTSIDE every `@layer`, on purpose (L-235). It used to sit in `@layer base`,
+ * and Tailwind 4 emits utilities in `@layer utilities`, which beats `base`
+ * whatever the specificity: `shadow-raised` on a tracker card replaced the
+ * ring, so the default view showed no focus at all. An unlayered rule beats
+ * every layered one, so no utility can paint over the ring again.
+ * `focus-ring-unlayered.contract.test.ts` holds it there. The cost is the one
+ * the old comment named: while focused, the ring replaces an element's own
+ * elevation shadow.
+ */
+:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--color-card),
+    0 0 0 4px var(--color-blue);
 }

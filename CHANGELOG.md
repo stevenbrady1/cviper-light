@@ -8,6 +8,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Fixed
 
+- Tracker cards now show the keyboard focus ring (L-235). Tabbing through the tracker, the app's first screen, used to show no sign of where you were: each card's own shadow painted over the ring. The ring now sits where no component style can replace it, and a test fails if it is ever moved back.
+
+### Fixed
+
 - The Windows setup no longer goes "Not Responding" on its last page (L-253). The desktop shortcut is now made while the app installs, rather than when you press Finish, and "Run CViper Light" starts the app without making the setup window wait for it. The "Create desktop shortcut" box is gone from the last page, because the shortcut has already been made.
 - Installing a newer version over an older one by hand no longer opens the old version's uninstaller with its "Delete the application data" box (L-253). The old version is now replaced quietly, keeping your data and saved keys, the same way the in-app update does. If CViper Light is open, the setup asks before closing it.
 
