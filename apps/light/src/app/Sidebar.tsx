@@ -3,7 +3,10 @@ import { shortcutHint } from './hints';
 import { type EnvironmentStatus } from '../status/environment';
 
 import { CViperMark } from './CViperMark';
+import { NavIcon } from './NavIcon';
 import { StatusStrip } from './StatusStrip';
+import { APP_VERSION } from '../features/settings/backup';
+
 import { PINNED_VIEWS, SEQUENCE_VIEWS, type ViewDefinition, type ViewId } from './views';
 
 /**
@@ -70,7 +73,11 @@ function NavButtonBody({
           : 'border-l-transparent text-ink-inverse-muted hover:bg-canvas/5 hover:text-ink-inverse',
       ].join(' ')}
     >
-      <span>{view.label}</span>
+      {/* The duotone icon beside the label (L-254); the shortcut column stays right-aligned. */}
+      <span className="flex min-w-0 items-center gap-2.5">
+        <NavIcon id={view.id} />
+        <span>{view.label}</span>
+      </span>
       {view.shortcut === null ? null : (
         // Teaching the shortcut in place costs nothing and saves the user
         // finding it in a menu that does not exist.
@@ -121,6 +128,15 @@ export function Sidebar({ activeView, onSelect, status }: SidebarProps) {
           </li>
         ))}
       </ul>
+
+      {/*
+        Which version this is, without opening Settings → About (L-251). The
+        same constant About shows. Plain text: nothing to press, nothing to
+        tab to.
+      */}
+      <p data-testid="sidebar-version" className="px-4 pb-3 text-xs text-ink-inverse-muted">
+        CViper Light {APP_VERSION}
+      </p>
 
       <StatusStrip status={status} onOpenSettings={() => onSelect('settings')} />
     </nav>

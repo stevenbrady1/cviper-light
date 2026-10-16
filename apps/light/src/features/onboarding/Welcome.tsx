@@ -10,6 +10,8 @@ import { ollamaNeedsChatModel, type Availability } from '../analysis/providers';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 
 import { ONBOARDING_CARDS, localModelLine, type OnboardingCard } from './cards';
+import { type LeftoverKeysPort } from './leftoverKeys';
+import { LeftoverKeysNotice } from './LeftoverKeysNotice';
 
 /**
  * The first screen, and the only one that ever explains the whole product.
@@ -70,6 +72,12 @@ export interface WelcomeProps {
    * to the real one, which hands the address to the browser.
    */
   readonly browser?: BrowserPort | undefined;
+  /**
+   * Keys left by an earlier install (L-251): the one-time question shown on a
+   * first run with no data. Injected by tests; defaults to the real
+   * credential store and database. See `leftoverKeys.ts`.
+   */
+  readonly leftoverKeys?: LeftoverKeysPort | undefined;
 }
 
 const CARD_ICON: Record<OnboardingCard['id'], IconName> = {
@@ -89,7 +97,7 @@ function localAiFound(availability: Availability | null): boolean {
   return availability !== null && availability.ollamaModels.length > 0;
 }
 
-export function Welcome({ onDismiss, detect, browser }: WelcomeProps) {
+export function Welcome({ onDismiss, detect, browser, leftoverKeys }: WelcomeProps) {
   const [availability, setAvailability] = useState<Availability | null>(null);
   const browserPort = useMemo(() => browser ?? createTauriBrowserPort(), [browser]);
 
@@ -176,6 +184,8 @@ export function Welcome({ onDismiss, detect, browser }: WelcomeProps) {
           ))}
         </ul>
       </div>
+
+      <LeftoverKeysNotice port={leftoverKeys} />
 
       <div className="mx-auto mt-8 grid w-full max-w-5xl items-stretch gap-4 lg:grid-cols-3">
         {ONBOARDING_CARDS.map((card) => (

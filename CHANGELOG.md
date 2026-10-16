@@ -10,9 +10,28 @@ All notable changes to CViper Light are recorded here. The format follows
 
 - Settings → About now links the terms of use, at cviper.ai/terms (L-232). They say in plain words that the app is free and provided as it is, that AI can get things wrong so you should check what it writes before you send it, that nothing in the app is careers, legal or financial advice, and that the laws of England and Wales apply. The link opens in your browser, like the other two.
 
+### Changed
+
+- New two-colour icons beside each item in the navigation, on the desktop sidebar and the phone's bottom bar: Profile, Search, Tracker, Analysis, Tailor, and a key for Settings (L-254). The main lines follow the item's text colour; the accent is CViper Light's teal.
+
+### Fixed
+
+- The Windows setup no longer goes "Not Responding" on its last page (L-253). The desktop shortcut is now made while the app installs, rather than when you press Finish, and "Run CViper Light" starts the app without making the setup window wait for it. The "Create desktop shortcut" box is gone from the last page, because the shortcut has already been made.
+- Installing a newer version over an older one by hand no longer opens the old version's uninstaller with its "Delete the application data" box (L-253). The old version is now replaced quietly, keeping your data and saved keys, the same way the in-app update does. If CViper Light is open, the setup asks before closing it.
+
+## [0.10.2] — 2026-10-16
+
+0.10.1 was tagged but not released on its own, so this release also brings everything listed under 0.10.1 below.
+
 ### Added
 
-- Settings → About now links the terms of use, at cviper.ai/terms (L-232). They say in plain words that the app is free and provided as it is, that AI can get things wrong so you should check what it writes before you send it, that nothing in the app is careers, legal or financial advice, and that the laws of England and Wales apply. The link opens in your browser, like the other two.
+- On the first run of a fresh install, if the app finds API or job-board keys saved by an earlier CViper Light install, the welcome screen names them and asks: Keep them, or Remove them from this computer (L-251). It asks once, only when the app has no data yet, and never deletes anything unless you choose Remove.
+- The sidebar shows which version you are running, "CViper Light 0.10.x", just below Settings (L-251).
+
+### Changed
+
+- When no key is saved, each AI key card now says "No key saved" beside its greyed-out "Remove saved key" button, and the "Your own AI service" card says "No service saved", so the button no longer sits there on its own (L-251).
+- The Windows setup installer now shows CViper Light's own art: a navy side panel with the logo on its first and last pages, and the logo in the header of the pages between (L-251).
 
 ## [0.10.1] — 2026-10-15
 
@@ -372,7 +391,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.1...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.2...main
+[0.10.2]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.1...light-v0.10.2
 [0.10.1]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.0...light-v0.10.1
 [0.10.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.9.0...light-v0.10.0
 [0.9.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.8.0...light-v0.9.0

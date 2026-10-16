@@ -1,6 +1,6 @@
 # CViper Light privacy policy
 
-_For CViper Light 0.10.1. This page is generated from the app's own list of the addresses it may contact — the same list the app shows under Settings → Privacy, and the one a test holds the code to. It changes when that list changes and not otherwise._
+_For CViper Light 0.10.2. This page is generated from the app's own list of the addresses it may contact — the same list the app shows under Settings → Privacy, and the one a test holds the code to. It changes when that list changes and not otherwise._
 
 ## The short version
 
@@ -17,7 +17,7 @@ We — the people who make CViper Light — receive nothing from the app itself.
 - **Which job boards you enabled and how you ordered them** — job-boards.json in the same data folder.
 - **Which AI providers you agreed to send your CV to** — ai-provider-consent.json in the same data folder.
 - **Which job you were last tailoring for, so it can be offered back — its id only, no text** — workflow.json in the same data folder.
-- **Small conveniences: your last search, which free job feeds you ticked, which AI model each service uses, today’s request count, and that you have seen the introduction** — this app’s own browser storage, which no other program reads.
+- **Small conveniences: your last search, which free job feeds you ticked, which AI model each service uses, today’s request count, that you have seen the introduction, and that you were asked about keys left by an earlier install** — this app’s own browser storage, which no other program reads.
 
 ## Every address the app can contact
 
