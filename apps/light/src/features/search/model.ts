@@ -236,8 +236,7 @@ export function searchDisabledReason(usableSources: number): string | null {
 
   return (
     'Nothing is ticked for CViper to look at. Tick one of the free feeds or a job board above ' +
-    '— the feeds need no key at all — or send this straight to a job site with the buttons ' +
-    'below.'
+    '— the feeds need no key at all — or tick a job site below to open it in your browser.'
   );
 }
 
