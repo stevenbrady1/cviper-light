@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- On every Adzuna advert in Search, the word "Adzuna" is now a link to adzuna.co.uk that opens in your browser, as Adzuna's API terms ask (L-239). It used to be a plain label. Reed and Guardian Jobs adverts keep their plain labels: neither asks for more. The privacy policy's line for adzuna.co.uk now names this link too.
+
 ## [0.10.3] — 2026-10-16
 
 0.10.1 and 0.10.2 were both tagged but not released, so this release also brings everything listed under 0.10.2 and 0.10.1 below.
@@ -17,10 +21,6 @@ All notable changes to CViper Light are recorded here. The format follows
 ### Changed
 
 - New two-colour icons beside each item in the navigation, on the desktop sidebar and the phone's bottom bar: Profile, Search, Tracker, Analysis, Tailor, and a key for Settings (L-254). The main lines follow the item's text colour; the accent is CViper Light's teal.
-
-### Fixed
-
-- On every Adzuna advert in Search, the word "Adzuna" is now a link to adzuna.co.uk that opens in your browser, as Adzuna's API terms ask (L-239). It used to be a plain label. Reed and Guardian Jobs adverts keep their plain labels: neither asks for more. The privacy policy's line for adzuna.co.uk now names this link too.
 
 ### Fixed
 
