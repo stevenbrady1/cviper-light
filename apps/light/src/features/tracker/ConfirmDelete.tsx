@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 
+import { useFocusTrap } from '../../lib/useFocusTrap';
+
 /**
  * The app's only modal.
  *
@@ -25,6 +27,9 @@ import { useEffect, useRef } from 'react';
  *     application?" is not a question anybody can answer confidently.
  *   * The confirm button says `Delete` — the same word as the button that
  *     opened it. An action keeps its name all the way through.
+ *   * Tab stays inside it, and focus goes back to the Delete button when it
+ *     closes (L-236). `aria-modal` alone tells a screen reader the page behind
+ *     is inert; it does not stop Tab from reaching it.
  */
 
 interface ConfirmDeleteProps {
@@ -43,6 +48,9 @@ export function ConfirmDelete({
   confirmClassName,
 }: ConfirmDeleteProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Before the focus effect below: the trap reads the opener first.
+  useFocusTrap(dialogRef);
 
   useEffect(() => {
     cancelRef.current?.focus();
@@ -63,6 +71,7 @@ export function ConfirmDelete({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 p-6">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-delete-title"

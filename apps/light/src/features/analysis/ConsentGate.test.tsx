@@ -11,6 +11,7 @@
  */
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ConsentGate, ConsentStatus } from './ConsentGate';
@@ -120,5 +121,45 @@ describe('ConsentStatus', () => {
 
     await user.click(screen.getByTestId('analysis-consent-withdraw-openai'));
     expect(onWithdraw).toHaveBeenCalledWith('openai');
+  });
+});
+
+describe('ConsentGate keeps focus while it is open (L-236)', () => {
+  function Host() {
+    const [open, setOpen] = useState(false);
+    return (
+      <div>
+        <button type="button" data-testid="opener" onClick={() => setOpen(true)}>
+          Check my CV
+        </button>
+        <button type="button" data-testid="behind">
+          Behind
+        </button>
+        {open ? (
+          <ConsentGate kind="openai" onAccept={vi.fn()} onDecline={() => setOpen(false)} />
+        ) : null}
+      </div>
+    );
+  }
+
+  it('Tab from the last button stays inside the dialog', async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await user.click(screen.getByTestId('opener'));
+    screen.getByTestId('analysis-consent-accept').focus();
+
+    await user.tab();
+
+    expect(document.activeElement).toBe(screen.getByTestId('analysis-consent-decline'));
+  });
+
+  it('returns focus to the opener when it closes', async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await user.click(screen.getByTestId('opener'));
+
+    await user.click(screen.getByTestId('analysis-consent-decline'));
+
+    expect(document.activeElement).toBe(screen.getByTestId('opener'));
   });
 });
