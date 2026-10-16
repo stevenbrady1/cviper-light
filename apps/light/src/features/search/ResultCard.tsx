@@ -95,6 +95,12 @@ interface ResultCardProps {
    * a button that goes nowhere is worse than none.
    */
   readonly onAnalyse?: (() => void) | undefined;
+  /**
+   * Open the advert source's own site (L-239). Given only for Adzuna, whose
+   * API terms ask for the word "Adzuna" on each advert to link to their site;
+   * with it, the source label is that link.
+   */
+  readonly onOpenSource?: (() => void) | undefined;
 }
 
 export function ResultCard({
@@ -110,6 +116,7 @@ export function ResultCard({
   onSave,
   onOpen,
   onAnalyse,
+  onOpenSource,
 }: ResultCardProps) {
   const { job, contractType } = entry;
 
@@ -143,12 +150,26 @@ export function ResultCard({
             terms require their data to be attributed wherever it appears, and
             the user needs to know which board an odd advert came from anyway.
           */}
-          <span
-            data-testid={`result-source-${job.id}`}
-            className="rounded-pill bg-sunken px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] text-ink-muted uppercase"
-          >
-            {SOURCE_LABEL[job.source]}
-          </span>
+          {onOpenSource === undefined ? (
+            <span
+              data-testid={`result-source-${job.id}`}
+              className="rounded-pill bg-sunken px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] text-ink-muted uppercase"
+            >
+              {SOURCE_LABEL[job.source]}
+            </span>
+          ) : (
+            // A link to the source's own site, as Adzuna's terms ask: at
+            // least 116 x 23 pixels, opened in the user's browser (L-239).
+            <button
+              type="button"
+              data-testid={`result-source-${job.id}`}
+              onClick={onOpenSource}
+              title={`Open ${SOURCE_LABEL[job.source]} in your browser`}
+              className="inline-flex min-h-[23px] min-w-[116px] items-center justify-center rounded-pill bg-sunken px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] text-blue uppercase underline underline-offset-2 hover:text-navy"
+            >
+              {SOURCE_LABEL[job.source]}
+            </button>
+          )}
         </div>
       </div>
 

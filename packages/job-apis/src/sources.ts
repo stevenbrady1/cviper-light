@@ -30,3 +30,15 @@ export const SOURCE_LABEL: Readonly<Record<JobSource, string>> = {
   linkedin: 'LinkedIn',
   indeed: 'Indeed',
 };
+
+/**
+ * Where the word "Adzuna" on an Adzuna advert links to (L-239).
+ *
+ * Adzuna's API terms, "Publishing Adzuna ad listings"
+ * (https://developer.adzuna.com/docs/terms_of_service, read 2026-10-16): label
+ * each displayed advert with "Adzuna", at least 116 x 23 pixels, the word
+ * hyperlinked to the main Adzuna site or the relevant local domain. This app
+ * searches the UK, so the UK domain. Reed's Jobseeker API page asks for no
+ * attribution, so a Reed advert's label stays a plain name.
+ */
+export const ADZUNA_ATTRIBUTION_URL = 'https://www.adzuna.co.uk';
