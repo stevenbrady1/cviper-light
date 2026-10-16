@@ -29,6 +29,13 @@ import { todayIsoDate } from '../../lib/dates';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { readJobKeyStates, type KeyState } from '../../status/environment';
 
+import {
+  openBoards,
+  readBoardChoice,
+  searchButtonLabel,
+  tickedBoards,
+  toggleBoard,
+} from './boardChoice';
 import { FewResults, KeylessBar } from './KeylessBar';
 import {
   chosenFeeds,
@@ -52,6 +59,7 @@ import {
   providerAvailability,
   searchDisabledReason,
   toSearchInput,
+  boardSearchInput,
   validateForm,
   type ContractChoice,
   type FormErrors,
@@ -201,6 +209,14 @@ export function Search({
   const [jobBoards, setJobBoards] = useState<readonly Board[]>(() =>
     mergeBoards(SHIPPED_BOARDS, NO_PREFERENCES),
   );
+  /*
+    The boards ticked to open with the next Search (L-219 part 4), remembered
+    between visits. Ids of boards since switched off or deleted are ignored
+    here and dropped on the next tick — see `boardChoice.ts`.
+  */
+  const [boardChoice, setBoardChoice] = useState<readonly string[]>(() => readBoardChoice());
+  /** Boards that would not open on the last Search, named so the user can retry them. */
+  const [boardsProblem, setBoardsProblem] = useState<readonly string[]>([]);
 
   // ── Loading ──────────────────────────────────────────────────────────────
 
@@ -317,7 +333,15 @@ export function Search({
     counts, so a machine with no keys at all can press it — the state this
     feature exists to fix.
   */
-  const disabledReason = searchDisabledReason(usableChosen.length + keylessWanted.length);
+  const boardsToOpen = useMemo(
+    () => tickedBoards(jobBoards, boardChoice),
+    [jobBoards, boardChoice],
+  );
+  const ticked = useMemo(() => new Set(boardsToOpen.map((board) => board.id)), [boardsToOpen]);
+  // A ticked board is something to do, so the button is enabled for boards alone.
+  const disabledReason = searchDisabledReason(
+    usableChosen.length + keylessWanted.length + boardsToOpen.length,
+  );
 
   const reedVerdict = quotaVerdict(quota, 'reed', utcDateOf(clock) ?? quota.date);
 
@@ -371,6 +395,20 @@ export function Search({
       const found = validateForm(form, { requireQuery: usableChosen.length > 0 });
       setErrors(found);
       if (!formIsValid(found)) return;
+
+      /*
+        The ticked job boards (L-219 part 4): one tab each, in the list's
+        order, opened by this press and nothing else. Like the single-board
+        buttons before them they need no words in the boxes — an empty search
+        is a valid search on every board — but an invalid form opens nothing.
+        One that will not open is named; the rest still open.
+      */
+      setBoardsProblem([]);
+      if (boardsToOpen.length > 0) {
+        const failed = await openBoards(browserPort, boardsToOpen, boardSearchInput(form));
+        setBoardsProblem(failed);
+      }
+
       if (usableChosen.length === 0 && keylessWanted.length === 0) return;
 
       setRunning(true);
@@ -428,7 +466,24 @@ export function Search({
       setKeylessOutcome(keyless);
       setRunning(false);
     },
-    [clock, form, keylessWanted, newId, quota.date, searchPort, usableChosen],
+    [
+      boardsToOpen,
+      browserPort,
+      clock,
+      form,
+      keylessWanted,
+      newId,
+      quota.date,
+      searchPort,
+      usableChosen,
+    ],
+  );
+
+  const onToggleBoard = useCallback(
+    (id: string, on: boolean) => {
+      setBoardChoice((current) => toggleBoard(current, id, on, jobBoards));
+    },
+    [jobBoards],
   );
 
   const onSave = useCallback(
@@ -701,11 +756,11 @@ export function Search({
                 className={PRIMARY_BUTTON}
               >
                 {/*
-                  Always "Search" (L-219, owner decision 2026-10-08): one action,
-                  one name. What each source does with it is said where the
-                  sources are, and under the results.
+                  "Search" (L-219, owner decision 2026-10-08): one action, one
+                  name. With boards ticked it says how many tabs it will open
+                  (part 4), so pressing it never surprises anybody.
                 */}
-                {running ? 'Working…' : 'Search'}
+                {running ? 'Working…' : searchButtonLabel(boardsToOpen.length)}
               </button>
 
               {disabledReason === null ? null : (
@@ -714,13 +769,28 @@ export function Search({
                 </p>
               )}
             </div>
+
+            {boardsProblem.length === 0 ? null : (
+              <p
+                role="alert"
+                data-testid="search-boards-problem"
+                className="mt-2 rounded-control bg-danger/5 px-3 py-2 text-danger"
+              >
+                {`${boardsProblem.join(', ')} did not open in your browser. Check that a default browser is set, then press Search again.`}
+              </p>
+            )}
           </form>
 
           {/*
             ALWAYS here, and right under the form (L-219): the same search on
             the whole of a job board is one click away, before anything else.
           */}
-          <KeylessBar form={form} browser={browserPort} boards={jobBoards} />
+          <KeylessBar
+            boards={jobBoards}
+            ticked={ticked}
+            onToggle={onToggleBoard}
+            disabled={running}
+          />
 
           {recent.length === 0 ? null : (
             <div data-testid="search-recent" className="flex flex-wrap items-center gap-2">
