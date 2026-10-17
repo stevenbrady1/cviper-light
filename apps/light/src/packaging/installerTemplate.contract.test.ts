@@ -152,11 +152,66 @@ describe('fix 2: an upgrade by hand never shows the old uninstaller', () => {
   });
 
   it('asks before closing a running app, rather than letting a silent uninstall kill it', () => {
-    expect(leave).toMatch(/!insertmacro CheckIfAppIsRunning "\$\{MAINBINARYNAME\}\.exe"/);
+    expect(leave).toMatch(
+      /!insertmacro CheckIfAppIsRunning "\$INSTDIR\\\$\{MAINBINARYNAME\}\.exe"/,
+    );
   });
 
   it('the updater path still skips the uninstaller altogether', () => {
     expect(leave).toMatch(/\$\{If\} \$UpdateMode = 1\s*\n\s*Goto reinst_done/);
+  });
+});
+
+/**
+ * tauri-cli 2.12 rewrote `CheckIfAppIsRunning` in its `utils.nsh` (which the
+ * bundler always supplies fresh, never from this copy): it now takes the app's
+ * FULL PATH and asks Windows' Restart Manager, whose macros come from
+ * `Win\RestartManager.nsh`. A copy made from 2.11 includes neither, and
+ * makensis stops with `macro named "RestartManager_StartSession" not found`
+ * — which is how the grouped npm update (#310) failed the smoke build.
+ */
+export function appRunningCheckProblems(nsis: string): string[] {
+  const problems: string[] = [];
+  const source = code(nsis);
+  if (!/^!include "Win\\RestartManager\.nsh"$/m.test(source)) {
+    problems.push('Win\\RestartManager.nsh is not included');
+  }
+  for (const call of source.matchAll(/!insertmacro CheckIfAppIsRunning "([^"]*)"/g)) {
+    if (!call[1]?.startsWith('$INSTDIR\\')) {
+      problems.push(`CheckIfAppIsRunning is given "${call[1] ?? ''}", not a path under $INSTDIR`);
+    }
+  }
+  return problems;
+}
+
+describe('the running-app check matches tauri-cli 2.12’s utils.nsh', () => {
+  it('includes RestartManager.nsh and passes every call a full path', () => {
+    expect(appRunningCheckProblems(TEMPLATE)).toEqual([]);
+  });
+
+  it('there are three calls: install, uninstall and the silent replace', () => {
+    expect(code(TEMPLATE).match(/!insertmacro CheckIfAppIsRunning /g)).toHaveLength(3);
+  });
+
+  it('negative: a 2.11-style call (bare exe name) is caught', () => {
+    const old = TEMPLATE.replace(
+      /CheckIfAppIsRunning "\$INSTDIR\\\$\{MAINBINARYNAME\}\.exe"/,
+      'CheckIfAppIsRunning "${MAINBINARYNAME}.exe"',
+    );
+    expect(appRunningCheckProblems(old)).toHaveLength(1);
+  });
+
+  it('negative: a missing RestartManager include is caught', () => {
+    const old = TEMPLATE.replace(/^!include "Win\\RestartManager\.nsh"\n/m, '');
+    expect(appRunningCheckProblems(old)).toEqual(['Win\\RestartManager.nsh is not included']);
+  });
+
+  it('boundary: a commented-out include does not count', () => {
+    const old = TEMPLATE.replace(
+      /^!include "Win\\RestartManager\.nsh"$/m,
+      '; !include "Win\\RestartManager.nsh"',
+    );
+    expect(appRunningCheckProblems(old)).toEqual(['Win\\RestartManager.nsh is not included']);
   });
 });
 
