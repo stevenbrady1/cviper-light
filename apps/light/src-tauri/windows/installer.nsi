@@ -1,7 +1,7 @@
 ; CViper Light's copy of Tauri's NSIS installer template (L-253).
 ;
-; Copied from tauri-cli 2.11.4 (crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi
-; at tag tauri-cli-v2.11.4), used through bundle.windows.nsis.template in tauri.conf.json.
+; Copied from tauri-cli 2.12.1 (crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi
+; at tag tauri-cli-v2.12.1), used through bundle.windows.nsis.template in tauri.conf.json.
 ; It is the stock file except for the lines marked "; CVIPER:", which are:
 ;
 ;   1. The finish page has no "Create desktop shortcut" action; the shortcut is made in
@@ -16,7 +16,8 @@
 ;      0.10.1 also deletes saved keys) never appears during an upgrade, and nothing the
 ;      user keeps is touched.
 ;   4. Before that silent uninstall, a running CViper Light is asked about (OK/Cancel),
-;      instead of being closed without asking.
+;      instead of being closed without asking. Since tauri-cli 2.12 the check takes the
+;      app's full path and asks Windows' Restart Manager (Win\RestartManager.nsh).
 ;
 ; The in-app updater path (/UPDATE /P) is unchanged: it never runs the old uninstaller,
 ; and .onInstSuccess's /R relaunch is untouched.
@@ -54,6 +55,7 @@ ManifestDPIAwareness PerMonitorV2
 !include "FileAssociation.nsh"
 !include "Win\COM.nsh"
 !include "Win\Propkey.nsh"
+!include "Win\RestartManager.nsh"
 !include "StrFunc.nsh"
 ${StrCase}
 ${StrLoc}
@@ -289,7 +291,7 @@ Function PageReinstall
 
   ; Skip showing the page if passive
   ;
-  ; Note that we don't call this earlier at the begining
+  ; Note that we don't call this earlier at the beginning
   ; of this function because we need to populate some variables
   ; related to current installed version if detected and whether
   ; we are downgrading or not.
@@ -381,7 +383,9 @@ Function PageLeaveReinstall
     ${If} $WixMode <> 1
     ${AndIf} $R0 = 1
       StrCpy $CviperSilentReplace 1
-      !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+      ; CVIPER: tauri-cli 2.12's check takes a full path. $INSTDIR is still the old install
+      ; CVIPER: here (this page comes before the directory page), as the stock check below uses.
+      !insertmacro CheckIfAppIsRunning "$INSTDIR\${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
     ${EndIf}
 
     HideWindow
@@ -418,7 +422,7 @@ Function PageLeaveReinstall
         Abort
       ${EndIf}
 
-      ; Other erros? show generic error message and return to select un/reinstall page
+      ; Other errors? show generic error message and return to select un/reinstall page
       MessageBox MB_ICONEXCLAMATION "$(unableToUninstall)"
       Abort
     ${EndIf}
@@ -682,7 +686,7 @@ Section Install
     !insertmacro NSIS_HOOK_PREINSTALL
   !endif
 
-  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+  !insertmacro CheckIfAppIsRunning "$INSTDIR\${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
 
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
@@ -816,7 +820,7 @@ Section Uninstall
     !insertmacro NSIS_HOOK_PREUNINSTALL
   !endif
 
-  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+  !insertmacro CheckIfAppIsRunning "$INSTDIR\${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
 
   ; Delete the app directory and its content from disk
   ; Copy main executable
