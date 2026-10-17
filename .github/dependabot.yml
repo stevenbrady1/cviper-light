@@ -43,6 +43,12 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: vitest
         update-types: ['version-update:semver-major']
+      # Zod stays on 4.4.x for the launch (#308). Zod 4.6 changed the internal
+      # that packages/*/src/zod.test.ts reads to prove the eval probe never
+      # runs, so that guard can no longer see. Patches still flow. Remove this
+      # entry in the PR that teaches the guard to read zod 4.6.
+      - dependency-name: zod
+        update-types: ['version-update:semver-minor', 'version-update:semver-major']
 
   - package-ecosystem: cargo
     directory: /apps/light/src-tauri
