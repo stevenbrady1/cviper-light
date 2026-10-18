@@ -1,6 +1,8 @@
 import { type ReactNode } from 'react';
 
-import { PageHeader, type IconName } from '../ui';
+import { PageHeader } from '../ui';
+
+import { NAV_ICON } from './NavIcon';
 
 import { type ViewId } from './views';
 
@@ -14,17 +16,10 @@ import { type ViewId } from './views';
  *
  * Drawn by the shared `PageHeader` (the welcome refresh's styling language):
  * an icon tile for the view, the title, and the summary in muted ink.
+ *
+ * The tile shows the view's duotone navigation icon (`NAV_ICON`, L-254) — the
+ * same drawing as the rail, from the same table, so the two cannot drift.
  */
-
-/** The icon each view wears in its header. One per view, so the set is closed. */
-export const VIEW_ICON: Record<ViewId, IconName> = {
-  profile: 'profile',
-  search: 'search',
-  tracker: 'tracker',
-  analysis: 'analysis',
-  tailor: 'tailor',
-  settings: 'settings',
-};
 
 interface ViewHeaderProps {
   readonly title: string;
@@ -41,7 +36,7 @@ export function ViewHeader({ title, summary, action = null, view }: ViewHeaderPr
       title={title}
       subtitle={summary}
       actions={action}
-      icon={view === undefined ? undefined : VIEW_ICON[view]}
+      glyph={view === undefined ? undefined : NAV_ICON[view]}
     />
   );
 }

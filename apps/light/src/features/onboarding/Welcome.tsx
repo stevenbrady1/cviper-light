@@ -1,9 +1,18 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 
 import { CViperMark } from '../../app/CViperMark';
+import { NAV_ICON } from '../../app/NavIcon';
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { type ViewId } from '../../app/views';
-import { Card, Icon, IconTile, PageHeader, StatusPill, type IconName } from '../../ui';
+import {
+  Card,
+  Icon,
+  IconTile,
+  PageHeader,
+  StatusPill,
+  type IconName,
+  type NavIconProps,
+} from '../../ui';
 import { readAvailability } from '../analysis/availability';
 import { OllamaDownloadLink } from '../analysis/OllamaDownloadLink';
 import { ollamaNeedsChatModel, type Availability } from '../analysis/providers';
@@ -80,10 +89,11 @@ export interface WelcomeProps {
   readonly leftoverKeys?: LeftoverKeysPort | undefined;
 }
 
-const CARD_ICON: Record<OnboardingCard['id'], IconName> = {
-  tracker: 'tracker',
-  analysis: 'analysis',
-  search: 'search',
+/** Each card is a view, so it wears that view's navigation icon (L-254). */
+const CARD_ICON: Record<OnboardingCard['id'], ComponentType<NavIconProps>> = {
+  tracker: NAV_ICON.tracker,
+  analysis: NAV_ICON.analysis,
+  search: NAV_ICON.search,
 };
 
 const TRUST: ReadonlyArray<{ readonly icon: IconName; readonly label: string }> = [
@@ -265,7 +275,7 @@ function WelcomeCard({ card, availability, browser, onDismiss }: WelcomeCardProp
         </span>
       ) : null}
 
-      <IconTile icon={CARD_ICON[card.id]} tone={featured ? 'blue' : 'navy'} />
+      <IconTile glyph={CARD_ICON[card.id]} tone={featured ? 'blue' : 'navy'} />
 
       <h2 className="mt-4 text-base font-semibold text-ink">{card.title}</h2>
       <p className="text-ink-muted">{card.hook}</p>
