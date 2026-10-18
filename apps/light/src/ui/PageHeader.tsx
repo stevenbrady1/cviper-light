@@ -1,7 +1,8 @@
-import { type ReactNode } from 'react';
+import { type ComponentType, type ReactNode } from 'react';
 
 import { type IconName } from './Icon';
 import { IconTile } from './IconTile';
+import { type NavIconProps } from './NavIcons';
 
 /**
  * The top of a screen: what it is, one muted line on what it is for, and —
@@ -22,6 +23,8 @@ export interface PageHeaderProps {
   readonly subtitle: ReactNode;
   readonly actions?: ReactNode;
   readonly icon?: IconName | undefined;
+  /** A view's duotone navigation drawing, used in place of `icon` (L-254). */
+  readonly glyph?: ComponentType<NavIconProps> | undefined;
   readonly variant?: 'bar' | 'hero';
   /** Above the title in `hero`: the brand row. */
   readonly eyebrow?: ReactNode;
@@ -32,6 +35,7 @@ export function PageHeader({
   subtitle,
   actions = null,
   icon,
+  glyph,
   variant = 'bar',
   eyebrow = null,
 }: PageHeaderProps) {
@@ -58,7 +62,11 @@ export function PageHeader({
   return (
     <header className="flex flex-col gap-3 border-b border-line bg-card px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-4 md:px-6 md:py-4">
       <div className="flex min-w-0 items-center gap-3">
-        {icon === undefined ? null : <IconTile icon={icon} />}
+        {glyph !== undefined ? (
+          <IconTile glyph={glyph} />
+        ) : icon !== undefined ? (
+          <IconTile icon={icon} />
+        ) : null}
         <div className="min-w-0">
           <h1 className="text-lg font-semibold text-ink">{title}</h1>
           <p className="text-ink-muted">{subtitle}</p>

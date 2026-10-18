@@ -1,4 +1,7 @@
+import { type ComponentType } from 'react';
+
 import { Icon, type IconName } from './Icon';
+import { type NavIconProps } from './NavIcons';
 
 /**
  * An icon in a tinted square: the mark at the head of a card or a section.
@@ -15,6 +18,10 @@ import { Icon, type IconName } from './Icon';
  * The square uses the CONTROL radius, not the card radius: it is a small
  * object sitting inside a card, and a 12px corner on a 36px square reads as a
  * circle that gave up.
+ *
+ * A tile that stands for one of the six VIEWS takes that view's duotone
+ * navigation drawing as `glyph` instead of an `Icon` name (L-254), so a view
+ * looks the same in its header and on the welcome page as it does in the rail.
  */
 
 export type IconTileTone = 'navy' | 'blue' | 'teal' | 'gold' | 'danger';
@@ -28,24 +35,33 @@ const TONE: Record<IconTileTone, string> = {
 };
 
 const SIZE = {
-  sm: { box: 'size-8', icon: 16 },
-  md: { box: 'size-10', icon: 20 },
+  sm: { box: 'size-8', icon: 16, glyph: 'size-5' },
+  md: { box: 'size-10', icon: 20, glyph: 'size-6' },
 } as const;
 
-export interface IconTileProps {
-  readonly icon: IconName;
+interface IconTileBase {
   readonly tone?: IconTileTone;
   readonly size?: keyof typeof SIZE;
 }
 
-export function IconTile({ icon, tone = 'navy', size = 'md' }: IconTileProps) {
+export type IconTileProps = IconTileBase &
+  (
+    | { readonly icon: IconName; readonly glyph?: never }
+    | { readonly glyph: ComponentType<NavIconProps>; readonly icon?: never }
+  );
+
+export function IconTile({ icon, glyph: Glyph, tone = 'navy', size = 'md' }: IconTileProps) {
   return (
     <span
       aria-hidden="true"
       className={`inline-flex shrink-0 items-center justify-center rounded-control ${SIZE[size].box} ${TONE[tone] ?? TONE.navy}`}
     >
-      {/* A danger tile is one colour: no teal accent inside it (L-256). */}
-      <Icon name={icon} size={SIZE[size].icon} monochrome={tone === 'danger'} />
+      {Glyph !== undefined ? (
+        <Glyph className={SIZE[size].glyph} />
+      ) : icon !== undefined ? (
+        /* A danger tile is one colour: no teal accent inside it (L-256). */
+        <Icon name={icon} size={SIZE[size].icon} monochrome={tone === 'danger'} />
+      ) : null}
     </span>
   );
 }
