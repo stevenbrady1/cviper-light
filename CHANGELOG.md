@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.10.4] — 2026-10-18
+
+0.10.3 was prepared but never tagged or released, and 0.10.1 and 0.10.2 were tagged but not released, so this release also brings everything listed under 0.10.3, 0.10.2 and 0.10.1 below.
+
 ### Added
 
 - Settings → About now links the terms of use, at cviper.ai/terms (L-232). They say in plain words that the app is free and provided as it is, that AI can get things wrong so you should check what it writes before you send it, that nothing in the app is careers, legal or financial advice, and that the laws of England and Wales apply. The link opens in your browser, like the other two.
@@ -22,7 +26,7 @@ All notable changes to CViper Light are recorded here. The format follows
 - On every Adzuna advert in Search, the word "Adzuna" is now a link to adzuna.co.uk that opens in your browser, as Adzuna's API terms ask (L-239). It used to be a plain label. Reed and Guardian Jobs adverts keep their plain labels: neither asks for more. The privacy policy's line for adzuna.co.uk now names this link too.
 - Tracker cards now show the keyboard focus ring (L-235). Tabbing through the tracker, the app's first screen, used to show no sign of where you were: each card's own shadow painted over the ring. The ring now sits where no component style can replace it, and a test fails if it is ever moved back.
 - Keyboard focus stays where it should around dialogs (L-236). While "Delete this application?" or "Send this CV to …?" is open, Tab now cycles through its own buttons instead of reaching the page behind it, and when it closes, focus goes back to the button that opened it. On a phone, a card's details cover the whole screen, so they behave the same way: focus moves into them, stays there, and goes back to the card when you close them. On a wider window the details sit beside the board, and Tab can move between the two as before.
-- The icon at the top of every screen now matches the sidebar (L-254). The sidebar and phone bar got the new two-colour icons in 0.10.3, but each screen's own header, and the three cards on the welcome page, still drew the old single-colour ones, so Profile, for example, showed two different person icons at once. Headers and welcome cards now use the same drawing as the navigation, from the same table, and a test fails if they ever differ again.
+- The icon at the top of every screen now matches the sidebar (L-254). The sidebar and phone bar got the new two-colour icons (listed under 0.10.3), but each screen's own header, and the three cards on the welcome page, still drew the old single-colour ones, so Profile, for example, showed two different person icons at once. Headers and welcome cards now use the same drawing as the navigation, from the same table, and a test fails if they ever differ again.
 
 ## [0.10.3] — 2026-10-16
 
@@ -414,8 +418,9 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.3...main
-[0.10.3]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.2...light-v0.10.3
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.4...main
+[0.10.4]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.2...light-v0.10.4
+[0.10.3]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.2...light-v0.10.4
 [0.10.2]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.1...light-v0.10.2
 [0.10.1]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.0...light-v0.10.1
 [0.10.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.9.0...light-v0.10.0
