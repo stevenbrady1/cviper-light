@@ -1,7 +1,7 @@
 ; CViper Light's copy of Tauri's NSIS installer template (L-253).
 ;
-; Copied from tauri-cli 2.12.1 (crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi
-; at tag tauri-cli-v2.12.1), used through bundle.windows.nsis.template in tauri.conf.json.
+; Copied from tauri-cli 2.12.2 (crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi
+; at tag tauri-cli-v2.12.2), used through bundle.windows.nsis.template in tauri.conf.json.
 ; It is the stock file except for the lines marked "; CVIPER:", which are:
 ;
 ;   1. The finish page has no "Create desktop shortcut" action; the shortcut is made in
@@ -565,27 +565,33 @@ Function .onInit
   !if "${INSTALLMODE}" == "both"
     !insertmacro MULTIUSER_INIT
   !endif
-FunctionEnd
 
-
-Section EarlyChecks
-  ; Abort silent installer if downgrades is disabled
+  ; Abort downgrades if they are disabled, in the modes that skip the reinstall page choice:
+  ; silent, passive and update
   !if "${ALLOWDOWNGRADES}" == "false"
   ${If} ${Silent}
+  ${OrIf} $PassiveMode = 1
+  ${OrIf} $UpdateMode = 1
+    ReadRegStr $R0 SHCTX "${UNINSTKEY}" "DisplayVersion"
+    nsis_tauri_utils::SemverCompare "${VERSION}" $R0
+    Pop $R0
     ; If downgrading
     ${If} $R0 = -1
-      System::Call 'kernel32::AttachConsole(i -1)i.r0'
-      ${If} $0 <> 0
-        System::Call 'kernel32::GetStdHandle(i -11)i.r0'
-        System::call 'kernel32::SetConsoleTextAttribute(i r0, i 0x0004)' ; set red color
-        FileWrite $0 "$(silentDowngrades)"
+      ${If} ${Silent}
+        System::Call 'kernel32::AttachConsole(i -1)i.r0'
+        ${If} $0 <> 0
+          System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+          System::call 'kernel32::SetConsoleTextAttribute(i r0, i 0x0004)' ; set red color
+          FileWrite $0 "$(silentDowngrades)"
+        ${EndIf}
+      ${Else}
+        MessageBox MB_ICONSTOP "$(silentDowngrades)"
       ${EndIf}
       Abort
     ${EndIf}
   ${EndIf}
   !endif
-
-SectionEnd
+FunctionEnd
 
 Section WebView2
   ; Check if Webview2 is already installed and skip this section
