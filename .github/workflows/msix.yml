@@ -714,7 +714,7 @@ jobs:
           }
 
       # ----------------------------------------------------------------------
-      # THE OPEN TEST, ON THE RUNNER (L-258).
+      # THE OPEN TEST, ON THE RUNNER (L-259).
       # ----------------------------------------------------------------------
       # The certification kit reads the package and never runs it — its own
       # report says "Running tests without application deployment" — so a

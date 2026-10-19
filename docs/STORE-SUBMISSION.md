@@ -178,7 +178,7 @@ not run it. So a package can pass every check in Step 4, be reported overall
 **PASS**, and still fail to draw a window — and until somebody installs it,
 nobody knows which.
 
-**The workflow now does this on the runner (L-258).** After the kit, the same
+**The workflow now does this on the runner (L-259).** After the kit, the same
 run trusts its own signer, installs the package under the real Store identity,
 launches it through `shell:AppsFolder` the way the Start menu would, waits for
 a window, keeps it up for ten seconds, photographs the screen, then uninstalls

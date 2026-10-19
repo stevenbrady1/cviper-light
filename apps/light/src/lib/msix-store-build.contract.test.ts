@@ -1040,7 +1040,7 @@ const ARTEFACT_FILES = [
   'target-inventory.txt',
   'wack-report.xml',
   'wack-verdict.md',
-  // Evidence from the open test on the runner (L-258): the verdict, and the
+  // Evidence from the open test on the runner (L-259): the verdict, and the
   // screen at the moment the installed app's window was up.
   'open-test.md',
   'open-test.png',

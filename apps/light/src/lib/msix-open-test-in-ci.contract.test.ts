@@ -1,5 +1,5 @@
 /**
- * The Store package is installed and OPENED on the runner (L-258).
+ * The Store package is installed and OPENED on the runner (L-259).
  *
  * ============================================================================
  * WHY THIS EXISTS
