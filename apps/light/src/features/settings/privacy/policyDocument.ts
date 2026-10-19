@@ -5,7 +5,6 @@ import {
   type OutboundHost,
   type OutboundPurpose,
 } from '../../../lib/outbound-hosts';
-import { APP_VERSION } from '../backup';
 
 import { DATA_LOCATIONS, type DataLocation } from './dataLocations';
 import { GROUPS } from './PrivacyNotice';
@@ -78,7 +77,6 @@ export function formatPolicyDate(iso: string): string {
 }
 
 export interface PolicyInputs {
-  readonly version: string;
   readonly hosts: readonly OutboundHost[];
   readonly locations: readonly DataLocation[];
   /**
@@ -106,7 +104,7 @@ export function renderPrivacyPolicy(inputs: PolicyInputs): string {
   push(
     '# CViper Light privacy policy',
     '',
-    `_For CViper Light ${inputs.version}. This page is generated from the app's own list of ` +
+    "_This page is generated from the app's own list of " +
       'the addresses it may contact — the same list the app shows under Settings → Privacy, ' +
       'and the one a test holds the code to. It changes when that list changes. Last ' +
       `updated: ${formatPolicyDate(POLICY_LAST_UPDATED)}._`,
@@ -269,7 +267,6 @@ export function renderPrivacyPolicy(inputs: PolicyInputs): string {
 /** The policy for this build. */
 export function currentPrivacyPolicy(): string {
   return renderPrivacyPolicy({
-    version: APP_VERSION,
     hosts: OUTBOUND_HOSTS,
     locations: DATA_LOCATIONS,
     capabilities: OUTBOUND_CAPABILITIES,
