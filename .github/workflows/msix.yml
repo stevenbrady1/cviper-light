@@ -714,6 +714,163 @@ jobs:
           }
 
       # ----------------------------------------------------------------------
+      # THE OPEN TEST, ON THE RUNNER (L-259).
+      # ----------------------------------------------------------------------
+      # The certification kit reads the package and never runs it — its own
+      # report says "Running tests without application deployment" — so a
+      # package can PASS above and still fail to draw a window. Step 4a of
+      # docs/STORE-SUBMISSION.md had the owner find out by hand, on a real PC,
+      # trusting a throwaway certificate machine-wide to do it. This step does
+      # the same thing here, where the machine IS throwaway: trust this run's
+      # signer, install the package under its real Store identity, launch it
+      # the way the Start menu would, wait for a window, keep it up for a
+      # while, photograph it, then uninstall and untrust.
+      #
+      # WHAT IT PROVES: the package installs, the app starts from the packaged
+      # location, and it draws a window that stays up. WHAT IT DOES NOT: that
+      # the app can be USED. The Store flavour carries no automation server,
+      # on purpose (no-automation-server-in-shipped-builds.contract.test.ts),
+      # so nothing here can click it. "Can be used" is the smoke job's
+      # question, asked of the same source; this is the one question only a
+      # packaged install can answer. The screenshot is evidence for a human,
+      # not a gate: the gate is the window handle.
+      #
+      # Not gated on RUN_WACK, and the contract test holds it that way: a run
+      # that skips the kit to iterate on packaging still has to open the app.
+      #
+      # msix-open-test-in-ci.contract.test.ts holds this step's shape.
+      - name: Install the package, open the app, and prove it draws a window
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+
+          [xml]$manifest = Get-Content -LiteralPath (Join-Path $env:OUT_DIR 'Package.appxmanifest')
+          $identityName = $manifest.Package.Identity.Name
+          $appId = $manifest.Package.Applications.Application.Id
+          if (-not $identityName -or -not $appId) {
+            Write-Host '::error title=Manifest unreadable::Could not read Identity/@Name or Application/@Id from the staged manifest, so there is nothing to install or launch.'
+            exit 1
+          }
+
+          $thumbprint = $null
+          $pkg = $null
+          $proc = $null
+          $verdict = 'FAILED'
+          $detail = ''
+          try {
+            # 1. Trust THIS run's signer, by importing the same public half the
+            #    artefact carries. The thumbprint is what untrusts it below:
+            #    never the subject, which is the real Store publisher's CN.
+            $cer = Import-Certificate -FilePath (Join-Path $env:OUT_DIR 'devcert-public.cer') -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+            $thumbprint = $cer.Thumbprint
+            Write-Host "Trusted $thumbprint in LocalMachine\TrustedPeople for the length of this step."
+
+            # 2. Install. No -AllowUnsigned: the package is signed, and that
+            #    switch would install a different identity from the one that
+            #    is submitted. If this throws, the error is the finding.
+            Add-AppxPackage -Path $env:MSIX_PATH
+            $pkg = Get-AppxPackage -Name $identityName
+            if ($null -eq $pkg) {
+              throw "Add-AppxPackage returned, but Get-AppxPackage -Name $identityName finds nothing."
+            }
+            Write-Host "Installed $($pkg.PackageFullName) at $($pkg.InstallLocation)"
+
+            # 3. Launch through the shell, by Application User Model ID, the
+            #    way the Start menu does. Starting the .exe out of WindowsApps
+            #    by path is not how a packaged app runs and proves nothing.
+            $aumid = "$($pkg.PackageFamilyName)!$appId"
+            Start-Process -FilePath 'explorer.exe' -ArgumentList "shell:AppsFolder\$aumid"
+            Write-Host "Launched shell:AppsFolder\$aumid"
+
+            # 4. Wait for a WINDOW, not a process: a process that starts and
+            #    never draws is exactly the failure this step exists to catch.
+            #    Only a process running from the packaged location counts.
+            $prefix = $pkg.InstallLocation.TrimEnd('\') + '\'
+            $deadline = [DateTime]::UtcNow.AddSeconds(90)
+            while ([DateTime]::UtcNow -lt $deadline) {
+              $proc = Get-Process -ErrorAction SilentlyContinue | Where-Object {
+                $path = $null
+                try { $path = $_.Path } catch { $path = $null }
+                $path -and $path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -and $_.MainWindowHandle -ne 0
+              } | Select-Object -First 1
+              if ($null -ne $proc) { break }
+              Start-Sleep -Seconds 2
+            }
+            if ($null -eq $proc) {
+              $any = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+                $path = $null
+                try { $path = $_.Path } catch { $path = $null }
+                $path -and $path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
+              })
+              if ($any.Count -gt 0) {
+                throw "The app started ($($any.Count) process(es) from the packaged location) but drew no window within 90 seconds."
+              }
+              throw 'No process from the packaged location appeared within 90 seconds of launch.'
+            }
+            $title = $proc.MainWindowTitle
+            Write-Host "Window up: pid $($proc.Id), title '$title'"
+
+            # 5. Keep it up. A window that appears and vanishes is a crash on
+            #    first paint, which is the other thing the kit cannot see.
+            Start-Sleep -Seconds 10
+            $proc.Refresh()
+            if ($proc.HasExited) {
+              throw "The app drew a window and then exited within 10 seconds (exit code $($proc.ExitCode))."
+            }
+
+            # 6. Photograph the primary screen for the artefact. Evidence, not
+            #    a gate: a black capture on a headless session does not fail
+            #    the run, the handle above already did the deciding.
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bitmap = [System.Drawing.Bitmap]::new($bounds.Width, $bounds.Height)
+            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+            $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+            $bitmap.Save((Join-Path $env:OUT_DIR 'open-test.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+            $graphics.Dispose(); $bitmap.Dispose()
+
+            $verdict = 'PASSED'
+            $detail = "Installed $($pkg.PackageFullName); window '$title' (pid $($proc.Id)) up after 10 s."
+          }
+          catch {
+            $detail = $_.Exception.Message
+            Write-Host "::error title=The package did not open::$detail"
+          }
+          finally {
+            # 7. Tidy up, and exercise the uninstall path while at it. The
+            #    certificate goes by THUMBPRINT: the throwaway signer shares
+            #    its CN with the real Store publisher, so a tidy-up by subject
+            #    is the one tidy-up that can delete the wrong thing.
+            if ($null -ne $proc) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+            if ($null -ne $pkg) {
+              Remove-AppxPackage -Package $pkg.PackageFullName -ErrorAction Continue
+              if ($null -ne (Get-AppxPackage -Name $identityName)) {
+                Write-Host '::warning title=Uninstall incomplete::Remove-AppxPackage returned but the package is still registered.'
+              } else {
+                Write-Host 'Uninstalled.'
+              }
+            }
+            if ($thumbprint) {
+              Remove-Item -Path "Cert:\LocalMachine\TrustedPeople\$thumbprint" -ErrorAction Continue
+              Write-Host "Untrusted $thumbprint."
+            }
+
+            $sb = [System.Text.StringBuilder]::new()
+            [void]$sb.AppendLine('## Open test (installed and launched on the runner)')
+            [void]$sb.AppendLine('')
+            [void]$sb.AppendLine("Result: **$verdict**  ")
+            [void]$sb.AppendLine($detail)
+            [void]$sb.AppendLine('')
+            [void]$sb.AppendLine('Proves the package installs, starts from the packaged location, and draws a window that stays up. Does not prove the app can be used: the Store flavour carries no automation server, so nothing here can click it. `open-test.png` in the artefact is the screen at the moment the window was up.')
+            $summary = $sb.ToString()
+            $summary >> $env:GITHUB_STEP_SUMMARY
+            Set-Content -Path (Join-Path $env:OUT_DIR 'open-test.md') -Value $summary
+          }
+
+          if ($verdict -ne 'PASSED') { exit 1 }
+
+      # ----------------------------------------------------------------------
       # THE GATE ON THE UPLOAD, NOT A NOTE IN AN EARLIER STEP (L-119).
       # ----------------------------------------------------------------------
       # This sweep started life inside the export step and was worthless there,

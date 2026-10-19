@@ -170,7 +170,7 @@ and why it is stated rather than ignored.
 
 ---
 
-## Step 4a — Install the package once, on a real PC
+## Step 4a — Install the package once, and open it
 
 The certification kit in Step 4 never opens the app. Its own report says
 _"Running tests without application deployment"_: it reads the package, it does
@@ -178,8 +178,22 @@ not run it. So a package can pass every check in Step 4, be reported overall
 **PASS**, and still fail to draw a window — and until somebody installs it,
 nobody knows which.
 
-This is the test that finds out. The owner does it once, on a real Windows PC,
-and it takes about ten minutes.
+**The workflow now does this on the runner (L-259).** After the kit, the same
+run trusts its own signer, installs the package under the real Store identity,
+launches it through `shell:AppsFolder` the way the Start menu would, waits for
+a window, keeps it up for ten seconds, photographs the screen, then uninstalls
+and untrusts by thumbprint. The job goes red if no window appears or the window
+goes away. The artefact carries `open-test.md` (the verdict) and
+`open-test.png` (the screen while the window was up); the job summary shows
+the verdict too. `msix-open-test-in-ci.contract.test.ts` fails the build if
+that step is removed, gated on the kit, or allowed to swallow its failure.
+
+What the runner cannot do is USE the app: the Store flavour carries no
+automation server, on purpose, so nothing can click it. That half is the smoke
+job's question, asked of the same source on every push. If you want to see the
+installed Store copy with your own eyes before a submission, the manual
+procedure below still works, and takes about ten minutes. It is no longer
+required.
 
 ### What it proves, and what it does not
 

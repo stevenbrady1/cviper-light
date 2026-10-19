@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The Store package is now installed and opened on the build machine (L-259). Microsoft's certification kit reads the package but never runs it, so until now the owner had to install each build on a real PC, trusting a throwaway certificate on it, just to see whether a window appeared. The MSIX workflow now does that itself on a throwaway runner: trust, install, launch from the Start-menu path, wait for a window, keep it up, photograph it, uninstall, untrust by thumbprint. It goes red if no window appears, and the artefact carries the verdict and the screenshot. It still cannot click through the app, because the Store build deliberately has no automation hooks; the smoke test covers that on the same code.
+
 ### Changed
 
 - The privacy policy no longer names the app version in its first line (L-258). It says it changes only when the list of places the app contacts changes, but the version changed it on every release, with nothing in the policy itself different. The "Last updated" date still says how current it is. A test fails if the version comes back.
