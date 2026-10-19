@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The Store package is now installed and opened on the build machine (L-258). Microsoft's certification kit reads the package but never runs it, so until now the owner had to install each build on a real PC, trusting a throwaway certificate on it, just to see whether a window appeared. The MSIX workflow now does that itself on a throwaway runner: trust, install, launch from the Start-menu path, wait for a window, keep it up, photograph it, uninstall, untrust by thumbprint. It goes red if no window appears, and the artefact carries the verdict and the screenshot. It still cannot click through the app, because the Store build deliberately has no automation hooks; the smoke test covers that on the same code.
+
 ## [0.10.4] — 2026-10-18
 
 0.10.3 was prepared but never tagged or released, and 0.10.1 and 0.10.2 were tagged but not released, so this release also brings everything listed under 0.10.3, 0.10.2 and 0.10.1 below.
