@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The privacy policy no longer names the app version in its first line (L-258). It says it changes only when the list of places the app contacts changes, but the version changed it on every release, with nothing in the policy itself different. The "Last updated" date still says how current it is. A test fails if the version comes back.
+
 ## [0.10.4] — 2026-10-18
 
 0.10.3 was prepared but never tagged or released, and 0.10.1 and 0.10.2 were tagged but not released, so this release also brings everything listed under 0.10.3, 0.10.2 and 0.10.1 below.
