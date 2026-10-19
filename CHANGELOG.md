@@ -13,6 +13,7 @@ All notable changes to CViper Light are recorded here. The format follows
 ### Changed
 
 - The privacy policy no longer names the app version in its first line (L-258). It says it changes only when the list of places the app contacts changes, but the version changed it on every release, with nothing in the policy itself different. The "Last updated" date still says how current it is. A test fails if the version comes back.
+- The Windows installer is now built with Tauri's build tool 2.12.2, up from 2.12.1 (#317). Tauri 2.12.2 extends the "no downgrades" check so that a quiet install (passive or update mode) of an older version is stopped with a message, where before only a fully silent one was. CViper Light's copy of the installer template carries that change with the same four CViper changes as before, and the guard that holds the copy to the recorded version is what caught the gap.
 
 ## [0.10.4] — 2026-10-18
 
