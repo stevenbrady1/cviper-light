@@ -30,53 +30,17 @@
  * that a brand name is ABSENT. Rewording the marketing copy is free.
  */
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { REPO_ROOT } from './repo-scan.ts';
+import { STORE_LISTING_DOCS as DOCS, fencedSpans } from './store-listing-fences.ts';
 
 /** Brand tokens forbidden inside a `generic-copy` fence. Case-insensitive. */
 const BRAND_TOKENS = /\b(OpenAI|Anthropic|Claude|ChatGPT|GPT-|Gemini|Google AI|Mistral)\b/gi;
 
-const FENCE_START = '<!-- generic-copy:start';
-const FENCE_END = '<!-- generic-copy:end';
-
-const DOCS: readonly { readonly path: string; readonly file: string }[] = [
-  { path: 'docs/STORE-SUBMISSION.md', file: join(REPO_ROOT, 'docs/STORE-SUBMISSION.md') },
-  {
-    path: 'docs/app-store/LISTING.md',
-    file: join(REPO_ROOT, 'docs/app-store/LISTING.md'),
-  },
-];
-
 interface Finding {
   readonly doc: string;
   readonly token: string;
-}
-
-/**
- * Every `generic-copy:start` … `:end` span in `text`, as the text BETWEEN the
- * markers (fence lines themselves excluded, so the marker comment's own
- * prose — which names this guard, in a code comment — is never scanned).
- *
- * Pure: takes the document text as an argument, so it can be proved against a
- * planted string rather than only against the real files.
- */
-export function fencedSpans(text: string): string[] {
-  const spans: string[] = [];
-  let cursor = 0;
-  for (;;) {
-    const start = text.indexOf(FENCE_START, cursor);
-    if (start === -1) break;
-    const afterStartMarker = text.indexOf('-->', start);
-    if (afterStartMarker === -1) break;
-    const end = text.indexOf(FENCE_END, afterStartMarker);
-    if (end === -1) break;
-    spans.push(text.slice(afterStartMarker + '-->'.length, end));
-    cursor = end + FENCE_END.length;
-  }
-  return spans;
 }
 
 /** Every brand-token hit inside `doc`'s fenced spans. */
