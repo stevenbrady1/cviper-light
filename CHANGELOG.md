@@ -6,7 +6,11 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.10.5] — 2026-10-20
+
 ### Added
+
+- macOS. The release workflow's Mac leg has always been there behind the Apple signing gate; this is the first release cut with the five `APPLE_*` secrets set, so it builds, signs and notarises a universal (Intel and Apple Silicon) binary and publishes it alongside the Windows installers. Whether the first run gets all the way through is exactly what this release is for.
 
 - The Store package is now installed and opened on the build machine (L-259). Microsoft's certification kit reads the package but never runs it, so until now the owner had to install each build on a real PC, trusting a throwaway certificate on it, just to see whether a window appeared. The MSIX workflow now does that itself on a throwaway runner: trust, install, launch from the Start-menu path, wait for a window, keep it up, photograph it, uninstall, untrust by thumbprint. It goes red if no window appears, and the artefact carries the verdict and the screenshot. It still cannot click through the app, because the Store build deliberately has no automation hooks; the smoke test covers that on the same code.
 
@@ -428,7 +432,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.4...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.5...main
+[0.10.5]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.4...light-v0.10.5
 [0.10.4]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.2...light-v0.10.4
 [0.10.3]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.2...light-v0.10.4
 [0.10.2]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.1...light-v0.10.2
