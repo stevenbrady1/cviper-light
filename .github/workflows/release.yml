@@ -403,25 +403,22 @@ jobs:
           args: --config src-tauri/tauri.release-build.conf.json ${{ matrix.args }}
 
       # ======================================================================
-      # THE MAC UPDATER BUNDLE, PACKED HERE BECAUSE THE BUILD NO LONGER DOES.
+      # THE MAC UPDATER BUNDLE IS tauri-action's TO MAKE. NOT OURS. (L-260)
       # ======================================================================
-      # With `createUpdaterArtifacts` off, `tauri build` writes no
-      # `.app.tar.gz`, which is what the updater installs on a Mac. This packs
-      # the same thing: the `.app` as the archive's one top-level entry, which
-      # the updater strips on install. `COPYFILE_DISABLE` stops macOS tar adding
-      # `._` resource-fork files the bundle never had. The `sign` job signs it.
-      - name: Pack the macOS updater bundle
-        if: runner.os == 'macOS' && steps.apple.outputs.signing == 'yes'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          COPYFILE_DISABLE: '1'
-        run: |
-          set -euo pipefail
-          bundle_dir=apps/light/src-tauri/target/universal-apple-darwin/release/bundle/macos
-          tar -czf CViper.Light_universal.app.tar.gz -C "$bundle_dir" 'CViper Light.app'
-          gh release upload "$GITHUB_REF_NAME" CViper.Light_universal.app.tar.gz --clobber
+      # `createUpdaterArtifacts` is off, so `tauri build` writes no
+      # `.app.tar.gz` — but tauri-action does: GitHub cannot take a directory
+      # as a release asset, so the action tars every `.app` it finds and
+      # uploads that. light-v0.10.5's log reads "Packaging … CViper Light.app
+      # directory into … .app.tar.gz" then "… successfully uploaded", and the
+      # `sign` job below found it, signed it and wrote it into latest.json.
+      #
+      # A step here used to pack and upload a second one. Had its upload ever
+      # succeeded, `sign` would have downloaded both, signed both, and
+      # `assembleUpdaterManifest` would have refused two bundles for one
+      # platform — no latest.json, no Mac updates. It only ever failed on a
+      # dropped connection, which is the one reason the draft was usable.
+      # `one-mac-updater-bundle.contract.test.ts` fails the build if anything
+      # other than tauri-action packs or uploads an `.app.tar.gz` again.
 
   # ==========================================================================
   # SIGN THE UPDATER BUNDLES, AWAY FROM THE BUILD (L-223).
@@ -541,7 +538,13 @@ jobs:
   # files the manifest names. Held by stable-download-name.contract.test.ts.
   stable-download:
     needs: bundle
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    # `!cancelled()` for the same reason as `sign`: `bundle` is a matrix, one
+    # failed leg makes its result `failure`, and a plain `needs:` would skip
+    # this job — light-v0.10.5's Mac leg went red after the Windows installer
+    # was already on the draft, and the stable name cviper.ai's Download
+    # button fetches was never written. The job itself refuses when there is
+    # not exactly one setup installer, so a Windows failure still stops it.
+    if: ${{ !cancelled() && needs.bundle.result != 'skipped' && github.event_name == 'push' && github.ref_type == 'tag' }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 10
