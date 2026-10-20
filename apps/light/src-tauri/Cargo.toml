@@ -1,6 +1,6 @@
 [package]
 name = "light"
-version = "0.10.5"
+version = "0.10.6"
 description = "CViper Light — local-first CV and job-search desktop app"
 authors = ["CViper"]
 edition = "2021"
