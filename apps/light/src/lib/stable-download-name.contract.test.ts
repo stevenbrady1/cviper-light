@@ -93,6 +93,16 @@ function stableDownloadOffences(workflow: string): string[] {
     offences.push(`\`${JOB}\` does not wait for \`bundle\`.`);
   if (!/github\.event_name == 'push' && github\.ref_type == 'tag'/.test(job))
     offences.push(`\`${JOB}\` is not limited to a tag push.`);
+  // `bundle` is a matrix: one failed leg makes its result `failure`, and a
+  // plain `needs:` then skips this job, so a Mac failure strips the Windows
+  // installer of the name cviper.ai's Download button fetches (light-v0.10.5).
+  if (
+    !/if:[^\n]*!\s*cancelled\(\)/.test(job) ||
+    !/needs\.bundle\.result\s*!=\s*'skipped'/.test(job)
+  )
+    offences.push(
+      `\`${JOB}\` has no \`!cancelled() && needs.bundle.result != 'skipped'\`, so one failed platform leg holds the other platform's stable download back.`,
+    );
   if (!/--pattern\s+'\*-setup\.exe'/.test(job))
     offences.push(`\`${JOB}\` does not fetch the setup installer by its pattern.`);
   if (!/-ne 1\b|!= 1\b|-eq 1\b|== 1\b/.test(job))
@@ -134,7 +144,7 @@ describe('the checker itself', () => {
     "      - run: gh release download x --pattern '*.msi' --pattern '*-setup.exe'",
     '  stable-download:',
     '    needs: bundle',
-    "    if: github.event_name == 'push' && github.ref_type == 'tag'",
+    "    if: ${{ !cancelled() && needs.bundle.result != 'skipped' && github.event_name == 'push' && github.ref_type == 'tag' }}",
     '    steps:',
     "      - run: gh release download x --pattern '*-setup.exe'",
     '      - run: if [ "$n" -ne 1 ]; then exit 1; fi',
@@ -152,6 +162,13 @@ describe('the checker itself', () => {
   it('fails when the job is only a comment', () => {
     const commented = good.map((line, i) => (i >= 5 ? `#${line}` : line));
     expect(stableDownloadOffences(commented.join('\n'))).not.toEqual([]);
+  });
+
+  it('fails when one failed bundle leg could skip it', () => {
+    const text = good
+      .join('\n')
+      .replace("!cancelled() && needs.bundle.result != 'skipped' && ", '');
+    expect(stableDownloadOffences(text).join('\n')).toMatch(/!cancelled\(\)/);
   });
 
   it('fails when the upload forgets --clobber', () => {
