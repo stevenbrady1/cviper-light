@@ -549,7 +549,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    # Uploads one asset to the draft.
+    # Uploads two assets to the draft.
     permissions:
       contents: write
 
@@ -579,10 +579,44 @@ jobs:
           cp "${found[0]}" stable/CViper-Light-Windows-x64.exe
           gh release upload "$TAG" stable/CViper-Light-Windows-x64.exe --clobber
           {
-            echo '### Stable download name'
+            echo '### Stable download names'
             echo ''
             echo "\`$(basename "${found[0]}")\` is also on the **$TAG** draft as \`CViper-Light-Windows-x64.exe\`, the file cviper.ai's Download button fetches."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # The Mac disk image the same way (L-261), so cviper.ai's Mac button can
+      # point at one name too. ZERO is allowed: the Mac leg skips itself when
+      # the Apple secrets are unset, and Windows must still ship. TWO is
+      # refused for the same reason as two setup installers. The sign job
+      # never downloads `*.dmg`, so this copy cannot reach latest.json — the
+      # updater installs the `.app.tar.gz`, never the disk image.
+      - name: Copy the Mac disk image to its stable name on the draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stable-mac
+          # `gh` exits 1 both for "no assets match" and for a dropped
+          # connection. Only the first is a legitimate zero (L-260 was a
+          # dropped connection read as success by a looser check).
+          if ! out=$(gh release download "$TAG" --dir stable-mac --clobber --pattern '*.dmg' 2>&1); then
+            if ! grep -q 'no assets match' <<<"$out"; then
+              echo "$out"
+              exit 1
+            fi
+          fi
+          shopt -s nullglob
+          dmg=(stable-mac/*.dmg)
+          if [ "${#dmg[@]}" -gt 1 ]; then
+            echo "::error title=Expected at most one disk image::$TAG has ${#dmg[@]} files matching *.dmg. Refusing to guess which one the website should download."
+            exit 1
+          fi
+          if [ "${#dmg[@]}" -eq 0 ]; then
+            echo "::warning title=No Mac disk image::$TAG carries no *.dmg (the macOS leg skipped or failed), so CViper-Light-macOS.dmg is not written. cviper.ai's Mac button will serve the previous release's copy until a release carries one."
+            exit 0
+          fi
+          cp "${dmg[0]}" stable-mac/CViper-Light-macOS.dmg
+          gh release upload "$TAG" stable-mac/CViper-Light-macOS.dmg --clobber
+          echo "\`$(basename "${dmg[0]}")\` is also on the **$TAG** draft as \`CViper-Light-macOS.dmg\`, the file cviper.ai's Mac button fetches." >> "$GITHUB_STEP_SUMMARY"
 
   # ==========================================================================
   # PROMOTE THE MANIFEST. THE SECOND PRESS, AFTER A PERSON HAS LOOKED.

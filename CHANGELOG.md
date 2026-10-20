@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Every release now also carries the Mac disk image under one name that never changes, `CViper-Light-macOS.dmg`, next to `CViper-Light-Windows-x64.exe` (L-261), so cviper.ai can offer a Mac download button that never needs a version number. A release with no Mac build (the Apple secrets unset) still ships Windows and says so in its summary; a release with two disk images is refused rather than guessed at. The guard that holds the Windows name now holds this one too, and checks that the signing job can never pick either up.
+
 ## [0.10.6] — 2026-10-20
 
 0.10.5 was tagged but never published: its Mac build was correct, but the release workflow's own extra packing step went red (L-260) and the Windows installer's stable download name was never written. This is the same code with that workflow fix, released properly.
