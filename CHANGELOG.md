@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.10.6] — 2026-10-20
+
+0.10.5 was tagged but never published: its Mac build was correct, but the release workflow's own extra packing step went red (L-260) and the Windows installer's stable download name was never written. This is the same code with that workflow fix, released properly.
+
 ### Fixed
 
 - The release workflow no longer packs a second macOS updater bundle (L-260). tauri-action already tars the signed, notarised `.app` and uploads it, and the `sign` job signs that one; the extra step would have put two bundles on the draft and made the manifest writer refuse both. Its upload failed on light-v0.10.5 instead, which turned the Mac leg red and, because the stable-name job waited on every leg, left the Windows installer without the name cviper.ai's Download button fetches. That job now runs whenever a leg finished, like signing does. Two contract tests hold both.
@@ -436,7 +440,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.5...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.6...main
+[0.10.6]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.5...light-v0.10.6
 [0.10.5]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.4...light-v0.10.5
 [0.10.4]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.2...light-v0.10.4
 [0.10.3]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.2...light-v0.10.4
