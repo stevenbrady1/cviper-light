@@ -46,6 +46,8 @@ import { REPO_ROOT } from './repo-scan.ts';
 const STABLE_NAME = 'CViper-Light-Windows-x64.exe';
 const RELEASE = '.github/workflows/release.yml';
 const JOB = 'stable-download';
+/** The Mac disk image's stable name (L-261). Absent when the Mac leg skipped, never two. */
+const STABLE_MAC_NAME = 'CViper-Light-macOS.dmg';
 
 const stripComments = (text: string): string =>
   text
@@ -113,12 +115,26 @@ function stableDownloadOffences(workflow: string): string[] {
     ).test(job)
   )
     offences.push(`\`${JOB}\` does not upload ${STABLE_NAME} with --clobber.`);
+  // The Mac disk image too (L-261). The Mac leg may skip (no Apple secrets),
+  // so zero is fine; two means the job cannot know which one to offer.
+  if (!/--pattern\s+'\*\.dmg'/.test(job))
+    offences.push(`\`${JOB}\` does not fetch the Mac disk image by its pattern.`);
+  if (!/-gt 1\b|> 1\b/.test(job))
+    offences.push(`\`${JOB}\` does not refuse when there is more than one disk image.`);
+  if (
+    !new RegExp(
+      `gh release upload[^\\n]*${STABLE_MAC_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^\\n]*--clobber`,
+    ).test(job)
+  )
+    offences.push(`\`${JOB}\` does not upload ${STABLE_MAC_NAME} with --clobber.`);
   const sign = all.get('sign') ?? '';
   for (const pattern of downloadPatterns(sign)) {
-    if (pattern.test(STABLE_NAME))
-      offences.push(
-        `${STABLE_NAME} matches the sign job's download pattern ${pattern}; it would be signed into latest.json.`,
-      );
+    for (const name of [STABLE_NAME, STABLE_MAC_NAME]) {
+      if (pattern.test(name))
+        offences.push(
+          `${name} matches the sign job's download pattern ${pattern}; it would be signed into latest.json.`,
+        );
+    }
   }
   return offences;
 }
@@ -149,6 +165,9 @@ describe('the checker itself', () => {
     "      - run: gh release download x --pattern '*-setup.exe'",
     '      - run: if [ "$n" -ne 1 ]; then exit 1; fi',
     `      - run: gh release upload x ${STABLE_NAME} --clobber`,
+    "      - run: gh release download x --pattern '*.dmg'",
+    '      - run: if [ "$m" -gt 1 ]; then exit 1; fi',
+    `      - run: gh release upload x ${STABLE_MAC_NAME} --clobber`,
   ];
 
   it('passes a well-formed job', () => {
@@ -174,6 +193,21 @@ describe('the checker itself', () => {
   it('fails when the upload forgets --clobber', () => {
     const text = good.join('\n').replace(' --clobber', '');
     expect(stableDownloadOffences(text).join('\n')).toMatch(/--clobber/);
+  });
+
+  it('fails when the Mac disk image is never copied (L-261)', () => {
+    const text = good.filter((line) => !line.includes('dmg') && !line.includes('-gt 1')).join('\n');
+    expect(stableDownloadOffences(text).join('\n')).toMatch(/disk image/);
+  });
+
+  it('fails when two disk images would not be refused', () => {
+    const text = good.join('\n').replace('if [ "$m" -gt 1 ]; then exit 1; fi', 'true');
+    expect(stableDownloadOffences(text).join('\n')).toMatch(/more than one disk image/);
+  });
+
+  it('fails when the Mac stable name would be picked up by the sign job', () => {
+    const text = good.join('\n').replace("--pattern '*.msi'", "--pattern '*.dmg'");
+    expect(stableDownloadOffences(text).join('\n')).toMatch(/CViper-Light-macOS\.dmg matches/);
   });
 
   it('fails when the stable name would be picked up by the sign job', () => {
