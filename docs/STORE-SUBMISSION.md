@@ -518,8 +518,7 @@ WHAT IT NEVER DOES
 • It never sends anything to us. There is no "us" to send it to: no server, no
   analytics, no crash reporting.
 • The only requests it ever makes are ones you start, or switched on
-  yourself — like the update check on startup, which you can switch off any
-  time. Settings → Privacy lists every address the app is allowed to name,
+  yourself. Settings → Privacy lists every address the app is allowed to name,
   and a test in the public source code fails the build if another one is
   added.
 
@@ -677,6 +676,16 @@ made-up companies. **Never a real CV.**
 The AI lane is deliberately **not** one of the four. A screenshot of a key-entry
 screen would be the first thing a reviewer sees, and the listing's whole
 compliance position is that keys are optional.
+
+Name the files `1-analysis.png`, `2-tracker.png`, `3-search.png`,
+`4-settings.png` and upload them in that order. **After uploading, check every
+thumbnail against this table.** Submission 1 (20 Oct 2026) went out with the
+Tracker shot twice and no Analysis shot, because two files looked alike in the
+picker; it took a listing-only Submission 2 to fix.
+
+For shot 1, use a sample advert whose gaps make sense for the role. A result
+that says an operations job needs Python reads as the AI being wrong, even
+when the advert really asked for it.
 
 ---
 
