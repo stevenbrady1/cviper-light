@@ -45,7 +45,7 @@ export const PRIVACY_CONTACT_URL = 'https://github.com/stevenbrady1/cviper-light
 export const PRIVACY_CONTACT_EMAIL = 'cviperuk@gmail.com';
 
 /** When the policy last changed, as an ISO date. See the docblock above. */
-export const POLICY_LAST_UPDATED = '2026-10-16';
+export const POLICY_LAST_UPDATED = '2026-10-22';
 
 const MONTHS = [
   'January',

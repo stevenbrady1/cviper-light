@@ -9,6 +9,7 @@ All notable changes to CViper Light are recorded here. The format follows
 ### Added
 
 - Every release now also carries the Mac disk image under one name that never changes, `CViper-Light-macOS.dmg`, next to `CViper-Light-Windows-x64.exe` (L-261), so cviper.ai can offer a Mac download button that never needs a version number. A release with no Mac build (the Apple secrets unset) still ships Windows and says so in its summary; a release with two disk images is refused rather than guessed at. The guard that holds the Windows name now holds this one too, and checks that the signing job can never pick either up.
+- A tenth keyless job board: GOV.UK Find a job, the Department for Work and Pensions' Work Hub service (L-262). It is UK-wide, covers every sector, searches by keyword and location, and needs no account; like the other nine it opens in your own browser, and the app never loads or reads the page. The search address uses `keywords`, because the `q` the page also accepts is ignored and returns every job in the country.
 
 ## [0.10.6] — 2026-10-20
 

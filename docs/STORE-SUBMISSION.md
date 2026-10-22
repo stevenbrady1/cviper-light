@@ -495,7 +495,7 @@ WORKS THE MOMENT YOU OPEN IT — NO KEY, NO SIGN-UP
   from the web with no key and no account, and narrowed down on your own
   computer. It is a browse of what has just been posted rather than a search of
   the whole market, and each feed tells you on screen if it stops working.
-• Search nine UK job boards in your browser with one click. Turn any of them
+• Search ten UK job boards in your browser with one click. Turn any of them
   off, put them in the order you use them, or add your own.
 • Export everything to a single file whenever you like, and import it back.
 
@@ -531,7 +531,7 @@ CViper Light is free and open source under the MIT licence.
 Track every application in one place, with no account
 Check your CV against a job advert on your own computer
 Browse recent job adverts in the app with no key and no account
-Nine UK job boards, one click, no key needed
+Ten UK job boards, one click, no key needed
 Reads PDF, Word and JSON Resume files
 Export and import everything as one file
 Optional: bring your own AI provider's key, or run a model locally with Ollama
