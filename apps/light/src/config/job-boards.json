@@ -108,5 +108,11 @@
     "label": "Jobserve",
     "urlTemplate": "https://www.jobserve.com/gb/en/JobSearch.aspx?q={keyword}&l={location}",
     "encoding": "plus"
+  },
+  {
+    "id": "gov-uk-find-a-job",
+    "label": "GOV.UK Find a job",
+    "urlTemplate": "https://www.jobs.service.gov.uk/jobs/search?keywords={keyword}&location={location}",
+    "encoding": "plus"
   }
 ]
