@@ -785,11 +785,21 @@ text editor and starts with `"schemaVersion": 1`.
    **An agent must never generate or handle a release signing key, and this one must never
    be regenerated: every installed copy would stop accepting updates, permanently.**
 6. Create the public mirror repo; add all GitHub secrets.
-7. Apple enrolment — the Developer ID Application certificate and the five
-   `APPLE_*` repository secrets that carry it. The macOS release leg is built and
-   merged (L-96): a universal binary behind the three-state secret gate. It is
-   inert until those exist, and with none of them set it skips itself with a
-   warning while Windows still ships.
+7. ~~Apple enrolment — the Developer ID Application certificate and the five
+   `APPLE_*` repository secrets that carry it.~~ **Done 2026-10-20.** The
+   certificate was made from a CSR generated with openssl on Windows (Apple
+   accepts it; no Mac needed), bundled into a `.p12` with
+   `-keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1` because Git for
+   Windows' openssl has no `-legacy` provider, and the five secrets set the same
+   day. `light-v0.10.6` is the first release the macOS leg built: universal,
+   Developer ID signed, notarised and stapled, published with its `.dmg`, its
+   `.app.tar.gz` and a `latest.json` that offers it to both darwin targets.
+   **A person installed it from the `.dmg` on a real Mac on 2026-10-21 and the
+   app opened** — the one thing CI cannot prove. Not yet exercised: the Mac
+   updater (nothing newer than 0.10.6 exists to update to) and the second chip
+   type (one Mac was tested; the binary is universal). The first run,
+   `light-v0.10.5`, went red on a step of our own and is what L-260 fixed; L-261
+   gave the disk image a stable download name for cviper.ai's Mac button.
 8. Microsoft Store enrolment — **the recommended next step**, on the strength of
    the WACK result recorded in Status. Enrol as a **free individual account** at
    `storedeveloper.microsoft.com` — fees waived, verified with a government ID
