@@ -72,7 +72,8 @@ on every redirect hop, the scheme must be `http` or `https`, the URL may carry
 no username or password, the host may not be `localhost`, `.localhost` or
 `.local`, and every address the host resolves to must be public — loopback,
 private, link-local, carrier-NAT, multicast and reserved ranges are refused in
-IPv4 and IPv6, including an IPv4 address written as IPv6. The connection is
+IPv4 and IPv6, including an IPv4 address written as IPv6 or carried inside a
+NAT64 or 6to4 address, and Teredo tunnels are refused outright. The connection is
 pinned to the addresses just vetted, so the name cannot change its mind between
 the check and the connect. A redirect may not leave the registrable domain it
 started on, and at most three are followed. The reply must be HTML or plain
