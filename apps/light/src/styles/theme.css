@@ -307,9 +307,17 @@
  * `focus-ring-unlayered.contract.test.ts` holds it there. The cost is the one
  * the old comment named: while focused, the ring replaces an element's own
  * elevation shadow.
+ *
+ * A TRANSPARENT outline, not `outline: none`. Windows High Contrast (forced
+ * colours) strips every box-shadow, so the ring above vanished there and a
+ * keyboard user saw no focus at all (WCAG 2.4.7). Normally the outline is
+ * invisible; under forced colours the system repaints it in its highlight
+ * colour, so it appears exactly when the shadow is removed.
+ * `focus-ring-forced-colors.contract.test.ts` holds it.
  */
 :focus-visible {
-  outline: none;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
   box-shadow:
     0 0 0 2px var(--color-card),
     0 0 0 4px var(--color-blue);
