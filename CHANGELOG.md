@@ -10,6 +10,18 @@ All notable changes to CViper Light are recorded here. The format follows
 
 - Every release now also carries the Mac disk image under one name that never changes, `CViper-Light-macOS.dmg`, next to `CViper-Light-Windows-x64.exe` (L-261), so cviper.ai can offer a Mac download button that never needs a version number. A release with no Mac build (the Apple secrets unset) still ships Windows and says so in its summary; a release with two disk images is refused rather than guessed at. The guard that holds the Windows name now holds this one too, and checks that the signing job can never pick either up.
 
+### Changed
+
+- Release and Store builds are harder to tamper with and harder to stall. Every checkout in the release and Store workflows drops the job's GitHub token instead of leaving it in `.git/config`, where any build dependency could have read it and replaced a published installer. The Store package now waits for CI to pass on a commit on `main`, as releases already did, so a package can no longer be built from a red or unmerged commit. Rust is pinned to 1.99.1 in `rust-toolchain.toml` and in every workflow, so the compiler changes only when a PR says so. CI and smoke runs on `main` are no longer cancelled by a quick second merge, which used to leave a tag waiting on a manual re-run. Every job now has its own timeout instead of GitHub's six hours. Four new contract tests hold all of this.
+
+### Fixed
+
+- A local Ollama run no longer goes through a proxy. The app's network client honoured `HTTP_PROXY`/`ALL_PROXY` and the system proxy settings, with no exception for `127.0.0.1`, so on a machine with a proxy set (common on work laptops and with some VPNs) the CV and advert sent to Ollama travelled to that proxy in plain HTTP. Ollama now has its own client that never uses a proxy and never follows a redirect; every cloud provider keeps the proxy, so users who need one can still reach them. A test runs the real request against a fake proxy in a child process and fails if the local request reaches it.
+
+- Fetch from a link now refuses private addresses hidden inside IPv6 transition prefixes. On an IPv6-only network with NAT64 (common on work Wi-Fi and phone tethering), an advert whose name resolved to `64:ff9b::c0a8:101` reached the user's router at 192.168.1.1; 6to4 (`2002::/16`) carried the same trick. The IPv4 address inside both is now judged as itself, and local-use NAT64 (`64:ff9b:1::/48`), Teredo (`2001::/32`) and the old site-local range (`fec0::/10`) are refused. The custom AI provider check shares the rule, so it tightens there too.
+
+- Keyboard focus is visible again in Windows High Contrast. The focus ring is drawn with a box-shadow, which High Contrast removes, and the rule beside it said `outline: none`, so a keyboard user there saw no focus at all. The ring now also carries a transparent outline: invisible normally, repainted in the system highlight colour under High Contrast. A contract test holds it.
+
 ### Security
 
 - zod is updated from 4.4.3 to 4.6.7 for GHSA-mrhx-c7xc-m3w5, where validating an oversized collection could exhaust memory. A backup file is validated with zod on import, so a hostile backup could have frozen the app. The test that proves zod never runs its `new Function` probe read zod's internals, which changed shape in 4.6; it now reads the new shape and still fails loudly if they change again.
