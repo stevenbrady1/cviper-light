@@ -310,9 +310,33 @@ fn ipv6_is_forbidden(ip: Ipv6Addr) -> bool {
     if let Some(compatible) = ip.to_ipv4() {
         return ipv4_is_forbidden(compatible);
     }
-    let first = ip.segments()[0];
-    // fc00::/7 unique-local, fe80::/10 link-local.
-    (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80
+    let s = ip.segments();
+    let embedded = |hi: u16, lo: u16| {
+        let [a, b] = hi.to_be_bytes();
+        let [c, d] = lo.to_be_bytes();
+        Ipv4Addr::new(a, b, c, d)
+    };
+    // 64:ff9b::/96, well-known NAT64. On an IPv6-only network the gateway
+    // turns 64:ff9b::c0a8:101 into 192.168.1.1, so judge the IPv4 inside.
+    if s[0] == 0x0064 && s[1] == 0xff9b && s[2..6] == [0, 0, 0, 0] {
+        return ipv4_is_forbidden(embedded(s[6], s[7]));
+    }
+    // 64:ff9b:1::/48, NAT64 for local use only (RFC 8215).
+    if s[0] == 0x0064 && s[1] == 0xff9b && s[2] == 0x0001 {
+        return true;
+    }
+    // 2002::/16, 6to4: the IPv4 address sits in the next 32 bits.
+    if s[0] == 0x2002 {
+        return ipv4_is_forbidden(embedded(s[1], s[2]));
+    }
+    // 2001::/32, Teredo: tunnels to an address this check cannot see.
+    if s[0] == 0x2001 && s[1] == 0x0000 {
+        return true;
+    }
+    let first = s[0];
+    // fc00::/7 unique-local, fe80::/10 link-local, fec0::/10 the deprecated
+    // site-local range that some stacks still treat as on-site.
+    (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80 || (first & 0xffc0) == 0xfec0
 }
 
 pub(crate) fn ip_is_forbidden(ip: IpAddr) -> bool {
@@ -878,6 +902,46 @@ mod tests {
         // …and a mapped PUBLIC address is still allowed, so the rule is
         // unwrapping rather than blanket-refusing.
         assert!(!ip_is_forbidden("::ffff:93.184.216.34".parse().unwrap()));
+    }
+
+    #[test]
+    fn ipv4_inside_an_ipv6_transition_prefix_is_judged_as_that_ipv4() {
+        // NAT64 (64:ff9b::/96): on an IPv6-only network with NAT64 - common on
+        // enterprise Wi-Fi and phone tethering - the gateway turns
+        // 64:ff9b::c0a8:101 into 192.168.1.1. A hostile advert's AAAA record
+        // was therefore a blind GET to the user's router.
+        // 6to4 (2002::/16) carries an IPv4 address in bits 16-48 the same way.
+        for address in [
+            "64:ff9b::c0a8:101",  // 192.168.1.1
+            "64:ff9b::7f00:1",    // 127.0.0.1
+            "64:ff9b::a9fe:a9fe", // 169.254.169.254
+            "2002:c0a8:101::1",   // 6to4 of 192.168.1.1
+            "2002:7f00:1::",      // 6to4 of 127.0.0.1
+            "2002:a00:1::1",      // 6to4 of 10.0.0.1
+        ] {
+            assert!(ip_is_forbidden(address.parse().unwrap()), "{address}");
+        }
+        // ...and the same prefixes wrapping a PUBLIC address stay allowed, so
+        // the rule unwraps rather than blanket-refusing.
+        assert!(!ip_is_forbidden("64:ff9b::5db8:d822".parse().unwrap()));
+        assert!(!ip_is_forbidden("2002:5db8:d822::1".parse().unwrap()));
+    }
+
+    #[test]
+    fn local_use_nat64_teredo_and_site_local_are_refused() {
+        // 64:ff9b:1::/48 is NAT64 for LOCAL use (RFC 8215): no public meaning.
+        // Teredo (2001::/32) tunnels to an address we cannot vet.
+        // fec0::/10 is the deprecated site-local range, still honoured by
+        // some stacks as on-site.
+        for address in ["64:ff9b:1::c0a8:101", "2001:0:4136:e378::1", "fec0::1"] {
+            assert!(ip_is_forbidden(address.parse().unwrap()), "{address}");
+        }
+        // BOUNDARY: Teredo is 2001:0::/32 only. The rest of 2001::/16 is
+        // ordinary global space (this is Google's public DNS).
+        assert!(!ip_is_forbidden("2001:4860:4860::8888".parse().unwrap()));
+        // BOUNDARY: 64:ff9b::/96 means segments 2-5 are zero. One bit set
+        // there is outside the well-known prefix and is an ordinary address.
+        assert!(!ip_is_forbidden("64:ff9b:0:0:1::c0a8:101".parse().unwrap()));
     }
 
     #[test]
