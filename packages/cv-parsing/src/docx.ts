@@ -6,7 +6,6 @@
  * CV never leaves the machine.
  */
 import { err, ok, type Result } from '@cviper/core-types';
-import mammoth from 'mammoth';
 
 import type { ExtractedDocument } from './document';
 import {
@@ -86,6 +85,10 @@ export async function extractDocxText(
 
   let raw;
   try {
+    // Loaded here, not at the top of the file: mammoth and its XML and zip
+    // dependencies are ~200 kB that every launch used to parse for a feature
+    // most sessions never touch. `word-code-loads-on-demand.contract.test.ts`.
+    const { default: mammoth } = await import('mammoth');
     raw = await mammoth.extractRawText(dualEnvironmentInput(copy.buffer, copy.view));
   } catch (cause) {
     return err(mapMammothError(cause));
