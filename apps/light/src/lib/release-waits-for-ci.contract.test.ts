@@ -27,7 +27,10 @@ import { REPO_ROOT } from './repo-scan.ts';
 const WORKFLOWS = join(REPO_ROOT, '.github', 'workflows');
 const read = (file: string): string => readFileSync(join(WORKFLOWS, file), 'utf8');
 
-const BUNDLES = /uses:\s*tauri-apps\/tauri-action@/;
+// A release bundle (tauri-action) or a Store package (`pnpm build:msix`). The
+// Store package is uploaded by hand to Partner Center, so a red commit packed
+// from a feature branch would reach certification with nothing to stop it.
+const BUNDLES = /uses:\s*tauri-apps\/tauri-action@|pnpm\s+build:msix\b/;
 const RUNS_THE_GATE = /node\s+apps\/light\/src\/release\/checkCiGate\.ts/;
 
 interface Job {
@@ -137,6 +140,12 @@ describe('a release waits for CI', () => {
     expect(releaseGateOffences(read('release.yml'))).toEqual([]);
   });
 
+  it('msix.yml is clean: the Store package waits for CI too', () => {
+    // The premise first, so a renamed script cannot make this vacuous.
+    expect(jobsOf(read('msix.yml')).some((job) => BUNDLES.test(job.text))).toBe(true);
+    expect(releaseGateOffences(read('msix.yml'))).toEqual([]);
+  });
+
   it('every check the gate requires is a real job on a push to main', () => {
     const names = [...checkNamesOf(read('ci.yml')), ...checkNamesOf(read('smoke.yml'))];
     expect(REQUIRED_CHECKS.filter((required) => !names.includes(required))).toEqual([]);
@@ -176,6 +185,15 @@ describe('the detector can actually fail', () => {
     steps:
       - run: echo skip  # node apps/light/src/release/checkCiGate.ts${BUNDLER('    needs: ci-passed\n')}`;
     expect(releaseGateOffences(commented)).toHaveLength(1);
+  });
+
+  it('flags a Store packaging job with no gate', () => {
+    const store = `
+  package:
+    runs-on: windows-latest
+    steps:
+      - run: pnpm build:msix`;
+    expect(releaseGateOffences(`jobs:${GATE}${store}`)).toHaveLength(1);
   });
 
   it('flags a gate allowed to fail', () => {
