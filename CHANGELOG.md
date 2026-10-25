@@ -24,6 +24,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Security
 
+- Requests to the cloud AI providers no longer follow redirects. The shared network client followed up to ten, and on the way it stripped only the `Authorization` header, so an Anthropic key (sent as `x-api-key`) would have gone along with a redirect to another host, and a request could have followed https down to http. No provider redirects an API call for a good reason, so a redirect now comes back as an error. Job-board feeds are unchanged.
+
+- "Delete everything" now also removes a half-written safety copy. The copy made before an update is written through a temporary `cviper.db.partial` file; a crash or a full disk mid-copy left that file, a full copy of the CVs and applications, behind.
+
 - zod is updated from 4.4.3 to 4.6.7 for GHSA-mrhx-c7xc-m3w5, where validating an oversized collection could exhaust memory. A backup file is validated with zod on import, so a hostile backup could have frozen the app. The test that proves zod never runs its `new Function` probe read zod's internals, which changed shape in 4.6; it now reads the new shape and still fails loudly if they change again.
 
 ## [0.10.6] — 2026-10-20
