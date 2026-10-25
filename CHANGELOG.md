@@ -10,10 +10,6 @@ All notable changes to CViper Light are recorded here. The format follows
 
 - Every release now also carries the Mac disk image under one name that never changes, `CViper-Light-macOS.dmg`, next to `CViper-Light-Windows-x64.exe` (L-261), so cviper.ai can offer a Mac download button that never needs a version number. A release with no Mac build (the Apple secrets unset) still ships Windows and says so in its summary; a release with two disk images is refused rather than guessed at. The guard that holds the Windows name now holds this one too, and checks that the signing job can never pick either up.
 
-### Fixed
-
-- Fetch from a link now refuses private addresses hidden inside IPv6 transition prefixes. On an IPv6-only network with NAT64 (common on work Wi-Fi and phone tethering), an advert whose name resolved to `64:ff9b::c0a8:101` reached the user's router at 192.168.1.1; 6to4 (`2002::/16`) carried the same trick. The IPv4 address inside both is now judged as itself, and local-use NAT64 (`64:ff9b:1::/48`), Teredo (`2001::/32`) and the old site-local range (`fec0::/10`) are refused. The custom AI provider check shares the rule, so it tightens there too.
-
 ## [0.10.6] — 2026-10-20
 
 0.10.5 was tagged but never published: its Mac build was correct, but the release workflow's own extra packing step went red (L-260) and the Windows installer's stable download name was never written. This is the same code with that workflow fix, released properly.
