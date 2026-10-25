@@ -18,17 +18,23 @@ import { globalConfig, util } from 'zod/v4/core';
 // Side effect: evaluating the entry point constructs every JSON Resume schema.
 import './index';
 
-/** See the twin file — zod's `cached()` memoises by replacing its own getter. */
+/** See the twin file — zod's `cached()` holds the probe in `_getter` until first read. */
 function probeState(): 'evaluated' | 'never-asked' {
-  const descriptor = Object.getOwnPropertyDescriptor(util.allowsEval, 'value');
-  if (descriptor === undefined) {
+  // zod 4.6 replaced the self-replacing getter with a small `Cached` class: a
+  // `value` getter on the PROTOTYPE that calls `_getter` once, then sets
+  // `_getter` to undefined. So the own `_getter` slot is now the record of
+  // whether anything ever asked - a function until the first read, undefined
+  // after it.
+  const holder: unknown = util.allowsEval;
+  if (typeof holder !== 'object' || holder === null || !Object.hasOwn(holder, '_getter')) {
     throw new Error(
-      "zod's `util.allowsEval` has no own `value` property any more. Its `cached()` helper has " +
+      "zod's `util.allowsEval` has no own `_getter` slot any more. Its `cached()` helper has " +
         'changed shape, so this file can no longer tell whether the eval probe ran. Read ' +
         'zod/v4/core/util and rewrite the detector — do not delete it.',
     );
   }
-  return typeof descriptor.get === 'function' ? 'never-asked' : 'evaluated';
+  const getter: unknown = Reflect.get(holder, '_getter');
+  return typeof getter === 'function' ? 'never-asked' : 'evaluated';
 }
 
 describe('zod is configured jitless before resume-schema builds a schema', () => {

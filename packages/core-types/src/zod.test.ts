@@ -32,9 +32,9 @@
  * ============================================================================
  * HOW THE PROBE IS DETECTED
  * ============================================================================
- * `util.allowsEval` is built by zod's `cached()`: an object whose `value` starts
- * as a GETTER and, the first time it is read, replaces itself with a plain data
- * property holding the answer. So the shape of that one property descriptor is a
+ * `util.allowsEval` is built by zod's `cached()`: since zod 4.6 a `Cached`
+ * object holding the probe in `_getter` until the first read of `value`, and
+ * `undefined` there after it. So that one slot is a
  * record of whether anything ever asked — no instrumentation, no monkey-patching,
  * and nothing this test has to keep in step with zod's internals beyond the fact
  * that `cached()` memoises. The last test in this file proves the detector by
@@ -56,15 +56,21 @@ import './index';
  * file, and a test that cannot tell is a test that must say so.
  */
 function probeState(): 'evaluated' | 'never-asked' {
-  const descriptor = Object.getOwnPropertyDescriptor(util.allowsEval, 'value');
-  if (descriptor === undefined) {
+  // zod 4.6 replaced the self-replacing getter with a small `Cached` class: a
+  // `value` getter on the PROTOTYPE that calls `_getter` once, then sets
+  // `_getter` to undefined. So the own `_getter` slot is now the record of
+  // whether anything ever asked - a function until the first read, undefined
+  // after it.
+  const holder: unknown = util.allowsEval;
+  if (typeof holder !== 'object' || holder === null || !Object.hasOwn(holder, '_getter')) {
     throw new Error(
-      "zod's `util.allowsEval` has no own `value` property any more. Its `cached()` helper has " +
+      "zod's `util.allowsEval` has no own `_getter` slot any more. Its `cached()` helper has " +
         'changed shape, so this file can no longer tell whether the eval probe ran. Read ' +
         'zod/v4/core/util and rewrite the detector — do not delete it.',
     );
   }
-  return typeof descriptor.get === 'function' ? 'never-asked' : 'evaluated';
+  const getter: unknown = Reflect.get(holder, '_getter');
+  return typeof getter === 'function' ? 'never-asked' : 'evaluated';
 }
 
 describe('zod is configured jitless before core-types builds a schema', () => {
