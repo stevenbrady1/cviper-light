@@ -1,0 +1,13 @@
+# The one Rust version CI, releases and local builds use.
+#
+# At the repo ROOT, not in apps/light/src-tauri: `pnpm cargo:test` runs cargo
+# from here with --manifest-path, and rustup looks for this file from the
+# current directory upwards, so a copy under src-tauri was never read by it.
+#
+# Pinned, not `stable`: a new stable ships every six weeks, and the release
+# binary should change compiler only in a PR that says so, with CI green first.
+# To move it, change this line AND every `toolchain:` input in
+# .github/workflows; rust-toolchain-pinned.contract.test.ts fails if they
+# disagree. 1.99.1 is what `stable` resolved to on CI run #773 (2026-10-22).
+[toolchain]
+channel = "1.99.1"

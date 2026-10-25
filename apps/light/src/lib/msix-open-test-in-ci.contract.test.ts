@@ -40,9 +40,16 @@ function withoutComments(workflow: string): string {
     .join('\n');
 }
 
-/** Each `- name:` step of the (single) job, as text, in order. */
+/**
+ * Each `- name:` step of every job, as text, in workflow order. Every job, not
+ * the first: the CI gate job now runs before `package`, and reading only the
+ * first `steps:` block would look at the gate and miss the open test.
+ */
 export function steps(workflow: string): string[] {
-  const body = withoutComments(workflow).split(/^\s{4}steps:\s*$/m)[1] ?? '';
+  const body = withoutComments(workflow)
+    .split(/^\s{4}steps:\s*$/m)
+    .slice(1)
+    .join('\n');
   return body.split(/^(?=\s{6}- name:)/m).filter((step) => /^\s{6}- name:/.test(step));
 }
 
@@ -140,6 +147,23 @@ describe('msix.yml installs and opens the Store package on the runner', () => {
 });
 
 describe('the guard itself', () => {
+  it('finds the open test in a later job, behind a gate job', () => {
+    const gate = `jobs:
+  ci-passed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for CI to pass on this commit
+        run: node apps/light/src/release/checkCiGate.ts
+`;
+    const gated =
+      gate +
+      STEP(GOOD)
+        .replace(/^jobs:\n/, '')
+        .replace(/^ {2}msix:\n/, '  msix:\n    needs: ci-passed\n');
+    expect(openTestStep(gated)).toBeDefined();
+    expect(openTestOffences(gated)).toEqual([]);
+  });
+
   it('happy: a complete step passes', () => {
     expect(openTestOffences(STEP(GOOD))).toEqual([]);
   });

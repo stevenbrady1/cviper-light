@@ -48,7 +48,9 @@ permissions:
 
 concurrency:
   group: smoke-${{ github.ref }}
-  cancel-in-progress: true
+  # Never on main: the release gate reads these runs, and a cancelled one
+  # strands a tag. gate-checks-not-cancelled-on-main.contract.test.ts holds it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
@@ -57,6 +59,7 @@ jobs:
   built-app:
     name: build the app and drive the real binary
     runs-on: windows-latest
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -72,9 +75,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable branch; version pinned below
         with:
-          toolchain: stable
+          toolchain: 1.99.1 # = rust-toolchain.toml
 
       # Its own cache key. This job compiles in DEBUG, and twice — once without
       # the `wdio` feature and once with it — so its artefacts are not the ones

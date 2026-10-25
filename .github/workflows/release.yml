@@ -65,6 +65,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.promote_tag == ''
 
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     # Reads nothing, writes nothing, checks nothing out. This job only prints
     # and exits.
@@ -127,6 +128,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # No pnpm: the script imports nothing but Node builtins and its own
       # judge, as in release-admin.yml.
@@ -196,6 +199,7 @@ jobs:
             args: '--target universal-apple-darwin'
 
     runs-on: ${{ matrix.platform }}
+    timeout-minutes: 150
 
     env:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
@@ -291,6 +295,9 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+        with:
+          persist-credentials: false
+
       # ======================================================================
       # THE TAG AND THE VERSION HAVE TO BE THE SAME NUMBER.
       # ======================================================================
@@ -336,9 +343,9 @@ jobs:
       # Comma-separated. On macOS this installs BOTH darwin slices, which is
       # what `--target universal-apple-darwin` is lipo'd from; on Windows the
       # matrix leaves it empty and nothing extra is installed.
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable branch; version pinned below
         with:
-          toolchain: stable
+          toolchain: 1.99.1 # = rust-toolchain.toml
           targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
@@ -459,6 +466,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Enable pnpm through corepack
         run: corepack enable pnpm
@@ -653,6 +662,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.promote_tag != ''
 
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     # `contents: write` because it uploads an asset. Named explicitly so the
     # job can also check the repository out.
@@ -694,6 +704,9 @@ jobs:
           esac
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+        with:
+          persist-credentials: false
 
       - name: Enable pnpm through corepack
         run: corepack enable pnpm

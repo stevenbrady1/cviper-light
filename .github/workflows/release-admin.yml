@@ -41,6 +41,7 @@ concurrency:
 jobs:
   tidy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     # `contents: write` is what editing and deleting a release needs, and it
     # includes the read the checkout needs.

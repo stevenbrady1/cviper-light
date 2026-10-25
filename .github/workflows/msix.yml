@@ -88,13 +88,51 @@ env:
   VITE_CVIPER_DISTRIBUTION: microsoft-store
 
 jobs:
+  # ==========================================================================
+  # NOTHING IS PACKED FOR THE STORE UNTIL THE COMMIT HAS PASSED CI.
+  # ==========================================================================
+  # This workflow is dispatched by hand from any ref, and its artefact is what
+  # gets uploaded to Partner Center. Without a gate, a dispatch from a feature
+  # branch or a red commit produced a submittable package. Same gate as
+  # release.yml: the commit must be on main, and verify, WebKit, secret-scan
+  # and the real-binary smoke test must each have passed on it.
+  # `release-waits-for-ci.contract.test.ts` holds this workflow too.
+  ci-passed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+
+    # Reads the check runs and the compare API. Writes nothing.
+    permissions:
+      contents: read
+      checks: read
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GATE_SHA: ${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Wait for CI to pass on this commit
+        run: node apps/light/src/release/checkCiGate.ts
+
   package:
+    needs: ci-passed
     name: build the Store flavour and pack it as MSIX
     runs-on: windows-latest
     timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Before setup-node, because `cache: pnpm` needs a pnpm binary to ask
       # where the store lives.
@@ -106,9 +144,9 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable branch; version pinned below
         with:
-          toolchain: stable
+          toolchain: 1.99.1 # = rust-toolchain.toml
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
