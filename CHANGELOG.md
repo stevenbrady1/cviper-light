@@ -16,6 +16,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Fixed
 
+- A crash on one screen no longer takes the whole app down. There was one error boundary, round everything, so a render error on Tailor (say) blanked the window, menu included, and "Try again" re-rendered the same broken screen. Each screen now has its own: the menu and the other screens keep working, and moving to another screen starts it clean. The error message is still never shown, since it can carry CV text.
+
+- Keyboard and screen-reader focus now follows you to the new screen. Switching screens dropped focus to the top of the page, so a keyboard user had to tab through the menu to find where they were; the new screen's heading now takes focus (WCAG 2.4.3).
+
 - A local Ollama run no longer goes through a proxy. The app's network client honoured `HTTP_PROXY`/`ALL_PROXY` and the system proxy settings, with no exception for `127.0.0.1`, so on a machine with a proxy set (common on work laptops and with some VPNs) the CV and advert sent to Ollama travelled to that proxy in plain HTTP. Ollama now has its own client that never uses a proxy and never follows a redirect; every cloud provider keeps the proxy, so users who need one can still reach them. A test runs the real request against a fake proxy in a child process and fails if the local request reaches it.
 
 - Fetch from a link now refuses private addresses hidden inside IPv6 transition prefixes. On an IPv6-only network with NAT64 (common on work Wi-Fi and phone tethering), an advert whose name resolved to `64:ff9b::c0a8:101` reached the user's router at 192.168.1.1; 6to4 (`2002::/16`) carried the same trick. The IPv4 address inside both is now judged as itself, and local-use NAT64 (`64:ff9b:1::/48`), Teredo (`2001::/32`) and the old site-local range (`fec0::/10`) are refused. The custom AI provider check shares the rule, so it tightens there too.
