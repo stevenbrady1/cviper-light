@@ -377,6 +377,53 @@ pub(crate) fn client() -> Result<&'static reqwest::Client, String> {
         })
 }
 
+/// The client for a provider on THIS machine (Ollama at 127.0.0.1).
+///
+/// The shared client honours HTTP_PROXY / ALL_PROXY and, through the
+/// `system-proxy` feature the updater turns on, the OS proxy settings - and
+/// reqwest has no implicit bypass for loopback. So a "local" run went to the
+/// configured proxy in plain HTTP, CV and advert included, which breaks
+/// SECURITY.md's "a local Ollama run never leaves the machine".
+///
+/// `no_proxy()` clears every proxy, system ones included. Redirects are off: a
+/// local model server has no reason to send the request anywhere else.
+pub(crate) fn loopback_client() -> Result<&'static reqwest::Client, String> {
+    static CLIENT: OnceLock<Option<reqwest::Client>> = OnceLock::new();
+
+    CLIENT
+        .get_or_init(|| {
+            // BEFORE `build()`, always: see `install_crypto_provider`.
+            install_crypto_provider();
+            reqwest::Client::builder()
+                .no_proxy()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .ok()
+        })
+        .as_ref()
+        .ok_or_else(|| {
+            transport_error(
+                "network",
+                "Secure networking is unavailable in this build.".to_string(),
+            )
+        })
+}
+
+/// The client a provider's requests go through. Only a local provider skips
+/// the proxy: a user whose only way out is a proxy must still reach the cloud.
+pub(crate) fn client_for(provider: ProviderId) -> Result<&'static reqwest::Client, String> {
+    match provider {
+        ProviderId::Ollama => loopback_client(),
+        // Listed, not `_`: a new provider has to decide which side it is on.
+        ProviderId::Anthropic
+        | ProviderId::Openai
+        | ProviderId::Google
+        | ProviderId::Mistral
+        | ProviderId::Grok
+        | ProviderId::Openrouter => client(),
+    }
+}
+
 /// Everything checked before a body is put on the wire.
 ///
 /// Split out so the boundaries are testable without a socket.
@@ -463,7 +510,7 @@ async fn send(provider: ProviderId, request: reqwest::RequestBuilder) -> Result<
 pub(crate) async fn provider_chat(provider: ProviderId, body: String) -> Result<String, String> {
     validate_chat_body(&body).map_err(|message| transport_error("bad-request", message))?;
 
-    let mut request = client()?
+    let mut request = client_for(provider)?
         .post(format!("{}{}", provider.base_url(), provider.chat_path()))
         .timeout(CHAT_TIMEOUT)
         .header("content-type", "application/json")
@@ -479,7 +526,7 @@ pub(crate) async fn provider_chat(provider: ProviderId, body: String) -> Result<
 /// List the models this provider will accept.
 #[tauri::command]
 pub(crate) async fn provider_list_models(provider: ProviderId) -> Result<String, String> {
-    let mut request = client()?
+    let mut request = client_for(provider)?
         .get(format!("{}{}", provider.base_url(), provider.models_path()))
         .timeout(MODELS_TIMEOUT);
 
@@ -666,7 +713,7 @@ fn candidate_auth_headers(provider: ProviderId, key: String) -> Vec<(&'static st
 pub(crate) async fn provider_test_key(provider: ProviderId, key: String) -> Result<(), String> {
     let candidate = candidate_key(provider, &key)?;
 
-    let mut request = client()?
+    let mut request = client_for(provider)?
         .get(format!("{}{}", provider.base_url(), provider.key_test_path()))
         .timeout(MODELS_TIMEOUT);
 
@@ -707,7 +754,7 @@ pub(crate) async fn provider_test_key(provider: ProviderId, key: String) -> Resu
 /// the other commands; nothing in this function produces one.
 #[tauri::command]
 pub(crate) async fn ollama_probe() -> Result<Option<String>, String> {
-    let Ok(http) = client() else {
+    let Ok(http) = loopback_client() else {
         return Ok(None);
     };
 
@@ -789,6 +836,136 @@ mod tests {
         install_crypto_provider();
         install_crypto_provider();
         assert!(client().is_ok(), "installing twice broke the shared client");
+    }
+
+    // ====================================================================
+    // A LOCAL RUN MUST NOT LEAVE THE MACHINE THROUGH A PROXY.
+    // ====================================================================
+    // reqwest reads HTTP_PROXY / ALL_PROXY (and, with the `system-proxy`
+    // feature the updater switches on, the OS proxy settings) and has NO
+    // implicit bypass for 127.0.0.1. Through the shared client, a CV sent to
+    // Ollama went to whatever proxy the machine had configured, in plain HTTP.
+    //
+    // The real check runs in a CHILD process, for two reasons:
+    //   * it sets proxy variables, which would leak into every other test in
+    //     this binary;
+    //   * building any client installs the rustls provider for the whole
+    //     process, which would make `the_shared_http_client_can_be_built`
+    //     pass even with its own install call deleted (see its comment).
+    #[test]
+    fn the_loopback_client_ignores_a_configured_proxy() {
+        let exe = std::env::current_exe().expect("test binary path");
+        let output = std::process::Command::new(exe)
+            .args([
+                "--exact",
+                "providers::tests::loopback_proxy_child",
+                "--ignored",
+                "--test-threads=1",
+                "--nocapture",
+            ])
+            .env(LOOPBACK_CHILD_ENV, "1")
+            .output()
+            .expect("re-run the test binary");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(output.status.success(), "child failed:\n{stdout}\n{stderr}");
+        // A filter that matched nothing also exits 0. Insist the child ran.
+        assert!(
+            stdout.contains("1 passed"),
+            "the child test did not run:\n{stdout}\n{stderr}"
+        );
+    }
+
+    const LOOPBACK_CHILD_ENV: &str = "CVIPER_LOOPBACK_PROXY_CHILD";
+
+    /// Accepts connections on 127.0.0.1, counts them, and answers every one
+    /// with a fixed status. Returns the port and the counter.
+    fn one_status_server(
+        status: &'static str,
+    ) -> (u16, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        use std::io::{Read, Write};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let hits = std::sync::Arc::new(AtomicUsize::new(0));
+        let counter = hits.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { continue };
+                counter.fetch_add(1, Ordering::SeqCst);
+                let mut buf = [0u8; 4096];
+                let _ = stream.read(&mut buf);
+                let reply =
+                    format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                let _ = stream.write_all(reply.as_bytes());
+            }
+        });
+        (port, hits)
+    }
+
+    #[test]
+    #[ignore = "run by the_loopback_client_ignores_a_configured_proxy in a child process"]
+    fn loopback_proxy_child() {
+        use std::sync::atomic::Ordering;
+        if std::env::var(LOOPBACK_CHILD_ENV).as_deref() != Ok("1") {
+            return;
+        }
+
+        let (proxy_port, proxy_hits) = one_status_server("502 Bad Gateway");
+        let (target_port, target_hits) = one_status_server("200 OK");
+        let proxy = format!("http://127.0.0.1:{proxy_port}");
+        for name in ["NO_PROXY", "no_proxy"] {
+            std::env::remove_var(name);
+        }
+        for name in ["HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"] {
+            std::env::set_var(name, &proxy);
+        }
+        let target = format!("http://127.0.0.1:{target_port}/api/tags");
+
+        // CONTROL: the shared client honours the proxy. Without this, a
+        // matcher that ignored the variables would make the real assertion
+        // below pass for the wrong reason.
+        let via_shared =
+            tauri::async_runtime::block_on(client().expect("shared client").get(&target).send())
+                .expect("the proxy answers");
+        assert_eq!(
+            via_shared.status().as_u16(),
+            502,
+            "control did not reach the proxy"
+        );
+        assert_eq!(proxy_hits.load(Ordering::SeqCst), 1);
+
+        // THE GUARD: the loopback client goes straight to 127.0.0.1.
+        let via_loopback = tauri::async_runtime::block_on(
+            loopback_client()
+                .expect("loopback client")
+                .get(&target)
+                .send(),
+        )
+        .expect("the local server answers");
+        assert_eq!(via_loopback.status().as_u16(), 200);
+        assert_eq!(target_hits.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            proxy_hits.load(Ordering::SeqCst),
+            1,
+            "a local request was sent to the proxy"
+        );
+
+        // AND THE COMMANDS PICK IT: only Ollama is local, so only Ollama skips
+        // the proxy. A cloud provider keeps it - a user whose only way out is a
+        // proxy must still reach OpenAI.
+        for provider in ALL {
+            let chosen = client_for(provider).expect("client");
+            let expected = if provider == ProviderId::Ollama {
+                loopback_client().expect("loopback client")
+            } else {
+                client().expect("shared client")
+            };
+            assert!(
+                std::ptr::eq(chosen, expected),
+                "{provider:?} picked the wrong client"
+            );
+        }
     }
 
     #[test]
