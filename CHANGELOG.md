@@ -10,10 +10,6 @@ All notable changes to CViper Light are recorded here. The format follows
 
 - Every release now also carries the Mac disk image under one name that never changes, `CViper-Light-macOS.dmg`, next to `CViper-Light-Windows-x64.exe` (L-261), so cviper.ai can offer a Mac download button that never needs a version number. A release with no Mac build (the Apple secrets unset) still ships Windows and says so in its summary; a release with two disk images is refused rather than guessed at. The guard that holds the Windows name now holds this one too, and checks that the signing job can never pick either up.
 
-### Fixed
-
-- A local Ollama run no longer goes through a proxy. The app's network client honoured `HTTP_PROXY`/`ALL_PROXY` and the system proxy settings, with no exception for `127.0.0.1`, so on a machine with a proxy set (common on work laptops and with some VPNs) the CV and advert sent to Ollama travelled to that proxy in plain HTTP. Ollama now has its own client that never uses a proxy and never follows a redirect; every cloud provider keeps the proxy, so users who need one can still reach them. A test runs the real request against a fake proxy in a child process and fails if the local request reaches it.
-
 ## [0.10.6] — 2026-10-20
 
 0.10.5 was tagged but never published: its Mac build was correct, but the release workflow's own extra packing step went red (L-260) and the Windows installer's stable download name was never written. This is the same code with that workflow fix, released properly.
