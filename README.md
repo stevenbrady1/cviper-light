@@ -4,7 +4,8 @@ A desktop app for running a job hunt: search adverts, track what you have
 applied for, and check a CV against a job description. It runs on your own
 computer and keeps everything there.
 
-Windows, with an iPhone build target checked in CI. Tauri v2, React, SQLite.
+Windows and macOS, with an iPhone build target checked in CI. Tauri v2, React,
+SQLite.
 
 ## Who made this, and why
 
@@ -16,14 +17,14 @@ and no payment — it is free and MIT-licensed, for anyone, now and later — an
 the tracker, the CV text extraction and the basic keyword match work with no
 internet connection at all.
 
-It is early, and it is released. The first published release is
-[`light-v0.2.0`](https://github.com/stevenbrady1/cviper-light/releases/latest)
-(2026-09-19): a Windows installer, also linked from
-[cviper.ai](https://cviper.ai). Windows shows a SmartScreen warning on it
-because the installer carries the project's own updater signature, not a paid
-Authenticode certificate — the Microsoft Store listing, which re-signs the
-package, is the planned fix. On other platforms the way to run it today is to
-build it yourself (below). There are no
+It is early, and it is released. The first published release was
+`light-v0.2.0` (2026-09-19). [The latest release](https://github.com/stevenbrady1/cviper-light/releases/latest)
+carries a Windows installer and a signed, notarised macOS disk image, both also
+linked from [cviper.ai](https://cviper.ai). Windows shows a SmartScreen warning
+on the installer because it carries the project's own updater signature, not a
+paid Authenticode certificate — the Microsoft Store listing, which re-signs the
+package, is the planned fix. On any other platform the way to run it today is
+to build it yourself (below). There are no
 screenshots in this repository;
 [docs/app-store/SCREENSHOTS.md](docs/app-store/SCREENSHOTS.md) says which
 screens get captured and how.
