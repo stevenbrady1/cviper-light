@@ -10,10 +10,6 @@ All notable changes to CViper Light are recorded here. The format follows
 
 - Every release now also carries the Mac disk image under one name that never changes, `CViper-Light-macOS.dmg`, next to `CViper-Light-Windows-x64.exe` (L-261), so cviper.ai can offer a Mac download button that never needs a version number. A release with no Mac build (the Apple secrets unset) still ships Windows and says so in its summary; a release with two disk images is refused rather than guessed at. The guard that holds the Windows name now holds this one too, and checks that the signing job can never pick either up.
 
-### Changed
-
-- Release and Store builds are harder to tamper with and harder to stall. Every checkout in the release and Store workflows drops the job's GitHub token instead of leaving it in `.git/config`, where any build dependency could have read it and replaced a published installer. The Store package now waits for CI to pass on a commit on `main`, as releases already did, so a package can no longer be built from a red or unmerged commit. Rust is pinned to 1.99.1 in `rust-toolchain.toml` and in every workflow, so the compiler changes only when a PR says so. CI and smoke runs on `main` are no longer cancelled by a quick second merge, which used to leave a tag waiting on a manual re-run. Every job now has its own timeout instead of GitHub's six hours. Four new contract tests hold all of this.
-
 ## [0.10.6] — 2026-10-20
 
 0.10.5 was tagged but never published: its Mac build was correct, but the release workflow's own extra packing step went red (L-260) and the Windows installer's stable download name was never written. This is the same code with that workflow fix, released properly.
