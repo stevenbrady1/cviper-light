@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-10-26
+
+The launch release. The free CV check reads skills it used to miss, a new user sees a full result in one click and is no longer asked for job-board keys, there is a tenth UK job board, and three security fixes: AI requests no longer follow redirects, a local Ollama run never goes through a proxy, and a memory issue in backup validation is patched.
+
 ### Added
 
 - A one-click sample on the Analysis screen (L-277). Before you have added a CV, "Try it with a sample CV" checks a made-up data analyst's CV against a made-up advert with the basic match and shows the full result, so a new user sees what a check gives back before hunting for files. It saves nothing — no CV row, no history — because a single CV cannot be deleted from the app, and a sample would otherwise sit in your list for good. It contacts nothing, it is gone once you add your own CV, and "Hide the sample" puts it away. A test pins the sample to a middle-band result with real gaps, so a scorer change cannot quietly turn the demonstration into a 95 or a "weak".
@@ -481,7 +485,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.6...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.11.0...main
+[0.11.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.6...light-v0.11.0
 [0.10.6]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.5...light-v0.10.6
 [0.10.5]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.4...light-v0.10.5
 [0.10.4]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.2...light-v0.10.4
