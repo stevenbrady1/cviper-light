@@ -37,6 +37,7 @@ import {
   type ScoringError,
 } from './errors';
 import { stripJobBoilerplate } from './boilerplate';
+import { displayTerm } from './display-names';
 import { matchProfileToJob, type MatchResult } from './match';
 import { buildCvProfile, buildJobPosting } from './profile';
 import { DEFAULT_SKILL_WEIGHT, skillWeight } from './weights';
@@ -82,8 +83,12 @@ function prepare(text: string): string {
  * into `Ci/Cd` and `node.js` into `Node.Js`.
  */
 function displaySkill(skill: string): string {
-  if (skill.includes('/') || skill.includes('.')) return skill;
-  return skill.replace(/[A-Za-z]+/g, (word) => word[0]!.toUpperCase() + word.slice(1));
+  const cased =
+    skill.includes('/') || skill.includes('.')
+      ? skill
+      : skill.replace(/[A-Za-z]+/g, (word) => word[0]!.toUpperCase() + word.slice(1));
+  // L-288: then the display map, so "Sql" is "SQL" in a sentence as well as a list.
+  return displayTerm(cased);
 }
 
 /** "1 thing" / "3 things". */

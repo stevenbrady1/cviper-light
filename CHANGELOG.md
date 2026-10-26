@@ -16,6 +16,8 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Fixed
 
+- Skill names are now spelled the same in the free check's advice as in its lists (L-288). The lists already showed "SQL" and "Power BI", but the advice under them said "The advert asks for Sql" and "Power Bi", because the sentences skipped the step that fixes names for the screen. That step now runs inside the check itself, so every name it writes is right wherever it appears. Joining words also stay small: "Literacy and Numeracy", "End of Life Care". Nothing about any score changes.
+
 - The free CV check no longer counts a skill your CV says you do not have (L-283). "No CPC or tachograph card yet" used to count as holding a tachograph card, and "Driver CPC not held" as holding a CPC. Now a skill right after "no", "not", "without", "lacking", "do not have" or "don't hold", or right before "not held", "expired" or "lapsed", is not counted — unless the CV names it somewhere else as well. The rule is narrow on purpose, because hiding a skill you hold is worse than the old bug: "not only", "no less than", "never", "non-technical", "working towards" and "pending" still count as having it. It changes only which skills are read from the CV; the advert and the ATS keyword check are read as before. On the twenty test CVs it removes exactly one skill — the tachograph card that CV says it lacks.
 
 ### Added
