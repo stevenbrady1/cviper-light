@@ -19,6 +19,8 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Fixed
 
+- The free CV check no longer misses a skill that ends a sentence or shares a slash (L-275). "Advanced Excel.", "residents with dementia." and "Python/Django" all hid the skill, because the word matcher treated `.` and `/` as part of the word; the check then told people to add words their CV already had. A full stop now ends a word unless a letter follows it, so `node` still does not match inside `node.js`, and a slash now separates two skills. Hyphens are unchanged on purpose: splitting them would make "go" match "go-to-market". The same matcher feeds the match score, the keyword score, the skills panel, search ranking and the Tailor comparison, so all of them gain the fix. This is a deliberate break from the old web app's scorer, which had the same defect; that app is mothballed, so there is nothing left for the two to disagree about.
+
 - A crash on one screen no longer takes the whole app down. There was one error boundary, round everything, so a render error on Tailor (say) blanked the window, menu included, and "Try again" re-rendered the same broken screen. Each screen now has its own: the menu and the other screens keep working, and moving to another screen starts it clean. The error message is still never shown, since it can carry CV text.
 
 - Keyboard and screen-reader focus now follows you to the new screen. Switching screens dropped focus to the top of the page, so a keyboard user had to tab through the menu to find where they were; the new screen's heading now takes focus (WCAG 2.4.3).

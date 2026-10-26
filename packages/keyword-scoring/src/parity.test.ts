@@ -99,27 +99,24 @@ describe('termInText parity with the Python original', () => {
 
 /**
  * ============================================================================
- * KNOWN LIMITATIONS OF THE PORTED MATCHER — PINNED DELIBERATELY.
+ * L-275 — WHERE LIGHT NOW LEAVES THE PYTHON, ON PURPOSE.
  * ============================================================================
- * `.` is inside the token character class so that `node` cannot match inside
- * `node.js`. The price is that a skill at the END OF A SENTENCE, followed by a
- * full stop, does not match either — and CVs are full of sentences that end on
- * a skill.
+ * The Python keeps `.` inside the token class, so a skill at the END OF A
+ * SENTENCE never matches. This block used to pin that defect for parity. The
+ * web app it had parity with was mothballed in September 2026, so there is no
+ * second scorer left to disagree with, and Light fixes it on its own side.
  *
- * This is a REAL DEFECT in the upstream scorer, reproduced here on purpose so
- * the two implementations agree. It is reported alongside this port rather
- * than fixed here: fixing it in one repository and not the other would make
- * the same CV score differently in each, which is worse than the bug.
+ * Every OTHER case in this file still matches the Python. These are the only
+ * expectations that deliberately differ; `term.test.ts` holds the full set of
+ * L-275 cases, including the symbol tokens that must not change.
  */
-describe('known upstream limitation: a trailing full stop hides a skill', () => {
+describe('L-275 divergence: a trailing full stop no longer hides a skill', () => {
   it.each([
     ['python', 'I know Python.'],
     ['docker', 'Deployed on AWS with Docker.'],
     ['stakeholder management', 'Strong SQL and stakeholder management.'],
-  ])('termInText(%j, %j) is false, matching the Python', (term, text) => {
-    expect(termInText(term, text)).toBe(false);
-    // ...and matches the moment the full stop is not immediately adjacent.
-    expect(termInText(term, text.replace(/\.$/, ' too'))).toBe(true);
+  ])('termInText(%j, %j) is true (the Python says false)', (term, text) => {
+    expect(termInText(term, text)).toBe(true);
   });
 });
 
@@ -134,6 +131,12 @@ describe('known upstream limitation: a trailing full stop hides a skill', () => 
  * Expected arrays were produced by running
  * `FallbackService(KeywordService()).ats_score(cv, job)["missing_keywords"]`
  * in the CViper repo (backend/ai/fallbacks.py), not by reasoning about it.
+ *
+ * L-275 moved two of them. "Compliance." and "java." end a sentence in their
+ * adverts, so the Python never recognised them as skills and ranked them with
+ * the prose words. Light now finds them, so they rank in the skill tier. The
+ * tier RULE these tests exist for is unchanged: "machine learning" and
+ * "stakeholder management" still rank with the prose, exactly as before.
  */
 describe('atsScore missing-keyword ranking parity (L-197)', () => {
   const CV = 'pastry chef';
@@ -147,6 +150,7 @@ describe('atsScore missing-keyword ranking parity (L-197)', () => {
     expect(atsScore(CV, job).missingKeywords).toEqual([
       'sql',
       'python',
+      'compliance', // L-275: was 11th, behind the prose, when "Compliance." went unseen
       'delivery',
       'machine learning',
       'reporting',
@@ -155,7 +159,6 @@ describe('atsScore missing-keyword ranking parity (L-197)', () => {
       'data',
       'pipeline',
       'expertise',
-      'compliance',
       'mentoring',
     ]);
   });
@@ -210,10 +213,10 @@ describe('atsScore missing-keyword ranking parity (L-197)', () => {
       'We need python and sql and java. Delivery delivery delivery. Reporting reporting. Governance.';
     expect(atsScore(CV, job).missingKeywords).toEqual([
       'python',
+      'java', // L-275: was 5th, behind the prose, when "java." went unseen
       'sql',
       'delivery',
       'reporting',
-      'java',
       'governance',
     ]);
   });
