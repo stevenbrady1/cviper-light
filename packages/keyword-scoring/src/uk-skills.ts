@@ -40,6 +40,11 @@ export interface UkTerm {
   readonly label: string;
   /** Other ways a UK advert or CV writes the same thing. */
   readonly aliases: readonly string[];
+  /**
+   * L-285: labels a CV holding this one is also credited with. C+E implies C;
+   * NVQ Level 3 implies Level 2. CV side only — see `impliedUkSkills`.
+   */
+  readonly implies: readonly string[];
 }
 
 function cleanString(value: unknown): string | null {
@@ -69,7 +74,11 @@ export function readUkTerms(raw: unknown): UkTerm[] {
     const aliases = (rawAliases as unknown[])
       .map(cleanString)
       .filter((alias): alias is string => alias !== null);
-    terms.push({ label, aliases });
+    const rawImplies = record['implies'];
+    const implies = Array.isArray(rawImplies)
+      ? (rawImplies as unknown[]).map(cleanString).filter((l): l is string => l !== null)
+      : [];
+    terms.push({ label, aliases, implies });
   }
   return terms;
 }
@@ -88,4 +97,30 @@ export function extractUkSkills(text: string): string[] {
   return UK_TERMS.filter((term) =>
     [term.label, ...term.aliases].some((phrase) => termInFoldedText(phrase, folded)),
   ).map((term) => term.label);
+}
+
+const IMPLIES: ReadonlyMap<string, readonly string[]> = new Map(
+  UK_TERMS.map((term) => [term.label, term.implies]),
+);
+
+/**
+ * L-285 — the labels `held` implies that it does not already contain, each
+ * once. One step only: nothing in the list implies a label that itself
+ * implies more, and `uk-skills.test.ts` would have to change if it did.
+ *
+ * For the CV ONLY. An advert asking for NVQ Level 3 is not also asking for
+ * Level 2, and widening the advert would add a requirement it never stated.
+ */
+export function impliedUkSkills(held: readonly string[]): string[] {
+  const have = new Set(held);
+  const out: string[] = [];
+  for (const label of held) {
+    for (const implied of IMPLIES.get(label) ?? []) {
+      if (!have.has(implied)) {
+        have.add(implied);
+        out.push(implied);
+      }
+    }
+  }
+  return out;
 }

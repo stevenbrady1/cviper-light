@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- A higher UK qualification now counts for the lower one it includes (L-285). A CV with NVQ Level 3 meets an advert asking for NVQ Level 2, and a C+E licence meets one asking for a C licence, which you cannot hold C+E without. Only the CV side is widened: an advert asking for Level 3 is not read as also asking for Level 2, and a CV that says "No NVQ Level 3" gets neither.
+
 ### Fixed
 
 - The free CV check no longer counts a skill your CV says you do not have (L-283). "No CPC or tachograph card yet" used to count as holding a tachograph card, and "Driver CPC not held" as holding a CPC. Now a skill right after "no", "not", "without", "lacking", "do not have" or "don't hold", or right before "not held", "expired" or "lapsed", is not counted — unless the CV names it somewhere else as well. The rule is narrow on purpose, because hiding a skill you hold is worse than the old bug: "not only", "no less than", "never", "non-technical", "working towards" and "pending" still count as having it. It changes only which skills are read from the CV; the advert and the ATS keyword check are read as before. On the twenty test CVs it removes exactly one skill — the tachograph card that CV says it lacks.

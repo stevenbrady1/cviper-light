@@ -25,7 +25,7 @@ import { maskNegated } from './negation';
 import { foldSpelling } from './spelling';
 import { getSimilarTerms } from './similar';
 import { termInFoldedText } from './term';
-import { extractUkSkills } from './uk-skills';
+import { extractUkSkills, impliedUkSkills } from './uk-skills';
 import { COMMON_SKILLS, SKILL_VOCABULARY } from './vocabulary';
 
 /** Matches `_MAX_TEXT_LENGTH` in `FallbackService` — a CPU guard on regex work. */
@@ -251,7 +251,9 @@ export function buildCvProfile(cvText: string): CvProfile {
   // L-283: "No CPC or tachograph card yet" is not a tachograph. Skills only —
   // titles are read from the full text. See negation.ts for what is masked.
   const skillText = maskNegated(text);
-  const skills = withUkSkills(extractSkills(skillText), skillText);
+  const found = withUkSkills(extractSkills(skillText), skillText);
+  // L-285: NVQ Level 3 also counts for Level 2, C+E for C. CV side only.
+  const skills = [...found, ...impliedUkSkills(found)];
   return {
     skills,
     relatedSkills: [],
