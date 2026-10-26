@@ -1,0 +1,335 @@
+[
+  {
+    "advert": "01",
+    "file": "01-good.txt",
+    "fit": "good",
+    "person": "Joanne Pickering",
+    "intended_rating_1_to_5": 5,
+    "which_must_haves_met": [
+      "Physically and medically fit for care duties",
+      "NVQ Level 2 in care or equivalent",
+      "Self-motivated team player, flexible and adaptable",
+      "Can organise and prioritise work under pressure",
+      "Clear spoken and written communication"
+    ],
+    "which_missing": [],
+    "why": "Six years in residential care, four on nights in a dementia-heavy home; holds Level 2 Diploma (QCF equivalent of NVQ 2) and is studying Level 3. Evidence of prioritising on short-staffed nights, clear care notes, covering shifts, promoting independence and choice. Meets all nice-to-haves too."
+  },
+  {
+    "advert": "01",
+    "file": "01-poor.txt",
+    "fit": "poor",
+    "person": "Hamza Iqbal",
+    "intended_rating_1_to_5": 2,
+    "which_must_haves_met": [
+      "Can organise and prioritise work under pressure",
+      "Clear spoken and written communication"
+    ],
+    "which_missing": [
+      "NVQ Level 2 in care or equivalent, or willing to work towards it",
+      "Self-motivated team player, flexible and adaptable",
+      "Physically and medically fit for care duties"
+    ],
+    "why": "Accounting student wanting weekend-only term-time nights around his degree, with no care experience or qualification and no stated willingness to train in care; career aim is accountancy. Shares surface words: 'night', 'resident', 'welfare', 'Leicester', 'first aid'."
+  },
+  {
+    "advert": "02",
+    "file": "02-good.txt",
+    "fit": "good",
+    "person": "Morag Fraser",
+    "intended_rating_1_to_5": 5,
+    "which_must_haves_met": [
+      "Experience of, or aptitude for, recruiting and developing volunteers",
+      "Enthusiasm for managing and empowering people",
+      "Can motivate a team to grow sales and keep costs down",
+      "Ready to take on a new challenge",
+      "Interest in the charity's housing cause"
+    ],
+    "which_missing": [],
+    "why": "Deputy manager of an Edinburgh charity shop who grew the volunteer team from 14 to 26, lifted takings about 18% and cut waste costs; volunteers at a homelessness drop-in, giving a clear personal link to housing."
+  },
+  {
+    "advert": "02",
+    "file": "02-poor.txt",
+    "fit": "poor",
+    "person": "Callum Reid",
+    "intended_rating_1_to_5": 2,
+    "which_must_haves_met": ["Ready to take on a new challenge"],
+    "which_missing": [
+      "Experience of, or aptitude for, recruiting and developing volunteers",
+      "Enthusiasm for managing and empowering people",
+      "Can motivate a team to grow sales and keep costs down",
+      "Interest in the charity's housing cause"
+    ],
+    "why": "Junior fashion sales assistant with no supervisory, volunteer or charity experience and no interest in housing. Personal sales targets only. Shares surface words: 'retail', 'sales', 'team', 'shop', 'stock'."
+  },
+  {
+    "advert": "03",
+    "file": "03-good.txt",
+    "fit": "good",
+    "person": "Darren Whittle",
+    "intended_rating_1_to_5": 5,
+    "which_must_haves_met": [
+      "Category C+E (Class 1) licence",
+      "At least 1 year of HGV driving experience",
+      "Valid Driver CPC",
+      "Digital tachograph card",
+      "No more than 6 penalty points",
+      "None of the serious endorsements (DR, DD, DG, IN, TT)"
+    ],
+    "which_missing": [],
+    "why": "Class 1 driver since 2017 with ten years' HGV experience, six on nights in the North West; CPC valid to 2028, current tacho card, 3 points (SP30) only and no serious endorsements."
+  },
+  {
+    "advert": "03",
+    "file": "03-poor.txt",
+    "fit": "poor",
+    "person": "Bartosz Nowak",
+    "intended_rating_1_to_5": 1,
+    "which_must_haves_met": [
+      "No more than 6 penalty points",
+      "None of the serious endorsements (DR, DD, DG, IN, TT)"
+    ],
+    "which_missing": [
+      "Category C+E (Class 1) licence",
+      "At least 1 year of HGV driving experience",
+      "Valid Driver CPC",
+      "Digital tachograph card"
+    ],
+    "why": "Local van multi-drop driver with only a Cat B licence, no CPC or tacho card and no HGV time; plans Cat C training next year. Shares surface words: 'driver', 'nights', 'Bamber Bridge', 'HGV', 'licence', 'CPC', 'tachograph' (stated as not held)."
+  },
+  {
+    "advert": "04",
+    "file": "04-good.txt",
+    "fit": "good",
+    "person": "Lauren Bunting",
+    "intended_rating_1_to_5": 5,
+    "which_must_haves_met": [
+      "Experience working with primary-age children",
+      "Understanding of or experience with SEMH or additional needs",
+      "Behaviour management and de-escalation skills",
+      "Good literacy and numeracy",
+      "Patient, resilient, reflective team player",
+      "Right to work in the UK (no sponsorship)",
+      "Enhanced DBS check"
+    ],
+    "which_missing": [],
+    "why": "Primary TA in King's Lynn supporting a Year 3 pupil with an SEMH EHCP, Team Teach trained, runs regulation and soft-start groups; Level 3 STL, GCSE English 6 and Maths 5, enhanced DBS on the Update Service, British citizen, and keen on trauma-informed practice."
+  },
+  {
+    "advert": "04",
+    "file": "04-poor.txt",
+    "fit": "poor",
+    "person": "Ritu Sharma",
+    "intended_rating_1_to_5": 2,
+    "which_must_haves_met": [
+      "Good literacy and numeracy",
+      "Right to work in the UK (no sponsorship)"
+    ],
+    "which_missing": [
+      "Experience working with primary-age children",
+      "Understanding of or experience with SEMH or additional needs",
+      "Behaviour management and de-escalation skills",
+      "Enhanced DBS check"
+    ],
+    "why": "FE college library assistant supporting students aged 16+ and adults; no primary, SEMH or behaviour experience and only a basic DBS. Shares surface words: 'learning', 'literacy', 'support', 'DBS', 'teaching assistant', 'patient', 'team player'."
+  },
+  {
+    "advert": "05",
+    "file": "05-good.txt",
+    "fit": "good",
+    "person": "Bethany Hollins",
+    "intended_rating_1_to_5": 5,
+    "which_must_haves_met": [
+      "Current experience in a customer-facing role (retail, hospitality or call centre)",
+      "Deals with customers directly every day",
+      "Accurate when handling customer details and data",
+      "Computer literate and quick with systems"
+    ],
+    "which_missing": [],
+    "why": "Currently on a supermarket customer service desk serving 150+ customers a shift, takes loyalty-scheme personal data with GDPR care, quick on EPOS; also covers all nice-to-haves: cash reconciliation, following set procedures, calming complaints and spotting scams aimed at vulnerable customers."
+  },
+  {
+    "advert": "05",
+    "file": "05-poor.txt",
+    "fit": "poor",
+    "person": "Gareth Lowe",
+    "intended_rating_1_to_5": 2,
+    "which_must_haves_met": [
+      "Accurate when handling customer details and data",
+      "Computer literate and quick with systems"
+    ],
+    "which_missing": [
+      "Current experience in a customer-facing role (retail, hospitality or call centre)",
+      "Deals with customers directly every day"
+    ],
+    "why": "Back-office stock control administrator; his only face-to-face customer work was bar staff ten years ago, and his current contact is internal emails. Strong on data and systems, so a keyword matcher may rate him well. Shares surface words: 'customer details', 'data protection', 'accurate', 'process', 'systems'."
+  },
+  {
+    "advert": "06",
+    "file": "06-good.txt",
+    "fit": "good",
+    "person": "Oluwaseun (Seun) Bakare",
+    "intended_rating_1_to_5": 5,
+    "which_must_haves_met": [
+      "Solid experience in market risk and/or balance sheet risk management",
+      "Strong analytical, quantitative and problem-solving skills",
+      "Understanding of treasury, balance sheet management and prudential risk frameworks",
+      "Turns financial and non-financial data into evidence-based recommendations",
+      "Strong communication and stakeholder management",
+      "Advanced Excel plus modelling and reporting experience in financial services"
+    ],
+    "which_missing": [],
+    "why": "Ten years in UK banking: IRRBB, liquidity and market risk at a building society and a challenger bank; behavioural models approved by ALCO, presents ALCO packs, works on ILAAP/ICAAP. CertBALM, QRM user and writes a weekly market note, so meets all three nice-to-haves."
+  },
+  {
+    "advert": "06",
+    "file": "06-poor.txt",
+    "fit": "poor",
+    "person": "Rebecca Thornton",
+    "intended_rating_1_to_5": 2,
+    "which_must_haves_met": ["Strong communication and stakeholder management"],
+    "which_missing": [
+      "Solid experience in market risk and/or balance sheet risk management",
+      "Understanding of treasury, balance sheet management and prudential risk frameworks",
+      "Turns financial and non-financial data into evidence-based recommendations",
+      "Advanced Excel plus modelling and reporting experience in financial services",
+      "Strong analytical, quantitative and problem-solving skills"
+    ],
+    "why": "Junior corporate treasury assistant at a manufacturer (cash positioning, payments, FX spot); no banking, prudential or balance sheet risk experience and is not at senior level. Shares surface words: 'treasury', 'Excel', 'forecast', 'Coventry', 'financial services'."
+  },
+  {
+    "advert": "07",
+    "file": "07-good.txt",
+    "fit": "good",
+    "person": "Natalie Ferreira",
+    "intended_rating_1_to_5": 5,
+    "which_must_haves_met": [
+      "Previous HR administration experience",
+      "Hands-on BambooHR experience",
+      "Confident with Microsoft 365 including SharePoint",
+      "Strong organisation and practical, proactive approach",
+      "Excellent written and verbal communication",
+      "Discreet with confidential information",
+      "Problem solver who uses tech to improve efficiency"
+    ],
+    "which_missing": [],
+    "why": "Six years of HR admin, currently administering BambooHR (workflows, reports) at a remote charity; moved the policy library to SharePoint and automated requests with Power Automate; handles ER case notes; led a small project, which covers the nice-to-have."
+  },
+  {
+    "advert": "07",
+    "file": "07-poor.txt",
+    "fit": "poor",
+    "person": "Tom Ashby",
+    "intended_rating_1_to_5": 2,
+    "which_must_haves_met": [
+      "Strong organisation and practical, proactive approach",
+      "Discreet with confidential information"
+    ],
+    "which_missing": [
+      "Previous HR administration experience",
+      "Hands-on BambooHR experience",
+      "Confident with Microsoft 365 including SharePoint"
+    ],
+    "why": "Agency recruitment coordinator using Bullhorn and Google Workspace; no in-house HR admin, no BambooHR and no Microsoft 365/SharePoint. Shares surface words: 'onboarding', 'right to work', 'GDPR', 'records', 'confidentiality', 'HR'."
+  },
+  {
+    "advert": "08",
+    "file": "08-good.txt",
+    "fit": "good",
+    "person": "Ayesha Rahman",
+    "intended_rating_1_to_5": 5,
+    "which_must_haves_met": [
+      "Admin and operations support across several workstreams with good prioritisation",
+      "Has run an online application or review platform (Award Force or similar)",
+      "CRM data management and reporting (Zoho or any CRM)",
+      "Confident dealing with senior stakeholders",
+      "Organised, adaptable, works alone or in a team",
+      "Strong attention to detail with data"
+    ],
+    "which_missing": [],
+    "why": "Education charity operations officer who runs a schools awards process on Submittable (an Award Force equivalent) and manages Salesforce data and board dashboards (a CRM in place of Zoho); works with patron's office and trustees, delivered a 250-guest ceremony, has Mailchimp/marketing background. Synonym test: never names Award Force or Zoho."
+  },
+  {
+    "advert": "08",
+    "file": "08-poor.txt",
+    "fit": "poor",
+    "person": "James Whitfield",
+    "intended_rating_1_to_5": 2,
+    "which_must_haves_met": ["Organised, adaptable, works alone or in a team"],
+    "which_missing": [
+      "Has run an online application or review platform (Award Force or similar)",
+      "CRM data management and reporting (Zoho or any CRM)",
+      "Strong attention to detail with data",
+      "Confident dealing with senior stakeholders",
+      "Admin and operations support across several workstreams with good prioritisation"
+    ],
+    "why": "Hotel conference and events coordinator; strong on event delivery (a nice-to-have) but no application platform, CRM, data reporting or senior stakeholder work. Shares surface words: 'events', 'coordinator', 'operations', 'charity', 'booking system'."
+  },
+  {
+    "advert": "09",
+    "file": "09-good.txt",
+    "fit": "good",
+    "person": "Siobhan Gallagher",
+    "intended_rating_1_to_5": 5,
+    "which_must_haves_met": [
+      "Experience in a research or data analysis setting",
+      "Proficient in Power BI",
+      "Strong Excel and general IT skills",
+      "Works with large datasets accurately",
+      "Explains data clearly to technical and non-technical people",
+      "Commitment to the charity's domestic-abuse mission"
+    ],
+    "which_missing": [],
+    "why": "Data and insight officer at a domestic abuse charity building Power BI (DAX/Power Query) dashboards on about 250k rows, commissioner returns in Excel, trains frontline staff; former university research assistant using SPSS and NVivo for qualitative work; volunteered on a DA helpline. Meets all nice-to-haves."
+  },
+  {
+    "advert": "09",
+    "file": "09-poor.txt",
+    "fit": "poor",
+    "person": "Ravi Mistry",
+    "intended_rating_1_to_5": 2,
+    "which_must_haves_met": ["Works with large datasets accurately"],
+    "which_missing": [
+      "Experience in a research or data analysis setting",
+      "Proficient in Power BI",
+      "Explains data clearly to technical and non-technical people",
+      "Commitment to the charity's domestic-abuse mission",
+      "Strong Excel and general IT skills"
+    ],
+    "why": "Sales data entry administrator: cleans records and exports figures for someone else to report on. Basic Excel, no Power BI, no analysis or research, no charity or domestic abuse link. Shares surface words: 'data', 'Excel', 'large volumes', 'remote', 'data cleansing'."
+  },
+  {
+    "advert": "10",
+    "file": "10-good.txt",
+    "fit": "good",
+    "person": "Marcus Campbell",
+    "intended_rating_1_to_5": 5,
+    "which_must_haves_met": [
+      "Significant experience in security, IT audit, compliance or a technical IT role",
+      "Understands how cyber risk is identified, assessed and managed",
+      "Hands-on audit/compliance work against a framework such as ISO 27001, CAF or Cyber Essentials Plus",
+      "Methodical, with strong documentation habits",
+      "Explains technical findings clearly to non-technical stakeholders"
+    ],
+    "which_missing": [],
+    "why": "Ten years in IT, five in GRC at a university: runs internal ISO 27001 audits, led Cyber Essentials Plus certification, keeps the information risk register, used NCSC CAF for a gap analysis; ISO 27001 Lead Auditor and CISMP; runs staff phishing sessions."
+  },
+  {
+    "advert": "10",
+    "file": "10-poor.txt",
+    "fit": "poor",
+    "person": "Sophie Brennan",
+    "intended_rating_1_to_5": 2,
+    "which_must_haves_met": [
+      "Methodical, with strong documentation habits",
+      "Explains technical findings clearly to non-technical stakeholders"
+    ],
+    "which_missing": [
+      "Significant experience in security, IT audit, compliance or a technical IT role",
+      "Understands how cyber risk is identified, assessed and managed",
+      "Hands-on audit/compliance work against a framework such as ISO 27001, CAF or Cyber Essentials Plus"
+    ],
+    "why": "Health and safety compliance officer (NEBOSH, ISO 45001 audits) with a theatre front-of-house background; no IT or cyber security experience. Shares surface words: 'compliance', 'audit', 'risk assessment', 'ISO', 'theatre', 'SharePoint'."
+  }
+]
