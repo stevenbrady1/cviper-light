@@ -15,6 +15,7 @@ import {
   clusterSiblings,
   describeCluster,
   externalKey,
+  hasAnyJobBoardKey,
   postedLabel,
   providerAvailability,
   searchDisabledReason,
@@ -243,5 +244,24 @@ describe('why the Search button cannot be pressed', () => {
     expect(reason).toContain('below');
     expect(reason).toContain('no key');
     expect(reason.indexOf('below')).toBeLessThan(reason.length);
+  });
+});
+
+describe('hasAnyJobBoardKey — whether the keyed-board row belongs on screen (L-276)', () => {
+  it('is false when neither key is saved', () => {
+    expect(hasAnyJobBoardKey({ adzuna: 'missing', reed: 'missing' })).toBe(false);
+  });
+
+  it('negative: is false while the credential store has not answered', () => {
+    expect(hasAnyJobBoardKey({ adzuna: 'unreadable', reed: 'missing' })).toBe(false);
+  });
+
+  it('is true when either key is saved', () => {
+    expect(hasAnyJobBoardKey({ adzuna: 'missing', reed: 'configured' })).toBe(true);
+    expect(hasAnyJobBoardKey({ adzuna: 'configured', reed: 'missing' })).toBe(true);
+  });
+
+  it('boundary: half a credential counts, so the user can see what to finish', () => {
+    expect(hasAnyJobBoardKey({ adzuna: 'incomplete', reed: 'missing' })).toBe(true);
   });
 });

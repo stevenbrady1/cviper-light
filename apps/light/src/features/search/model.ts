@@ -6,6 +6,7 @@
  * actually be searched, and how an advert is described.
  */
 import {
+  JOB_PROVIDER_IDS,
   MAX_QUERY_CHARS,
   PROVIDER_LABEL,
   type BrowserSearchInput,
@@ -175,6 +176,24 @@ export interface ProviderAvailability {
 }
 
 /**
+ * Whether the screen shows the keyed-board row at all (L-276).
+ *
+ * Job-board keys are optional and need registering on two other sites, so a
+ * machine with none gets the free feeds and the board buttons, and no row of
+ * disabled boxes asking for keys. Settings still has them one fold down. A
+ * HALF credential counts as set up: that user started, and the row is where
+ * they are told what is left to finish. An unreadable store does not count —
+ * it is also the state before the store has answered at all, and flashing a
+ * row of greyed boxes at someone who has no keys would be the clutter this
+ * removes.
+ */
+export function hasAnyJobBoardKey(states: Readonly<Record<JobProviderId, KeyState>>): boolean {
+  return JOB_PROVIDER_IDS.some(
+    (provider) => states[provider] === 'configured' || states[provider] === 'incomplete',
+  );
+}
+
+/**
  * Can this board be searched, and if not, why not?
  *
  * Three different "no"s with three different fixes, said differently. The one
@@ -235,8 +254,8 @@ export function searchDisabledReason(usableSources: number): string | null {
   if (usableSources > 0) return null;
 
   return (
-    'Nothing is ticked for CViper to look at. Tick one of the free feeds or a job board above ' +
-    '— the feeds need no key at all — or tick a job site below to open it in your browser.'
+    'Nothing is ticked for CViper to look at. Tick one of the free feeds above ' +
+    '— they need no key at all — or tick a job site below to open it in your browser.'
   );
 }
 
