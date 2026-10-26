@@ -1,5 +1,5 @@
 {
-  "_comment": "L-282. Light-only, hand-made: UK qualifications, licences, checks and everyday job words the upstream vocabulary does not scan. NOT a copy of anything upstream. Each label is what the user sees; each alias is another way a UK advert or CV writes the same thing. Rule for adding a term: it means one thing in a UK job advert. Bare words that mean something else in another trade (cpc = cost per click, adr = alternative dispute resolution, sage, literacy) are aliases only inside a longer phrase. uk-skills.test.ts holds the negatives. Single-token aliases of 4+ letters ending in s lose the s when matched (plurals.ts), so 'cpcs' alone would match 'CPC': write such abbreviations inside a phrase.",
+  "_comment": "L-282. Light-only, hand-made: UK qualifications, licences, checks and everyday job words the upstream vocabulary does not scan. NOT a copy of anything upstream. Each label is what the user sees; each alias is another way a UK advert or CV writes the same thing. Rule for adding a term: it means one thing in a UK job advert. Bare words that mean something else in another trade (cpc = cost per click, adr = alternative dispute resolution, sage, literacy) are aliases only inside a longer phrase. uk-skills.test.ts holds the negatives. Single-token aliases of 4+ letters ending in s lose the s when matched (plurals.ts), so 'cpcs' alone would match 'CPC': write such abbreviations inside a phrase. Optional 'implies' (L-285): labels a CV holding this one is also credited with — only where holding it is impossible without them (C+E needs C) or UK adverts read it as 'or above' (NVQ 3 for NVQ 2). CV side only.",
   "terms": [
     {
       "label": "NVQ Level 2",
@@ -21,7 +21,8 @@
         "level 3 diploma in adult care",
         "level 3 health and social care",
         "qcf level 3"
-      ]
+      ],
+      "implies": ["NVQ Level 2"]
     },
     { "label": "Care Certificate", "aliases": [] },
     {
@@ -74,7 +75,8 @@
         "hgv class 1",
         "class 1 driver",
         "lgv class 1"
-      ]
+      ],
+      "implies": ["C licence"]
     },
     {
       "label": "C licence",

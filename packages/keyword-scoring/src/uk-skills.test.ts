@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildCvProfile, buildJobPosting } from './profile';
 import { scoreByKeywords } from './score';
-import { UK_TERMS, extractUkSkills, readUkTerms } from './uk-skills';
+import { UK_TERMS, extractUkSkills, impliedUkSkills, readUkTerms } from './uk-skills';
 import { SKILL_VOCABULARY } from './vocabulary';
 
 describe('the UK list itself', () => {
@@ -61,8 +61,8 @@ describe('readUkTerms — a bad hand-edit must not take the app down', () => {
       ],
     };
     expect(readUkTerms(data)).toEqual([
-      { label: 'DBS check', aliases: ['enhanced dbs'] },
-      { label: 'IPAF', aliases: ['ipaf licence'] },
+      { label: 'DBS check', aliases: ['enhanced dbs'], implies: [] },
+      { label: 'IPAF', aliases: ['ipaf licence'], implies: [] },
     ]);
   });
 });
@@ -152,5 +152,67 @@ describe('wired into both sides of the free check', () => {
     if (!withIt.ok || !without.ok) throw new Error('refused');
     expect(withIt.value.match_score).toBeGreaterThan(without.value.match_score);
     expect(without.value.missing_skills).toContain('DBS Check');
+  });
+});
+
+/**
+ * L-285 — a higher UK qualification counts for the lower one it includes.
+ *
+ * Only where holding one is impossible without the other (C+E needs C) or
+ * where UK adverts treat it as "or above" (NVQ 3 for an NVQ 2 ask). Applied to
+ * the CV only: an advert asking for Level 3 does not also ask for Level 2.
+ */
+describe('implied qualifications (L-285)', () => {
+  it('every "implies" names a real label, never itself', () => {
+    const labels = new Set(UK_TERMS.map((t) => t.label));
+    for (const term of UK_TERMS) {
+      for (const implied of term.implies) {
+        expect(labels.has(implied), `${term.label} implies unknown ${implied}`).toBe(true);
+        expect(implied).not.toBe(term.label);
+      }
+    }
+  });
+
+  it.each([
+    ['NVQ Level 3', 'NVQ Level 2'],
+    ['C+E licence', 'C licence'],
+  ])('%s implies %s', (held, implied) => {
+    expect(impliedUkSkills([held])).toEqual([implied]);
+  });
+
+  // NEGATIVE — implication runs one way.
+  it.each([['NVQ Level 2'], ['C licence'], ['DBS check']])('%s implies nothing', (held) => {
+    expect(impliedUkSkills([held])).toEqual([]);
+  });
+
+  // BOUNDARY
+  it('implies nothing for an empty list, and never repeats a label already held', () => {
+    expect(impliedUkSkills([])).toEqual([]);
+    expect(impliedUkSkills(['NVQ Level 3', 'NVQ Level 2'])).toEqual([]);
+  });
+
+  it('a malformed "implies" is dropped, not thrown', () => {
+    expect(readUkTerms({ terms: [{ label: 'X', aliases: [], implies: 'Y' }] })).toEqual([
+      { label: 'X', aliases: [], implies: [] },
+    ]);
+  });
+
+  it('a CV with Level 3 is credited for an advert asking for Level 2', () => {
+    const cv = buildCvProfile('Level 3 Diploma in Adult Care, 2024. Care worker, nights.');
+    expect(cv.skills).toEqual(expect.arrayContaining(['NVQ Level 3', 'NVQ Level 2']));
+  });
+
+  // NEGATIVE — the advert side is never widened.
+  it('an advert asking for Level 3 does not also require Level 2', () => {
+    const job = buildJobPosting('Senior Carer\n\nEssential: NVQ Level 3 in care.');
+    expect(job.keySkills).toContain('NVQ Level 3');
+    expect(job.keySkills).not.toContain('NVQ Level 2');
+  });
+
+  // NEGATIVE — a negated higher qualification implies nothing (L-283 first).
+  it('"No NVQ Level 3" credits neither level', () => {
+    const cv = buildCvProfile('No NVQ Level 3 yet. Barista, five years.');
+    expect(cv.skills).not.toContain('NVQ Level 3');
+    expect(cv.skills).not.toContain('NVQ Level 2');
   });
 });
