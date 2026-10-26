@@ -146,6 +146,15 @@ pattern), never as a quiet change to a parity expectation.
   `score.ts`, after `matchProfileToJob`, so `match.ts` and its parity with the
   Python stay untouched.
 
+- **Desirable skills count only when the CV has them (L-289).** `desirable.ts`
+  splits the advert on "Desirable" / "Nice to have" headings and inline
+  "(desirable)" markers; `profile.ts` fills `essentialSkills` with every
+  skill NOT named only as desirable; `match.ts` adds back the desirables the
+  CV covers. The `match.ts` part is a named divergence from the Python, which
+  used essentials alone and so made a desirable the CV has worth nothing.
+  Coverage can only rise against the old behaviour; `desirable.test.ts` pins
+  that on the real eval advert 05.
+
 - **The score cannot reach 0 or 100.** It is floored at 10 and capped at 95
   (`RAW_SCORE_CAP`). Nothing in this package has read the CV, so it never
   claims certainty in either direction. The ATS sub-score does reach both ends.
