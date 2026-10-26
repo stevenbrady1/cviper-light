@@ -37,6 +37,11 @@ import {
   type ScoringError,
 } from './errors';
 import { stripJobBoilerplate } from './boilerplate';
+import {
+  HIGH_CONFIDENCE_REQUIREMENTS,
+  type ConfidenceLevel,
+  type KeywordConfidence,
+} from './confidence';
 import { displayTerm } from './display-names';
 import { matchProfileToJob, type MatchResult } from './match';
 import { buildCvProfile, buildJobPosting } from './profile';
@@ -278,6 +283,31 @@ export function atsKeywordScore(
   const refusal = refuseUnscorable(cv, advert);
   if (refusal !== null) return err(refusal);
   return ok(atsScore(cv, advert).score);
+}
+
+/** L-291 — the three-word confidence for a count of recognised requirements. */
+function confidenceLevel(requirements: number): ConfidenceLevel {
+  if (requirements < MIN_REQUIREMENTS_FOR_STRONG) return 'low';
+  if (requirements < HIGH_CONFIDENCE_REQUIREMENTS) return 'medium';
+  return 'high';
+}
+
+/**
+ * L-291 — how many requirements a basic-match score rests on, and what that
+ * makes its confidence. Same hygiene, same refusal and the same `required` as
+ * `scoreByKeywords`, so it describes exactly the score shown beside it. Null
+ * where the scorer would refuse: no score, no label.
+ */
+export function keywordConfidence(
+  cvText: string,
+  jobDescription: string,
+): KeywordConfidence | null {
+  const cv = prepare(cvText);
+  const advert = prepare(stripJobBoilerplate(jobDescription));
+  if (refuseUnscorable(cv, advert) !== null) return null;
+  const requirements = matchProfileToJob(buildCvProfile(cv), buildJobPosting(advert)).required
+    .length;
+  return { level: confidenceLevel(requirements), requirements };
 }
 
 /**

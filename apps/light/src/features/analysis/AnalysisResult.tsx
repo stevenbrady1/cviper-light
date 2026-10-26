@@ -1,5 +1,10 @@
 import { type CvAnalysis, type SuggestionPriority, type Verdict } from '@cviper/core-types';
-import { atsBand, evidenceLine } from '@cviper/keyword-scoring';
+import {
+  atsBand,
+  evidenceLine,
+  keywordConfidence,
+  type KeywordConfidence,
+} from '@cviper/keyword-scoring';
 
 import { Hint } from '../../app/Hint';
 import { cardClasses } from '../../ui';
@@ -140,6 +145,22 @@ function MatchProof({ skills, cvText }: { skills: readonly string[]; cvText: str
   );
 }
 
+/**
+ * L-291 — what a basic-match score rests on, beside the score.
+ *
+ * It describes the MEASUREMENT, not the fit: "low" means the advert gave the
+ * word list little to count, not that the candidate is weak. Plain ink, never
+ * a warning colour, for the same reason the verdict is never red.
+ */
+function confidenceSentence({ level, requirements }: KeywordConfidence): string {
+  const found =
+    requirements === 0
+      ? 'no requirements'
+      : `${level === 'low' ? 'only ' : ''}${requirements} ${requirements === 1 ? 'requirement' : 'requirements'}`;
+  const tail = level === 'low' ? ' Read the advert yourself before relying on it.' : '';
+  return `Confidence: ${level} — based on ${found} found in the advert.${tail}`;
+}
+
 interface AnalysisResultProps {
   readonly analysis: CvAnalysis;
   /** As stored: `keyword`, `ollama`, `anthropic`, `openai`. */
@@ -167,6 +188,12 @@ interface AnalysisResultProps {
    * each matched skill. Optional: without it the proof block is left out.
    */
   readonly cvText?: string | undefined;
+  /**
+   * The advert this result checked (L-291), to say how many requirements a
+   * basic-match score rests on. Optional: without it, or on an AI result, the
+   * confidence line is left out.
+   */
+  readonly advertText?: string | undefined;
 }
 
 export function AnalysisResult({
@@ -177,8 +204,11 @@ export function AnalysisResult({
   aiAvailable,
   atsKeywordScore,
   cvText,
+  advertText,
 }: AnalysisResultProps) {
   const isKeyword = provider === 'keyword';
+  const confidence =
+    isKeyword && cvText && advertText ? keywordConfidence(cvText, advertText) : null;
   const ats =
     atsKeywordScore !== undefined &&
     Number.isFinite(atsKeywordScore) &&
@@ -233,6 +263,15 @@ export function AnalysisResult({
           <Hint text={VERDICT_HINT[analysis.verdict]}>{VERDICT_LABEL[analysis.verdict]}</Hint>
         </span>
       </div>
+      {confidence === null ? null : (
+        <p
+          data-testid="analysis-confidence"
+          data-level={confidence.level}
+          className="-mt-3 text-xs text-ink-muted"
+        >
+          {confidenceSentence(confidence)}
+        </p>
+      )}
 
       {/*
         Its own block, never folded into the match score or the eligibility
