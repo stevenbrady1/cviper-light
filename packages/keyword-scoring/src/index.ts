@@ -21,12 +21,21 @@ export const KEYWORD_SCORING_PACKAGE = '@cviper/keyword-scoring' as const;
 
 // ── The public entry point ───────────────────────────────────────────────────
 
-export { MIN_SCORABLE_CHARS, atsKeywordScore, scoreByKeywords } from './score';
+export {
+  MIN_REQUIREMENTS_FOR_STRONG,
+  MIN_SCORABLE_CHARS,
+  THIN_ADVERT_SCORE_CAP,
+  atsKeywordScore,
+  keywordConfidence,
+  scoreByKeywords,
+} from './score';
 
 export type { ScoringError, ScoringErrorCode } from './errors';
 
 export { stripJobBoilerplate } from './boilerplate';
 export { EVIDENCE_MAX_CHARS, evidenceLine } from './evidence';
+export { HIGH_CONFIDENCE_REQUIREMENTS } from './confidence';
+export type { ConfidenceLevel, KeywordConfidence } from './confidence';
 
 // ── The gates that run BEFORE the score and are never averaged into it ──────
 

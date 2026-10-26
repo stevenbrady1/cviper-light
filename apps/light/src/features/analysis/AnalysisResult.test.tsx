@@ -460,3 +460,93 @@ describe('AnalysisResult — where your CV shows each matched skill (L-290)', ()
     expect(screen.queryByTestId('analysis-proof')).toBeNull();
   });
 });
+
+/**
+ * L-291 — how much a basic-match score rests on.
+ *
+ * Keyword path only: an AI score is not built from the word list, so a count
+ * of word-list requirements beside it would describe the wrong thing.
+ */
+describe('AnalysisResult — confidence beside the score (L-291)', () => {
+  const CV =
+    'Data analyst, five years. SQL, Excel, Power BI, Python, Tableau, Jira, Agile and Scrum ' +
+    'for the trading team.';
+  const advertWith = (skills: string[]): string =>
+    `Data Analyst\nBristol.\n\nEssential:\n${skills.map((s) => `- ${s}`).join('\n')}`;
+
+  it('says low, and how few, on a thin advert', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        cvText={CV}
+        advertText={advertWith(['SQL', 'Excel'])}
+      />,
+    );
+    const label = screen.getByTestId('analysis-confidence');
+    expect(label.getAttribute('data-level')).toBe('low');
+    expect(label.textContent).toMatch(/low.*only 2 requirements/i);
+  });
+
+  it('says high on a well-specified advert', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        cvText={CV}
+        advertText={advertWith(['SQL', 'Excel', 'Power BI', 'Python', 'Tableau', 'Jira', 'Agile'])}
+      />,
+    );
+    const label = screen.getByTestId('analysis-confidence');
+    expect(label.getAttribute('data-level')).toBe('high');
+    expect(label.textContent).toMatch(/high.*7 requirements/i);
+  });
+
+  // NEGATIVE — an AI score does not rest on the word list.
+  it('is not shown for an AI result', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="anthropic"
+        model="m"
+        aiAvailable
+        cvText={CV}
+        advertText={advertWith(['SQL', 'Excel'])}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-confidence')).toBeNull();
+  });
+
+  // NEGATIVE — without the advert text there is nothing to count.
+  it('is not shown without the advert text', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="m"
+        aiAvailable
+        cvText={CV}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-confidence')).toBeNull();
+  });
+
+  // BOUNDARY — no recognised requirement at all.
+  it('says so plainly when no requirement was recognised', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="m"
+        aiAvailable
+        cvText={CV}
+        advertText={'Data Analyst\n\nJoin our friendly team in Bristol, three days in the office.'}
+      />,
+    );
+    expect(screen.getByTestId('analysis-confidence').textContent).toMatch(/low.*no requirements/i);
+  });
+});

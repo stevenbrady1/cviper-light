@@ -155,6 +155,18 @@ describe('try it with a sample (L-277)', () => {
     expect(proof.textContent ?? '').toMatch(/SQL/);
   });
 
+  // L-291 — through the real screen: the sample's basic-match score says what
+  // it rests on.
+  it('says how many requirements the sample score rests on', async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId('analysis-try-sample'));
+    const label = within(await screen.findByTestId('analysis-sample')).getByTestId(
+      'analysis-confidence',
+    );
+    expect(label.textContent ?? '').toMatch(/^Confidence: (low|medium|high) — based on/);
+  });
+
   it('negative: saves no CV and no analysis, and contacts nothing', async () => {
     const { port } = await renderView();
     const user = userEvent.setup();

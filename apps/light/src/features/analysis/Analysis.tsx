@@ -59,7 +59,7 @@ import {
   type ProviderOption,
 } from './providers';
 import { runAnalysis } from './runAnalysis';
-import { SAMPLE_CV_TEXT, runSample, type SampleResult } from './sample';
+import { SAMPLE_ADVERT_TEXT, SAMPLE_CV_TEXT, runSample, type SampleResult } from './sample';
 import { createAnalysisSession, type AnalysisSession } from './session';
 import { gapsFromAnalysis, type TailorHandoff } from '../flow/handoff';
 import { JobStepBar } from '../flow/JobStepBar';
@@ -1146,6 +1146,8 @@ export function Analysis({
                 // L-290. The result is always the selected CV's: switching CV
                 // clears it (see the CV picker's handler).
                 cvText={selectedCv?.extracted_text ?? undefined}
+                // L-291: the advert this result CHECKED, not the box's current text.
+                advertText={checkedAdvert ?? undefined}
               />
               {/*
                 The next step of the flow (L-190), after the result it follows
@@ -1194,6 +1196,7 @@ export function Analysis({
                 aiAvailable={aiAvailable}
                 atsKeywordScore={sample.atsKeywordScore}
                 cvText={SAMPLE_CV_TEXT}
+                advertText={SAMPLE_ADVERT_TEXT}
               />
             </section>
           ) : null}
