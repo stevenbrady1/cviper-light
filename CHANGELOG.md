@@ -16,6 +16,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 - A test that asks the free CV check the question a user asks (L-281): given a CV that fits the job and one that does not, does the fitting one score higher? Ten real UK adverts (care, charity retail, HGV driving, a school, customer service, treasury, HR, operations, data, security and compliance), requirements paraphrased, with twenty invented CVs, one good and one poor fit each. Today the check gets 6 of the 10 pairs the right way round; the test pins that number exactly, so a change that makes it worse fails CI, and a change that makes it better must say so by raising it. The four it gets wrong — care, HGV, teaching assistant, and a health-and-safety CV tying a real analyst at 92 — are the targets for the next two changes. No app behaviour changes.
 
+### Changed
+
+- The WebKit check in CI no longer depends on a fast Ubuntu mirror (L-284). Its install pulls about 70 system packages, and on 26 October the mirror served them at a few kB/s three times; the L-280 cap stopped the job hanging but still failed it. apt now keeps those packages in a folder CI saves and restores, so a warm run downloads only what Ubuntu has updated since. Tested on Ubuntu 24.04 with a small package: without the change, the image deletes the package after installing it and the next install downloads it again; with it, the next install needs 0 bytes. A contract test fails if the cache, the apt setting or the report step goes missing. No app change.
+
 ## [0.11.0] — 2026-10-26
 
 The launch release. The free CV check reads skills it used to miss, a new user sees a full result in one click and is no longer asked for job-board keys, there is a tenth UK job board, and three security fixes: AI requests no longer follow redirects, a local Ollama run never goes through a proxy, and a memory issue in backup validation is patched.

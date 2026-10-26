@@ -184,8 +184,29 @@ jobs:
       # holds the dpkg lock so the retry fails in a second (PR #371's first run).
       # One line on purpose: `webkit-check-runs-in-ci.contract.test.ts` reads
       # inline `run:` commands only, and asserts both caps are here.
+      # L-284. The cap above stops a slow mirror holding the job; this stops the
+      # job needing the mirror. `--with-deps` installs ~70 Ubuntu packages, and
+      # every slow run on 26 Oct 2026 was those downloads. apt is pointed at a
+      # folder this cache restores and saves, so a warm run fetches only what
+      # Ubuntu has updated since. Keyed on the lockfile like the browser cache
+      # above: a playwright-core bump can change the package list. Only `.deb`
+      # files are saved — apt's lock and its root-owned `partial/` are not
+      # readable by the cache action.
+      - name: Restore WebKit's system packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/webkit-apt/*.deb
+          key: webkit-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: webkit-apt-${{ runner.os }}-
+
+      - name: Point apt at the cached packages
+        run: bash .github/scripts/webkit-apt-cache.sh configure ~/.cache/webkit-apt
+
       - name: Install the WebKit browser
         run: timeout --kill-after=20 300 pnpm --filter @cviper/light exec playwright-core install --with-deps webkit || (bash .github/scripts/release-apt-lock.sh && timeout --kill-after=20 300 pnpm --filter @cviper/light exec playwright-core install --with-deps webkit)
+
+      - name: Report the cached packages
+        run: bash .github/scripts/webkit-apt-cache.sh report ~/.cache/webkit-apt
 
       # Builds the harness page, then drives it. A missing browser FAILS here;
       # it never skips.
