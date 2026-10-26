@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { type Result } from '@cviper/core-types';
 
@@ -46,6 +46,7 @@ import { readEnvironmentStatus, type EnvironmentStatus } from '../status/environ
 
 import { BottomNav } from './BottomNav';
 import { QUIET_BUTTON } from './buttons';
+import { ErrorBoundary } from './ErrorBoundary';
 import { Sidebar } from './Sidebar';
 import { useViewportClass } from './viewport';
 import { DEFAULT_VIEW, viewForShortcut, type ViewId } from './views';
@@ -189,6 +190,23 @@ export default function App({
   boardProgressPort,
 }: AppProps = {}) {
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
+
+  // Focus follows the view (WCAG 2.4.3). Switching view unmounts whatever had
+  // focus, which dropped it to <body>: a keyboard or screen-reader user heard
+  // nothing and had to tab from the top to find where they were. The new
+  // view's heading takes focus instead. Compared with the view last focused,
+  // not "first render", so React's development double-run cannot fire it at
+  // launch.
+  const mainRef = useRef<HTMLElement>(null);
+  const focusedView = useRef(activeView);
+  useEffect(() => {
+    if (focusedView.current === activeView) return;
+    focusedView.current = activeView;
+    const heading = mainRef.current?.querySelector('h1');
+    if (!(heading instanceof HTMLElement)) return;
+    if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+    heading.focus({ preventScroll: true });
+  }, [activeView]);
   const [status, setStatus] = useState<EnvironmentStatus | null>(null);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !hasSeenWelcome());
   const [incomingCv, setIncomingCv] = useState<Result<PickedCv, FileError> | null>(null);
@@ -566,7 +584,7 @@ export default function App({
     >
       {narrow ? null : <Sidebar activeView={activeView} onSelect={onSelect} status={status} />}
 
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <main ref={mainRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/*
           A strip above the view, never a modal over it. The app stays usable
           behind it and "Not now" installs nothing — see `UpdateBanner`.
@@ -612,88 +630,95 @@ export default function App({
           </div>
         )}
 
-        {renderView(activeView, {
-          profile: {
-            port: profilePort,
-            now,
-          },
-          search: {
-            port: searchPort,
-            browser,
-            boardsPort,
-            readKeyStates,
-            newId,
-            now,
-            // The search screen cannot navigate: the shell owns which view is
-            // showing, so "no Adzuna key — open Settings" has to come back here
-            // to be acted on.
-            onOpenSettings: () => setActiveView('settings'),
-            onAnalyse: onAnalyseJob,
-          },
-          tracker: {
-            port: trackerPort,
-            now,
-            createTransport,
-            browser,
-            // Same arrangement as the search screen: the shell owns which view
-            // is showing, so "no AI provider — open Settings" comes back here.
-            onOpenSettings: () => setActiveView('settings'),
-            onAnalyse: onTrackerAnalyse,
-            onTailor: onTrackerTailor,
-            boardProgressPort,
-            tailoredJob,
-            // "Continue" under a started card goes where the step bar would.
-            onContinue: (job: Job, step: StepId) => onJobStep(step, job),
-          },
-          analysis: {
-            port: analysisPort,
-            filePort,
-            // The SAME port the profile view uses: the gates (L-156) read what
-            // that view saved, and a test can watch one write reach both.
-            profilePort,
-            createTransport,
-            now,
-            incomingCv,
-            onIncomingCvHandled,
-            session: analysisSession,
-            onTailor: (handoff: TailorHandoff) => {
-              setTailorEntryStep('tailor');
-              onTailorJob(handoff);
+        {/*
+          One boundary per screen, keyed by it (see ErrorBoundary's `scope`):
+          a crash in one view no longer takes the rail with it, and moving to
+          another view starts clean instead of re-rendering the broken one.
+        */}
+        <ErrorBoundary key={activeView} scope="view">
+          {renderView(activeView, {
+            profile: {
+              port: profilePort,
+              now,
             },
-            tailoredJob,
-            onJobStep,
-            onTracker,
-            jobChoice,
-            onJobChoice,
-          },
-          tailor: {
-            port: tailorPort,
-            filePort,
-            createTransport,
-            now,
-            // Same arrangement as Search and the tracker (L-175): no model or
-            // key means "set one up in Settings", and the shell does the going.
-            onOpenSettings: () => setActiveView('settings'),
-            handoff: tailorHandoff,
-            onHandoffHandled: onTailorHandoffHandled,
-            jobSessions,
-            entryStep: tailorEntryStep,
-            onJobStep,
-            onTracker,
-          },
-          settings: {
-            port: backupPort,
-            erasePort,
-            filePort,
-            keyPort,
-            browser,
-            boardsPort,
-            updatePort: updatePortInstance,
-            onShowWelcome,
-            onErased,
-            now,
-          },
-        })}
+            search: {
+              port: searchPort,
+              browser,
+              boardsPort,
+              readKeyStates,
+              newId,
+              now,
+              // The search screen cannot navigate: the shell owns which view is
+              // showing, so "no Adzuna key — open Settings" has to come back here
+              // to be acted on.
+              onOpenSettings: () => setActiveView('settings'),
+              onAnalyse: onAnalyseJob,
+            },
+            tracker: {
+              port: trackerPort,
+              now,
+              createTransport,
+              browser,
+              // Same arrangement as the search screen: the shell owns which view
+              // is showing, so "no AI provider — open Settings" comes back here.
+              onOpenSettings: () => setActiveView('settings'),
+              onAnalyse: onTrackerAnalyse,
+              onTailor: onTrackerTailor,
+              boardProgressPort,
+              tailoredJob,
+              // "Continue" under a started card goes where the step bar would.
+              onContinue: (job: Job, step: StepId) => onJobStep(step, job),
+            },
+            analysis: {
+              port: analysisPort,
+              filePort,
+              // The SAME port the profile view uses: the gates (L-156) read what
+              // that view saved, and a test can watch one write reach both.
+              profilePort,
+              createTransport,
+              now,
+              incomingCv,
+              onIncomingCvHandled,
+              session: analysisSession,
+              onTailor: (handoff: TailorHandoff) => {
+                setTailorEntryStep('tailor');
+                onTailorJob(handoff);
+              },
+              tailoredJob,
+              onJobStep,
+              onTracker,
+              jobChoice,
+              onJobChoice,
+            },
+            tailor: {
+              port: tailorPort,
+              filePort,
+              createTransport,
+              now,
+              // Same arrangement as Search and the tracker (L-175): no model or
+              // key means "set one up in Settings", and the shell does the going.
+              onOpenSettings: () => setActiveView('settings'),
+              handoff: tailorHandoff,
+              onHandoffHandled: onTailorHandoffHandled,
+              jobSessions,
+              entryStep: tailorEntryStep,
+              onJobStep,
+              onTracker,
+            },
+            settings: {
+              port: backupPort,
+              erasePort,
+              filePort,
+              keyPort,
+              browser,
+              boardsPort,
+              updatePort: updatePortInstance,
+              onShowWelcome,
+              onErased,
+              now,
+            },
+          })}
+        </ErrorBoundary>
       </main>
 
       {narrow ? <BottomNav activeView={activeView} onSelect={onSelect} /> : null}

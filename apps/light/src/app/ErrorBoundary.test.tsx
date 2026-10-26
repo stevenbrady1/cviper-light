@@ -111,3 +111,57 @@ describe('the whole app is inside it', () => {
     expect(main).toMatch(/<ErrorBoundary>\s*<App \/>\s*<\/ErrorBoundary>/);
   });
 });
+
+describe('one screen at a time (scope="view")', () => {
+  it('a crash in one view stays inside it: no second <main>, no full-screen takeover', () => {
+    render(
+      <main>
+        <nav>
+          <button type="button">Tracker</button>
+        </nav>
+        <ErrorBoundary scope="view">
+          <Fragile />
+        </ErrorBoundary>
+      </main>,
+    );
+    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    // The navigation beside it is still there to press.
+    expect(screen.getByRole('button', { name: 'Tracker' })).toBeTruthy();
+    expect(screen.getByText(/this screen stopped working/i)).toBeTruthy();
+    expect(screen.getByText(/your data is safe/i)).toBeTruthy();
+  });
+
+  it('never puts the error message on screen in view scope either', () => {
+    render(
+      <ErrorBoundary scope="view">
+        <Fragile />
+      </ErrorBoundary>,
+    );
+    expect(screen.queryByText(/a render bug/)).toBeNull();
+  });
+
+  it('a new key (another view) starts clean, so moving away from a broken screen recovers', () => {
+    const { rerender } = render(
+      <ErrorBoundary scope="view" key="tailor">
+        <Fragile />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByRole('alert')).toBeTruthy();
+    shouldThrow = false;
+    rerender(
+      <ErrorBoundary scope="view" key="tracker">
+        <Fragile />
+      </ErrorBoundary>,
+    );
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText('The app, working')).toBeTruthy();
+  });
+
+  it('App.tsx wraps the active view in its own boundary, keyed by the view', () => {
+    const app = readFileSync(join(import.meta.dirname, 'App.tsx'), 'utf8');
+    expect(app).toMatch(
+      /<ErrorBoundary key=\{activeView\} scope="view">\s*\{renderView\(activeView,/,
+    );
+  });
+});

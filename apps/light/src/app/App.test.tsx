@@ -112,6 +112,37 @@ describe('the shell', () => {
   });
 });
 
+describe('focus follows the view (WCAG 2.4.3)', () => {
+  // Switching view unmounts the control that had focus, and focus fell to
+  // <body>: a keyboard or screen-reader user heard nothing and had to tab from
+  // the top of the page to find where they were.
+  it("after a rail click, focus is on the new view's heading", async () => {
+    const user = userEvent.setup();
+    await renderApp();
+
+    await user.click(screen.getByTestId('nav-search'));
+
+    const view = screen.getByTestId('view-search');
+    const heading = view.querySelector('h1');
+    expect(heading).not.toBeNull();
+    await vi.waitFor(() => expect(document.activeElement).toBe(heading));
+  });
+
+  it('after Ctrl+2, focus is on the Search heading', async () => {
+    await renderApp();
+
+    fireEvent.keyDown(document, { key: '2', ctrlKey: true });
+
+    const heading = screen.getByTestId('view-search').querySelector('h1');
+    await vi.waitFor(() => expect(document.activeElement).toBe(heading));
+  });
+
+  it('negative: the first render does not move focus', async () => {
+    await renderApp();
+    expect(document.activeElement).toBe(document.body);
+  });
+});
+
 describe('keyboard shortcuts', () => {
   it('switches to Profile, Search, Tracker, Analysis and Tailor with Ctrl+1 to Ctrl+5', async () => {
     await renderApp();
