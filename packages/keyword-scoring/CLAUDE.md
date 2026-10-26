@@ -57,6 +57,10 @@ If a number here looks wrong, measure the Python before changing it. Two
 implementations of the same scorer that disagree are worse than one with a
 known quirk, because neither number can be trusted.
 
+The web app was mothballed in September 2026, so a fix that only Light needs
+can now land here — but only as a named, tested divergence (L-275 is the
+pattern), never as a quiet change to a parity expectation.
+
 ## Things that will bite you
 
 - **`skillWeight` is the whole point.** Coverage is rarity-WEIGHTED, not
@@ -93,11 +97,15 @@ known quirk, because neither number can be trusted.
   advert's spelling, because that is the string the employer's system looks
   for. Folding the labels too would advise a candidate into a miss.
 
-- **A trailing full stop hides a skill.** `termInText('python', 'I know
-Python.')` is `false`, in the Python original as well as here — `.` is inside
-  the token character class so that `node` cannot match inside `node.js`.
-  Reproduced on purpose and pinned in `parity.test.ts`; reported upstream
-  rather than fixed on one side only.
+- **Punctuation is where Light deliberately leaves the Python (L-275).** The
+  Python keeps `.` and `/` inside the token class, so "Advanced Excel." and
+  "Python/Django" hide the skill. That was reproduced here for parity until the
+  web app was mothballed (Sept 2026); with no second scorer left to disagree
+  with, `term.ts` now ends a token at a trailing `.` and splits on `/`.
+  `node` still does not match inside `node.js`, and `-` is unchanged on
+  purpose (`go` must not match `go-to-market`). `parity.test.ts` marks the
+  diverging expectations by name; every other case still matches the Python.
+  If the web app is ever revived, port L-275 to it rather than reverting here.
 
 - **The score cannot reach 0 or 100.** It is floored at 10 and capped at 95
   (`RAW_SCORE_CAP`). Nothing in this package has read the CV, so it never
