@@ -187,6 +187,64 @@ describe('the WebKit check runs in CI', () => {
   });
 });
 
+/**
+ * L-280 — a slow package mirror must not hold a required check for 20 minutes.
+ *
+ * On 26 Oct 2026 the install ran out the whole job twice. It was not a hang:
+ * `--with-deps` pulls system libraries through apt, and the Ubuntu mirror was
+ * serving them at 20-40 KB/s. A normal install takes under a minute. So each
+ * attempt is capped with `timeout`, and a second attempt follows a failed
+ * first one, on a fresh connection. The whole retry is on ONE `run:` line
+ * because the parser above reads inline commands only.
+ */
+export const INSTALL_ATTEMPT_CAP_SECONDS = 300;
+
+export function installAttempts(command: string): number[] {
+  return [
+    ...command.matchAll(
+      /\btimeout\s+(?:--\S+\s+)*(\d+)\s+[^|]*?playwright-core\s+install\b[^|]*?\bwebkit\b/g,
+    ),
+  ].map((match) => Number(match[1]));
+}
+
+describe('a slow mirror cannot hold the check for the whole job (L-280)', () => {
+  const install =
+    JOB_COMMANDS.find(
+      (command) => /playwright-core\s+install\b/.test(command) && /\bwebkit\b/.test(command),
+    ) ?? '';
+
+  it('caps every install attempt with a timeout, and tries twice', () => {
+    const attempts = installAttempts(install);
+    expect(attempts, `install step: ${install}`).toHaveLength(2);
+    for (const seconds of attempts)
+      expect(seconds).toBeLessThanOrEqual(INSTALL_ATTEMPT_CAP_SECONDS);
+    expect(install).toMatch(/\|\|/);
+  });
+
+  it('both attempts fit inside the job, leaving time to run the check', () => {
+    const jobMinutes = Number(/^\s+timeout-minutes:\s*(\d+)\s*$/m.exec(JOB_TEXT)?.[1] ?? NaN);
+    const installMinutes = installAttempts(install).reduce((sum, s) => sum + s, 0) / 60;
+    expect(installMinutes).toBeLessThan(jobMinutes - 5);
+  });
+
+  // NEGATIVE — the detector itself.
+  it('does not count an uncapped install as capped', () => {
+    expect(
+      installAttempts(
+        'pnpm --filter @cviper/light exec playwright-core install --with-deps webkit',
+      ),
+    ).toEqual([]);
+  });
+
+  it('boundary: reads a cap with a kill-after flag', () => {
+    expect(
+      installAttempts(
+        'timeout --kill-after=20 300 pnpm exec playwright-core install --with-deps webkit',
+      ),
+    ).toEqual([300]);
+  });
+});
+
 describe('and it stays out of the offline loop', () => {
   it(`\`pnpm ${LOOP_SCRIPT}\` does not chain it`, () => {
     const parsed: unknown = JSON.parse(read(MANIFEST_PATH));
