@@ -1,6 +1,6 @@
 # L-278 — ESCO skills list for the free scorer (spec, not built)
 
-Status: **proposed**, 26 Oct 2026. No code until this is agreed.
+Status: **agreed except the licence**, 26 Oct 2026. No code until the licence is confirmed.
 
 ## The problem, measured
 
@@ -89,23 +89,16 @@ hand-made `uk.json` (target under 150 terms), reviewed by Steven.
 - [ ] Still no network: the existing outbound-hosts guard passes unchanged.
 - [ ] Attribution shown wherever the licence requires it (open question 1).
 
-## Open questions — Steven to decide
+## Decisions (26 Oct 2026)
 
-1. **Licence.** ESCO is published by the European Commission and is generally
-   described as free to reuse, including commercially, with attribution.
-   **Not verified**: the ESCO site refused my fetch on 26 Oct. Read the
-   legal notice on esco.ec.europa.eu before any data is committed. If
-   attribution is required, it goes in Settings → About and in the README.
-2. **Commit the raw CSV, or only the filtered JSON?** Committing the raw file
-   makes the build reproducible but adds tens of MB to the repo. Recommended:
-   commit only the filtered JSON plus the script and the ESCO version it was
-   built from.
-3. **Also use `occupationSkillRelations`?** It could infer likely requirements
-   from a job title alone ("care assistant" implies personal care). Powerful,
-   but it invents requirements the advert never stated. Recommended: not in
-   this item.
-4. **Port back to the web app?** Only if it is ever revived. Until then,
-   Light-only.
+| #   | Question                                     | Decision                                                                                                                                                |
+| --- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ESCO licence                                 | **Open — Steven is reading the legal notice** on esco.ec.europa.eu. No ESCO data is committed until he confirms the terms and any attribution wording.  |
+| 2   | Commit the raw CSV or only the filtered JSON | **Filtered JSON plus the build script**, with the ESCO version it was built from recorded beside it. No raw CSV in the repo.                            |
+| 3   | Infer requirements from a job title          | **No.** The free check scores only what the advert states. `occupationSkillRelations` is not used, so no requirement is ever invented from a job title. |
+| 4   | The mothballed web app                       | **Light is the reference scorer.** If the web app is ever revived, port Light's divergences (L-275 and this item) to it; do not revert them here.       |
+
+Build starts when decision 1 is closed.
 
 ## Effort
 
