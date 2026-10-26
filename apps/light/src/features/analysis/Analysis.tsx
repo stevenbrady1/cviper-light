@@ -1089,7 +1089,9 @@ export function Analysis({
                   'being sent anywhere.'
                 : `Sending your CV and the advert to ${providerInSentence(selectedOption.kind)}. ` +
                   'This usually takes a few seconds.'}{' '}
-              <span className="font-mono tabular-nums">{elapsed}s</span>
+              <span aria-hidden="true" className="font-mono tabular-nums">
+                {elapsed}s
+              </span>
             </p>
           ) : null}
 

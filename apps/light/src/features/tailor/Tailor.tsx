@@ -1312,7 +1312,10 @@ export function Tailor({
               : phase === 'writing'
                 ? 'Drafting the letter. '
                 : ''}
-            {progressText} <span className="font-mono tabular-nums">{elapsed}s</span>
+            {progressText}{' '}
+            <span aria-hidden="true" className="font-mono tabular-nums">
+              {elapsed}s
+            </span>
           </p>
         ) : null}
 
