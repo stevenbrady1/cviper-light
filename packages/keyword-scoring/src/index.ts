@@ -26,6 +26,7 @@ export { MIN_SCORABLE_CHARS, atsKeywordScore, scoreByKeywords } from './score';
 export type { ScoringError, ScoringErrorCode } from './errors';
 
 export { stripJobBoilerplate } from './boilerplate';
+export { displayTerm, displayTerms } from './display-names';
 
 // ── The gates that run BEFORE the score and are never averaged into it ──────
 
