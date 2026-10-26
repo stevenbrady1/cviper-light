@@ -49,7 +49,7 @@ diploma names, "full UK driving licence", right to work. These go in a small
 hand-made `uk.json` (target under 150 terms), reviewed by Steven.
 
 **Shipped separately as L-282** (27 Oct 2026), ahead of ESCO, because it needs
-no licence decision: `lexicons-light/uk.json` + `uk-skills.ts`, about 65 terms,
+no licence decision: `lexicons-light/uk.json` + `uk-skills.ts`, 63 terms,
 each a label plus aliases. ESCO, when it lands, should reuse that layer (labels
 reported, aliases folded in) rather than add a second mechanism.
 
