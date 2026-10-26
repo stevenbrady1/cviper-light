@@ -33,6 +33,7 @@ export {
 export type { ScoringError, ScoringErrorCode } from './errors';
 
 export { stripJobBoilerplate } from './boilerplate';
+export { displayTerm, displayTerms } from './display-names';
 export { EVIDENCE_MAX_CHARS, evidenceLine } from './evidence';
 export { HIGH_CONFIDENCE_REQUIREMENTS } from './confidence';
 export type { ConfidenceLevel, KeywordConfidence } from './confidence';
