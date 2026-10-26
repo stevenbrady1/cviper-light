@@ -172,8 +172,20 @@ jobs:
       # may not want. The download is asked for here, explicitly.
       # `--with-deps` installs the system libraries WebKit needs on a bare
       # runner; without them the launch fails with a missing .so.
+      #
+      # Capped and retried once (L-280). Those libraries come from the Ubuntu
+      # mirror through apt, and on 26 Oct 2026 the mirror served them at
+      # 20-40 KB/s: the install never finished and the required check sat for
+      # the job's whole 20 minutes, twice. A normal install takes under a
+      # minute, so each attempt gets 5, and a slow first attempt is retried on a
+      # fresh connection, where apt also reuses whatever the first one fetched.
+      # Before the retry, `release-apt-lock.sh` stops the apt-get the cap left
+      # behind: it runs under sudo, outside `timeout`'s reach, and otherwise
+      # holds the dpkg lock so the retry fails in a second (PR #371's first run).
+      # One line on purpose: `webkit-check-runs-in-ci.contract.test.ts` reads
+      # inline `run:` commands only, and asserts both caps are here.
       - name: Install the WebKit browser
-        run: pnpm --filter @cviper/light exec playwright-core install --with-deps webkit
+        run: timeout --kill-after=20 300 pnpm --filter @cviper/light exec playwright-core install --with-deps webkit || (bash .github/scripts/release-apt-lock.sh && timeout --kill-after=20 300 pnpm --filter @cviper/light exec playwright-core install --with-deps webkit)
 
       # Builds the harness page, then drives it. A missing browser FAILS here;
       # it never skips.
