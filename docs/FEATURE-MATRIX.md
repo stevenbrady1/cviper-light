@@ -47,7 +47,7 @@ product that exists (L-114).
 | Job search (Adzuna/Reed)                     | Yes — user's own API keys, direct calls                                                                                                                                                          | Yes — server-side, shared keys     | Built                     |
 | Browse recent jobs, no key                   | Yes — Arbeitnow + Guardian feeds, filtered locally                                                                                                                                               | Not applicable                     | Built                     |
 | Cross-post detection                         | Yes — flags duplicates, never merges                                                                                                                                                             | Yes — merges, with a server undo   | Built                     |
-| Keyless browser search links                 | Yes — nine UK boards, opens in browser                                                                                                                                                           | Not applicable                     | Built                     |
+| Keyless browser search links                 | Yes — ten UK boards, opens in browser                                                                                                                                                            | Not applicable                     | Built                     |
 | Job-board list, user-edited                  | Yes — enable, reorder, add your own                                                                                                                                                              | Not applicable                     | Built                     |
 | API key setup                                | Yes — tested before saved, never read back                                                                                                                                                       | Not applicable                     | Built                     |
 | Application tracker                          | Yes — local SQLite                                                                                                                                                                               | Yes — synced                       | Built                     |
@@ -153,7 +153,7 @@ product that exists (L-114).
   guest endpoint. Light ports only the URL construction. A scraper inside an
   installed binary points LinkedIn's rate limiting at the user's own home IP and
   breaks on LinkedIn's schedule, with no way to patch it that afternoon.
-- **The board list is data, not code.** Nine UK boards ship in
+- **The board list is data, not code.** Ten UK boards ship in
   `apps/light/src/config/job-boards.json` — LinkedIn, Indeed, Totaljobs,
   CV-Library, Reed, Adzuna, Google Jobs and Guardian Jobs — and Settings can
   switch any of them off, reorder them, or add one by pasting a search URL with

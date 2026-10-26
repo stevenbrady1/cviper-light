@@ -37,6 +37,8 @@ const PERMANENT: Readonly<Record<string, string>> = {
     'https://www.google.com/search?q=software+tester+permanent+jobs+London&udm=8&hl=en&gl=uk',
   guardian: 'https://jobs.theguardian.com/jobs/software-tester/',
   jobserve: 'https://www.jobserve.com/gb/en/JobSearch.aspx?q=software+tester&l=London',
+  'gov-uk-find-a-job':
+    'https://www.jobs.service.gov.uk/jobs/search?keywords=software+tester&location=London',
 };
 
 const CONTRACT: Readonly<Record<string, string>> = {
@@ -53,6 +55,8 @@ const CONTRACT: Readonly<Record<string, string>> = {
     'https://www.google.com/search?q=software+tester+contract+jobs+London&udm=8&hl=en&gl=uk',
   guardian: 'https://jobs.theguardian.com/jobs/software-tester/',
   jobserve: 'https://www.jobserve.com/gb/en/JobSearch.aspx?q=software+tester&l=London',
+  'gov-uk-find-a-job':
+    'https://www.jobs.service.gov.uk/jobs/search?keywords=software+tester&location=London',
 };
 
 function board(id: string) {

@@ -24,7 +24,7 @@ devicetypes` shows what is available; any device in the same size class works.
    sheet. Caption: _Open a CV from Files, Mail or Safari._
 4. **Settings → Privacy** — the generated notice with the address list.
    Caption: _Every address the app can contact, listed. Nothing else._
-5. **Search** — the keyless board links. Caption: _Nine UK job boards, one
+5. **Search** — the keyless board links. Caption: _Ten UK job boards, one
    tap, no key._
 
 Captions go in the marketing frame, not in the app: the screenshot is the

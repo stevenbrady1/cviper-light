@@ -32,6 +32,7 @@ const EXPECTED_IDS = [
   'google-jobs',
   'guardian',
   'jobserve',
+  'gov-uk-find-a-job',
 ];
 
 /** `id -> the whole URL`, for `business analyst` in `Milton Keynes`. */
@@ -47,6 +48,10 @@ const WORKED_URLS: Readonly<Record<string, string>> = {
     'https://www.google.com/search?q=business+analyst+jobs+Milton+Keynes&udm=8&hl=en&gl=uk',
   guardian: 'https://jobs.theguardian.com/jobs/business-analyst/',
   jobserve: 'https://www.jobserve.com/gb/en/JobSearch.aspx?q=business+analyst&l=Milton+Keynes',
+  // GOV.UK Work Hub (L-262). `keywords`, not `q`: `q` is accepted and ignored,
+  // and the page then shows every job in the country — measured 2026-10-22.
+  'gov-uk-find-a-job':
+    'https://www.jobs.service.gov.uk/jobs/search?keywords=business+analyst&location=Milton+Keynes',
 };
 
 /** The same search with the location box left empty. */
@@ -60,6 +65,7 @@ const NO_LOCATION_URLS: Readonly<Record<string, string>> = {
   'google-jobs': 'https://www.google.com/search?q=business+analyst+jobs&udm=8&hl=en&gl=uk',
   guardian: 'https://jobs.theguardian.com/jobs/business-analyst/',
   jobserve: 'https://www.jobserve.com/gb/en/JobSearch.aspx?q=business+analyst',
+  'gov-uk-find-a-job': 'https://www.jobs.service.gov.uk/jobs/search?keywords=business+analyst',
 };
 
 function boardById(id: string) {
@@ -79,7 +85,7 @@ describe('the shipped job-board config', () => {
     }
   });
 
-  it('holds exactly these nine ids, in this order', () => {
+  it('holds exactly these ten ids, in this order', () => {
     expect(SHIPPED_BOARDS.map((board) => board.id)).toEqual(EXPECTED_IDS);
   });
 

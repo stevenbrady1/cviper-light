@@ -169,7 +169,7 @@ published and narrows it down on your computer, so it is a browse of recent
 jobs rather than a look at the whole market, and each feed says so on screen if
 it stops working. Add your own free Adzuna and Reed keys and the same screen
 searches those two boards properly as well. Either way, what you find saves
-straight onto the tracker board. The browser links cover nine UK boards and open
+straight onto the tracker board. The browser links cover ten UK boards and open
 in your own browser; Settings lets you turn any of them off, put them in the
 order you use them, and add your own.
 
