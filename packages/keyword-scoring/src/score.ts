@@ -100,7 +100,41 @@ function plural(count: number, singular: string, pluralWord: string): string {
  * assessed them will act on this number very differently from one who knows a
  * word list matched it, and only one of those beliefs is true here.
  */
-function buildSummary(match: MatchResult, ats: AtsResult): string {
+/**
+ * L-287 — the fewest recognised requirements a "strong" verdict can rest on.
+ *
+ * With one requirement, coverage is all or nothing: a CV that has the one
+ * phrase scores 92 "strong" (the care and charity-shop adverts in the L-281
+ * eval set did exactly that). Below this many, the score is capped at
+ * `THIN_ADVERT_SCORE_CAP`, the top of "possible", and the summary says so.
+ * A Light-only divergence from the web app's formula, chosen by Steven on
+ * 26 Oct 2026 over shrinking towards 50 or a note alone.
+ */
+export const MIN_REQUIREMENTS_FOR_STRONG = 3;
+
+/** One below `deriveVerdict`'s "strong" threshold (75). */
+export const THIN_ADVERT_SCORE_CAP = 74;
+
+/** The score after the L-287 cap, and whether the cap lowered it. */
+function capThinAdvert(match: MatchResult): { score: number; capped: boolean } {
+  const capped =
+    match.required.length < MIN_REQUIREMENTS_FOR_STRONG && match.matchScore > THIN_ADVERT_SCORE_CAP;
+  return { score: capped ? THIN_ADVERT_SCORE_CAP : match.matchScore, capped };
+}
+
+function capNote(match: MatchResult): string {
+  const n = match.required.length;
+  const found =
+    n === 0
+      ? 'No requirement could be recognised in this advert'
+      : `Only ${n} ${n === 1 ? 'requirement' : 'requirements'} could be recognised in this advert`;
+  return (
+    `${found}, so the score is capped at ${THIN_ADVERT_SCORE_CAP} ("possible"): ` +
+    'that is too little to call it a strong match. Check the full advert yourself.'
+  );
+}
+
+function buildSummary(match: MatchResult, ats: AtsResult, capped: boolean): string {
   const lead =
     'Keyword match only — this compared the words on your CV with the words in ' +
     'the advert, and nothing more.';
@@ -120,7 +154,8 @@ function buildSummary(match: MatchResult, ats: AtsResult): string {
         'gap costs more than a missing buzzword.'
       : 'Treat it as a rough steer rather than a verdict.';
 
-  return `${lead} ${coverage} ${weighting}`;
+  const base = `${lead} ${coverage} ${weighting}`;
+  return capped ? `${base} ${capNote(match)}` : base;
 }
 
 // ── Suggestions ──────────────────────────────────────────────────────────────
@@ -260,6 +295,7 @@ export function scoreByKeywords(
   const job = buildJobPosting(advert);
   const match = matchProfileToJob(profile, job);
   const ats = atsScore(cv, advert);
+  const { score, capped } = capThinAdvert(match);
 
   return ok({
     // Evidence first, conclusion last — the same reading order the JSON schema
@@ -270,10 +306,10 @@ export function scoreByKeywords(
     keyword_gaps: [...ats.missingKeywords],
     ats_notes: buildAtsNotes(ats),
     suggestions: buildSuggestions(match, ats),
-    summary: buildSummary(match, ats),
-    match_score: match.matchScore,
+    summary: buildSummary(match, ats, capped),
+    match_score: score,
     // Derived, never decided here — exactly as the AI path does it, so the
     // score and the verdict can never contradict each other on screen.
-    verdict: deriveVerdict(match.matchScore),
+    verdict: deriveVerdict(score),
   });
 }
