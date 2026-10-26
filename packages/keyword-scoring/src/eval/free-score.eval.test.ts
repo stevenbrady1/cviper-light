@@ -47,6 +47,10 @@
  * with these ten adverts in view, so this set now flatters it; it proves the
  * list fixes what it was aimed at, not that it generalises. Only adverts the
  * list's author has not seen can say that.
+ *
+ * L-283 (CV negation): still 10 of 10 — the pin cannot rise further. It did
+ * move one score the right way: the HGV poor fit ("No CPC or tachograph card
+ * yet") dropped from 27 to 10, because it is no longer credited with the card.
  */
 import { describe, expect, it } from 'vitest';
 

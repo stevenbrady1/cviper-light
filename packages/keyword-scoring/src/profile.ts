@@ -21,6 +21,7 @@
  * skills with `getSimilarTerms` internally rather than trusting a
  * pre-expanded list.
  */
+import { maskNegated } from './negation';
 import { foldSpelling } from './spelling';
 import { getSimilarTerms } from './similar';
 import { termInFoldedText } from './term';
@@ -247,7 +248,10 @@ function withUkSkills(upstream: readonly string[], text: string): string[] {
 /** Build the `cv_profile` structure `matching()` expects from CV text. */
 export function buildCvProfile(cvText: string): CvProfile {
   const text = (cvText || '').slice(0, MAX_TEXT_LENGTH);
-  const skills = withUkSkills(extractSkills(text), text);
+  // L-283: "No CPC or tachograph card yet" is not a tachograph. Skills only —
+  // titles are read from the full text. See negation.ts for what is masked.
+  const skillText = maskNegated(text);
+  const skills = withUkSkills(extractSkills(skillText), skillText);
   return {
     skills,
     relatedSkills: [],

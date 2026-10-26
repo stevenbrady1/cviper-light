@@ -118,6 +118,15 @@ pattern), never as a quiet change to a parity expectation.
   `_comment` in the JSON: a bare `cpcs` alias matched "Driver CPC", because
   plurals strip a trailing `s` from tokens of four letters or more.
 
+- **A skill the CV says it lacks is not credited (L-283).** `negation.ts`
+  masks "no / not / without / lacking / do not have / don't hold" + up to six
+  words, and up to six words before "not held / expired / lapsed", in the CV's
+  SKILL scan only — not titles, not the advert, not `ats.ts` (the words are on
+  the page). "not only", "no less than", "never", "non-", "working towards"
+  and "pending" are deliberately left alone, each with a test. Widening the
+  rule is how a real skill gets hidden; any new cue needs a near-miss test
+  beside it. On the eval CVs it removes exactly one skill, the right one.
+
 - **`src/eval/` is the only test that asks the user's question (L-281).** Ten
   real UK adverts, twenty invented CVs, one good and one poor fit each. It pins
   how many pairs rank the good fit strictly higher. A scoring change that
