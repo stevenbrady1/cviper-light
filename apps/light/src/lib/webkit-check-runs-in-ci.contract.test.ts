@@ -258,6 +258,62 @@ describe('a slow mirror cannot hold the check for the whole job (L-280)', () => 
   });
 });
 
+/**
+ * L-284 — WebKit's system packages are cached, so a slow mirror is not hit.
+ *
+ * L-280 capped a slow install; it did not make it succeed. Three stalls on
+ * 26 Oct 2026 were all the Ubuntu mirror serving `--with-deps` packages at a
+ * few kB/s. So apt's package directory is pointed at a folder `actions/cache`
+ * restores before the install and saves after it. Each leg below is a step
+ * whose absence would quietly make the cache empty again, with every run still
+ * green — just slow, and sometimes red for a reason nobody connects to it.
+ */
+export const APT_CACHE_DIR = '~/.cache/webkit-apt';
+const APT_CACHE_SCRIPT = '.github/scripts/webkit-apt-cache.sh';
+
+/** The index of the first job line matching `pattern`, or -1. */
+export function lineIndexOf(jobText: string, pattern: RegExp): number {
+  return jobText.split('\n').findIndex((line) => pattern.test(line));
+}
+
+describe("WebKit's system packages are cached between runs (L-284)", () => {
+  const lines = JOB_TEXT;
+  const installLine = lineIndexOf(lines, /playwright-core\s+install\b.*\bwebkit\b/);
+  const configure = JOB_COMMANDS.findIndex((c) =>
+    c.startsWith(`bash ${APT_CACHE_SCRIPT} configure ${APT_CACHE_DIR}`),
+  );
+  const report = JOB_COMMANDS.findIndex((c) =>
+    c.startsWith(`bash ${APT_CACHE_SCRIPT} report ${APT_CACHE_DIR}`),
+  );
+  const install = JOB_COMMANDS.findIndex(
+    (c) => /playwright-core\s+install\b/.test(c) && /\bwebkit\b/.test(c),
+  );
+
+  it('restores the package folder with actions/cache BEFORE the install', () => {
+    const cachePath = lineIndexOf(lines, new RegExp(`path:\\s*${APT_CACHE_DIR}/\\*\\.deb\\s*$`));
+    expect(cachePath, `no actions/cache step saves ${APT_CACHE_DIR}/*.deb`).toBeGreaterThan(-1);
+    expect(cachePath).toBeLessThan(installLine);
+  });
+
+  it('points apt at that folder before the install, and reports after it', () => {
+    expect(configure, `no step runs ${APT_CACHE_SCRIPT} configure`).toBeGreaterThan(-1);
+    expect(configure).toBeLessThan(install);
+    expect(report, `no step runs ${APT_CACHE_SCRIPT} report`).toBeGreaterThan(install);
+    expect(existsSync(join(REPO_ROOT, APT_CACHE_SCRIPT))).toBe(true);
+  });
+
+  it('the script keeps what apt downloads, outside the path docker-clean empties', () => {
+    const script = read(APT_CACHE_SCRIPT);
+    expect(script).toMatch(/Dir::Cache::Archives\s+"\$dir\/"/);
+    expect(script).toMatch(/APT::Keep-Downloaded-Packages\s+"true"/);
+  });
+
+  // NEGATIVE — the detector itself.
+  it('does not find a cache step that is not there', () => {
+    expect(lineIndexOf('steps:\n  - run: echo hi', /path:\s*~\/\.cache\/webkit-apt/)).toBe(-1);
+  });
+});
+
 describe('and it stays out of the offline loop', () => {
   it(`\`pnpm ${LOOP_SCRIPT}\` does not chain it`, () => {
     const parsed: unknown = JSON.parse(read(MANIFEST_PATH));
