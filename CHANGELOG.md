@@ -12,6 +12,8 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Changed
 
+- The app starts with about 700 kB less code to load. The libraries that read a Word CV and write a Word export (`mammoth`, `docx`, `jszip`) were in the main bundle and parsed on every launch, though most sessions never touch a Word file; they now load the first time a Word file is read or saved. The main chunk drops from about 1.6 MB to 900 kB. A contract test forbids static imports of either.
+
 - Release and Store builds are harder to tamper with and harder to stall. Every checkout in the release and Store workflows drops the job's GitHub token instead of leaving it in `.git/config`, where any build dependency could have read it and replaced a published installer. The Store package now waits for CI to pass on a commit on `main`, as releases already did, so a package can no longer be built from a red or unmerged commit. Rust is pinned to 1.99.1 in `rust-toolchain.toml` and in every workflow, so the compiler changes only when a PR says so. CI and smoke runs on `main` are no longer cancelled by a burst of merges, which used to leave a tag waiting on a manual re-run: each commit on `main` now gets its own concurrency group, because turning `cancel-in-progress` off still let GitHub cancel a pending run when a third merge arrived. Every job now has its own timeout instead of GitHub's six hours. Four new contract tests hold all of this.
 
 ### Fixed
