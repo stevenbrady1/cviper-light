@@ -21,9 +21,11 @@
  * skills with `getSimilarTerms` internally rather than trusting a
  * pre-expanded list.
  */
+import { maskNegated } from './negation';
 import { foldSpelling } from './spelling';
 import { getSimilarTerms } from './similar';
 import { termInFoldedText } from './term';
+import { extractUkSkills } from './uk-skills';
 import { COMMON_SKILLS, SKILL_VOCABULARY } from './vocabulary';
 
 /** Matches `_MAX_TEXT_LENGTH` in `FallbackService` — a CPU guard on regex work. */
@@ -227,16 +229,29 @@ export function buildJobPosting(jobText: string): JobPosting {
     description: text,
     // `job_summary` scans `common_skills` for the advert's stated skills; the
     // wider `skills` list is the ATS layer's vocabulary, not this one.
-    keySkills: extractSkills(text, COMMON_SKILLS),
+    // L-282: the hand-made UK list, AFTER the upstream scan (see uk-skills.ts).
+    keySkills: withUkSkills(extractSkills(text, COMMON_SKILLS), text),
     essentialSkills: [],
     keyRequirements: [],
   };
 }
 
+/**
+ * L-282 — append the UK terms the text names that the upstream scan did not.
+ * A Light-only divergence: the upstream list comes first and is unchanged.
+ */
+function withUkSkills(upstream: readonly string[], text: string): string[] {
+  const have = new Set(upstream.map((skill) => skill.toLowerCase()));
+  return [...upstream, ...extractUkSkills(text).filter((label) => !have.has(label.toLowerCase()))];
+}
+
 /** Build the `cv_profile` structure `matching()` expects from CV text. */
 export function buildCvProfile(cvText: string): CvProfile {
   const text = (cvText || '').slice(0, MAX_TEXT_LENGTH);
-  const skills = extractSkills(text);
+  // L-283: "No CPC or tachograph card yet" is not a tachograph. Skills only —
+  // titles are read from the full text. See negation.ts for what is masked.
+  const skillText = maskNegated(text);
+  const skills = withUkSkills(extractSkills(skillText), skillText);
   return {
     skills,
     relatedSkills: [],

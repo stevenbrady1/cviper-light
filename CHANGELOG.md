@@ -6,7 +6,13 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The free CV check no longer counts a skill your CV says you do not have (L-283). "No CPC or tachograph card yet" used to count as holding a tachograph card, and "Driver CPC not held" as holding a CPC. Now a skill right after "no", "not", "without", "lacking", "do not have" or "don't hold", or right before "not held", "expired" or "lapsed", is not counted — unless the CV names it somewhere else as well. The rule is narrow on purpose, because hiding a skill you hold is worse than the old bug: "not only", "no less than", "never", "non-technical", "working towards" and "pending" still count as having it. It changes only which skills are read from the CV; the advert and the ATS keyword check are read as before. On the twenty test CVs it removes exactly one skill — the tachograph card that CV says it lacks.
+
 ### Added
+
+- The free CV check now knows UK qualifications, licences and checks (L-282). It used to find no requirements at all in a care, HGV or teaching assistant advert, so those scores were close to random. A hand-made list of 63 terms — NVQ Level 2 and 3, DBS check, C+E and C licences, Driver CPC, digital tachograph, SIA licence, EYFS, SEMH, EHCP, food hygiene, CSCS-style site cards and more — is now read on both sides, and different wordings of the same thing count as the same thing: a CV saying "Level 2 Diploma in Health and Social Care" meets an advert asking for "NVQ Level 2". On the ten-advert test set the right CV now scores higher in 10 of 10 pairs, up from 6. That set was in view while the list was written, so it shows the list fixes what it aimed at, not that it works on every advert. Words that mean something else in another job are only matched inside a longer phrase, so "CPC" in a marketing advert (cost per click) and "ADR" in a legal one (dispute resolution) are not read as driving qualifications. Tech and finance adverts score exactly as before.
 
 - A test that asks the free CV check the question a user asks (L-281): given a CV that fits the job and one that does not, does the fitting one score higher? Ten real UK adverts (care, charity retail, HGV driving, a school, customer service, treasury, HR, operations, data, security and compliance), requirements paraphrased, with twenty invented CVs, one good and one poor fit each. Today the check gets 6 of the 10 pairs the right way round; the test pins that number exactly, so a change that makes it worse fails CI, and a change that makes it better must say so by raising it. The four it gets wrong — care, HGV, teaching assistant, and a health-and-safety CV tying a real analyst at 92 — are the targets for the next two changes. No app behaviour changes.
 

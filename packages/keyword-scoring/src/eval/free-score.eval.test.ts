@@ -42,6 +42,15 @@
  *     floor-ish score and the order is noise. L-282 (UK skills list).
  *   - 10 security and compliance analyst — a health-and-safety CV ties the
  *     real analyst at 92 "strong" on shared words. L-283 and later work.
+ *
+ * L-282 (UK skills list): 10 of 10. Read that with care. The list was written
+ * with these ten adverts in view, so this set now flatters it; it proves the
+ * list fixes what it was aimed at, not that it generalises. Only adverts the
+ * list's author has not seen can say that.
+ *
+ * L-283 (CV negation): still 10 of 10 — the pin cannot rise further. It did
+ * move one score the right way: the HGV poor fit ("No CPC or tachograph card
+ * yet") dropped from 27 to 10, because it is no longer credited with the card.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -69,7 +78,7 @@ import cv10Good from './fixtures/cvs/10-good.txt?raw';
 import cv10Poor from './fixtures/cvs/10-poor.txt?raw';
 import manifestJson from './fixtures/manifest.json';
 
-const RIGHT_ORDER = 6;
+const RIGHT_ORDER = 10;
 
 interface Advert {
   job_title: string;
