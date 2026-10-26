@@ -106,6 +106,14 @@ describe('localModelLine — the live detection shown on the analysis card', () 
     expect(line).toContain('works with nothing');
   });
 
+  // L-293 — a first-time user does not know what "API key" or "local model"
+  // means; the sentence a brand-new machine shows must not need them.
+  it('says it without jargon', () => {
+    const line = localModelLine(NOTHING);
+    expect(line).not.toMatch(/\bAPI\b|local model|\bmodel\b/i);
+    expect(line).toMatch(/AI/);
+  });
+
   it('mentions a saved cloud key only when that key can actually be used', () => {
     // ========================================================================
     // THE CARD MUST NOT PROMISE A ROW THE PICKER WILL NOT SHOW (L-102 / L-149)

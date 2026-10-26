@@ -119,6 +119,33 @@ export function AiKeySetup({ ports, browser, customServicePort }: AiKeySetupProp
         {AI_COST_LINE}
       </p>
 
+      {/*
+        L-293. The audit's walk-through lost a non-technical user here: "API
+        key", six company names and "model", and nothing saying what to do. So,
+        before the first card, three steps in plain words that quote the
+        cards' real buttons (AiKeySetup.steps.test.tsx fails if a label
+        changes). No company is recommended: which one suits a person depends
+        on what they are willing to pay and share, and that is their call.
+      */}
+      <div
+        data-testid="ai-keys-steps"
+        className={cardClasses({ padding: 'none' }) + ' mt-3 p-3 text-ink-muted'}
+      >
+        <p className="font-medium text-ink">How to add AI, in three steps</p>
+        <ol className="mt-1.5 list-decimal space-y-1 pl-5">
+          <li>Pick one company below. You only need one.</li>
+          <li>
+            On its card, press &ldquo;Where do I get &hellip; key?&rdquo;. Sign in on its website
+            and create a key: a long line of letters and numbers.
+          </li>
+          <li>Paste it into the card and press &ldquo;Test and save this key&rdquo;.</li>
+        </ol>
+        <p className="mt-1.5 text-xs text-ink-faint">
+          The key is kept in your computer&rsquo;s own password store, and is only used to talk to
+          that company.
+        </p>
+      </div>
+
       <div className="mt-4 space-y-4">
         {AI_KEY_PROVIDER_IDS.map((id) => (
           <AiKeyCard
