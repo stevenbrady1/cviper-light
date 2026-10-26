@@ -227,6 +227,19 @@ describe('a slow mirror cannot hold the check for the whole job (L-280)', () => 
     expect(installMinutes).toBeLessThan(jobMinutes - 5);
   });
 
+  // The first live run of L-280 (PR #371) proved this is needed: `timeout`
+  // stopped pnpm, but apt-get runs under sudo in its own process group, so it
+  // outlived the cap, kept the dpkg lock, and the retry failed in one second
+  // with "Could not get lock". The retry is worthless unless the leftover apt
+  // is stopped and a half-done install repaired first.
+  it('frees the dpkg lock before the retry', () => {
+    const [, retry = ''] = install.split('||');
+    expect(retry, `retry half of: ${install}`).toMatch(
+      /^\s*\(\s*bash\s+\.github\/scripts\/release-apt-lock\.sh\s*&&\s*timeout\b/,
+    );
+    expect(existsSync(join(REPO_ROOT, '.github/scripts/release-apt-lock.sh'))).toBe(true);
+  });
+
   // NEGATIVE — the detector itself.
   it('does not count an uncapped install as capped', () => {
     expect(
