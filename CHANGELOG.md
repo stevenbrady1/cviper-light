@@ -8,6 +8,8 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Added
 
+- A one-click sample on the Analysis screen (L-277). Before you have added a CV, "Try it with a sample CV" checks a made-up data analyst's CV against a made-up advert with the basic match and shows the full result, so a new user sees what a check gives back before hunting for files. It saves nothing — no CV row, no history — because a single CV cannot be deleted from the app, and a sample would otherwise sit in your list for good. It contacts nothing, it is gone once you add your own CV, and "Hide the sample" puts it away. A test pins the sample to a middle-band result with real gaps, so a scorer change cannot quietly turn the demonstration into a 95 or a "weak".
+
 - Every release now also carries the Mac disk image under one name that never changes, `CViper-Light-macOS.dmg`, next to `CViper-Light-Windows-x64.exe` (L-261), so cviper.ai can offer a Mac download button that never needs a version number. A release with no Mac build (the Apple secrets unset) still ships Windows and says so in its summary; a release with two disk images is refused rather than guessed at. The guard that holds the Windows name now holds this one too, and checks that the signing job can never pick either up.
 - A tenth keyless job board: GOV.UK Find a job, the Department for Work and Pensions' Work Hub service (L-262). It is UK-wide, covers every sector, searches by keyword and location, and needs no account; like the other nine it opens in your own browser, and the app never loads or reads the page. The search address uses `keywords`, because the `q` the page also accepts is ignored and returns every job in the country.
 
