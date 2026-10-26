@@ -67,7 +67,7 @@ What you will need
 - Experience with Tableau or Power BI
 - Python for data analysis
 - Experience with statistics and A/B testing
-- Knowledge of Google Analytics is a plus`;
+- Knowledge of Google Analytics`;
 
 export interface SampleResult {
   readonly analysis: CvAnalysis;

@@ -325,8 +325,6 @@ export function matchProfileToJob(cvProfile: CvProfile, job: JobPosting): MatchR
   }
 
   // ── Requirement coverage ─────────────────────────────────────────────────
-  const required = job.essentialSkills.length > 0 ? job.essentialSkills : job.keySkills;
-
   const isCovered = (requirement: string): boolean => {
     const rl = requirement.toLowerCase();
     if (seen.has(rl) || cvSkillsExpanded.has(rl)) return true;
@@ -336,6 +334,23 @@ export function matchProfileToJob(cvProfile: CvProfile, job: JobPosting): MatchR
     const similar = new Set(getSimilarTerms(requirement).map((term) => term.toLowerCase()));
     return intersects(similar, cvSkillsExpanded);
   };
+
+  // L-289 (Light-only): with essentials known, a DESIRABLE skill counts only
+  // when the CV has it. Lacking a nice-to-have costs nothing; having one still
+  // helps. Coverage (met / counted) can then only rise against counting every
+  // skill, because a missed desirable leaves the denominator instead of
+  // sitting in it unmet. The source used essentials alone, which made a
+  // desirable the CV has worth nothing (eval 05: 49 -> 35).
+  const essentialSet = new Set(job.essentialSkills.map((skill) => skill.toLowerCase()));
+  const required =
+    job.essentialSkills.length > 0
+      ? [
+          ...job.essentialSkills,
+          ...job.keySkills.filter(
+            (skill) => !essentialSet.has(skill.toLowerCase()) && isCovered(skill),
+          ),
+        ]
+      : job.keySkills;
 
   const missingEssential = required.filter((requirement) => !isCovered(requirement));
   const covered = required.filter((requirement) => !missingEssential.includes(requirement));
