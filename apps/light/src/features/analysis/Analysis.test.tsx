@@ -142,6 +142,19 @@ describe('try it with a sample (L-277)', () => {
     expect(sample.textContent ?? '').toMatch(/nothing was saved/i);
   });
 
+  // L-290 — through the real screen: the sample's matched skills come with the
+  // lines of the sample CV that show them.
+  it('shows where the sample CV says each matched skill', async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId('analysis-try-sample'));
+    const proof = within(await screen.findByTestId('analysis-sample')).getByTestId(
+      'analysis-proof',
+    );
+    expect(within(proof).getAllByRole('listitem').length).toBeGreaterThan(2);
+    expect(proof.textContent ?? '').toMatch(/SQL/);
+  });
+
   it('negative: saves no CV and no analysis, and contacts nothing', async () => {
     const { port } = await renderView();
     const user = userEvent.setup();

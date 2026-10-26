@@ -59,7 +59,7 @@ import {
   type ProviderOption,
 } from './providers';
 import { runAnalysis } from './runAnalysis';
-import { runSample, type SampleResult } from './sample';
+import { SAMPLE_CV_TEXT, runSample, type SampleResult } from './sample';
 import { createAnalysisSession, type AnalysisSession } from './session';
 import { gapsFromAnalysis, type TailorHandoff } from '../flow/handoff';
 import { JobStepBar } from '../flow/JobStepBar';
@@ -1143,6 +1143,9 @@ export function Analysis({
                 retried={result.retried}
                 aiAvailable={aiAvailable}
                 atsKeywordScore={result.atsKeywordScore}
+                // L-290. The result is always the selected CV's: switching CV
+                // clears it (see the CV picker's handler).
+                cvText={selectedCv?.extracted_text ?? undefined}
               />
               {/*
                 The next step of the flow (L-190), after the result it follows
@@ -1190,6 +1193,7 @@ export function Analysis({
                 model={`keyword-v${KEYWORD_SCORING_VERSION}`}
                 aiAvailable={aiAvailable}
                 atsKeywordScore={sample.atsKeywordScore}
+                cvText={SAMPLE_CV_TEXT}
               />
             </section>
           ) : null}
