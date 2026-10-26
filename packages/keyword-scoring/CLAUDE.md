@@ -107,6 +107,17 @@ pattern), never as a quiet change to a parity expectation.
   diverging expectations by name; every other case still matches the Python.
   If the web app is ever revived, port L-275 to it rather than reverting here.
 
+- **UK qualifications and checks are a separate, Light-only layer (L-282).**
+  `lexicons-light/uk.json` + `uk-skills.ts`: about 65 hand-made terms (NVQ, DBS,
+  C+E, Driver CPC, SIA, EYFS…), each a display label plus aliases, reported
+  under the label so "Level 2 Diploma in Health and Social Care" on a CV meets
+  "NVQ Level 2" in an advert. `profile.ts` appends them AFTER the upstream scan;
+  nothing in `lexicon`, `getSimilarTerms` or `SKILL_VOCABULARY` changes, and a
+  test forbids a UK entry repeating an upstream term. Not used by `ats.ts`,
+  which asks about the advert's exact words. Before adding a term, read the
+  `_comment` in the JSON: a bare `cpcs` alias matched "Driver CPC", because
+  plurals strip a trailing `s` from tokens of four letters or more.
+
 - **`src/eval/` is the only test that asks the user's question (L-281).** Ten
   real UK adverts, twenty invented CVs, one good and one poor fit each. It pins
   how many pairs rank the good fit strictly higher. A scoring change that

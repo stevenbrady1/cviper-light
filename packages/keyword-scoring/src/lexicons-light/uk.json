@@ -1,0 +1,209 @@
+{
+  "_comment": "L-282. Light-only, hand-made: UK qualifications, licences, checks and everyday job words the upstream vocabulary does not scan. NOT a copy of anything upstream. Each label is what the user sees; each alias is another way a UK advert or CV writes the same thing. Rule for adding a term: it means one thing in a UK job advert. Bare words that mean something else in another trade (cpc = cost per click, adr = alternative dispute resolution, sage, literacy) are aliases only inside a longer phrase. uk-skills.test.ts holds the negatives. Single-token aliases of 4+ letters ending in s lose the s when matched (plurals.ts), so 'cpcs' alone would match 'CPC': write such abbreviations inside a phrase.",
+  "terms": [
+    {
+      "label": "NVQ Level 2",
+      "aliases": [
+        "nvq 2",
+        "nvq2",
+        "level 2 diploma in health and social care",
+        "level 2 diploma in care",
+        "level 2 health and social care",
+        "qcf level 2"
+      ]
+    },
+    {
+      "label": "NVQ Level 3",
+      "aliases": [
+        "nvq 3",
+        "nvq3",
+        "level 3 diploma in health and social care",
+        "level 3 diploma in adult care",
+        "level 3 health and social care",
+        "qcf level 3"
+      ]
+    },
+    { "label": "Care Certificate", "aliases": [] },
+    {
+      "label": "Personal care",
+      "aliases": ["washing and dressing", "continence care", "intimate care"]
+    },
+    {
+      "label": "Dementia care",
+      "aliases": ["dementia awareness", "living with dementia", "dementia support"]
+    },
+    { "label": "End of life care", "aliases": ["palliative care"] },
+    { "label": "Domiciliary care", "aliases": ["home care", "homecare"] },
+    { "label": "Moving and handling", "aliases": ["moving and positioning", "hoist training"] },
+    { "label": "Manual handling", "aliases": [] },
+    { "label": "First aid", "aliases": ["first aider", "first aid at work"] },
+    { "label": "Paediatric first aid", "aliases": [] },
+    { "label": "Food hygiene", "aliases": ["food safety"] },
+    { "label": "Allergen awareness", "aliases": ["allergen training"] },
+    {
+      "label": "DBS check",
+      "aliases": [
+        "dbs",
+        "enhanced dbs",
+        "dbs checked",
+        "dbs certificate",
+        "disclosure and barring",
+        "pvg scheme",
+        "pvg"
+      ]
+    },
+    {
+      "label": "Full UK driving licence",
+      "aliases": [
+        "full driving licence",
+        "clean driving licence",
+        "uk driving licence",
+        "full uk licence",
+        "driving licence"
+      ]
+    },
+    { "label": "Own car", "aliases": ["own vehicle", "own transport", "access to a car"] },
+    {
+      "label": "C+E licence",
+      "aliases": [
+        "category c+e",
+        "cat c+e",
+        "c+e driver",
+        "class 1 licence",
+        "class 1 hgv",
+        "hgv class 1",
+        "class 1 driver",
+        "lgv class 1"
+      ]
+    },
+    {
+      "label": "C licence",
+      "aliases": [
+        "category c",
+        "cat c",
+        "class 2 licence",
+        "class 2 hgv",
+        "hgv class 2",
+        "class 2 driver",
+        "lgv class 2"
+      ]
+    },
+    {
+      "label": "Driver CPC",
+      "aliases": [
+        "dcpc",
+        "driver qualification card",
+        "dqc",
+        "cpc card",
+        "certificate of professional competence"
+      ]
+    },
+    {
+      "label": "Digital tachograph",
+      "aliases": ["tachograph", "tachograph card", "tacho card", "digital tacho"]
+    },
+    { "label": "HGV driving", "aliases": ["hgv driver", "hgv", "lgv driver", "lgv"] },
+    {
+      "label": "ADR licence",
+      "aliases": ["adr certificate", "adr card", "adr trained", "adr qualified"]
+    },
+    {
+      "label": "Forklift licence",
+      "aliases": ["forklift", "flt licence", "flt", "counterbalance", "reach truck"]
+    },
+    { "label": "Pick and pack", "aliases": ["picking and packing", "order picking"] },
+    { "label": "Multi-drop", "aliases": ["multi drop", "multidrop"] },
+    { "label": "SMSTS", "aliases": ["site management safety training scheme"] },
+    { "label": "SSSTS", "aliases": ["site supervisor safety training scheme"] },
+    { "label": "IPAF", "aliases": ["ipaf licence"] },
+    { "label": "PASMA", "aliases": [] },
+    {
+      "label": "CPCS card",
+      "aliases": ["cpcs blue card", "cpcs red card", "cpcs ticket", "cpcs operator"]
+    },
+    { "label": "Gas Safe", "aliases": ["gas safe registered", "gas safe register"] },
+    { "label": "18th Edition", "aliases": ["bs 7671", "bs7671"] },
+    { "label": "Asbestos awareness", "aliases": [] },
+    {
+      "label": "Supporting Teaching and Learning",
+      "aliases": ["teaching assistant qualification", "ta qualification"]
+    },
+    {
+      "label": "SEMH",
+      "aliases": ["social emotional and mental health", "emotional and mental health needs"]
+    },
+    { "label": "EHCP", "aliases": ["education health and care plan", "ehc plan"] },
+    {
+      "label": "De-escalation",
+      "aliases": ["deescalation", "de escalation", "team teach", "positive handling"]
+    },
+    { "label": "Behaviour management", "aliases": ["behaviour support", "managing behaviour"] },
+    { "label": "Phonics", "aliases": ["read write inc", "letters and sounds"] },
+    { "label": "Literacy and numeracy", "aliases": [] },
+    {
+      "label": "GCSE English and maths",
+      "aliases": ["gcse maths and english", "english and maths gcse", "gcses in english and maths"]
+    },
+    {
+      "label": "Trauma-informed practice",
+      "aliases": ["trauma-informed", "trauma informed", "attachment and trauma"]
+    },
+    {
+      "label": "EYFS",
+      "aliases": [
+        "early years foundation stage",
+        "early years practitioner",
+        "early years educator",
+        "early years setting"
+      ]
+    },
+    { "label": "Cash handling", "aliases": ["handling cash", "cashing up"] },
+    {
+      "label": "Volunteer management",
+      "aliases": [
+        "managing volunteers",
+        "volunteer recruitment",
+        "recruiting volunteers",
+        "developing volunteers",
+        "volunteer coordination",
+        "volunteer coordinator"
+      ]
+    },
+    { "label": "Call centre", "aliases": ["contact centre"] },
+    { "label": "Personal licence", "aliases": ["personal licence holder", "aplh"] },
+    {
+      "label": "SIA licence",
+      "aliases": [
+        "sia",
+        "sia door supervisor",
+        "sia badge",
+        "sia licensed",
+        "door supervisor licence"
+      ]
+    },
+    { "label": "CCTV", "aliases": ["cctv monitoring", "cctv operation"] },
+    { "label": "ISO 27001", "aliases": ["iso/iec 27001", "iso27001", "isms"] },
+    { "label": "Cyber Essentials", "aliases": ["cyber essentials plus"] },
+    { "label": "NCSC CAF", "aliases": ["cyber assessment framework"] },
+    { "label": "IOSH", "aliases": ["iosh managing safely", "iosh working safely"] },
+    { "label": "ISO 45001", "aliases": ["iso45001"] },
+    { "label": "Data entry", "aliases": ["data input"] },
+    {
+      "label": "Microsoft Office",
+      "aliases": ["ms office", "microsoft 365", "office 365", "m365", "o365"]
+    },
+    { "label": "SharePoint", "aliases": [] },
+    { "label": "Minute taking", "aliases": ["taking minutes", "minute-taking"] },
+    { "label": "Diary management", "aliases": ["managing diaries", "calendar management"] },
+    { "label": "AAT", "aliases": ["aat qualified", "association of accounting technicians"] },
+    {
+      "label": "Sage accounting",
+      "aliases": ["sage 50", "sage 200", "sage accounts", "sage line 50"]
+    },
+    { "label": "Xero", "aliases": [] },
+    {
+      "label": "CIPD",
+      "aliases": ["cipd qualified", "cipd level 3", "cipd level 5", "cipd level 7"]
+    }
+  ]
+}
