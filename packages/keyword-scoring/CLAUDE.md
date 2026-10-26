@@ -140,6 +140,12 @@ pattern), never as a quiet change to a parity expectation.
   raises it must raise `RIGHT_ORDER` in the same PR. Do not edit the CVs or
   adverts to make a change pass — the set is the yardstick, not the work.
 
+- **"Strong" needs three recognised requirements (L-287).** Below
+  `MIN_REQUIREMENTS_FOR_STRONG`, `score.ts` caps the score at
+  `THIN_ADVERT_SCORE_CAP` (74) and adds a sentence to the summary. It sits in
+  `score.ts`, after `matchProfileToJob`, so `match.ts` and its parity with the
+  Python stay untouched.
+
 - **The score cannot reach 0 or 100.** It is floored at 10 and capped at 95
   (`RAW_SCORE_CAP`). Nothing in this package has read the CV, so it never
   claims certainty in either direction. The ATS sub-score does reach both ends.
