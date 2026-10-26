@@ -107,6 +107,13 @@ pattern), never as a quiet change to a parity expectation.
   diverging expectations by name; every other case still matches the Python.
   If the web app is ever revived, port L-275 to it rather than reverting here.
 
+- **`src/eval/` is the only test that asks the user's question (L-281).** Ten
+  real UK adverts, twenty invented CVs, one good and one poor fit each. It pins
+  how many pairs rank the good fit strictly higher. A scoring change that
+  lowers that number is a regression whatever the unit tests say; one that
+  raises it must raise `RIGHT_ORDER` in the same PR. Do not edit the CVs or
+  adverts to make a change pass — the set is the yardstick, not the work.
+
 - **The score cannot reach 0 or 100.** It is floored at 10 and capped at 95
   (`RAW_SCORE_CAP`). Nothing in this package has read the CV, so it never
   claims certainty in either direction. The ATS sub-score does reach both ends.

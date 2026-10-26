@@ -6,6 +6,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A test that asks the free CV check the question a user asks (L-281): given a CV that fits the job and one that does not, does the fitting one score higher? Ten real UK adverts (care, charity retail, HGV driving, a school, customer service, treasury, HR, operations, data, security and compliance), requirements paraphrased, with twenty invented CVs, one good and one poor fit each. Today the check gets 6 of the 10 pairs the right way round; the test pins that number exactly, so a change that makes it worse fails CI, and a change that makes it better must say so by raising it. The four it gets wrong — care, HGV, teaching assistant, and a health-and-safety CV tying a real analyst at 92 — are the targets for the next two changes. No app behaviour changes.
+
 ## [0.11.0] — 2026-10-26
 
 The launch release. The free CV check reads skills it used to miss, a new user sees a full result in one click and is no longer asked for job-board keys, there is a tenth UK job board, and three security fixes: AI requests no longer follow redirects, a local Ollama run never goes through a proxy, and a memory issue in backup validation is patched.
