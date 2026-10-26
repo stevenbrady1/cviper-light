@@ -119,6 +119,67 @@ async function renderView(
   return { port, filePort };
 }
 
+/**
+ * L-277 — a new user can see a real result before finding a CV and an advert.
+ * The sample is checked with the free keyword scan, on built-in text, and
+ * writes NOTHING: there is no way to delete a single CV from the app, so a
+ * sample saved as a CV would sit in the user's list for good.
+ */
+describe('try it with a sample (L-277)', () => {
+  it('offers a sample when there is no CV yet', async () => {
+    await renderView();
+    expect(await screen.findByTestId('analysis-try-sample')).toBeTruthy();
+  });
+
+  it('shows a real result in one click, saying it is a sample', async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId('analysis-try-sample'));
+
+    const sample = await screen.findByTestId('analysis-sample');
+    expect(within(sample).getByTestId('analysis-result')).toBeTruthy();
+    expect(sample.textContent ?? '').toMatch(/made-up/i);
+    expect(sample.textContent ?? '').toMatch(/nothing was saved/i);
+  });
+
+  it('negative: saves no CV and no analysis, and contacts nothing', async () => {
+    const { port } = await renderView();
+    const user = userEvent.setup();
+    const button = await screen.findByTestId('analysis-try-sample');
+    // The screen's own start-up reads happen before the click; the click
+    // itself must add nothing — no database write, no command to the backend.
+    const commandsBefore = tauri.invoke.mock.calls.length;
+    await user.click(button);
+    await screen.findByTestId('analysis-sample');
+
+    expect(port.calls.saveCv).toBe(0);
+    expect(port.calls.saveAnalysis).toBe(0);
+    expect(tauri.invoke.mock.calls.slice(commandsBefore)).toEqual([]);
+  });
+
+  it('negative: is not offered once the user has a CV of their own', async () => {
+    await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
+    expect(screen.queryByTestId('analysis-try-sample')).toBeNull();
+  });
+
+  it('boundary: keeps the screen to one primary button', async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId('analysis-try-sample'));
+    await screen.findByTestId('analysis-sample');
+    expect(document.querySelectorAll('[data-primary="true"]')).toHaveLength(1);
+  });
+
+  it('can be put away again', async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId('analysis-try-sample'));
+    await user.click(await screen.findByTestId('analysis-sample-hide'));
+    expect(screen.queryByTestId('analysis-sample')).toBeNull();
+    expect(screen.getByTestId('analysis-try-sample')).toBeTruthy();
+  });
+});
+
 describe('the empty screen', () => {
   it('says nothing has been checked and offers the basic match', async () => {
     await renderView();

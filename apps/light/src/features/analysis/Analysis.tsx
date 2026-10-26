@@ -7,7 +7,7 @@ import {
   type Profile,
   type Result,
 } from '@cviper/core-types';
-import { runGates } from '@cviper/keyword-scoring';
+import { KEYWORD_SCORING_VERSION, runGates } from '@cviper/keyword-scoring';
 
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { DetailPane } from '../../app/DetailPane';
@@ -59,6 +59,7 @@ import {
   type ProviderOption,
 } from './providers';
 import { runAnalysis } from './runAnalysis';
+import { runSample, type SampleResult } from './sample';
 import { createAnalysisSession, type AnalysisSession } from './session';
 import { gapsFromAnalysis, type TailorHandoff } from '../flow/handoff';
 import { JobStepBar } from '../flow/JobStepBar';
@@ -288,6 +289,8 @@ export function Analysis({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadProblem, setUploadProblem] = useState<string | null>(null);
+  /** The one-click sample (L-277): shown and forgotten, never saved. */
+  const [sample, setSample] = useState<SampleResult | null>(null);
   /** Per-provider agreement to send a CV to a named cloud AI (Apple 5.1.2(i)). */
   const [consent, setConsent] = useState<ConsentState>(NO_CONSENT);
   /**
@@ -1112,6 +1115,22 @@ export function Analysis({
                 Pick a CV, paste an advert, and press the button. The basic match needs no account
                 and no API key, and nothing leaves this machine.
               </p>
+              {/*
+                L-277: before the user has a CV, one click shows what a check
+                gives back. Secondary, so the view keeps its one blue button.
+                Only while there is no CV: after that the real thing is right
+                there and a sample would be in the way.
+              */}
+              {cvsLoaded && cvs.length === 0 && sample === null ? (
+                <button
+                  type="button"
+                  data-testid="analysis-try-sample"
+                  onClick={() => setSample(runSample())}
+                  className={`${SECONDARY_BUTTON} mt-4`}
+                >
+                  Try it with a sample CV
+                </button>
+              ) : null}
             </div>
           ) : (
             <>
@@ -1143,6 +1162,37 @@ export function Analysis({
               )}
             </>
           )}
+
+          {sample !== null && result === null ? (
+            <section
+              data-testid="analysis-sample"
+              aria-label="Sample check"
+              className="space-y-4 rounded-card border border-line bg-sunken p-4"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <p className="text-ink-muted">
+                  <span className="font-medium text-ink">A sample check.</span> A made-up data
+                  analyst&rsquo;s CV against a made-up advert, using the basic match. Nothing was
+                  saved. Add your own CV above to check it for real.
+                </p>
+                <button
+                  type="button"
+                  data-testid="analysis-sample-hide"
+                  onClick={() => setSample(null)}
+                  className={SECONDARY_BUTTON}
+                >
+                  Hide the sample
+                </button>
+              </div>
+              <AnalysisResult
+                analysis={sample.analysis}
+                provider="keyword"
+                model={`keyword-v${KEYWORD_SCORING_VERSION}`}
+                aiAvailable={aiAvailable}
+                atsKeywordScore={sample.atsKeywordScore}
+              />
+            </section>
+          ) : null}
         </div>
 
         {historyOpen && selectedCv !== null ? (
