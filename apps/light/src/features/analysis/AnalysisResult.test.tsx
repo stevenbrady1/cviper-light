@@ -550,3 +550,58 @@ describe('AnalysisResult — confidence beside the score (L-291)', () => {
     expect(screen.getByTestId('analysis-confidence').textContent).toMatch(/low.*no requirements/i);
   });
 });
+
+/**
+ * L-292 — a missed nice-to-have is shown, but not as a gap.
+ */
+describe('AnalysisResult — nice to have, not on your CV (L-292)', () => {
+  const ADVERT =
+    'Data Analyst\nBristol.\n\nEssential:\n- SQL\n- Python\n\nDesirable:\n- Tableau\n- Power BI';
+  const CV = 'Analyst. Daily SQL reporting and Python scripts for the monthly close.';
+
+  it('lists them on a basic-match result', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        cvText={CV}
+        advertText={ADVERT}
+      />,
+    );
+    const list = screen.getByTestId('analysis-nice-to-have');
+    expect(within(list).getByText('Tableau')).toBeTruthy();
+    expect(within(list).getByText('Power BI')).toBeTruthy();
+  });
+
+  // NEGATIVE — not on an AI result, whose gaps come from the model.
+  it('is not shown on an AI result', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="anthropic"
+        model="m"
+        aiAvailable
+        cvText={CV}
+        advertText={ADVERT}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-nice-to-have')).toBeNull();
+  });
+
+  // BOUNDARY — none missed: the block is left out, not shown empty.
+  it('is left out when there is nothing to list', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="m"
+        aiAvailable
+        cvText={`${CV} Tableau and Power BI dashboards.`}
+        advertText={ADVERT}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-nice-to-have')).toBeNull();
+  });
+});

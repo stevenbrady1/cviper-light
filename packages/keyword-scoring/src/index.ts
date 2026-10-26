@@ -27,6 +27,7 @@ export {
   THIN_ADVERT_SCORE_CAP,
   atsKeywordScore,
   keywordConfidence,
+  missingNiceToHaves,
   scoreByKeywords,
 } from './score';
 

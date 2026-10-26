@@ -3,6 +3,7 @@ import {
   atsBand,
   evidenceLine,
   keywordConfidence,
+  missingNiceToHaves,
   type KeywordConfidence,
 } from '@cviper/keyword-scoring';
 
@@ -209,6 +210,10 @@ export function AnalysisResult({
   const isKeyword = provider === 'keyword';
   const confidence =
     isKeyword && cvText && advertText ? keywordConfidence(cvText, advertText) : null;
+  // L-292: the desirables the CV lacks. They cost nothing (L-289), so they are
+  // not gaps, but the user should still see them. Basic match only.
+  const niceToHave =
+    isKeyword && cvText && advertText ? missingNiceToHaves(cvText, advertText) : [];
   const ats =
     atsKeywordScore !== undefined &&
     Number.isFinite(atsKeywordScore) &&
@@ -337,6 +342,19 @@ export function AnalysisResult({
             emptyText="Nothing the advert asks for is missing."
             testId="analysis-missing-skills"
           />
+          {niceToHave.length === 0 ? null : (
+            <div data-testid="analysis-nice-to-have" className="mt-3">
+              <p className="text-xs text-ink-faint">
+                Nice to have, not on your CV &mdash; these do not lower your score.
+              </p>
+              <TermChips
+                terms={niceToHave}
+                tone="bg-sunken text-ink-muted"
+                emptyText=""
+                testId="analysis-nice-to-have-list"
+              />
+            </div>
+          )}
         </div>
       </div>
 

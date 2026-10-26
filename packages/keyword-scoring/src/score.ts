@@ -311,6 +311,30 @@ export function keywordConfidence(
 }
 
 /**
+ * L-292 — the advert's desirables the CV does not show, spelled for the screen.
+ *
+ * L-289 made a missed desirable cost nothing, so it is rightly absent from
+ * `missing_skills`; the user should still be told about it, as something nice
+ * to have rather than a gap. Empty when the advert marks nothing desirable, and
+ * where the scorer would refuse. Same hygiene and matching as
+ * `scoreByKeywords`, so it never lists a skill the score counted as met.
+ */
+export function missingNiceToHaves(cvText: string, jobDescription: string): string[] {
+  const cv = prepare(cvText);
+  const advert = prepare(stripJobBoilerplate(jobDescription));
+  if (refuseUnscorable(cv, advert) !== null) return [];
+  const job = buildJobPosting(advert);
+  if (job.essentialSkills.length === 0) return [];
+  const match = matchProfileToJob(buildCvProfile(cv), job);
+  const lower = (skill: string): string => skill.toLowerCase();
+  const essential = new Set(job.essentialSkills.map(lower));
+  const counted = new Set(match.required.map(lower));
+  return job.keySkills
+    .filter((skill) => !essential.has(lower(skill)) && !counted.has(lower(skill)))
+    .map(displaySkill);
+}
+
+/**
  * Score one CV against one job advert using keywords alone.
  *
  * Returns `Result.err` for input there is nothing to measure — never a zero
