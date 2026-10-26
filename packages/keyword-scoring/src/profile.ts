@@ -21,6 +21,7 @@
  * skills with `getSimilarTerms` internally rather than trusting a
  * pre-expanded list.
  */
+import { dropEnglishWordSkills } from './english-words';
 import { maskNegated } from './negation';
 import { foldSpelling } from './spelling';
 import { getSimilarTerms } from './similar';
@@ -230,7 +231,8 @@ export function buildJobPosting(jobText: string): JobPosting {
     // `job_summary` scans `common_skills` for the advert's stated skills; the
     // wider `skills` list is the ATS layer's vocabulary, not this one.
     // L-282: the hand-made UK list, AFTER the upstream scan (see uk-skills.ts).
-    keySkills: withUkSkills(extractSkills(text, COMMON_SKILLS), text),
+    // L-286: "the rest of the team" is not a REST requirement.
+    keySkills: dropEnglishWordSkills(withUkSkills(extractSkills(text, COMMON_SKILLS), text), text),
     essentialSkills: [],
     keyRequirements: [],
   };
@@ -251,7 +253,8 @@ export function buildCvProfile(cvText: string): CvProfile {
   // L-283: "No CPC or tachograph card yet" is not a tachograph. Skills only —
   // titles are read from the full text. See negation.ts for what is masked.
   const skillText = maskNegated(text);
-  const found = withUkSkills(extractSkills(skillText), skillText);
+  // L-286: "I go to de-escalation first" is not Go.
+  const found = dropEnglishWordSkills(withUkSkills(extractSkills(skillText), skillText), skillText);
   // L-285: NVQ Level 3 also counts for Level 2, C+E for C. CV side only.
   const skills = [...found, ...impliedUkSkills(found)];
   return {

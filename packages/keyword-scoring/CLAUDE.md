@@ -127,6 +127,12 @@ pattern), never as a quiet change to a parity expectation.
   rule is how a real skill gets hidden; any new cue needs a near-miss test
   beside it. On the eval CVs it removes exactly one skill, the right one.
 
+- **Six skills are also English words (L-286).** `english-words.ts`: go,
+  rest, react, windows, swift, rust count only when capitalised or on a line
+  with another tech skill — on both sides, not in `ats.ts`. Adding a word
+  (excel, testing, cloud, risk were left off on purpose) needs a test showing
+  the real skill, written the way real CVs write it, still matches.
+
 - **`src/eval/` is the only test that asks the user's question (L-281).** Ten
   real UK adverts, twenty invented CVs, one good and one poor fit each. It pins
   how many pairs rank the good fit strictly higher. A scoring change that
