@@ -1,10 +1,10 @@
 import { type CvAnalysis, type SuggestionPriority, type Verdict } from '@cviper/core-types';
-import { atsBand } from '@cviper/keyword-scoring';
+import { atsBand, evidenceLine } from '@cviper/keyword-scoring';
 
 import { Hint } from '../../app/Hint';
 import { cardClasses } from '../../ui';
 import { ATS_BAND_HINT, VERDICT_HINT } from '../../app/hints';
-import { displayTerms } from './acronyms';
+import { displayTerm, displayTerms } from './acronyms';
 import { ATS_BAND_TONE, ATS_BAND_WORD } from './atsBandWords';
 import { BandScale } from './BandScale';
 import { providerInSentence } from './model';
@@ -107,6 +107,39 @@ function TermChips({
   );
 }
 
+/**
+ * L-290 — where the CV shows each matched skill.
+ *
+ * A match the user can check against their own words is one they can trust;
+ * a chip that just says "SQL" asks them to take it on faith. Each line comes
+ * from `evidenceLine`, which follows the score's own rules, so the proof can
+ * never contradict the score. A skill with no literal line (common on the AI
+ * path, which names skills in its own words) is left out, never guessed, and
+ * with no line at all the block is not drawn. Folded by default: it is there
+ * for the user who wants to check, not in the way of the one who does not.
+ */
+function MatchProof({ skills, cvText }: { skills: readonly string[]; cvText: string }) {
+  const rows = skills
+    .map((skill) => ({ skill: displayTerm(skill), quote: evidenceLine(skill, cvText) }))
+    .filter((row): row is { skill: string; quote: string } => row.quote !== null);
+  if (rows.length === 0) return null;
+
+  return (
+    <details data-testid="analysis-proof" className="mt-2 text-xs">
+      <summary className="cursor-pointer text-ink-muted">Show where your CV says this</summary>
+      <ul className="mt-1.5 space-y-1">
+        {rows.map((row) => (
+          <li key={row.skill}>
+            <span className="font-medium text-ink">{row.skill}</span>
+            {' — '}
+            <q className="text-ink-muted">{row.quote}</q>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 interface AnalysisResultProps {
   readonly analysis: CvAnalysis;
   /** As stored: `keyword`, `ollama`, `anthropic`, `openai`. */
@@ -129,6 +162,11 @@ interface AnalysisResultProps {
    * because inventing a figure for it would be worse than showing none.
    */
   readonly atsKeywordScore?: number | undefined;
+  /**
+   * The text of the CV this result is for (L-290), to show the line behind
+   * each matched skill. Optional: without it the proof block is left out.
+   */
+  readonly cvText?: string | undefined;
 }
 
 export function AnalysisResult({
@@ -138,6 +176,7 @@ export function AnalysisResult({
   retried = false,
   aiAvailable,
   atsKeywordScore,
+  cvText,
 }: AnalysisResultProps) {
   const isKeyword = provider === 'keyword';
   const ats =
@@ -249,6 +288,7 @@ export function AnalysisResult({
             emptyText="None of the advert&rsquo;s skills were found on your CV."
             testId="analysis-matched-skills"
           />
+          {cvText ? <MatchProof skills={analysis.matched_skills} cvText={cvText} /> : null}
         </div>
         <div>
           <Eyebrow>What they asked for and could not find</Eyebrow>

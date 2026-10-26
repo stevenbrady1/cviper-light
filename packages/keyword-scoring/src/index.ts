@@ -27,6 +27,7 @@ export type { ScoringError, ScoringErrorCode } from './errors';
 
 export { stripJobBoilerplate } from './boilerplate';
 export { displayTerm, displayTerms } from './display-names';
+export { EVIDENCE_MAX_CHARS, evidenceLine } from './evidence';
 
 // ── The gates that run BEFORE the score and are never averaged into it ──────
 

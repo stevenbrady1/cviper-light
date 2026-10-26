@@ -378,3 +378,85 @@ describe('the ATS keyword number (L-196)', () => {
     expect(block.getAttribute('style')).toBeNull();
   });
 });
+
+/**
+ * L-290 — the proof behind each matched skill.
+ *
+ * A user can check a match against their own words instead of trusting it.
+ * Only lines the score itself would credit are shown, and a skill with no
+ * such line is left out rather than given a guessed one.
+ */
+describe('AnalysisResult — where your CV shows each matched skill (L-290)', () => {
+  const CV = [
+    'No SQL at my first job.',
+    '- Daily SQL reporting for the trading team.',
+    '- Python scripts for the monthly close.',
+  ].join('\n');
+
+  it('lists the CV line for each matched skill', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        cvText={CV}
+      />,
+    );
+    const proof = screen.getByTestId('analysis-proof');
+    expect(within(proof).getByText('Daily SQL reporting for the trading team.')).toBeTruthy();
+    expect(within(proof).getByText('Python scripts for the monthly close.')).toBeTruthy();
+    // Spelled like the chips above it.
+    expect(within(proof).getByText('SQL')).toBeTruthy();
+  });
+
+  // NEGATIVE — the negated line is never offered as proof.
+  it('does not quote the line that says the skill is missing', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        cvText={CV}
+      />,
+    );
+    expect(within(screen.getByTestId('analysis-proof')).queryByText(/No SQL/)).toBeNull();
+  });
+
+  // NEGATIVE — no CV text (an older result, a missing CV): no block at all.
+  it('shows nothing without the CV text', () => {
+    render(
+      <AnalysisResult analysis={keywordAnalysis()} provider="keyword" model="m" aiAvailable />,
+    );
+    expect(screen.queryByTestId('analysis-proof')).toBeNull();
+  });
+
+  // BOUNDARY — a skill with no literal line is left out, not guessed.
+  it('leaves out a skill the CV text does not literally show', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis({ matched_skills: ['Sql', 'Stakeholder management experience'] })}
+        provider="anthropic"
+        model="m"
+        aiAvailable
+        cvText={CV}
+      />,
+    );
+    const proof = screen.getByTestId('analysis-proof');
+    expect(within(proof).getAllByRole('listitem')).toHaveLength(1);
+  });
+
+  it('shows nothing when no matched skill has a line', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis({ matched_skills: ['Kubernetes'] })}
+        provider="keyword"
+        model="m"
+        aiAvailable
+        cvText={CV}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-proof')).toBeNull();
+  });
+});
