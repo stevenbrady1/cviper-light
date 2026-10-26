@@ -223,6 +223,55 @@ describe('which boards get contacted', () => {
   });
 });
 
+/**
+ * L-276 — the keyed boards stay out of the first run.
+ *
+ * A machine with no job-board key gets the free feeds and the board buttons,
+ * and no row of disabled Adzuna/Reed boxes asking for keys from two other
+ * sites. The keys are still one fold away in Settings ("Job-board keys
+ * (optional)"), and the moment either key exists the row comes back exactly
+ * as it was, reasons and Settings links included.
+ */
+describe('keyed boards on a machine with no job-board key (L-276)', () => {
+  it('shows no keyed-board row when neither key is saved', async () => {
+    renderSearch({ keys: { adzuna: 'missing', reed: 'missing' } });
+    await screen.findByTestId('search-empty');
+    await vi.waitFor(() => expect(screen.queryByTestId('provider-toggles')).toBeNull());
+  });
+
+  it('still offers the free feeds and the board buttons with no key', async () => {
+    renderSearch({ keys: { adzuna: 'missing', reed: 'missing' } });
+    await screen.findByTestId('search-empty');
+    expect(screen.getByTestId('keyless-source-guardian')).toBeTruthy();
+    expect(screen.getByTestId('keyless-bar')).toBeTruthy();
+  });
+
+  it('negative: the empty state does not point at boards the screen no longer shows', async () => {
+    renderSearch({ keys: { adzuna: 'missing', reed: 'missing' } });
+    const empty = await screen.findByTestId('search-empty');
+    await vi.waitFor(() => expect(screen.queryByTestId('provider-toggles')).toBeNull());
+    expect(empty.textContent ?? '').not.toMatch(/key/i);
+  });
+
+  it('negative: hides the row while the credential store has not answered', async () => {
+    renderSearch({ keys: { adzuna: 'unreadable', reed: 'unreadable' } });
+    await screen.findByTestId('search-empty');
+    expect(screen.queryByTestId('provider-toggles')).toBeNull();
+  });
+
+  it('boundary: one saved key brings the whole row back, the other board with its link', async () => {
+    renderSearch({ keys: { adzuna: 'missing', reed: 'configured' } });
+    await screen.findByTestId('provider-toggles');
+    expect(await screen.findByTestId('provider-settings-adzuna')).toBeTruthy();
+  });
+
+  it('boundary: half a credential counts as set up, so its fix stays on screen', async () => {
+    renderSearch({ keys: { adzuna: 'incomplete', reed: 'missing' } });
+    const reason = await screen.findByTestId('provider-reason-adzuna');
+    expect(reason.textContent ?? '').toContain('one of its two');
+  });
+});
+
 describe('the results', () => {
   it('shows title, company, location, salary, date, contract type and the source', async () => {
     const port = createFakeSearchPort();

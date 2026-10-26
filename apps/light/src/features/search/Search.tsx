@@ -57,6 +57,7 @@ import {
   clusterSiblings,
   externalKey,
   formIsValid,
+  hasAnyJobBoardKey,
   providerAvailability,
   searchDisabledReason,
   toSearchInput,
@@ -715,15 +716,24 @@ export function Search({
               </div>
             </div>
 
-            <div className="mt-3">
-              <ProviderToggles
-                keyStates={keyStates}
-                chosen={chosen}
-                onToggle={onToggle}
-                onOpenSettings={onOpenSettings ?? (() => undefined)}
-                disabled={running}
-              />
-            </div>
+            {/*
+              Only once a job-board key exists (L-276). With none, the free
+              feeds and the board buttons are the whole search, and the keys
+              are one fold down in Settings rather than a row of greyed boxes
+              on the first screen. The row's own rule — a board with no key is
+              disabled and says why — still holds whenever the row is shown.
+            */}
+            {hasAnyJobBoardKey(keyStates) ? (
+              <div className="mt-3">
+                <ProviderToggles
+                  keyStates={keyStates}
+                  chosen={chosen}
+                  onToggle={onToggle}
+                  onOpenSettings={onOpenSettings ?? (() => undefined)}
+                  disabled={running}
+                />
+              </div>
+            ) : null}
 
             {/*
               Under the keyed boards, not instead of them. The two are different
@@ -938,8 +948,8 @@ export function Search({
               </div>
               <p className="font-medium text-ink">Nothing looked at yet.</p>
               <p className="mt-1 text-ink-muted">
-                Type a job title and press Search: the free feeds need no key at all. Or search a
-                whole job board with the buttons above.
+                Type a job title and press Search to see the newest adverts from the free feeds. Or
+                open the same search on a whole job board with the buttons above.
               </p>
             </div>
           ) : (
