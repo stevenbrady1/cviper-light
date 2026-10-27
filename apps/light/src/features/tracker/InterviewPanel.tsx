@@ -98,12 +98,20 @@ function latestOfKind(documents: readonly Document[], kind: DocumentKind): Docum
   return matching[matching.length - 1] ?? null;
 }
 
-/** A section heading, in the app's eyebrow style — as `AnalysisResult` draws it. */
-function Eyebrow({ children }: { children: React.ReactNode }) {
+/**
+ * A section heading, in the app's eyebrow style — as `AnalysisResult` draws it.
+ *
+ * The panel sits under the detail pane's h2 (the job title), so "Interview" is
+ * an h3 and the parts of the pack under it are h4. Before L-297 every eyebrow
+ * here was an h4, so a screen-reader user moving by heading went h2 → h4 and
+ * met the pack's parts as siblings of the panel itself. Found by the axe pass.
+ */
+function Eyebrow({ children, level = 4 }: { children: React.ReactNode; level?: 3 | 4 }) {
+  const Heading = level === 3 ? 'h3' : 'h4';
   return (
-    <h4 className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase">
+    <Heading className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase">
       {children}
-    </h4>
+    </Heading>
   );
 }
 
@@ -317,7 +325,7 @@ export function InterviewPanel({
 
   return (
     <div data-testid="detail-interview" className="space-y-3 border-t border-line pt-3">
-      <Eyebrow>Interview</Eyebrow>
+      <Eyebrow level={3}>Interview</Eyebrow>
 
       {/*
         The picker only appears when there is a choice to make, exactly as the

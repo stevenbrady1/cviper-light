@@ -66,12 +66,18 @@ const PRIORITY_TONE: Record<SuggestionPriority, string> = {
 
 const PRIORITY_ORDER: readonly SuggestionPriority[] = ['high', 'medium', 'low'];
 
-/** A section heading, in the app's eyebrow style. */
+/**
+ * A section heading, in the app's eyebrow style.
+ *
+ * An h2: the result sits straight under the screen's h1 ("Analysis"), and a
+ * screen-reader user moving by heading met h1 then h3 — a skipped level that
+ * reads as a missing section (L-297, found by the axe pass).
+ */
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase">
+    <h2 className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase">
       {children}
-    </h3>
+    </h2>
   );
 }
 
