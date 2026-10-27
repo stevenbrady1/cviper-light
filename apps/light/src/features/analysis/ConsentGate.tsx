@@ -69,16 +69,32 @@ export function ConsentGate({ kind, onAccept, onDecline }: ConsentGateProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="consent-gate-title"
+        aria-describedby="consent-gate-body consent-gate-sensitive"
         data-testid="analysis-consent-gate"
         className="w-full max-w-sm rounded-card bg-card p-5 shadow-overlay"
       >
         <h2 id="consent-gate-title" className="font-semibold text-ink">
           {`Send this CV to ${label}?`}
         </h2>
-        <p className="mt-1 text-ink-muted">
+        <p id="consent-gate-body" className="mt-1 text-ink-muted">
           {`Checking it this way sends the text of your CV and the job advert to ${label}, ` +
             `${how}. This is the moment your CV leaves this machine — ` +
             'nothing is sent until you say so, and you can withdraw this any time.'}
+        </p>
+        {/*
+          L-296 (from L-234): CVs often carry details an employer does not
+          need, and health is special-category data under UK GDPR. Said here
+          because this is the last moment the user can act on it. A tip, not a
+          warning: no role, no warning colour. Only the CV's text is sent, so a
+          photo is not mentioned.
+        */}
+        <p
+          id="consent-gate-sensitive"
+          data-testid="analysis-consent-sensitive"
+          className="mt-2 text-ink-muted"
+        >
+          Tip: CVs often hold things an employer does not need, like your date of birth, health
+          details or nationality. You can take them out of your CV before you send it.
         </p>
 
         <div className="mt-4 flex items-center justify-end gap-2">
