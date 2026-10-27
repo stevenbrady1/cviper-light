@@ -292,9 +292,7 @@ function WelcomeCard({ card, availability, browser, onDismiss }: WelcomeCardProp
 
       {card.id === 'analysis' ? (
         <p data-testid="welcome-local-model" className="mt-2 text-xs text-ink-muted">
-          {availability === null
-            ? 'Looking for a local model on this machine…'
-            : localModelLine(availability)}
+          {availability === null ? 'Looking for free AI on this PC…' : localModelLine(availability)}
           {availability !== null && ollamaNeedsChatModel(availability) ? (
             <OllamaDownloadLink idPrefix="welcome" browser={browser} />
           ) : null}

@@ -192,7 +192,11 @@ describe('the empty board', () => {
   it('says the board needs no account and no key', async () => {
     await renderBoard();
 
-    expect(screen.getByTestId('tracker-empty').textContent).toContain('no API key');
+    // L-295: "no set-up", not "no API key" — a first-time user does not
+    // know what an API key is, and the board needs nothing at all.
+    const text = screen.getByTestId('tracker-empty').textContent;
+    expect(text).toContain('no account and no set-up');
+    expect(text).not.toMatch(/\bAPI\b/);
   });
 
   it('opens the form from the empty state', async () => {

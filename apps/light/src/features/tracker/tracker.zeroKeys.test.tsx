@@ -85,7 +85,7 @@ describe('the tracker on a machine with no keys and no Ollama', () => {
 
     // --- The board is there, and it is inviting rather than apologetic ------
     const empty = await screen.findByTestId('tracker-empty');
-    expect(empty.textContent).toContain('no API key');
+    expect(empty.textContent).toContain('no account and no set-up');
 
     // --- Add ---------------------------------------------------------------
     await user.click(screen.getByTestId('tracker-empty-add'));

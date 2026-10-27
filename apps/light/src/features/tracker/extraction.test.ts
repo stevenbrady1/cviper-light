@@ -86,10 +86,17 @@ describe('extractionOptions — what this machine can offer', () => {
 });
 
 describe('the note shown when nothing is configured', () => {
-  it('names the free route first and offers the manual one in the same breath', () => {
-    expect(NO_PROVIDER_NOTE).toContain('Ollama');
-    expect(NO_PROVIDER_NOTE).toContain('your own key');
+  // L-295: plain words. It still says one kind of AI is free, and still offers
+  // the manual route in the same breath; Settings explains the two kinds.
+  it('says AI is needed, that one kind is free, and offers the manual route', () => {
+    expect(NO_PROVIDER_NOTE).toMatch(/needs AI/);
+    expect(NO_PROVIDER_NOTE).toContain('Settings');
+    expect(NO_PROVIDER_NOTE).toMatch(/free/);
     expect(NO_PROVIDER_NOTE).toMatch(/add the job manually/i);
+  });
+
+  it('negative: no "Ollama", "your own key" or "AI provider" for a user who has none', () => {
+    expect(NO_PROVIDER_NOTE).not.toMatch(/Ollama|your own key|AI provider|\bAPI\b/i);
   });
 
   it('does not blame the user or call the machine broken', () => {

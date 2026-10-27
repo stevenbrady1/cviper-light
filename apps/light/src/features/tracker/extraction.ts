@@ -38,12 +38,14 @@ export function extractionOptions(availability: Availability): ProviderOption[] 
 /**
  * What to say when there is no AI on this machine at all.
  *
- * Names both routes out — the free one first — and never implies the user has
- * done something wrong. Adding a job by hand is a first-class way to use this
- * app, not a consolation prize, so it is offered in the same breath.
+ * Says AI is needed and that one kind is free, in plain words (L-295: no
+ * "Ollama", "provider" or "your own key" — Settings explains the two
+ * kinds), and never implies the user has done something wrong. Adding a job
+ * by hand is a first-class way to use this app, not a consolation prize, so it
+ * is offered in the same breath.
  */
 export const NO_PROVIDER_NOTE =
-  'Extraction needs an AI provider (free with Ollama, or your own key) — or add the job manually.';
+  'Reading the advert needs AI — add it in Settings (one kind is free), or add the job manually.';
 
 /**
  * What to say while a local model is thinking.

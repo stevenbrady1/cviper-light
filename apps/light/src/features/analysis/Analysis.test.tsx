@@ -209,7 +209,9 @@ describe('the empty screen', () => {
   it('says nothing has been checked and offers the basic match', async () => {
     await renderView();
 
-    expect(screen.getByTestId('analysis-empty').textContent).toContain('no API key');
+    // L-295: plain words — the promise is the same, "API key" is jargon.
+    expect(screen.getByTestId('analysis-empty').textContent).toContain('no account and no set-up');
+    expect(screen.getByTestId('analysis-empty').textContent).not.toMatch(/\bAPI\b/);
     const picker = screen.getByTestId('analysis-provider') as HTMLSelectElement;
     expect(picker.options).toHaveLength(1);
     expect(picker.value).toBe('keyword');

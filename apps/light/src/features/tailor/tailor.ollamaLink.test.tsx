@@ -73,7 +73,7 @@ describe('the Ollama hint on Tailor', () => {
     probeAnswers(null);
     renderTailor();
 
-    await screen.findByText('No local model or key set up');
+    await screen.findByText('No AI set up yet');
     expect(screen.queryByTestId('tailor-ollama-hint')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Open Ollama’s download page' })).toBeNull();
   });

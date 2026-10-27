@@ -975,7 +975,7 @@ function EmptyBoard({
         <p className="font-medium text-ink">Start with the last job you applied to.</p>
         <p className="mt-1 text-ink-muted">
           The board keeps every application in one place and shows you which ones have gone quiet.
-          It needs no account and no API key.
+          It needs no account and no set-up.
         </p>
         <div className="mt-4 flex items-center justify-center gap-2">
           <AddApplicationButton testId="tracker-empty-add" disabled={disabled} onClick={onAdd} />

@@ -71,7 +71,7 @@ import { runInterview } from './runInterview';
 const TICK_MS = 1000;
 
 /** What to say when there is no AI on this machine at all. */
-export const NO_AI_NOTE = 'Needs a local model or your own key.';
+export const NO_AI_NOTE = 'Needs AI — add it in Settings.';
 
 export interface InterviewPanelProps {
   readonly entry: TrackerEntry;

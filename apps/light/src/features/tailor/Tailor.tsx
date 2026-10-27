@@ -1214,7 +1214,7 @@ export function Tailor({
           >
             {aiAvailable ? null : (
               <option value="">
-                {availabilityRead ? 'No local model or key set up' : 'Checking what is set up…'}
+                {availabilityRead ? 'No AI set up yet' : 'Checking what is set up…'}
               </option>
             )}
             {options.map((option) => (
@@ -1225,7 +1225,7 @@ export function Tailor({
           </select>
           <p data-testid="tailor-provider-note" className="mt-1 text-xs text-ink-faint">
             {selectedOption?.note ??
-              'Writing needs a model. A local one keeps your CV on this PC; your own key sends it to the provider you chose.'}
+              'Writing needs AI. AI on this PC keeps your CV here; AI from a company sends it to that company.'}
           </p>
 
           {localModelHint === null ? null : (
@@ -1290,7 +1290,7 @@ export function Tailor({
                     Add an AI key
                   </button>
                 )}
-                <span>Your own key, from the AI company you choose.</span>
+                <span>You get the key from the AI company you choose.</span>
               </li>
               <li data-testid="tailor-free-local">
                 <span className="font-medium text-ink">Use a free AI on your own PC.</span> A model
