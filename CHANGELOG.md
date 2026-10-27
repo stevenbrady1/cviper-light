@@ -24,6 +24,8 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Added
 
+- Nice-to-haves you do not show are listed again, but not as gaps (L-292). Since L-289 a missed "desirable" costs nothing and is not in "What they asked for and could not find" — right for the score, but you were no longer told about it. A short list under it now says "Nice to have, not on your CV — these do not lower your score." Basic match only, and only when the advert marks something as desirable.
+
 - A confidence line under every basic-match score (L-291): "Confidence: low — based on only 2 requirements found in the advert. Read the advert yourself before relying on it.", or "Confidence: high — based on 7 requirements found in the advert." A 70 built on two requirements and a 70 built on ten used to look the same. It counts exactly what the score counted, so "low" is exactly when the score is also held below "strong". It describes how much the check had to go on, not how good your fit is, so it is never shown in a warning colour. It is not shown on AI results, whose score does not come from the word list. Low is fewer than 3, medium 3 to 5, high 6 or more; the 6 is a judgement, easy to move.
 
 - Proof behind every match (L-290). Under "What you have", a folded "Show where your CV says this" lists each matched skill next to the line of your CV it came from, so you can check a match instead of taking it on trust. The lines follow the same rules as the score: a line saying you lack a skill ("No SQL at my first job") is never shown as proof, and a skill with no line the check can point to is left out rather than guessed. It works for the sample too, and for AI results wherever the skill's name appears in your CV. Nothing new is saved.
