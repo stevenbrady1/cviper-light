@@ -23,7 +23,7 @@ const RESUME_TEXT = `{
     }
   ],
   "basics": {
-    "name": "Steve Brady"
+    "name": "Jamie Lewis"
   },
   "meta": {
     "version": "v1",
@@ -37,12 +37,12 @@ const RESUME_TEXT = `{
 
 const utf8 = (text: string) => new TextEncoder().encode(text);
 
-function cvFrom(jsonResume: string | null, name = 'Steve Brady CV.json'): Cv {
+function cvFrom(jsonResume: string | null, name = 'Jamie Lewis CV.json'): Cv {
   return {
     id: 'cv-42',
     name,
-    file_path: 'C:\\Users\\steve\\Documents\\' + name,
-    extracted_text: 'Steve Brady SQL',
+    file_path: 'C:\\Users\\jamie\\Documents\\' + name,
+    extracted_text: 'Jamie Lewis SQL',
     created_at: '2026-09-08T09:00:00.000Z',
     json_resume: jsonResume,
   };
@@ -84,8 +84,8 @@ describe('originalJsonResume', () => {
 
 describe('jsonResumeFileName', () => {
   it('happy: swaps the extension for .json, keeping the name', () => {
-    expect(jsonResumeFileName('Steve Brady CV.json')).toBe('Steve Brady CV.json');
-    expect(jsonResumeFileName('Steve Brady CV.pdf')).toBe('Steve Brady CV.json');
+    expect(jsonResumeFileName('Jamie Lewis CV.json')).toBe('Jamie Lewis CV.json');
+    expect(jsonResumeFileName('Jamie Lewis CV.pdf')).toBe('Jamie Lewis CV.json');
     expect(jsonResumeFileName('resume.JSON')).toBe('resume.json');
   });
 

@@ -36,7 +36,7 @@ function existingDatabase(): DatabaseSync {
   for (const file of BEFORE) db.exec(sqlOf(file));
   db.exec(`
     INSERT INTO cvs (id, name, file_path, extracted_text, created_at, json_resume)
-      VALUES ('cv-1', 'CV.docx', NULL, 'Steve Brady. Credit risk.', '2026-08-01T09:00:00.000Z', NULL);
+      VALUES ('cv-1', 'CV.docx', NULL, 'Jamie Lewis. Credit risk.', '2026-08-01T09:00:00.000Z', NULL);
   `);
   return db;
 }
@@ -69,7 +69,7 @@ describe('0008: cvs.original_text (L-218)', () => {
       id: 'cv-1',
       name: 'CV.docx',
       file_path: null,
-      extracted_text: 'Steve Brady. Credit risk.',
+      extracted_text: 'Jamie Lewis. Credit risk.',
       created_at: '2026-08-01T09:00:00.000Z',
       json_resume: null,
       original_text: null,

@@ -52,7 +52,7 @@ const LETTER: CoverLetter = {
     'Having spent eight years in credit risk, I was drawn to the Credit Risk Analyst role.',
     'At Lloyds Banking Group I cut IFRS 9 model run time by 40%.',
   ],
-  sign_off: 'Yours sincerely,\nSteve Brady',
+  sign_off: 'Yours sincerely,\nJamie Lewis',
 };
 
 // ── A zip reader the size of the format a test needs ─────────────────────────
@@ -124,7 +124,7 @@ const FORBIDDEN_IN_BODY = ['<w:tbl', '<w:drawing', '<w:pict', '<w:txbxContent', 
 
 describe('buildCvDocx', () => {
   it('is a zip with a Word document inside', async () => {
-    const bytes = await buildCvDocx(CV, 'Steve Brady');
+    const bytes = await buildCvDocx(CV, 'Jamie Lewis');
 
     // PK\x03\x04: the local-header signature every zip opens with.
     expect([...bytes.subarray(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]);
@@ -134,9 +134,9 @@ describe('buildCvDocx', () => {
   });
 
   it("renders the sections in MANDATORY_STRUCTURE's order, headings and all", async () => {
-    const lines = documentText(await buildCvDocx(CV, 'Steve Brady'));
+    const lines = documentText(await buildCvDocx(CV, 'Jamie Lewis'));
 
-    const name = lineIndex(lines, 'Steve Brady');
+    const name = lineIndex(lines, 'Jamie Lewis');
     const summary = lineIndex(lines, 'PROFESSIONAL SUMMARY');
     const skills = lineIndex(lines, 'KEY SKILLS');
     const experience = lineIndex(lines, 'PROFESSIONAL EXPERIENCE');
@@ -165,7 +165,7 @@ describe('buildCvDocx', () => {
     const lines = documentText(await buildCvDocx(CV, null));
 
     expect(lines[0]).toBe('PROFESSIONAL SUMMARY');
-    expect(lines).not.toContain('Steve Brady');
+    expect(lines).not.toContain('Jamie Lewis');
   });
 
   it('omits an empty section rather than rendering a bare heading', async () => {
@@ -180,12 +180,12 @@ describe('buildCvDocx', () => {
   });
 
   it('negative: a CV with zero roles is still a document', async () => {
-    const bytes = await buildCvDocx({ ...CV, experience: [] }, 'Steve Brady');
+    const bytes = await buildCvDocx({ ...CV, experience: [] }, 'Jamie Lewis');
 
     const lines = documentText(bytes);
     expect(lines).not.toContain('PROFESSIONAL EXPERIENCE');
     expect(lines).toEqual([
-      'Steve Brady',
+      'Jamie Lewis',
       'PROFESSIONAL SUMMARY',
       CV.summary,
       'KEY SKILLS',
@@ -208,7 +208,7 @@ describe('buildCvDocx', () => {
   });
 
   it('is ATS-safe: no table, no drawing, no text box, no second column', async () => {
-    const xml = documentXml(await buildCvDocx(CV, 'Steve Brady'));
+    const xml = documentXml(await buildCvDocx(CV, 'Jamie Lewis'));
 
     for (const forbidden of FORBIDDEN_IN_BODY) {
       expect(xml).not.toContain(forbidden);
@@ -248,7 +248,7 @@ describe('buildCoverLetterDocx', () => {
       LETTER.paragraphs[1],
       // A line break inside the sign-off stays a line break inside one
       // paragraph: the name sits under the valediction, not a blank line away.
-      'Yours sincerely,Steve Brady',
+      'Yours sincerely,Jamie Lewis',
     ]);
     expect(documentXml(await buildCoverLetterDocx(LETTER))).toContain('<w:br/>');
   });
@@ -256,7 +256,7 @@ describe('buildCoverLetterDocx', () => {
   it('negative: a letter with no paragraphs is still greeting and sign-off', async () => {
     const lines = documentText(await buildCoverLetterDocx({ ...LETTER, paragraphs: [] }));
 
-    expect(lines).toEqual(['Dear Hiring Manager,', 'Yours sincerely,Steve Brady']);
+    expect(lines).toEqual(['Dear Hiring Manager,', 'Yours sincerely,Jamie Lewis']);
   });
 
   it('boundary: blank blocks are dropped rather than rendered as empty paragraphs', async () => {

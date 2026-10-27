@@ -33,7 +33,7 @@ const { createFakeFilePort } = await import('../../platform/test/fakeFilePort');
 
 const NOW = new Date('2026-08-19T09:00:00.000Z');
 
-const CV_TEXT = `Steve Brady
+const CV_TEXT = `Jamie Lewis
 Senior Credit Risk Analyst, Lloyds Banking Group, London, Jan 2020 – Present
 - Built IFRS 9 impairment models in Python, cutting run time by 40%.
 Analyst, Barclays, 2016 – 2019
@@ -146,7 +146,7 @@ const LETTER = {
     'Having spent eight years in credit risk, I was drawn to the Credit Risk Analyst role.',
     'At Lloyds Banking Group I cut IFRS 9 model run time by 40%.',
   ],
-  sign_off: 'Yours sincerely,\nSteve Brady',
+  sign_off: 'Yours sincerely,\nJamie Lewis',
 };
 
 function ollamaEnvelope(content: unknown): ProviderHttpResponse {
@@ -489,7 +489,7 @@ describe('saving', () => {
     await user.click(screen.getByTestId('tailor-run'));
     await screen.findByTestId('tailor-result');
 
-    filePort.nextSavePath('C:\\Users\\steve\\Documents\\Tailored CV.txt');
+    filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Tailored CV.txt');
     await user.click(screen.getByTestId('tailor-save-text'));
 
     const message = await screen.findByTestId('tailor-save-message');
@@ -523,11 +523,11 @@ describe('saving as a PDF (L-201)', () => {
     await user.click(screen.getByTestId('tailor-run'));
     await screen.findByTestId('tailor-result');
 
-    filePort.nextSavePath('C:\\Users\\steve\\Documents\\Tailored CV.pdf');
+    filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Tailored CV.pdf');
     await user.click(screen.getByTestId('tailor-save-pdf-cv'));
 
     const message = await screen.findByTestId('tailor-save-message');
-    expect(message.textContent).toBe('Saved to C:\\Users\\steve\\Documents\\Tailored CV.pdf.');
+    expect(message.textContent).toBe('Saved to C:\\Users\\jamie\\Documents\\Tailored CV.pdf.');
     const written = filePort.writtenBytes()[0];
     expect(written?.extension).toBe('pdf');
     expect(written?.suggestedName).toBe('Tailored CV — Credit Risk Analyst.pdf');
@@ -543,7 +543,7 @@ describe('saving as a PDF (L-201)', () => {
     await user.click(screen.getByTestId('tailor-letter-run'));
     await screen.findByTestId('tailor-letter');
 
-    filePort.nextSavePath('C:\\Users\\steve\\Documents\\Cover letter.pdf');
+    filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Cover letter.pdf');
     await user.click(screen.getByTestId('tailor-save-pdf-letter'));
 
     await screen.findByTestId('tailor-save-message');
@@ -562,12 +562,12 @@ describe('saving as a PDF (L-201)', () => {
     await user.click(screen.getByTestId('tailor-letter-run'));
     await screen.findByTestId('tailor-letter');
 
-    filePort.nextSavePath('C:\\Users\\steve\\Documents\\Cover letter.pdf');
+    filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Cover letter.pdf');
     await user.click(screen.getByTestId('tailor-save-pdf-letter'));
 
     const message = await screen.findByTestId('tailor-save-message');
     expect(message.textContent).toContain(
-      'Saved to C:\\Users\\steve\\Documents\\Cover letter.pdf.',
+      'Saved to C:\\Users\\jamie\\Documents\\Cover letter.pdf.',
     );
     expect(message.textContent).toContain('И в а н');
     expect(message.textContent).toContain('Word');
@@ -616,7 +616,7 @@ describe('saving as a Word document (L-165)', () => {
     await user.click(screen.getByTestId('tailor-run'));
     await screen.findByTestId('tailor-result');
 
-    filePort.nextSavePath('C:\\Users\\steve\\Documents\\Tailored CV.docx');
+    filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Tailored CV.docx');
     await user.click(screen.getByTestId('tailor-save-docx-cv'));
 
     const message = await screen.findByTestId('tailor-save-message');
@@ -638,7 +638,7 @@ describe('saving as a Word document (L-165)', () => {
     await user.click(screen.getByTestId('tailor-letter-run'));
     await screen.findByTestId('tailor-letter');
 
-    filePort.nextSavePath('C:\\Users\\steve\\Documents\\Cover letter.docx');
+    filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Cover letter.docx');
     await user.click(screen.getByTestId('tailor-save-docx-letter'));
 
     await screen.findByTestId('tailor-save-message');
@@ -714,7 +714,7 @@ describe('while a save window is open (L-217)', () => {
     expect(screen.getByTestId('tailor-save-pdf-cv')).toHaveProperty('disabled', true);
     expect(screen.getByTestId('tailor-save-application')).toHaveProperty('disabled', true);
 
-    held.answer('C:\\Users\\steve\\Documents\\Tailored CV.pdf');
+    held.answer('C:\\Users\\jamie\\Documents\\Tailored CV.pdf');
     await screen.findByTestId('tailor-save-message');
     expect(screen.queryByTestId('tailor-save-choosing')).toBeNull();
     expect(screen.getByTestId('tailor-save-pdf-cv')).toHaveProperty('disabled', false);

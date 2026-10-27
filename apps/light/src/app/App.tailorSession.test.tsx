@@ -38,7 +38,7 @@ const { createFakeBrowserPort } = await import('../platform/test/fakeBrowserPort
 
 const BOTH_KEYS: Record<JobProviderId, 'configured'> = { adzuna: 'configured', reed: 'configured' };
 
-const CV_TEXT = `Steve Brady
+const CV_TEXT = `Jamie Lewis
 Senior Credit Risk Analyst, Lloyds Banking Group, London, Jan 2020 – Present
 - Built IFRS 9 impairment dashboards in Python for the credit committee.
 BSc Mathematics, University of Leeds, 2016`;

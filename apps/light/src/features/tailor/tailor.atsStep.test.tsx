@@ -31,7 +31,7 @@ const { createFakeFilePort } = await import('../../platform/test/fakeFilePort');
 
 const NOW = new Date('2026-08-19T09:00:00.000Z');
 
-const CV_TEXT = `Steve Brady
+const CV_TEXT = `Jamie Lewis
 Senior Credit Risk Analyst, Lloyds Banking Group, London, Jan 2020 – Present
 - Built IFRS 9 impairment models in Python, cutting run time by 40%.
 Analyst, Barclays, 2016 – 2019

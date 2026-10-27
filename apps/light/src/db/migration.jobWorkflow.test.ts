@@ -49,7 +49,7 @@ function existingDatabase(): DatabaseSync {
       VALUES ('job-1', 'manual', 'Credit Risk Analyst', 'Barclays', 'SQL and Python.', '2026-09-01T09:00:00.000Z'),
              ('job-2', 'reed', 'Quant Developer', 'Man Group', NULL, '2026-09-02T09:00:00.000Z');
     INSERT INTO cvs (id, name, file_path, extracted_text, created_at)
-      VALUES ('cv-1', 'CV.docx', NULL, 'Steve Brady. Credit risk.', '2026-08-01T09:00:00.000Z');
+      VALUES ('cv-1', 'CV.docx', NULL, 'Jamie Lewis. Credit risk.', '2026-08-01T09:00:00.000Z');
     INSERT INTO analyses (id, cv_id, job_id, provider, model, match_score, result_json, created_at)
       VALUES ('an-1', 'cv-1', 'job-1', 'keyword', 'keyword', 64, '{}', '2026-09-03T09:00:00.000Z');
     INSERT INTO interview_substages (id, name, position) VALUES ('sub-1', 'HR Screen', 0);

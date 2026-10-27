@@ -74,7 +74,7 @@ const LETTER: CoverLetter = {
     'Having spent eight years in credit risk, I was drawn to the Credit Risk Analyst role.',
     'At Lloyds Banking Group I cut IFRS 9 model run time by 40%.',
   ],
-  sign_off: 'Yours sincerely,\nSteve Brady',
+  sign_off: 'Yours sincerely,\nJamie Lewis',
 };
 
 /** A CV long enough for three pages or more: twelve roles of six bullets. */
@@ -121,10 +121,10 @@ function asText(bytes: Uint8Array): string {
 
 describe('buildCvPdf — read back by the app’s own PDF reader', () => {
   it('happy: the same words, in the same order, as the text export', async () => {
-    const built = buildCvPdf(CV, 'Steve Brady');
+    const built = buildCvPdf(CV, 'Jamie Lewis');
     const read = await readBack(built.bytes);
 
-    expect(words(read.text)).toBe(words(renderTailoredCv(CV, 'Steve Brady')));
+    expect(words(read.text)).toBe(words(renderTailoredCv(CV, 'Jamie Lewis')));
     expect(built.missing).toEqual([]);
   });
 
@@ -159,11 +159,11 @@ describe('buildCvPdf — read back by the app’s own PDF reader', () => {
 
   it('boundary: a long CV runs to three pages or more, and every bullet survives', async () => {
     const cv = longCv();
-    const read = await readBack(buildCvPdf(cv, 'Steve Brady').bytes);
+    const read = await readBack(buildCvPdf(cv, 'Jamie Lewis').bytes);
 
     expect(read.pageCount).toBeGreaterThanOrEqual(3);
     expect(read.warnings).toEqual([]);
-    expect(words(read.text)).toBe(words(renderTailoredCv(cv, 'Steve Brady')));
+    expect(words(read.text)).toBe(words(renderTailoredCv(cv, 'Jamie Lewis')));
   });
 
   it('negative: characters the built-in font cannot draw are named, not dropped quietly', async () => {
@@ -238,14 +238,14 @@ describe('buildCoverLetterPdf', () => {
     const read = await readBack(buildCoverLetterPdf(LETTER).bytes);
 
     expect(words(read.text)).toBe(words(renderCoverLetter(LETTER)));
-    expect(read.text.split('\n').map((line) => line.trim())).toContain('Steve Brady');
+    expect(read.text.split('\n').map((line) => line.trim())).toContain('Jamie Lewis');
   });
 });
 
 // ── ATS-safe, by forbid-list ────────────────────────────────────────────────
 
 describe('ATS-safe (forbid-list)', () => {
-  const file = asText(buildCvPdf(longCv(), 'Steve Brady').bytes);
+  const file = asText(buildCvPdf(longCv(), 'Jamie Lewis').bytes);
 
   it('is a PDF from its first byte to its last', () => {
     expect(file.startsWith('%PDF-1.')).toBe(true);
@@ -265,7 +265,7 @@ describe('ATS-safe (forbid-list)', () => {
 });
 
 describe('layoutBlocks', () => {
-  const pages = layoutBlocks(cvBlocks(longCv(), 'Steve Brady'));
+  const pages = layoutBlocks(cvBlocks(longCv(), 'Jamie Lewis'));
   const lines = pages.flat();
 
   it('one column: every line starts at the margin, or at the bullet indent', () => {
@@ -297,7 +297,7 @@ describe('layoutBlocks', () => {
     for (let roles = 1; roles <= 20; roles += 1) {
       const cv = { ...longCv(), experience: longCv().experience.concat(longCv().experience) };
       const laidOut = layoutBlocks(
-        cvBlocks({ ...cv, experience: cv.experience.slice(0, roles) }, 'Steve Brady'),
+        cvBlocks({ ...cv, experience: cv.experience.slice(0, roles) }, 'Jamie Lewis'),
       );
       for (const page of laidOut.slice(0, -1)) {
         const last = page.at(-1);

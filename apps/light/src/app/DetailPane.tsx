@@ -61,7 +61,7 @@ import { useViewportClass } from './viewport';
  *
  * `break-words` is not decoration. Without it the ONE subtitle that is a value
  * rather than a sentence — the CV filename on Past checks — spills straight out
- * of the pane the moment it has no spaces in it (`Steven_Brady_Senior_…docx`
+ * of the pane the moment it has no spaces in it (`Jordan_Lewis_Senior_…docx`
  * measured 530px in a 287px box and put a horizontal scrollbar on the window).
  * Removing a clip without it trades a hidden sentence for a broken layout.
  *

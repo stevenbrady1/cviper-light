@@ -52,8 +52,8 @@ const ADVERT =
 
 const EXISTING_CV: Cv = {
   id: 'cv-1',
-  name: 'Steven Brady CV.pdf',
-  file_path: 'C:\\Users\\steve\\Documents\\CV.pdf',
+  name: 'Jordan Lewis CV.pdf',
+  file_path: 'C:\\Users\\jamie\\Documents\\CV.pdf',
   extracted_text: CV_TEXT,
   json_resume: null,
   created_at: '2026-08-01T09:00:00.000Z',
@@ -240,7 +240,7 @@ describe('the run button explains its own disabled state', () => {
     const user = userEvent.setup();
     await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
 
-    await screen.findByDisplayValue('Steven Brady CV.pdf');
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
     await user.type(screen.getByTestId('analysis-job-text'), 'Analyst');
 
     expect(screen.getByTestId('analysis-run-reason').textContent).toContain('more of the advert');
@@ -251,7 +251,7 @@ describe('the run button explains its own disabled state', () => {
     const user = userEvent.setup();
     await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
 
-    await screen.findByDisplayValue('Steven Brady CV.pdf');
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
     await user.type(screen.getByTestId('analysis-job-text'), ADVERT);
 
     expect(screen.getByTestId('analysis-run')).toHaveProperty('disabled', false);
@@ -392,7 +392,7 @@ describe('running the basic match', () => {
     const user = userEvent.setup();
     const { port } = await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
 
-    await screen.findByDisplayValue('Steven Brady CV.pdf');
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
     await user.type(screen.getByTestId('analysis-job-text'), ADVERT);
     await user.click(screen.getByTestId('analysis-run'));
 
@@ -413,7 +413,7 @@ describe('running the basic match', () => {
     const user = userEvent.setup();
     await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
 
-    await screen.findByDisplayValue('Steven Brady CV.pdf');
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
     await user.type(screen.getByTestId('analysis-job-text'), ADVERT);
     await user.click(screen.getByTestId('analysis-run'));
 
@@ -428,7 +428,7 @@ describe('running the basic match', () => {
     const { port } = await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
 
     port.failNext('saveAnalysis');
-    await screen.findByDisplayValue('Steven Brady CV.pdf');
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
     await user.type(screen.getByTestId('analysis-job-text'), ADVERT);
     await user.click(screen.getByTestId('analysis-run'));
 
@@ -463,7 +463,7 @@ describe('history', () => {
     const user = userEvent.setup();
     await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
 
-    await screen.findByDisplayValue('Steven Brady CV.pdf');
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
     await user.type(screen.getByTestId('analysis-job-text'), ADVERT);
     await user.click(screen.getByTestId('analysis-run'));
     await screen.findByTestId('analysis-result');
@@ -482,7 +482,7 @@ describe('history', () => {
     const user = userEvent.setup();
     await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
 
-    await screen.findByDisplayValue('Steven Brady CV.pdf');
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
     await user.click(screen.getByTestId('analysis-history-open'));
 
     expect((await screen.findByTestId('analysis-history-empty')).textContent).toContain(

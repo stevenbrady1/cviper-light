@@ -46,7 +46,7 @@ it for requirement detection in the free scorer.
 
 UK qualifications and checks: NVQ levels, DBS, CSCS card, SIA licence, Level 3
 diploma names, "full UK driving licence", right to work. These go in a small
-hand-made `uk.json` (target under 150 terms), reviewed by Steven.
+hand-made `uk.json` (target under 150 terms), reviewed by the owner.
 
 **Shipped separately as L-282** (27 Oct 2026), ahead of ESCO, because it needs
 no licence decision: `lexicons-light/uk.json` + `uk-skills.ts`, 63 terms,
@@ -96,12 +96,12 @@ reported, aliases folded in) rather than add a second mechanism.
 
 ## Decisions (26 Oct 2026)
 
-| #   | Question                                     | Decision                                                                                                                                                |
-| --- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | ESCO licence                                 | **Open — Steven is reading the legal notice** on esco.ec.europa.eu. No ESCO data is committed until he confirms the terms and any attribution wording.  |
-| 2   | Commit the raw CSV or only the filtered JSON | **Filtered JSON plus the build script**, with the ESCO version it was built from recorded beside it. No raw CSV in the repo.                            |
-| 3   | Infer requirements from a job title          | **No.** The free check scores only what the advert states. `occupationSkillRelations` is not used, so no requirement is ever invented from a job title. |
-| 4   | The mothballed web app                       | **Light is the reference scorer.** If the web app is ever revived, port Light's divergences (L-275 and this item) to it; do not revert them here.       |
+| #   | Question                                     | Decision                                                                                                                                                  |
+| --- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ESCO licence                                 | **Open — the owner is reading the legal notice** on esco.ec.europa.eu. No ESCO data is committed until he confirms the terms and any attribution wording. |
+| 2   | Commit the raw CSV or only the filtered JSON | **Filtered JSON plus the build script**, with the ESCO version it was built from recorded beside it. No raw CSV in the repo.                              |
+| 3   | Infer requirements from a job title          | **No.** The free check scores only what the advert states. `occupationSkillRelations` is not used, so no requirement is ever invented from a job title.   |
+| 4   | The mothballed web app                       | **Light is the reference scorer.** If the web app is ever revived, port Light's divergences (L-275 and this item) to it; do not revert them here.         |
 
 Build starts when decision 1 is closed.
 

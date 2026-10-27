@@ -49,8 +49,8 @@ const CLEARANCE_ADVERT = SILENT_ADVERT + ' You must be eligible for SC clearance
 
 const EXISTING_CV: Cv = {
   id: 'cv-1',
-  name: 'Steven Brady CV.pdf',
-  file_path: 'C:\\Users\\steve\\Documents\\CV.pdf',
+  name: 'Jordan Lewis CV.pdf',
+  file_path: 'C:\\Users\\jamie\\Documents\\CV.pdf',
   extracted_text: CV_TEXT,
   json_resume: null,
   created_at: '2026-08-01T09:00:00.000Z',
@@ -93,7 +93,7 @@ async function runAgainst(
       now={NOW}
     />,
   );
-  await screen.findByDisplayValue('Steven Brady CV.pdf');
+  await screen.findByDisplayValue('Jordan Lewis CV.pdf');
   await vi.waitFor(() => expect(screen.getByTestId('analysis-provider')).toBeTruthy());
 
   await user.type(screen.getByTestId('analysis-job-text'), advert);

@@ -6,7 +6,7 @@
  * on the tailor screen and "Extraction needs an AI provider (free with Ollama,
  * or your own key)" on Paste a job. Each is accurate, and each is three words
  * the user does not know, on the screen where they are deciding whether to
- * carry on. Steven chose the plainest wording (27 Oct 2026): "Needs AI — add
+ * carry on. The owner chose the plainest wording (27 Oct 2026): "Needs AI — add
  * it in Settings." Settings is where the two kinds are explained (L-293's
  * three steps), so it is the one place these words belong.
  *

@@ -34,7 +34,7 @@ const { createFakeProgressPort } = await import('../flow/test/fakeProgressPort')
 
 const NOW = new Date('2026-10-06T09:00:00.000Z');
 
-const CV_TEXT = `Steve Brady
+const CV_TEXT = `Jamie Lewis
 Senior Credit Risk Analyst, Lloyds Banking Group, London, Jan 2020 – Present
 - Built IFRS 9 impairment models in Python, cutting run time by 40%.
 BSc Mathematics, University of Leeds, 2016`;
