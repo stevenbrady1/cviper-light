@@ -1,7 +1,10 @@
 ; CViper Light's copy of Tauri's NSIS installer template (L-253).
 ;
-; Copied from tauri-cli 2.12.2 (crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi
-; at tag tauri-cli-v2.12.2), used through bundle.windows.nsis.template in tauri.conf.json.
+; Copied from tauri-cli 2.12.3 (crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi
+; at tag tauri-cli-v2.12.3), used through bundle.windows.nsis.template in tauri.conf.json.
+; Re-diffed for 2.12.3 (L-294): the one stock change, PageLeaveReinstall deleting the old
+; install's leftover uninstall.exe and empty directory after an in-place uninstall, is taken
+; as is; it sits after the CVIPER silent-update uninstall and does not touch app data or keys.
 ; It is the stock file except for the lines marked "; CVIPER:", which are:
 ;
 ;   1. The finish page has no "Create desktop shortcut" action; the shortcut is made in
@@ -425,6 +428,15 @@ Function PageLeaveReinstall
       ; Other errors? show generic error message and return to select un/reinstall page
       MessageBox MB_ICONEXCLAMATION "$(unableToUninstall)"
       Abort
+    ${EndIf}
+
+    ; The NSIS uninstaller was run in place (`_?=`), so it cannot delete itself
+    ; and the install directory, clean them up here once the uninstall succeeded
+    ; https://nsis.sourceforge.io/Docs/Chapter3.html#:~:text=path%20contains%20spaces.-,3.2.3%20Examples,-installer.exe%20/NCRC
+    ${If} $WixMode = 0
+    ${AndIf} $4 != ""
+      Delete "$4\uninstall.exe"
+      RMDir "$4"
     ${EndIf}
   reinst_done:
 FunctionEnd
