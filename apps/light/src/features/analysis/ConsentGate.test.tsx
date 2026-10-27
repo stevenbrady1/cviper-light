@@ -33,6 +33,52 @@ describe('ConsentGate', () => {
     expect(dialog.getAttribute('aria-modal')).toBe('true');
   });
 
+  // L-296 (from L-234): CVs often carry details an employer does not need —
+  // health is special-category data under UK GDPR. The box says so, calmly,
+  // at the one moment the user can still act on it.
+  describe('the private-details tip (L-296)', () => {
+    it('names the details and says they can be taken out first', () => {
+      render(<ConsentGate kind="openai" onAccept={vi.fn()} onDecline={vi.fn()} />);
+
+      const tip = screen.getByTestId('analysis-consent-sensitive');
+      expect(tip.textContent).toMatch(/date of birth/);
+      expect(tip.textContent).toMatch(/health/);
+      expect(tip.textContent).toMatch(/nationality/);
+      expect(tip.textContent).toMatch(/take them out of your CV before you send it/);
+    });
+
+    it('is read out with the question: the dialog is described by it', () => {
+      render(<ConsentGate kind="openai" onAccept={vi.fn()} onDecline={vi.fn()} />);
+
+      const dialog = screen.getByTestId('analysis-consent-gate');
+      const ids = (dialog.getAttribute('aria-describedby') ?? '').split(/\s+/);
+      expect(ids).toContain(screen.getByTestId('analysis-consent-sensitive').id);
+    });
+
+    // BOUNDARY — a typed-address service may be on the user's own network, but
+    // the CV still leaves this app, so the tip is shown there too.
+    it('boundary: is shown for a service at an address the user added', () => {
+      render(<ConsentGate kind="custom" onAccept={vi.fn()} onDecline={vi.fn()} />);
+
+      expect(screen.getByTestId('analysis-consent-sensitive')).toBeTruthy();
+    });
+
+    // NEGATIVE — a tip, not a warning: nothing is wrong, and nobody did
+    // anything. Only the CV's TEXT is sent, so a photo is never mentioned.
+    it('negative: is not an alert, does not mention a photo, and changes no answer', async () => {
+      const user = userEvent.setup();
+      const onAccept = vi.fn();
+      render(<ConsentGate kind="openai" onAccept={onAccept} onDecline={vi.fn()} />);
+
+      const tip = screen.getByTestId('analysis-consent-sensitive');
+      expect(tip.getAttribute('role')).toBeNull();
+      expect(tip.textContent).not.toMatch(/photo/i);
+      expect(document.activeElement).toBe(screen.getByTestId('analysis-consent-decline'));
+      await user.click(screen.getByTestId('analysis-consent-accept'));
+      expect(onAccept).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('boundary: names Anthropic, never OpenAI, when that is the provider asking', () => {
     render(<ConsentGate kind="anthropic" onAccept={vi.fn()} onDecline={vi.fn()} />);
 

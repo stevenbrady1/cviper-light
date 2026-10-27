@@ -28,6 +28,8 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Added
 
+- A tip in the box that asks before your CV is sent to an AI company (L-296): "CVs often hold things an employer does not need, like your date of birth, health details or nationality. You can take them out of your CV before you send it." It is the same box on every screen that sends a CV: the CV check, tailoring, Paste a job, interview preparation and follow-ups. It is a tip, not a warning, so it uses no warning colour, and a screen reader reads it out with the question. Only the text of your CV is sent, so photos are not mentioned. Nothing else about the box changes: "Not now" is still where the focus starts.
+
 - The AI key screen now says what to do, in three plain steps (L-293): pick one company (you only need one), press "Where do I get … key?" on its card and make a key on its website, then paste it and press "Test and save this key". It also says the key is kept in your computer's own password store and is only used to talk to that company. No company is recommended. The welcome screen's line for a new machine now reads "No AI is set up yet — the basic word match works with nothing set up, and you can add AI later in Settings." instead of "No local model and no API key found".
 
 - Nice-to-haves you do not show are listed again, but not as gaps (L-292). Since L-289 a missed "desirable" costs nothing and is not in "What they asked for and could not find" — right for the score, but you were no longer told about it. A short list under it now says "Nice to have, not on your CV — these do not lower your score." Basic match only, and only when the advert marks something as desirable.
