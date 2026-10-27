@@ -31,9 +31,29 @@
 import { escapeRegExp, foldSpelling } from './spelling';
 import { pluralVariants } from './plurals';
 
-const TOKEN_CHARS = '\\p{L}\\p{N}_#+./\\-';
-const TOKEN_LEFT = '(?<![' + TOKEN_CHARS + '])';
-const TOKEN_RIGHT = '(?![' + TOKEN_CHARS + '])';
+/**
+ * ============================================================================
+ * L-275 — WHERE THIS LEAVES THE PYTHON ORIGINAL, ON PURPOSE.
+ * ============================================================================
+ * The Python put `.` and `/` in the token class on both sides. That kept
+ * `node` out of `node.js`, and it also hid every skill that ends a sentence
+ * ("Advanced Excel.") or shares a slash ("Python/Django"). The port reproduced
+ * it for parity; the web app it had parity with was mothballed in September
+ * 2026, so Light now fixes it here alone. Two changes, nothing else:
+ *
+ *   - `.` on the RIGHT ends a token unless a token character follows it.
+ *     "excel." matches; "node" still does not match inside "node.js".
+ *     On the LEFT it still joins, so "net" stays out of "asp.net".
+ *   - `/` is a separator on both sides. "python" and "django" both match
+ *     "python/django"; the whole term "ci/cd" still matches as written.
+ *
+ * `-` is NOT changed. Splitting on it would make the language "go" match
+ * "go-to-market" and "react" match "react-native", and a false match costs
+ * more than a missed one: it hides a real gap from the candidate.
+ */
+const TOKEN_CORE = '\\p{L}\\p{N}_#+';
+const TOKEN_LEFT = '(?<![' + TOKEN_CORE + '.\\-])';
+const TOKEN_RIGHT = '(?![' + TOKEN_CORE + '\\-]|\\.[' + TOKEN_CORE + '])';
 
 /**
  * Compiled patterns, keyed by the folded term.

@@ -187,6 +187,133 @@ describe('the WebKit check runs in CI', () => {
   });
 });
 
+/**
+ * L-280 — a slow package mirror must not hold a required check for 20 minutes.
+ *
+ * On 26 Oct 2026 the install ran out the whole job twice. It was not a hang:
+ * `--with-deps` pulls system libraries through apt, and the Ubuntu mirror was
+ * serving them at 20-40 KB/s. A normal install takes under a minute. So each
+ * attempt is capped with `timeout`, and a second attempt follows a failed
+ * first one, on a fresh connection. The whole retry is on ONE `run:` line
+ * because the parser above reads inline commands only.
+ */
+export const INSTALL_ATTEMPT_CAP_SECONDS = 300;
+
+export function installAttempts(command: string): number[] {
+  return [
+    ...command.matchAll(
+      /\btimeout\s+(?:--\S+\s+)*(\d+)\s+[^|]*?playwright-core\s+install\b[^|]*?\bwebkit\b/g,
+    ),
+  ].map((match) => Number(match[1]));
+}
+
+describe('a slow mirror cannot hold the check for the whole job (L-280)', () => {
+  const install =
+    JOB_COMMANDS.find(
+      (command) => /playwright-core\s+install\b/.test(command) && /\bwebkit\b/.test(command),
+    ) ?? '';
+
+  it('caps every install attempt with a timeout, and tries twice', () => {
+    const attempts = installAttempts(install);
+    expect(attempts, `install step: ${install}`).toHaveLength(2);
+    for (const seconds of attempts)
+      expect(seconds).toBeLessThanOrEqual(INSTALL_ATTEMPT_CAP_SECONDS);
+    expect(install).toMatch(/\|\|/);
+  });
+
+  it('both attempts fit inside the job, leaving time to run the check', () => {
+    const jobMinutes = Number(/^\s+timeout-minutes:\s*(\d+)\s*$/m.exec(JOB_TEXT)?.[1] ?? NaN);
+    const installMinutes = installAttempts(install).reduce((sum, s) => sum + s, 0) / 60;
+    expect(installMinutes).toBeLessThan(jobMinutes - 5);
+  });
+
+  // The first live run of L-280 (PR #371) proved this is needed: `timeout`
+  // stopped pnpm, but apt-get runs under sudo in its own process group, so it
+  // outlived the cap, kept the dpkg lock, and the retry failed in one second
+  // with "Could not get lock". The retry is worthless unless the leftover apt
+  // is stopped and a half-done install repaired first.
+  it('frees the dpkg lock before the retry', () => {
+    const [, retry = ''] = install.split('||');
+    expect(retry, `retry half of: ${install}`).toMatch(
+      /^\s*\(\s*bash\s+\.github\/scripts\/release-apt-lock\.sh\s*&&\s*timeout\b/,
+    );
+    expect(existsSync(join(REPO_ROOT, '.github/scripts/release-apt-lock.sh'))).toBe(true);
+  });
+
+  // NEGATIVE — the detector itself.
+  it('does not count an uncapped install as capped', () => {
+    expect(
+      installAttempts(
+        'pnpm --filter @cviper/light exec playwright-core install --with-deps webkit',
+      ),
+    ).toEqual([]);
+  });
+
+  it('boundary: reads a cap with a kill-after flag', () => {
+    expect(
+      installAttempts(
+        'timeout --kill-after=20 300 pnpm exec playwright-core install --with-deps webkit',
+      ),
+    ).toEqual([300]);
+  });
+});
+
+/**
+ * L-284 — WebKit's system packages are cached, so a slow mirror is not hit.
+ *
+ * L-280 capped a slow install; it did not make it succeed. Three stalls on
+ * 26 Oct 2026 were all the Ubuntu mirror serving `--with-deps` packages at a
+ * few kB/s. So apt's package directory is pointed at a folder `actions/cache`
+ * restores before the install and saves after it. Each leg below is a step
+ * whose absence would quietly make the cache empty again, with every run still
+ * green — just slow, and sometimes red for a reason nobody connects to it.
+ */
+export const APT_CACHE_DIR = '~/.cache/webkit-apt';
+const APT_CACHE_SCRIPT = '.github/scripts/webkit-apt-cache.sh';
+
+/** The index of the first job line matching `pattern`, or -1. */
+export function lineIndexOf(jobText: string, pattern: RegExp): number {
+  return jobText.split('\n').findIndex((line) => pattern.test(line));
+}
+
+describe("WebKit's system packages are cached between runs (L-284)", () => {
+  const lines = JOB_TEXT;
+  const installLine = lineIndexOf(lines, /playwright-core\s+install\b.*\bwebkit\b/);
+  const configure = JOB_COMMANDS.findIndex((c) =>
+    c.startsWith(`bash ${APT_CACHE_SCRIPT} configure ${APT_CACHE_DIR}`),
+  );
+  const report = JOB_COMMANDS.findIndex((c) =>
+    c.startsWith(`bash ${APT_CACHE_SCRIPT} report ${APT_CACHE_DIR}`),
+  );
+  const install = JOB_COMMANDS.findIndex(
+    (c) => /playwright-core\s+install\b/.test(c) && /\bwebkit\b/.test(c),
+  );
+
+  it('restores the package folder with actions/cache BEFORE the install', () => {
+    const cachePath = lineIndexOf(lines, new RegExp(`path:\\s*${APT_CACHE_DIR}/\\*\\.deb\\s*$`));
+    expect(cachePath, `no actions/cache step saves ${APT_CACHE_DIR}/*.deb`).toBeGreaterThan(-1);
+    expect(cachePath).toBeLessThan(installLine);
+  });
+
+  it('points apt at that folder before the install, and reports after it', () => {
+    expect(configure, `no step runs ${APT_CACHE_SCRIPT} configure`).toBeGreaterThan(-1);
+    expect(configure).toBeLessThan(install);
+    expect(report, `no step runs ${APT_CACHE_SCRIPT} report`).toBeGreaterThan(install);
+    expect(existsSync(join(REPO_ROOT, APT_CACHE_SCRIPT))).toBe(true);
+  });
+
+  it('the script keeps what apt downloads, outside the path docker-clean empties', () => {
+    const script = read(APT_CACHE_SCRIPT);
+    expect(script).toMatch(/Dir::Cache::Archives\s+"\$dir\/"/);
+    expect(script).toMatch(/APT::Keep-Downloaded-Packages\s+"true"/);
+  });
+
+  // NEGATIVE — the detector itself.
+  it('does not find a cache step that is not there', () => {
+    expect(lineIndexOf('steps:\n  - run: echo hi', /path:\s*~\/\.cache\/webkit-apt/)).toBe(-1);
+  });
+});
+
 describe('and it stays out of the offline loop', () => {
   it(`\`pnpm ${LOOP_SCRIPT}\` does not chain it`, () => {
     const parsed: unknown = JSON.parse(read(MANIFEST_PATH));

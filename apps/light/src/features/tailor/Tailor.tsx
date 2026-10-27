@@ -68,7 +68,6 @@ import { createJobSessions, sessionIn, type JobSessions, type TailorJobState } f
 import { AtsStep } from './AtsStep';
 import { CvTextPanel } from './CvTextPanel';
 import { compareAts } from './atsComparison';
-import { buildCoverLetterDocx, buildCvDocx } from './docx';
 import { buildCoverLetterPdf, buildCvPdf } from './pdf';
 import {
   LETTER_WORD_LIMIT,
@@ -892,15 +891,17 @@ export function Tailor({
       // `null` for the name: the app never asks the model for one, and this
       // screen has nothing else to offer (see `renderTailoredCv`).
       const build = async (): Promise<{ bytes: Uint8Array; missing: readonly string[] }> => {
+        // The Word builder (`docx` + `jszip`, ~400 kB) is loaded on the first
+        // Word export, not at launch: `word-code-loads-on-demand.contract.test.ts`.
         if (kind === 'cv' && result !== null) {
-          return format === 'pdf'
-            ? buildCvPdf(result.cv, null)
-            : { bytes: await buildCvDocx(result.cv, null), missing: [] };
+          if (format === 'pdf') return buildCvPdf(result.cv, null);
+          const { buildCvDocx } = await import('./docx');
+          return { bytes: await buildCvDocx(result.cv, null), missing: [] };
         }
         if (kind === 'cover_letter' && letter !== null) {
-          return format === 'pdf'
-            ? buildCoverLetterPdf(letter.letter)
-            : { bytes: await buildCoverLetterDocx(letter.letter), missing: [] };
+          if (format === 'pdf') return buildCoverLetterPdf(letter.letter);
+          const { buildCoverLetterDocx } = await import('./docx');
+          return { bytes: await buildCoverLetterDocx(letter.letter), missing: [] };
         }
         throw new Error('nothing to export');
       };
@@ -1311,7 +1312,10 @@ export function Tailor({
               : phase === 'writing'
                 ? 'Drafting the letter. '
                 : ''}
-            {progressText} <span className="font-mono tabular-nums">{elapsed}s</span>
+            {progressText}{' '}
+            <span aria-hidden="true" className="font-mono tabular-nums">
+              {elapsed}s
+            </span>
           </p>
         ) : null}
 

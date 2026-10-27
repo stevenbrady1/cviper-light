@@ -60,6 +60,75 @@ describe('termInText', () => {
   });
 });
 
+/**
+ * L-275 — a skill written next to ordinary punctuation is still the skill.
+ *
+ * `.` and `/` used to sit in the token class on BOTH sides, so "Excel." and
+ * "Python/Django" hid the skill. The symbol tokens that class protects
+ * (`node.js`, `.net`, `ci/cd`) must keep working, so every fix below is paired
+ * with the case it must not break.
+ */
+describe('termInText — punctuation after a skill (L-275)', () => {
+  // The defect: a skill at the end of a sentence.
+  it.each([
+    ['excel', 'Advanced Excel.'],
+    ['python', 'I know Python.'],
+    ['dementia', 'Cared for residents with dementia.'],
+    ['licence', 'Full UK driving licence.'],
+    ['stakeholder management', 'Strong SQL and stakeholder management.'],
+    ['node.js', 'Built services in Node.js.'],
+    ['c++', 'Wrote low-latency C++.'],
+  ])('matches %j before a full stop in %j', (term, text) => {
+    expect(termInText(term, text)).toBe(true);
+  });
+
+  // BOUNDARY — an ellipsis and a stop at the very end of the text.
+  it.each([
+    ['sql', 'SQL...'],
+    ['sql', 'sql.'],
+  ])('matches %j in %j', (term, text) => {
+    expect(termInText(term, text)).toBe(true);
+  });
+
+  // The defect: two skills joined by a slash.
+  it.each([
+    ['python', 'Python/Django developer'],
+    ['django', 'Python/Django developer'],
+    ['excel', 'Excel/Word'],
+  ])('matches %j either side of a slash in %j', (term, text) => {
+    expect(termInText(term, text)).toBe(true);
+  });
+
+  // NEGATIVE — the symbol tokens the class exists for are untouched.
+  it.each([
+    ['node', 'node.js services'],
+    ['net', 'asp.net core'],
+    ['js', 'node.js services'],
+    ['python', 'python.org tutorials'],
+  ])('still does not match %j inside the dotted token in %j', (term, text) => {
+    expect(termInText(term, text)).toBe(false);
+  });
+
+  it.each([
+    ['ci/cd', 'ci/cd pipelines'],
+    ['.net', 'the .net platform.'],
+    ['node.js', 'node.js services'],
+  ])('still matches the whole symbol token %j in %j', (term, text) => {
+    expect(termInText(term, text)).toBe(true);
+  });
+
+  // NEGATIVE — a hyphen is still part of the word, ON PURPOSE. Splitting on it
+  // would make the language "go" match "go-to-market" and "react" match
+  // "react-native"; a false match costs more than a missed one, because the
+  // user is never told to add a skill they lack.
+  it.each([
+    ['go', 'go-to-market plan'],
+    ['python', 'Python-based tools'],
+  ])('does not split %j out of the hyphenated word in %j', (term, text) => {
+    expect(termInText(term, text)).toBe(false);
+  });
+});
+
 describe('termInFoldedText', () => {
   // The fast path exists so a scan over hundreds of terms folds the haystack
   // once instead of once per term. It must agree with termInText exactly, or

@@ -21,9 +21,13 @@
  * skills with `getSimilarTerms` internally rather than trusting a
  * pre-expanded list.
  */
+import { splitDesirable } from './desirable';
+import { dropEnglishWordSkills } from './english-words';
+import { maskNegated } from './negation';
 import { foldSpelling } from './spelling';
 import { getSimilarTerms } from './similar';
 import { termInFoldedText } from './term';
+import { extractUkSkills, impliedUkSkills } from './uk-skills';
 import { COMMON_SKILLS, SKILL_VOCABULARY } from './vocabulary';
 
 /** Matches `_MAX_TEXT_LENGTH` in `FallbackService` — a CPU guard on regex work. */
@@ -47,7 +51,11 @@ export interface JobPosting {
   readonly description: string;
   /** Lexicon skills the advert names. */
   readonly keySkills: readonly string[];
-  /** Always empty without AI. `matching()` falls back to `keySkills`. */
+  /**
+   * The skills the advert does NOT name only as desirable (L-289). Empty when
+   * the advert marks nothing desirable — `matching()` then falls back to
+   * `keySkills`, as the source did without AI.
+   */
   readonly essentialSkills: readonly string[];
   /** Always empty without AI. Used only to corroborate ultra-short tokens. */
   readonly keyRequirements: readonly string[];
@@ -219,24 +227,63 @@ function extractJobTitle(lines: readonly string[]): string {
 }
 
 /** Build the `job` structure `matching()` expects from a pasted advert. */
+/**
+ * Every skill the advert text names: `job_summary` scans `common_skills` for
+ * the advert's stated skills (the wider `skills` list is the ATS layer's
+ * vocabulary, not this one); L-282 appends the hand-made UK list after it;
+ * L-286 drops "the rest of the team" and its like.
+ */
+function advertSkills(text: string): string[] {
+  return dropEnglishWordSkills(withUkSkills(extractSkills(text, COMMON_SKILLS), text), text);
+}
+
+/**
+ * L-289 — the advert's skills minus those it names ONLY as desirable.
+ *
+ * Empty when nothing is demoted, so `match.ts` falls back to every recognised
+ * skill exactly as before; and empty when EVERY skill is desirable, so the
+ * advert is scored against those rather than against nothing.
+ */
+function essentialSkillsOf(text: string, keySkills: readonly string[]): string[] {
+  const { desirable, rest } = splitDesirable(text);
+  if (!desirable) return [];
+  const required = new Set(advertSkills(rest).map((skill) => skill.toLowerCase()));
+  const essential = keySkills.filter((skill) => required.has(skill.toLowerCase()));
+  return essential.length === keySkills.length ? [] : essential;
+}
+
 export function buildJobPosting(jobText: string): JobPosting {
   const text = (jobText || '').slice(0, MAX_TEXT_LENGTH);
   const lines = contentLines(text);
+  const keySkills = advertSkills(text);
   return {
     title: extractJobTitle(lines),
     description: text,
-    // `job_summary` scans `common_skills` for the advert's stated skills; the
-    // wider `skills` list is the ATS layer's vocabulary, not this one.
-    keySkills: extractSkills(text, COMMON_SKILLS),
-    essentialSkills: [],
+    keySkills,
+    essentialSkills: essentialSkillsOf(text, keySkills),
     keyRequirements: [],
   };
+}
+
+/**
+ * L-282 — append the UK terms the text names that the upstream scan did not.
+ * A Light-only divergence: the upstream list comes first and is unchanged.
+ */
+function withUkSkills(upstream: readonly string[], text: string): string[] {
+  const have = new Set(upstream.map((skill) => skill.toLowerCase()));
+  return [...upstream, ...extractUkSkills(text).filter((label) => !have.has(label.toLowerCase()))];
 }
 
 /** Build the `cv_profile` structure `matching()` expects from CV text. */
 export function buildCvProfile(cvText: string): CvProfile {
   const text = (cvText || '').slice(0, MAX_TEXT_LENGTH);
-  const skills = extractSkills(text);
+  // L-283: "No CPC or tachograph card yet" is not a tachograph. Skills only —
+  // titles are read from the full text. See negation.ts for what is masked.
+  const skillText = maskNegated(text);
+  // L-286: "I go to de-escalation first" is not Go.
+  const found = dropEnglishWordSkills(withUkSkills(extractSkills(skillText), skillText), skillText);
+  // L-285: NVQ Level 3 also counts for Level 2, C+E for C. CV side only.
+  const skills = [...found, ...impliedUkSkills(found)];
   return {
     skills,
     relatedSkills: [],

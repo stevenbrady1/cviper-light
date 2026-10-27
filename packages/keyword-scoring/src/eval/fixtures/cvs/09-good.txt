@@ -1,0 +1,36 @@
+SIOBHAN GALLAGHER
+Leeds, West Yorkshire (happy to work remotely)
+Data and Insight Officer - violence against women and girls sector
+
+PROFILE
+Data analyst with four years in the charity sector, currently at a domestic abuse service where the numbers we report are about real people's safety. I turn messy case-management data into Power BI reports that frontline workers actually open, and I'm as comfortable explaining a trend to a trustee as to a commissioner's analyst. Before that I worked on a university research project, so I know how to handle sensitive data carefully.
+
+EXPERIENCE
+
+Data and Insight Officer - Domestic abuse charity, West Yorkshire
+February 2023 - present
+- Built and maintain the Power BI dashboards for our IDVA, refuge and helpline services, refreshed weekly from case-management exports (around 250,000 rows of contact records).
+- Wrote the DAX and Power Query logic behind our risk-level and repeat-referral measures, and documented it so others can pick it up.
+- Produce quarterly monitoring returns for three local authority contracts in Excel - no data queries from commissioners last year.
+- Run short "how to read this dashboard" sessions for service managers and caseworkers.
+- Worked with the service user involvement lead to code open-text survivor feedback into themes for our annual impact report.
+
+Research Assistant - University social policy department, Leeds
+September 2021 - January 2023
+- Cleaned and analysed survey data in SPSS for a study on access to housing support for women leaving abusive relationships.
+- Co-ran 18 semi-structured interviews and helped with the thematic analysis in NVivo.
+- Managed participant data under strict ethics and GDPR rules.
+
+Volunteer Helpline Support Worker - Regional domestic abuse helpline
+2020 - 2022 (evenings)
+
+EDUCATION
+MSc Social Research Methods - Merit, 2021
+BA (Hons) Sociology and Criminology - 2:1, 2020
+Microsoft Certified: Power BI Data Analyst Associate - 2024
+
+SKILLS
+Power BI (DAX, Power Query) / Excel (Power Pivot, XLOOKUP, dynamic arrays)
+SPSS / NVivo / basic SQL
+Data protection and working with special category data.
+Writing plain-English summaries for people who don't live in spreadsheets.

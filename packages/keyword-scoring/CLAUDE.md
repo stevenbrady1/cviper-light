@@ -57,6 +57,10 @@ If a number here looks wrong, measure the Python before changing it. Two
 implementations of the same scorer that disagree are worse than one with a
 known quirk, because neither number can be trusted.
 
+The web app was mothballed in September 2026, so a fix that only Light needs
+can now land here — but only as a named, tested divergence (L-275 is the
+pattern), never as a quiet change to a parity expectation.
+
 ## Things that will bite you
 
 - **`skillWeight` is the whole point.** Coverage is rarity-WEIGHTED, not
@@ -93,11 +97,63 @@ known quirk, because neither number can be trusted.
   advert's spelling, because that is the string the employer's system looks
   for. Folding the labels too would advise a candidate into a miss.
 
-- **A trailing full stop hides a skill.** `termInText('python', 'I know
-Python.')` is `false`, in the Python original as well as here — `.` is inside
-  the token character class so that `node` cannot match inside `node.js`.
-  Reproduced on purpose and pinned in `parity.test.ts`; reported upstream
-  rather than fixed on one side only.
+- **Punctuation is where Light deliberately leaves the Python (L-275).** The
+  Python keeps `.` and `/` inside the token class, so "Advanced Excel." and
+  "Python/Django" hide the skill. That was reproduced here for parity until the
+  web app was mothballed (Sept 2026); with no second scorer left to disagree
+  with, `term.ts` now ends a token at a trailing `.` and splits on `/`.
+  `node` still does not match inside `node.js`, and `-` is unchanged on
+  purpose (`go` must not match `go-to-market`). `parity.test.ts` marks the
+  diverging expectations by name; every other case still matches the Python.
+  If the web app is ever revived, port L-275 to it rather than reverting here.
+
+- **UK qualifications and checks are a separate, Light-only layer (L-282).**
+  `lexicons-light/uk.json` + `uk-skills.ts`: 63 hand-made terms (NVQ, DBS,
+  C+E, Driver CPC, SIA, EYFS…), each a display label plus aliases, reported
+  under the label so "Level 2 Diploma in Health and Social Care" on a CV meets
+  "NVQ Level 2" in an advert. `profile.ts` appends them AFTER the upstream scan;
+  nothing in `lexicon`, `getSimilarTerms` or `SKILL_VOCABULARY` changes, and a
+  test forbids a UK entry repeating an upstream term. Not used by `ats.ts`,
+  which asks about the advert's exact words. Before adding a term, read the
+  `_comment` in the JSON: a bare `cpcs` alias matched "Driver CPC", because
+  plurals strip a trailing `s` from tokens of four letters or more.
+
+- **A skill the CV says it lacks is not credited (L-283).** `negation.ts`
+  masks "no / not / without / lacking / do not have / don't hold" + up to six
+  words, and up to six words before "not held / expired / lapsed", in the CV's
+  SKILL scan only — not titles, not the advert, not `ats.ts` (the words are on
+  the page). "not only", "no less than", "never", "non-", "working towards"
+  and "pending" are deliberately left alone, each with a test. Widening the
+  rule is how a real skill gets hidden; any new cue needs a near-miss test
+  beside it. On the eval CVs it removes exactly one skill, the right one.
+
+- **Six skills are also English words (L-286).** `english-words.ts`: go,
+  rest, react, windows, swift, rust count only when capitalised or on a line
+  with another tech skill — on both sides, not in `ats.ts`. Adding a word
+  (excel, testing, cloud, risk were left off on purpose) needs a test showing
+  the real skill, written the way real CVs write it, still matches.
+
+- **`src/eval/` is the only test that asks the user's question (L-281).** Ten
+  real UK adverts, twenty invented CVs, one good and one poor fit each. It pins
+  how many pairs rank the good fit strictly higher. A scoring change that
+  lowers that number is a regression whatever the unit tests say; one that
+  raises it must raise `RIGHT_ORDER` in the same PR. Do not edit the CVs or
+  adverts to make a change pass — the set is the yardstick, not the work.
+
+- **"Strong" needs three recognised requirements (L-287).** Below
+  `MIN_REQUIREMENTS_FOR_STRONG`, `score.ts` caps the score at
+  `THIN_ADVERT_SCORE_CAP` (74) and adds a sentence to the summary. It sits in
+  `score.ts`, after `matchProfileToJob`, so `match.ts` and its parity with the
+  Python stay untouched.
+
+- **Desirable skills count only when the CV has them (L-289).** `desirable.ts`
+  splits the advert on "Desirable" / "Nice to have" headings and inline
+  "(desirable)" markers; `profile.ts` fills `essentialSkills` with every
+  skill NOT named only as desirable; `match.ts` adds back the desirables the
+  CV covers. The `match.ts` part is a named divergence from the Python, which
+  used essentials alone and so made a desirable the CV has worth nothing.
+  Coverage can only rise against the old behaviour; `desirable.test.ts` pins
+  that on the real eval advert 05.
 
 - **The score cannot reach 0 or 100.** It is floored at 10 and capped at 95
   (`RAW_SCORE_CAP`). Nothing in this package has read the CV, so it never

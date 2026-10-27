@@ -50,11 +50,17 @@ describe('the cards', () => {
     for (const card of ONBOARDING_CARDS) expect(card.status, card.id).toBe('Ready now');
   });
 
-  it('says on the search card that free keys add more, rather than hiding that keys exist', () => {
+  it('the search card asks for no key of any kind (L-276)', () => {
+    // Job-board keys are an optional extra one fold down in Settings. The first
+    // screen a new user reads does not send them to register on two other sites.
     const search = ONBOARDING_CARDS.find((card) => card.id === 'search');
+    expect(`${search?.hook} ${search?.body}`.toLowerCase()).not.toContain('key');
+  });
 
-    expect(search?.body.toLowerCase()).toContain('free keys');
-    expect(search?.body.toLowerCase()).toContain('more results');
+  it('the search card says what you get with nothing set up', () => {
+    const search = ONBOARDING_CARDS.find((card) => card.id === 'search');
+    expect(search?.body.toLowerCase()).toContain('uk job boards');
+    expect(search?.body.toLowerCase()).toContain('your board');
   });
 
   it('negative: no card says a key is required', () => {
@@ -98,6 +104,14 @@ describe('localModelLine — the live detection shown on the analysis card', () 
 
     expect(line).toContain('word match');
     expect(line).toContain('works with nothing');
+  });
+
+  // L-293 — a first-time user does not know what "API key" or "local model"
+  // means; the sentence a brand-new machine shows must not need them.
+  it('says it without jargon', () => {
+    const line = localModelLine(NOTHING);
+    expect(line).not.toMatch(/\bAPI\b|local model|\bmodel\b/i);
+    expect(line).toMatch(/AI/);
   });
 
   it('mentions a saved cloud key only when that key can actually be used', () => {

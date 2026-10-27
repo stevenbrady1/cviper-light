@@ -1,0 +1,37 @@
+OLUWASEUN (SEUN) BAKARE
+Stockport, Greater Manchester
+Treasury and ALM Analyst - banking book risk
+
+PROFILE
+Treasury analyst with ten years in UK banking, the last five focused on interest rate risk in the banking book, liquidity and funding. I build and run the models behind ALCO decisions and, just as importantly, explain what they mean to the people who have to make those decisions. ALMA CertBALM qualified. Looking for a senior role where I can own more of the balance sheet risk agenda.
+
+EXPERIENCE
+
+Treasury Analyst, Balance Sheet Risk - Regional building society, North West
+June 2021 - present
+- Run the monthly IRRBB measurement in QRM: EVE and NII sensitivities, basis and optionality risk, and the supervisory outlier test.
+- Rebuilt the behavioural assumptions for fixed-rate mortgage prepayment and non-maturity deposits using five years of customer data; the new model was approved by ALCO and passed second-line validation with no material findings.
+- Prepare the ALCO pack and write the commentary - I present the rate risk and liquidity sections each month.
+- Contribute to the ILAAP and ICAAP, including the liquidity stress scenarios and the Pillar 2A IRRBB number.
+- Monitor LCR and NSFR daily and explain the drivers to the Treasurer, particularly around large funding maturities and TFSME repayments.
+
+Market Risk Analyst - Challenger bank, Manchester
+September 2018 - May 2021
+- Daily VaR and sensitivity reporting for the liquid asset buffer and swap hedges.
+- Owned the limit-breach process, from first escalation through to root cause.
+- Automated the daily risk pack with Excel VBA and SQL, saving around two hours a day.
+
+Graduate Analyst, Finance - High street bank, Leeds
+September 2016 - August 2018
+- Rotations in management accounts, capital reporting and treasury operations.
+
+QUALIFICATIONS
+ALMA Certificate in Balance Sheet Asset and Liability Management (CertBALM) - 2022
+CFA Level I - passed 2019
+BSc (Hons) Economics and Mathematics - First, 2016
+
+SKILLS
+QRM / Excel and VBA / SQL / Power BI / some Python (pandas).
+PRA Rulebook, Basel 3.1 and the IRRBB standards.
+Working with the Treasurer, the CRO function, internal audit and the PRA.
+I keep a close eye on Bank Rate expectations and the swap curve, and write a short weekly market note for the treasury team.

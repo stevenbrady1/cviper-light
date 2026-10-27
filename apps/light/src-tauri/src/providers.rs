@@ -409,8 +409,38 @@ pub(crate) fn loopback_client() -> Result<&'static reqwest::Client, String> {
         })
 }
 
+/// The client for the fixed cloud AI providers: the system proxy as usual,
+/// but redirects OFF.
+///
+/// The shared `client()` follows up to ten redirects, and reqwest strips only
+/// `Authorization` when it does, so Anthropic's `x-api-key` would ride a
+/// cross-host 3xx and a Bearer call could follow https to http. No provider
+/// redirects an API call legitimately; a 3xx now comes back as an error.
+/// Job feeds keep `client()`, whose redirects they may rely on.
+pub(crate) fn cloud_client() -> Result<&'static reqwest::Client, String> {
+    static CLIENT: OnceLock<Option<reqwest::Client>> = OnceLock::new();
+
+    CLIENT
+        .get_or_init(|| {
+            // BEFORE `build()`, always: see `install_crypto_provider`.
+            install_crypto_provider();
+            reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .ok()
+        })
+        .as_ref()
+        .ok_or_else(|| {
+            transport_error(
+                "network",
+                "Secure networking is unavailable in this build.".to_string(),
+            )
+        })
+}
+
 /// The client a provider's requests go through. Only a local provider skips
 /// the proxy: a user whose only way out is a proxy must still reach the cloud.
+/// Neither follows a redirect.
 pub(crate) fn client_for(provider: ProviderId) -> Result<&'static reqwest::Client, String> {
     match provider {
         ProviderId::Ollama => loopback_client(),
@@ -420,7 +450,7 @@ pub(crate) fn client_for(provider: ProviderId) -> Result<&'static reqwest::Clien
         | ProviderId::Google
         | ProviderId::Mistral
         | ProviderId::Grok
-        | ProviderId::Openrouter => client(),
+        | ProviderId::Openrouter => cloud_client(),
     }
 }
 
@@ -877,6 +907,112 @@ mod tests {
     }
 
     const LOOPBACK_CHILD_ENV: &str = "CVIPER_LOOPBACK_PROXY_CHILD";
+    const REDIRECT_CHILD_ENV: &str = "CVIPER_CLOUD_REDIRECT_CHILD";
+
+    // ====================================================================
+    // A CLOUD PROVIDER'S REPLY IS NEVER FOLLOWED SOMEWHERE ELSE.
+    // ====================================================================
+    // The shared client follows up to ten redirects, and reqwest strips only
+    // `Authorization` on the way: Anthropic's `x-api-key` would ride a
+    // cross-host 3xx, and a Bearer request could follow https to http. None of
+    // the fixed providers redirects an API call legitimately, so their
+    // requests now go through a client that does not follow at all, and a
+    // 3xx comes back as the error it is. Job feeds keep the shared client.
+    //
+    // A child process, for the same reason as the proxy test: building a
+    // client here would pre-install the rustls provider for the whole binary.
+    #[test]
+    fn a_cloud_provider_request_does_not_follow_a_redirect() {
+        let exe = std::env::current_exe().expect("test binary path");
+        let output = std::process::Command::new(exe)
+            .args([
+                "--exact",
+                "providers::tests::cloud_redirect_child",
+                "--ignored",
+                "--test-threads=1",
+                "--nocapture",
+            ])
+            .env(REDIRECT_CHILD_ENV, "1")
+            .output()
+            .expect("re-run the test binary");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(output.status.success(), "child failed:\n{stdout}\n{stderr}");
+        assert!(
+            stdout.contains("1 passed"),
+            "the child test did not run:\n{stdout}\n{stderr}"
+        );
+    }
+
+    /// Answers every connection with a 302 to `location`, counting them.
+    fn redirect_server(location: String) -> (u16, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        use std::io::{Read, Write};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let hits = std::sync::Arc::new(AtomicUsize::new(0));
+        let counter = hits.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { continue };
+                counter.fetch_add(1, Ordering::SeqCst);
+                let mut buf = [0u8; 4096];
+                let _ = stream.read(&mut buf);
+                let reply = format!(
+                    "HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                );
+                let _ = stream.write_all(reply.as_bytes());
+            }
+        });
+        (port, hits)
+    }
+
+    #[test]
+    #[ignore = "run by a_cloud_provider_request_does_not_follow_a_redirect in a child process"]
+    fn cloud_redirect_child() {
+        use std::sync::atomic::Ordering;
+        if std::env::var(REDIRECT_CHILD_ENV).as_deref() != Ok("1") {
+            return;
+        }
+        for name in [
+            "HTTP_PROXY",
+            "http_proxy",
+            "HTTPS_PROXY",
+            "https_proxy",
+            "ALL_PROXY",
+            "all_proxy",
+        ] {
+            std::env::remove_var(name);
+        }
+
+        let (elsewhere_port, elsewhere_hits) = one_status_server("200 OK");
+        let (redirecting_port, _) =
+            redirect_server(format!("http://127.0.0.1:{elsewhere_port}/stolen"));
+        let url = format!("http://127.0.0.1:{redirecting_port}/v1/messages");
+
+        // CONTROL: the shared client follows, so the test can tell.
+        let followed = tauri::async_runtime::block_on(client().expect("shared").get(&url).send())
+            .expect("followed");
+        assert_eq!(followed.status().as_u16(), 200);
+        assert_eq!(elsewhere_hits.load(Ordering::SeqCst), 1);
+
+        // THE GUARD: every cloud provider's client stops at the 3xx.
+        for provider in ALL {
+            if provider == ProviderId::Ollama {
+                continue;
+            }
+            let reply = tauri::async_runtime::block_on(
+                client_for(provider).expect("client").get(&url).send(),
+            )
+            .expect("the redirecting server answers");
+            assert_eq!(reply.status().as_u16(), 302, "{provider:?} followed a redirect");
+        }
+        assert_eq!(
+            elsewhere_hits.load(Ordering::SeqCst),
+            1,
+            "a provider request reached the redirect target"
+        );
+    }
 
     /// Accepts connections on 127.0.0.1, counts them, and answers every one
     /// with a fixed status. Returns the port and the counter.
@@ -959,7 +1095,7 @@ mod tests {
             let expected = if provider == ProviderId::Ollama {
                 loopback_client().expect("loopback client")
             } else {
-                client().expect("shared client")
+                cloud_client().expect("cloud client")
             };
             assert!(
                 std::ptr::eq(chosen, expected),

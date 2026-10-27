@@ -388,7 +388,9 @@ export function InterviewPanel({
           className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
           {extractionProgressNote(selected)}{' '}
-          <span className="font-mono tabular-nums">{elapsed}s</span>
+          <span aria-hidden="true" className="font-mono tabular-nums">
+            {elapsed}s
+          </span>
         </p>
       ) : null}
 

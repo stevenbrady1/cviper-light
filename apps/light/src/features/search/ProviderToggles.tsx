@@ -25,9 +25,14 @@ import { providerAvailability } from './model';
  * Every one of them ends at the same place, so the button is right there rather
  * than in a sentence telling somebody to go and find Settings.
  *
- * Disabled, never hidden. A board that vanishes when it is not set up is a
- * board the user never learns exists, and "why can I not search Adzuna" has no
- * answer on a screen that does not mention Adzuna.
+ * Disabled, never hidden — ONCE THIS ROW IS SHOWN. A board that vanishes
+ * when it is not set up is a board the user never learns exists, so with one
+ * key saved the other board stays here with its reason and its link.
+ *
+ * The row as a whole is not shown until a job-board key exists (L-276,
+ * `hasAnyJobBoardKey`). Asking a first-time user to register on two other
+ * sites is the clutter that decision removed; the keys are still one fold
+ * down in Settings, under "Job-board keys (optional)".
  */
 
 interface ProviderTogglesProps {

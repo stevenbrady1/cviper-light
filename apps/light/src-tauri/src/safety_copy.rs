@@ -106,9 +106,14 @@ pub fn make_safety_copy(dir: &Path, db_file: &str, latest_schema: i64) -> io::Re
 }
 
 /// Remove the safety copy, for "Delete everything". Absent is success.
+///
+/// Also the temporary file `copy_atomically` writes through: a crash or a full
+/// disk mid-copy leaves it behind, holding the same data as the copy.
 pub fn delete_safety_copy(dir: &Path, db_file: &str) -> io::Result<()> {
-    remove_if_present(&with_suffix(dir, db_file, SAFETY_COPY_SUFFIX))?;
-    remove_if_present(&with_suffix(dir, db_file, &format!("{SAFETY_COPY_SUFFIX}-wal")))
+    let copy = with_suffix(dir, db_file, SAFETY_COPY_SUFFIX);
+    remove_if_present(&copy)?;
+    remove_if_present(&with_suffix(dir, db_file, &format!("{SAFETY_COPY_SUFFIX}-wal")))?;
+    remove_if_present(&copy.with_extension("partial"))
 }
 
 /// The data folder the SQL plugin keeps the database in (`app_config_dir`).
@@ -225,6 +230,28 @@ mod tests {
         assert!(!dir.join(format!("{DB}{SAFETY_COPY_SUFFIX}-wal")).exists());
         assert!(dir.join(DB).exists(), "deleting the copy never touches the database");
         delete_safety_copy(&dir, DB).unwrap();
+    }
+
+    #[test]
+    fn delete_also_removes_a_copy_left_half_written_by_a_crash() {
+        // `copy_atomically` writes through `<to>.with_extension("partial")`,
+        // which for both the copy and its log is `cviper.db.partial`. A crash
+        // or a full disk mid-copy left that file behind: a full copy of the
+        // CVs and applications that "Delete everything" did not touch.
+        let dir = scratch();
+        fs::write(dir.join(DB), b"data").unwrap();
+        let partial = dir.join("cviper.db.partial");
+        fs::write(&partial, b"half a copy of the user's data").unwrap();
+        assert_eq!(
+            partial,
+            dir.join(format!("{DB}{SAFETY_COPY_SUFFIX}")).with_extension("partial"),
+            "the test must name the file copy_atomically really writes"
+        );
+
+        delete_safety_copy(&dir, DB).unwrap();
+
+        assert!(!partial.exists(), "the half-written copy survived Delete everything");
+        assert!(dir.join(DB).exists(), "deleting the copy never touches the database");
     }
 
     #[test]

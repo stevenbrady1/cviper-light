@@ -37,6 +37,12 @@ import {
   type ScoringError,
 } from './errors';
 import { stripJobBoilerplate } from './boilerplate';
+import {
+  HIGH_CONFIDENCE_REQUIREMENTS,
+  type ConfidenceLevel,
+  type KeywordConfidence,
+} from './confidence';
+import { displayTerm } from './display-names';
 import { matchProfileToJob, type MatchResult } from './match';
 import { buildCvProfile, buildJobPosting } from './profile';
 import { DEFAULT_SKILL_WEIGHT, skillWeight } from './weights';
@@ -82,8 +88,12 @@ function prepare(text: string): string {
  * into `Ci/Cd` and `node.js` into `Node.Js`.
  */
 function displaySkill(skill: string): string {
-  if (skill.includes('/') || skill.includes('.')) return skill;
-  return skill.replace(/[A-Za-z]+/g, (word) => word[0]!.toUpperCase() + word.slice(1));
+  const cased =
+    skill.includes('/') || skill.includes('.')
+      ? skill
+      : skill.replace(/[A-Za-z]+/g, (word) => word[0]!.toUpperCase() + word.slice(1));
+  // L-288: then the display map, so "Sql" is "SQL" in a sentence as well as a list.
+  return displayTerm(cased);
 }
 
 /** "1 thing" / "3 things". */
@@ -100,7 +110,41 @@ function plural(count: number, singular: string, pluralWord: string): string {
  * assessed them will act on this number very differently from one who knows a
  * word list matched it, and only one of those beliefs is true here.
  */
-function buildSummary(match: MatchResult, ats: AtsResult): string {
+/**
+ * L-287 — the fewest recognised requirements a "strong" verdict can rest on.
+ *
+ * With one requirement, coverage is all or nothing: a CV that has the one
+ * phrase scores 92 "strong" (the care and charity-shop adverts in the L-281
+ * eval set did exactly that). Below this many, the score is capped at
+ * `THIN_ADVERT_SCORE_CAP`, the top of "possible", and the summary says so.
+ * A Light-only divergence from the web app's formula, chosen by Steven on
+ * 26 Oct 2026 over shrinking towards 50 or a note alone.
+ */
+export const MIN_REQUIREMENTS_FOR_STRONG = 3;
+
+/** One below `deriveVerdict`'s "strong" threshold (75). */
+export const THIN_ADVERT_SCORE_CAP = 74;
+
+/** The score after the L-287 cap, and whether the cap lowered it. */
+function capThinAdvert(match: MatchResult): { score: number; capped: boolean } {
+  const capped =
+    match.required.length < MIN_REQUIREMENTS_FOR_STRONG && match.matchScore > THIN_ADVERT_SCORE_CAP;
+  return { score: capped ? THIN_ADVERT_SCORE_CAP : match.matchScore, capped };
+}
+
+function capNote(match: MatchResult): string {
+  const n = match.required.length;
+  const found =
+    n === 0
+      ? 'No requirement could be recognised in this advert'
+      : `Only ${n} ${n === 1 ? 'requirement' : 'requirements'} could be recognised in this advert`;
+  return (
+    `${found}, so the score is capped at ${THIN_ADVERT_SCORE_CAP} ("possible"): ` +
+    'that is too little to call it a strong match. Check the full advert yourself.'
+  );
+}
+
+function buildSummary(match: MatchResult, ats: AtsResult, capped: boolean): string {
   const lead =
     'Keyword match only — this compared the words on your CV with the words in ' +
     'the advert, and nothing more.';
@@ -120,7 +164,8 @@ function buildSummary(match: MatchResult, ats: AtsResult): string {
         'gap costs more than a missing buzzword.'
       : 'Treat it as a rough steer rather than a verdict.';
 
-  return `${lead} ${coverage} ${weighting}`;
+  const base = `${lead} ${coverage} ${weighting}`;
+  return capped ? `${base} ${capNote(match)}` : base;
 }
 
 // ── Suggestions ──────────────────────────────────────────────────────────────
@@ -240,6 +285,55 @@ export function atsKeywordScore(
   return ok(atsScore(cv, advert).score);
 }
 
+/** L-291 — the three-word confidence for a count of recognised requirements. */
+function confidenceLevel(requirements: number): ConfidenceLevel {
+  if (requirements < MIN_REQUIREMENTS_FOR_STRONG) return 'low';
+  if (requirements < HIGH_CONFIDENCE_REQUIREMENTS) return 'medium';
+  return 'high';
+}
+
+/**
+ * L-291 — how many requirements a basic-match score rests on, and what that
+ * makes its confidence. Same hygiene, same refusal and the same `required` as
+ * `scoreByKeywords`, so it describes exactly the score shown beside it. Null
+ * where the scorer would refuse: no score, no label.
+ */
+export function keywordConfidence(
+  cvText: string,
+  jobDescription: string,
+): KeywordConfidence | null {
+  const cv = prepare(cvText);
+  const advert = prepare(stripJobBoilerplate(jobDescription));
+  if (refuseUnscorable(cv, advert) !== null) return null;
+  const requirements = matchProfileToJob(buildCvProfile(cv), buildJobPosting(advert)).required
+    .length;
+  return { level: confidenceLevel(requirements), requirements };
+}
+
+/**
+ * L-292 — the advert's desirables the CV does not show, spelled for the screen.
+ *
+ * L-289 made a missed desirable cost nothing, so it is rightly absent from
+ * `missing_skills`; the user should still be told about it, as something nice
+ * to have rather than a gap. Empty when the advert marks nothing desirable, and
+ * where the scorer would refuse. Same hygiene and matching as
+ * `scoreByKeywords`, so it never lists a skill the score counted as met.
+ */
+export function missingNiceToHaves(cvText: string, jobDescription: string): string[] {
+  const cv = prepare(cvText);
+  const advert = prepare(stripJobBoilerplate(jobDescription));
+  if (refuseUnscorable(cv, advert) !== null) return [];
+  const job = buildJobPosting(advert);
+  if (job.essentialSkills.length === 0) return [];
+  const match = matchProfileToJob(buildCvProfile(cv), job);
+  const lower = (skill: string): string => skill.toLowerCase();
+  const essential = new Set(job.essentialSkills.map(lower));
+  const counted = new Set(match.required.map(lower));
+  return job.keySkills
+    .filter((skill) => !essential.has(lower(skill)) && !counted.has(lower(skill)))
+    .map(displaySkill);
+}
+
 /**
  * Score one CV against one job advert using keywords alone.
  *
@@ -260,6 +354,7 @@ export function scoreByKeywords(
   const job = buildJobPosting(advert);
   const match = matchProfileToJob(profile, job);
   const ats = atsScore(cv, advert);
+  const { score, capped } = capThinAdvert(match);
 
   return ok({
     // Evidence first, conclusion last — the same reading order the JSON schema
@@ -270,10 +365,10 @@ export function scoreByKeywords(
     keyword_gaps: [...ats.missingKeywords],
     ats_notes: buildAtsNotes(ats),
     suggestions: buildSuggestions(match, ats),
-    summary: buildSummary(match, ats),
-    match_score: match.matchScore,
+    summary: buildSummary(match, ats, capped),
+    match_score: score,
     // Derived, never decided here — exactly as the AI path does it, so the
     // score and the verdict can never contradict each other on screen.
-    verdict: deriveVerdict(match.matchScore),
+    verdict: deriveVerdict(score),
   });
 }

@@ -28,6 +28,8 @@ const NOW = new Date('2026-08-19T09:00:00.000Z');
 const TODAY = '2026-08-19';
 const BOTH_KEYS: Record<JobProviderId, KeyState> = { adzuna: 'configured', reed: 'configured' };
 const NO_KEYS: Record<JobProviderId, KeyState> = { adzuna: 'missing', reed: 'missing' };
+/** The keyed-board row only shows once a key exists (L-276); one is enough. */
+const ONE_KEY: Record<JobProviderId, KeyState> = { adzuna: 'missing', reed: 'configured' };
 
 const DEFAULT_FIVE = ['linkedin', 'indeed', 'totaljobs', 'cv-library', 'reed'];
 
@@ -122,10 +124,10 @@ describe('job boards, right under the form (L-219)', () => {
 
     const more = screen.getByTestId('keyless-more');
     expect(more.getAttribute('aria-expanded')).toBe('false');
-    expect(more.textContent).toContain('4');
+    expect(more.textContent).toContain('5');
     await user.click(more);
     expect(more.getAttribute('aria-expanded')).toBe('true');
-    expect(boardIds(bar)).toHaveLength(9);
+    expect(boardIds(bar)).toHaveLength(10);
     await user.click(more);
     expect(boardIds(bar)).toEqual(DEFAULT_FIVE);
   });
@@ -230,7 +232,7 @@ describe('Arbeitnow and a UK location (L-219)', () => {
 
 describe('the sources take one line each (L-219)', () => {
   it('a board with no key is one short link, its reason a description', async () => {
-    renderSearch(NO_KEYS);
+    renderSearch(ONE_KEY);
     const link = await screen.findByTestId('provider-settings-adzuna');
     expect(link.textContent).toBe('set up in Settings');
     expect(describedBy(link)).toContain('Settings');
@@ -298,8 +300,8 @@ describe('phone pass (L-219, part 3)', () => {
   });
 
   it('every source row is a full-size tap target on a phone, compact on a wide screen', async () => {
-    renderSearch(NO_KEYS);
-    await screen.findByTestId('search-empty');
+    renderSearch(ONE_KEY);
+    await screen.findByTestId('provider-toggles');
     for (const id of [
       'provider-adzuna',
       'provider-reed',

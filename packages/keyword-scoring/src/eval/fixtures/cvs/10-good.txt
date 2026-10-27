@@ -1,0 +1,39 @@
+MARCUS CAMPBELL
+Lewisham, London
+Information Security and Compliance Analyst
+
+PROFILE
+Security professional with ten years in IT, the last five in governance, risk and compliance. I've run internal ISO 27001 audits, led a Cyber Essentials Plus certification from scratch, and maintained a risk register that our committee actually reads. I came up through infrastructure, so I can talk firewall rules with engineers and then explain to a finance director, in plain English, why it matters.
+
+EXPERIENCE
+
+Information Security Analyst - University, South East London
+April 2021 - present
+- Plan and carry out the internal audit programme against our ISO/IEC 27001:2022 ISMS - 14 audits a year, with findings tracked through to closure.
+- Led the first Cyber Essentials Plus certification for the professional services estate (around 2,800 devices), including the remediation plan for unsupported operating systems.
+- Run the information risk register: workshop new risks with system owners, score them, agree treatments and report quarterly to the risk committee.
+- Write and review policies and standards - access control, supplier security, acceptable use - and keep a tidy evidence library for the external auditors.
+- Carry out third-party security assessments on new suppliers and cloud services.
+
+Infrastructure Engineer - Managed service provider, Croydon
+2018 - 2021
+- Supported Windows Server, Microsoft 365 and Entra ID for 40 small business clients.
+- Set up patching and vulnerability scanning routines with Defender and Nessus.
+- Wrote runbooks and change records for everything I touched.
+
+2nd Line Support Analyst - Housing association, Kent
+2016 - 2018
+- Desktop and network support for 600 users; first taste of security when I helped clean up after a phishing incident.
+
+CERTIFICATIONS
+ISO/IEC 27001 Lead Auditor - 2022
+BCS Certificate in Information Security Management Principles (CISMP) - 2020
+CompTIA Security+ - 2019
+Used the NCSC Cyber Assessment Framework for a gap analysis in 2024
+
+SKILLS
+ISO 27001 / Cyber Essentials Plus / NCSC CAF / NIST CSF basics
+Risk assessment and treatment planning.
+Audit reports and evidence management.
+Microsoft 365 security, Defender, Intune.
+Explaining technical issues to non-technical people - I run the staff phishing awareness sessions.

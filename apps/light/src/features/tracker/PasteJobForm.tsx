@@ -420,7 +420,9 @@ export function PasteJobForm({
           className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
           Opening that page and reading the advert text out of it.{' '}
-          <span className="font-mono tabular-nums">{elapsed}s</span>
+          <span aria-hidden="true" className="font-mono tabular-nums">
+            {elapsed}s
+          </span>
         </p>
       ) : fetchNote === null ? null : (
         <p
@@ -590,7 +592,9 @@ export function PasteJobForm({
           className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
           {extractionProgressNote(selected)}{' '}
-          <span className="font-mono tabular-nums">{elapsed}s</span>
+          <span aria-hidden="true" className="font-mono tabular-nums">
+            {elapsed}s
+          </span>
         </p>
       ) : null}
 

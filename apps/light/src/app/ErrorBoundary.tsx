@@ -23,6 +23,13 @@ import { cardClasses } from '../ui';
 
 interface ErrorBoundaryProps {
   readonly children: ReactNode;
+  /**
+   * `app` (the default) is the last-resort net round the whole tree and fills
+   * the window. `view` sits round ONE screen inside the shell: it draws in the
+   * view's place, so the rail and the other screens stay usable, and App keys
+   * it by the view so moving to another screen starts clean.
+   */
+  readonly scope?: 'app' | 'view';
   /** Reloads the window. A prop so a test can observe it without reloading jsdom. */
   readonly onReload?: () => void;
 }
@@ -52,6 +59,32 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   override render(): ReactNode {
     if (!this.state.failed) return this.props.children;
+
+    if (this.props.scope === 'view') {
+      return (
+        <div className="flex min-h-0 flex-1 items-start justify-center p-6">
+          <section role="alert" className={`max-w-md ${cardClasses({ padding: 'none' })} p-6`}>
+            <h1 className="text-lg font-semibold text-ink">This screen stopped working</h1>
+            <p className="mt-2 text-ink-muted">
+              Your data is safe: your CVs, jobs and applications are stored on this computer and
+              nothing was lost. The other screens still work.
+            </p>
+            <p className="mt-2 text-ink-muted">
+              Try again, or reload the app. If it keeps happening, use Settings, then Report a
+              problem.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" className={PRIMARY_BUTTON} data-primary onClick={this.tryAgain}>
+                Try again
+              </button>
+              <button type="button" className={SECONDARY_BUTTON} onClick={this.reload}>
+                Reload the app
+              </button>
+            </div>
+          </section>
+        </div>
+      );
+    }
 
     return (
       <main className="flex min-h-screen items-center justify-center bg-canvas p-6">

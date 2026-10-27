@@ -259,6 +259,11 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     why: 'A keyless search link for Jobserve, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page, and it never scrapes Jobserve.',
   },
   {
+    host: 'www.jobs.service.gov.uk',
+    purpose: 'opened-in-your-browser',
+    why: 'A keyless search link for GOV.UK’s Find a job (the Work Hub service run by the Department for Work and Pensions), from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page, and it never scrapes it.',
+  },
+  {
     host: 'cviper.ai',
     purpose: 'opened-in-your-browser',
     why: 'This app’s own website: its download page and the privacy policy, opened in your browser when you tap a line that names it. The app never contacts it, and nothing is added to the link.',

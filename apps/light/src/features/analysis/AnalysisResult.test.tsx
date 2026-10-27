@@ -378,3 +378,230 @@ describe('the ATS keyword number (L-196)', () => {
     expect(block.getAttribute('style')).toBeNull();
   });
 });
+
+/**
+ * L-290 — the proof behind each matched skill.
+ *
+ * A user can check a match against their own words instead of trusting it.
+ * Only lines the score itself would credit are shown, and a skill with no
+ * such line is left out rather than given a guessed one.
+ */
+describe('AnalysisResult — where your CV shows each matched skill (L-290)', () => {
+  const CV = [
+    'No SQL at my first job.',
+    '- Daily SQL reporting for the trading team.',
+    '- Python scripts for the monthly close.',
+  ].join('\n');
+
+  it('lists the CV line for each matched skill', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        cvText={CV}
+      />,
+    );
+    const proof = screen.getByTestId('analysis-proof');
+    expect(within(proof).getByText('Daily SQL reporting for the trading team.')).toBeTruthy();
+    expect(within(proof).getByText('Python scripts for the monthly close.')).toBeTruthy();
+    // Spelled like the chips above it.
+    expect(within(proof).getByText('SQL')).toBeTruthy();
+  });
+
+  // NEGATIVE — the negated line is never offered as proof.
+  it('does not quote the line that says the skill is missing', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        cvText={CV}
+      />,
+    );
+    expect(within(screen.getByTestId('analysis-proof')).queryByText(/No SQL/)).toBeNull();
+  });
+
+  // NEGATIVE — no CV text (an older result, a missing CV): no block at all.
+  it('shows nothing without the CV text', () => {
+    render(
+      <AnalysisResult analysis={keywordAnalysis()} provider="keyword" model="m" aiAvailable />,
+    );
+    expect(screen.queryByTestId('analysis-proof')).toBeNull();
+  });
+
+  // BOUNDARY — a skill with no literal line is left out, not guessed.
+  it('leaves out a skill the CV text does not literally show', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis({ matched_skills: ['Sql', 'Stakeholder management experience'] })}
+        provider="anthropic"
+        model="m"
+        aiAvailable
+        cvText={CV}
+      />,
+    );
+    const proof = screen.getByTestId('analysis-proof');
+    expect(within(proof).getAllByRole('listitem')).toHaveLength(1);
+  });
+
+  it('shows nothing when no matched skill has a line', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis({ matched_skills: ['Kubernetes'] })}
+        provider="keyword"
+        model="m"
+        aiAvailable
+        cvText={CV}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-proof')).toBeNull();
+  });
+});
+
+/**
+ * L-291 — how much a basic-match score rests on.
+ *
+ * Keyword path only: an AI score is not built from the word list, so a count
+ * of word-list requirements beside it would describe the wrong thing.
+ */
+describe('AnalysisResult — confidence beside the score (L-291)', () => {
+  const CV =
+    'Data analyst, five years. SQL, Excel, Power BI, Python, Tableau, Jira, Agile and Scrum ' +
+    'for the trading team.';
+  const advertWith = (skills: string[]): string =>
+    `Data Analyst\nBristol.\n\nEssential:\n${skills.map((s) => `- ${s}`).join('\n')}`;
+
+  it('says low, and how few, on a thin advert', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        cvText={CV}
+        advertText={advertWith(['SQL', 'Excel'])}
+      />,
+    );
+    const label = screen.getByTestId('analysis-confidence');
+    expect(label.getAttribute('data-level')).toBe('low');
+    expect(label.textContent).toMatch(/low.*only 2 requirements/i);
+  });
+
+  it('says high on a well-specified advert', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        cvText={CV}
+        advertText={advertWith(['SQL', 'Excel', 'Power BI', 'Python', 'Tableau', 'Jira', 'Agile'])}
+      />,
+    );
+    const label = screen.getByTestId('analysis-confidence');
+    expect(label.getAttribute('data-level')).toBe('high');
+    expect(label.textContent).toMatch(/high.*7 requirements/i);
+  });
+
+  // NEGATIVE — an AI score does not rest on the word list.
+  it('is not shown for an AI result', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="anthropic"
+        model="m"
+        aiAvailable
+        cvText={CV}
+        advertText={advertWith(['SQL', 'Excel'])}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-confidence')).toBeNull();
+  });
+
+  // NEGATIVE — without the advert text there is nothing to count.
+  it('is not shown without the advert text', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="m"
+        aiAvailable
+        cvText={CV}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-confidence')).toBeNull();
+  });
+
+  // BOUNDARY — no recognised requirement at all.
+  it('says so plainly when no requirement was recognised', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="m"
+        aiAvailable
+        cvText={CV}
+        advertText={'Data Analyst\n\nJoin our friendly team in Bristol, three days in the office.'}
+      />,
+    );
+    expect(screen.getByTestId('analysis-confidence').textContent).toMatch(/low.*no requirements/i);
+  });
+});
+
+/**
+ * L-292 — a missed nice-to-have is shown, but not as a gap.
+ */
+describe('AnalysisResult — nice to have, not on your CV (L-292)', () => {
+  const ADVERT =
+    'Data Analyst\nBristol.\n\nEssential:\n- SQL\n- Python\n\nDesirable:\n- Tableau\n- Power BI';
+  const CV = 'Analyst. Daily SQL reporting and Python scripts for the monthly close.';
+
+  it('lists them on a basic-match result', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        cvText={CV}
+        advertText={ADVERT}
+      />,
+    );
+    const list = screen.getByTestId('analysis-nice-to-have');
+    expect(within(list).getByText('Tableau')).toBeTruthy();
+    expect(within(list).getByText('Power BI')).toBeTruthy();
+  });
+
+  // NEGATIVE — not on an AI result, whose gaps come from the model.
+  it('is not shown on an AI result', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="anthropic"
+        model="m"
+        aiAvailable
+        cvText={CV}
+        advertText={ADVERT}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-nice-to-have')).toBeNull();
+  });
+
+  // BOUNDARY — none missed: the block is left out, not shown empty.
+  it('is left out when there is nothing to list', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="m"
+        aiAvailable
+        cvText={`${CV} Tableau and Power BI dashboards.`}
+        advertText={ADVERT}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-nice-to-have')).toBeNull();
+  });
+});
