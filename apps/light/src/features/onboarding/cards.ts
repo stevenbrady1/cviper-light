@@ -146,7 +146,7 @@ export function localModelLine(availability: Availability): string {
   // The default machine, and the line that has to leave the reader with
   // something they can do right now rather than a shopping list.
   return (
-    'No local model and no API key found — the basic word match works with ' +
-    'nothing set up, and you can add either later.'
+    'No AI is set up yet — the basic word match works with nothing set up, ' +
+    'and you can add AI later in Settings.'
   );
 }
