@@ -97,8 +97,8 @@ function unavailable(reason: string): InterviewOutcome {
 }
 
 const NOT_IN_THIS_BUILD =
-  'That way of preparing an interview is not available in this build. Choose a local model ' +
-  'or a provider you have a key for.';
+  'That way of preparing an interview is not available in this build. Pick another AI ' +
+  'option, or add AI in Settings.';
 
 export async function runInterview(
   request: InterviewRequest,
@@ -128,8 +128,8 @@ export async function runInterview(
       // user just pressed; never "grant it elsewhere", the detour L-171 closed.
       return unavailable(
         `${label} needs your permission before your CV and this advert can be sent to it. ` +
-          'Press “Prepare for this interview” again and the app will ask — or prepare with a ' +
-          'local model instead.',
+          'Press “Prepare for this interview” again and the app will ask — or prepare with ' +
+          'AI on this PC instead.',
       );
     }
   }

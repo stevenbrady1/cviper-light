@@ -517,8 +517,8 @@ describe('with no AI provider configured', () => {
     await openPaste(user);
 
     const reason = await screen.findByTestId('paste-job-reason');
-    expect(reason.textContent).toContain('Ollama');
-    expect(reason.textContent).toMatch(/your own key/);
+    expect(reason.textContent).toMatch(/needs AI/);
+    expect(reason.textContent).not.toMatch(/Ollama|your own key|AI provider/);
     expect(reason.textContent).toMatch(/add the job manually/i);
 
     await user.click(screen.getByTestId('paste-job-settings'));

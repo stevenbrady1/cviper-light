@@ -49,7 +49,7 @@ export function providerFor(option: ProviderOption, transport: ChatTransport): A
 
 /** Said when the basic match is asked to write. It cannot. */
 export const KEYWORD_CANNOT_WRITE =
-  'The basic match compares words; it cannot write. Choose a local model or your own key.';
+  'The basic match compares words; it cannot write. Pick an AI option, or add AI in Settings.';
 
 /** Said when a chosen option has no adapter in this build. */
 export const OPTION_UNAVAILABLE =

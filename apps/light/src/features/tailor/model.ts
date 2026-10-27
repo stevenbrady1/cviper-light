@@ -42,7 +42,7 @@ export const LETTER_WORD_LIMIT = 400;
  * that works without a model — so the reason is never the end of the road.
  */
 export const NO_AI_REASON =
-  'Tailoring writes new text, so it needs an AI. Add your own key in Settings, or use a free one on your own PC.';
+  'Tailoring writes new text, so it needs AI. Add it in Settings — one kind is free and runs on your own PC.';
 
 /**
  * The options this screen offers: everything the analysis picker offers
@@ -114,7 +114,7 @@ export function runDisabledReason(state: TailorRunState): string | null {
 
   if (state.option === null) {
     return (
-      'The way you chose to run this is no longer available — the local model may have ' +
+      'The way you chose to run this is no longer available — the AI on this PC may have ' +
       'stopped. Pick another option.'
     );
   }

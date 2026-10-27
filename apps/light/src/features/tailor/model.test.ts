@@ -71,7 +71,7 @@ describe('runDisabledReason', () => {
       runDisabledReason({ ...ready, cv: null, jobText: '', option: null, aiAvailable: false }),
     ).toBe(NO_AI_REASON);
     expect(NO_AI_REASON).toBe(
-      'Tailoring writes new text, so it needs an AI. Add your own key in Settings, or use a free one on your own PC.',
+      'Tailoring writes new text, so it needs AI. Add it in Settings — one kind is free and runs on your own PC.',
     );
     // Generic: no provider is named on this surface (L-148).
     for (const brand of ['OpenAI', 'Anthropic', 'Ollama']) {

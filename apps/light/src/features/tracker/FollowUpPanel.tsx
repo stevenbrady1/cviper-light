@@ -91,7 +91,7 @@ import { runFollowUp } from './runFollowUp';
  */
 
 /** Why the buttons will not go when no model is configured. */
-export const NO_AI_NOTE = 'Needs a local model or your own key.';
+export const NO_AI_NOTE = 'Needs AI — add it in Settings.';
 
 export const THANK_YOU_OFFER = 'Want a short thank-you note for the interviewer?';
 

@@ -1113,7 +1113,7 @@ export function Analysis({
                   packages/keyword-scoring and reaches no network at all. */}
               <p className="mt-1 text-ink-muted">
                 Pick a CV, paste an advert, and press the button. The basic match needs no account
-                and no API key, and nothing leaves this machine.
+                and no set-up, and nothing leaves this machine.
               </p>
               {/*
                 L-277: before the user has a CV, one click shows what a check

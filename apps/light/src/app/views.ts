@@ -99,7 +99,7 @@ export const VIEWS: readonly ViewDefinition[] = [
   {
     id: 'settings',
     label: 'Settings',
-    summary: 'Your API keys, your data, and where it all lives.',
+    summary: 'Your AI set-up, your data, and where it all lives.',
     shortcut: null,
     placement: 'pinned',
   },
