@@ -342,6 +342,33 @@ fn file_dialog(app: &AppHandle) -> FileDialogBuilder<tauri::Wry> {
     builder
 }
 
+/// ============================================================================
+/// SMOKE BUILDS ONLY: THE BACKUP DIALOG IS ANSWERED BY THE TEST (L-242)
+/// ============================================================================
+/// The smoke test drives the built app through WebDriver, which runs inside
+/// the web view and cannot click a native file dialog. So in a build with the
+/// `wdio` feature — and ONLY there — the two backup commands take their file
+/// from `CVIPER_SMOKE_BACKUP` instead of asking, when it is set. Everything
+/// after the dialog is the shipped code: `write_backup_at`, `read_backup_at`,
+/// and the import that follows.
+///
+/// A shipped build cannot reach this. The variable is read only in the `wdio`
+/// half below, and `lib.rs` refuses to compile `wdio` into anything but a
+/// debug build. `outside_a_smoke_build_the_backup_dialog_is_never_skipped`
+/// sets the variable on a normal build and proves nothing reads it.
+#[cfg(any(feature = "wdio", test))]
+const SMOKE_BACKUP_VAR: &str = "CVIPER_SMOKE_BACKUP";
+
+#[cfg(feature = "wdio")]
+fn smoke_backup_file() -> Option<PathBuf> {
+    std::env::var_os(SMOKE_BACKUP_VAR).map(PathBuf::from)
+}
+
+#[cfg(not(feature = "wdio"))]
+fn smoke_backup_file() -> Option<PathBuf> {
+    None
+}
+
 /// Wait for the dialog the caller has just opened.
 ///
 /// ============================================================================
@@ -709,6 +736,10 @@ pub(crate) async fn pick_and_read_cv(app: AppHandle) -> Result<Option<CvFile>, S
 /// Ask for a backup and read it as text. `Ok(None)` means the user cancelled.
 #[tauri::command]
 pub(crate) async fn pick_and_read_backup(app: AppHandle) -> Result<Option<BackupFile>, String> {
+    if let Some(path) = smoke_backup_file() {
+        return read_backup_at(&path).map(Some);
+    }
+
     let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
 
     file_dialog(&app)
@@ -743,6 +774,11 @@ pub(crate) async fn pick_and_write_backup(
     // then refusing to write it is a worse experience than refusing up front.
     if contents.len() as u64 > MAX_BACKUP_BYTES {
         return Err("That backup is too large to write.".to_string());
+    }
+
+    if let Some(path) = smoke_backup_file() {
+        write_backup_at(&path, &contents)?;
+        return Ok(Some(path.display().to_string()));
     }
 
     let (answer, answers) = tauri::async_runtime::channel(ONE_ANSWER);
@@ -2131,6 +2167,29 @@ mod tests {
         }
 
         found
+    }
+
+    #[test]
+    #[cfg(not(feature = "wdio"))]
+    fn outside_a_smoke_build_the_backup_dialog_is_never_skipped() {
+        // The variable set, as a hostile environment might: a shipped build
+        // still shows the user the dialog, because the code that reads it is
+        // not compiled in (L-242).
+        std::env::set_var(SMOKE_BACKUP_VAR, "/tmp/elsewhere.json");
+        let skipped = smoke_backup_file();
+        std::env::remove_var(SMOKE_BACKUP_VAR);
+        assert_eq!(skipped, None);
+    }
+
+    #[test]
+    #[cfg(feature = "wdio")]
+    fn a_smoke_build_takes_the_backup_file_from_its_environment() {
+        std::env::remove_var(SMOKE_BACKUP_VAR);
+        assert_eq!(smoke_backup_file(), None, "unset: the dialog is shown as usual");
+        std::env::set_var(SMOKE_BACKUP_VAR, "/tmp/smoke-backup.json");
+        let skipped = smoke_backup_file();
+        std::env::remove_var(SMOKE_BACKUP_VAR);
+        assert_eq!(skipped, Some(PathBuf::from("/tmp/smoke-backup.json")));
     }
 
     #[test]
