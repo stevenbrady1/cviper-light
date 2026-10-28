@@ -37,7 +37,8 @@ import {
   tickedBoards,
   toggleBoard,
 } from './boardChoice';
-import { FewResults, KeylessBar } from './KeylessBar';
+import { FewResults, KeylessBar, NothingMatchedNotes, fewResultsText } from './KeylessBar';
+import { LiveStatus } from '../../app/LiveStatus';
 import {
   chosenFeeds,
   isUkLocation,
@@ -922,22 +923,12 @@ export function Search({
             </p>
           ))}
 
-          {/*
-            NOT an alert, and deliberately worded so it cannot be mistaken for
-            one: the feed answered, it published N jobs, and none of them
-            matched. The only thing to change is what the user typed, and this
-            is the one line on the screen that says so.
-          */}
-          {nothingMatched.map((entry) => (
-            <p
-              key={entry.source}
-              data-testid={`keyless-nothing-matched-${entry.source}`}
-              className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
-            >
-              {entry.note}
-            </p>
-          ))}
+          <NothingMatchedNotes entries={nothingMatched} />
 
+          {/* The few-results message, spoken from here (L-238) — see `fewResultsText`. */}
+          <LiveStatus
+            text={results.ran && !running ? fewResultsText(results.jobs.length, jobBoards) : null}
+          />
           {!results.ran ? (
             <div
               data-testid="search-empty"

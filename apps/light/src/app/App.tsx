@@ -24,7 +24,7 @@ import {
   type WorkflowPort,
 } from '../features/tailor/persistence';
 import { createDbTailorPort } from '../features/tailor/port';
-import { ResumeBanner } from '../features/tailor/ResumeBanner';
+import { ResumeBanner, resumeBannerText } from '../features/tailor/ResumeBanner';
 import { Tailor, type TailorProps } from '../features/tailor/Tailor';
 import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
 import { type TrackerEntry } from '../features/tracker/model';
@@ -37,7 +37,7 @@ import {
   type OpenedCvPort,
   type PickedCv,
 } from '../platform/files';
-import { UpdateBanner } from '../features/settings/updates/UpdateBanner';
+import { UpdateBanner, updateBannerText } from '../features/settings/updates/UpdateBanner';
 import { updateCheckOnLaunchEnabled } from '../features/settings/updates/launchCheck';
 import { nextStateAfterCheck } from '../features/settings/updates/model';
 import { createTauriUpdatePort } from '../features/settings/updates/port';
@@ -590,6 +590,25 @@ export default function App({
           A strip above the view, never a modal over it. The app stays usable
           behind it and "Not now" installs nothing — see `UpdateBanner`.
         */}
+        {/*
+          Both strips are spoken from here, where the shell is always on the
+          page (L-238): a strip arriving with its words already in it is not
+          reliably announced, so the strips themselves carry no role.
+        */}
+        <LiveStatus
+          text={
+            offeredUpdate === null
+              ? null
+              : updateBannerText(offeredUpdate.version, installPhase === 'installed')
+          }
+        />
+        <LiveStatus
+          text={
+            resumeOffer === null || activeView === 'tailor'
+              ? null
+              : resumeBannerText(resumeOffer.title, resumeOffer.company)
+          }
+        />
         {offeredUpdate === null ? null : (
           <UpdateBanner
             version={offeredUpdate.version}

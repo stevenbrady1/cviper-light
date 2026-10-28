@@ -21,6 +21,7 @@ import {
   type LeftoverKeysPort,
 } from './leftoverKeys';
 import { LeftoverKeysNotice } from './LeftoverKeysNotice';
+import { expectSpoken } from '../../app/test/spoken';
 
 interface FakePort extends LeftoverKeysPort {
   readonly calls: { found: number; hasData: number };
@@ -75,7 +76,10 @@ describe('a fresh install that finds keys from an earlier one', () => {
     await user.click(await screen.findByRole('button', { name: 'Remove them' }));
 
     expect(port.removed).toEqual([['google_api_key', 'reed_api_key']]);
-    expect((await screen.findByTestId('leftover-keys-done')).textContent).toContain('removed');
+    const done = await screen.findByTestId('leftover-keys-done');
+    expect(done.textContent).toContain('removed');
+    // Read out by a screen reader, from a region already on the page (L-238).
+    expectSpoken(done, 'Done — those keys are removed from this computer.');
     expect(screen.queryByRole('button', { name: 'Remove them' })).toBeNull();
   });
 

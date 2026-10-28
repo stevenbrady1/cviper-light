@@ -14,6 +14,7 @@ import { type JobProviderId } from '@cviper/job-apis';
 
 import type { JobWorkflowRow } from '../db/workflow';
 import type { WorkflowPort } from '../features/tailor/persistence';
+import { expectSpoken } from './test/spoken';
 
 const tauri = vi.hoisted(() => ({
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
@@ -193,6 +194,11 @@ describe('restarting mid-Tailor (L-199)', () => {
 
     const banner = await screen.findByTestId('resume-banner');
     expect(banner.textContent).toContain('Tailor for Senior Data Analyst at Acme Ltd');
+    // Read out by a screen reader, from a region already on the page (L-238).
+    expectSpoken(
+      banner,
+      'Continue where you left off — Tailor for Senior Data Analyst at Acme Ltd.',
+    );
 
     await user.click(screen.getByTestId('resume-continue'));
     await screen.findByTestId('view-tailor');

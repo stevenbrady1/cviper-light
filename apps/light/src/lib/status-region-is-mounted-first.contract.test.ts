@@ -16,11 +16,15 @@
  * `role="alert"` is not checked. An alert is assertive and is announced when
  * it is inserted; that is what the role is for.
  *
- * Honest limit: a component whose WHOLE body is conditional (`if (!x) return
- * null; return <div role="status">`, or a parent that mounts it with `&&`) is
- * invisible to a lexical check. Four do this today, reviewed on 28 Oct 2026
- * and left for a follow-up: `UpdateBanner`, `ResumeBanner`,
- * `LeftoverKeysNotice` and `FewResults` (in `KeylessBar.tsx`).
+ * A conditional right at the element is only one shape. A component whose
+ * WHOLE body is conditional (`if (!x) return null; return <div role="status">`,
+ * or a parent that mounts it with `&&`) is invisible to that lexical check, and
+ * four did exactly this until L-238: `UpdateBanner`, `ResumeBanner`,
+ * `LeftoverKeysNotice` and `FewResults`. So there is a second, stricter rule
+ * that does not care how the element is mounted: a `role="status"` element is
+ * a HIDDEN region (`sr-only`) that exists only to be spoken. A visible message
+ * never carries the role; its words go through `LiveStatus`, mounted where the
+ * message's own parent is always on the page.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -46,6 +50,33 @@ export function conditionalStatusRegions(source: string): number[] {
   return lines;
 }
 
+/** The opening tag around `index`, up to its closing `>` (an arrow's `=>` is not one). */
+function openingTag(source: string, tagStart: number): string {
+  let depth = 0;
+  for (let index = tagStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '{') depth += 1;
+    else if (char === '}') depth -= 1;
+    else if (char === '>' && depth === 0 && source[index - 1] !== '=') {
+      return source.slice(tagStart, index + 1);
+    }
+  }
+  return source.slice(tagStart);
+}
+
+/** Every `role="status"` element that is not a hidden (`sr-only`) region, as `line`. */
+export function visibleStatusRegions(source: string): number[] {
+  const lines: number[] = [];
+  for (const match of source.matchAll(/role="status"/g)) {
+    const tagStart = source.lastIndexOf('<', match.index);
+    if (tagStart === -1) continue;
+    if (!/\bsr-only\b/u.test(openingTag(source, tagStart))) {
+      lines.push(source.slice(0, match.index).split('\n').length);
+    }
+  }
+  return lines;
+}
+
 const FEATURES = join(REPO_ROOT, 'apps', 'light', 'src');
 
 describe('status messages are written into a region already on the page (L-299)', () => {
@@ -54,6 +85,16 @@ describe('status messages are written into a region already on the page (L-299)'
     expect(files.length).toBeGreaterThan(50);
     const offences = files.flatMap((file) =>
       conditionalStatusRegions(readFileSync(file, 'utf8')).map(
+        (line) => `${displayPath(file)}:${line}`,
+      ),
+    );
+    expect(offences).toEqual([]);
+  });
+
+  it('every role="status" element is a hidden region: visible messages speak through LiveStatus (L-238)', () => {
+    const files = walk(FEATURES, { extensions: ['.tsx'] });
+    const offences = files.flatMap((file) =>
+      visibleStatusRegions(readFileSync(file, 'utf8')).map(
         (line) => `${displayPath(file)}:${line}`,
       ),
     );
@@ -82,5 +123,33 @@ describe('the guard itself', () => {
     expect(conditionalStatusRegions('{p === null ? null : (\n  <p role="alert">x</p>\n)}')).toEqual(
       [],
     );
+  });
+});
+
+describe('the visible-region guard itself (L-238)', () => {
+  it('negative: a visible message with the role, however it is mounted', () => {
+    expect(
+      visibleStatusRegions(
+        'if (x) return null;\nreturn <div role="status" className="border">hi</div>;',
+      ),
+    ).toEqual([2]);
+    expect(
+      visibleStatusRegions(
+        '<p\n  data-testid="x"\n  role="status"\n  onClick={() => go()}\n  className="text-ink"\n>hi</p>',
+      ),
+    ).toEqual([3]);
+  });
+
+  it('boundary: a hidden region passes, wherever sr-only sits in the tag', () => {
+    expect(visibleStatusRegions('<p role="status" className="sr-only">{t}</p>')).toEqual([]);
+    expect(
+      visibleStatusRegions('<p className="sr-only" role="status" aria-live="polite">{t}</p>'),
+    ).toEqual([]);
+    // sr-only in a CHILD does not make the visible parent hidden.
+    expect(
+      visibleStatusRegions(
+        '<div role="status" className="p-2"><span className="sr-only">x</span></div>',
+      ),
+    ).toEqual([1]);
   });
 });
