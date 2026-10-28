@@ -122,6 +122,53 @@ One concern per pull request. Say in the description what was verified and
 how; a change whose only demonstration is an input the real code path never
 receives will be asked for a real one.
 
+## The changelog
+
+**Never edit `## [Unreleased]` in `CHANGELOG.md`.** A pull request adds its
+entry as a file of its own, `changes/unreleased/L-NNN.md`:
+
+```
+---
+section: Fixed
+---
+
+- Screen readers now read status messages out (L-299). One line per entry, written for the user.
+```
+
+- `section` is one of `Added`, `Changed`, `Fixed` or `Security`.
+- The file is named after the work item, and the entry names that item.
+- One line per bullet. Two bullets for one item is fine; two items is two files.
+
+Why: every pull request used to add its line at the top of the same section,
+so any two open at once edited the same lines and the second one always
+conflicted. 8 of the 27 pull requests from #370 to #419 needed a conflict fix,
+and 8 of those 10 fixes were in `CHANGELOG.md` — each one another local verify
+and another full CI run (L-303). Two files never conflict.
+
+`changes-unreleased.contract.test.ts` fails the build if an entry goes straight
+into `CHANGELOG.md`, or if a fragment is one the release would refuse.
+
+At release time:
+
+```
+pnpm changelog:preview                    # see the notes as they will appear
+pnpm changelog:release 0.11.1 2026-10-29  # write them in, delete the fragments
+```
+
+Then add the one-paragraph summary under the new heading by hand and commit
+it as the release commit. The script refuses an empty release, a version that
+is not newer than the last one, and a date that is not a real day.
+
+## Keeping a pull request mergeable
+
+- **Small and short-lived.** A pull request open for days collects conflicts.
+- **When one merges, bring `main` into the others straight away**, before
+  reviewing them, so a conflict is fixed once, while it is small.
+- **Two open pull requests should not both rewrite the same big component.**
+  If they must, merge one first and start the other from the result.
+- **A new export in an `index.ts` goes in alphabetical order, not at the end**, so two additions
+  land on different lines.
+
 ## Layout, and the conventions that bite
 
 ```

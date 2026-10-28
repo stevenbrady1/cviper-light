@@ -6,21 +6,7 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ## [Unreleased]
 
-### Changed
-
-- No person is named in the app's source, test data or docs any more (L-298), at the owner's request. Example CVs in the tests use an invented name, comments and docs say "the owner", the licence reads "The CViper Light authors", and the App Store copyright line is "© 2026 CViper". A test fails the build if a banned name comes back; it keeps the names only as SHA-256 hashes, so it does not name anyone itself. Some places still name the owner, each for a reason: the privacy policy (UK GDPR asks it to name who controls the data, and changing that is a legal decision), the Microsoft Store publisher name (it must match Partner Center exactly), and the GitHub account name in every link, including the one the updater checks. Nothing about how the app works changes.
-
-### Fixed
-
-- A long CV is no longer cut to its first 6,000 characters when it goes to an AI company (L-302). That limit was set for the small AI that runs on your own PC, but every AI got it, and nobody was told. When tailoring, it meant the new CV was rewritten from the first 6,000 characters only, so later jobs and your education could be missing from it. Now an AI company is sent up to 16,000 characters — a long, four-page CV — and is given room to send the whole tailored CV back. The AI on your PC still reads 6,000, because that is what it can hold. When your CV is longer than the AI you picked will read, the CV check and Tailor screens now say so before you start: "Your CV is 9,200 characters long. This AI is sent the first 6,000, so anything after that is not read." A CV under 6,000 characters is sent exactly as before.
-
-- Screen readers now read status messages out (L-299). About 25 messages — "Key saved", "Sending your CV to…", "Drafting the letter", "No applications match your search" and the rest — appeared on screen with their words already in them, and a screen reader often stays silent about a message that arrives that way. Each screen now keeps a hidden message area ready from the start and writes the words into it, so the message is read out once. Nothing changes on screen. The grey "Check this CV", "Tailor CV" and "Read the advert" buttons are now linked to the sentence beside them that says why they cannot be pressed, so a screen reader reading the button reads the reason too. A test fails the build if a status message is ever added the old way again.
-
-### Added
-
-- The test that runs the real, built Windows app now uses it the way a person does (L-301). It adds a job to the tracker, moves it to Applied, closes the app, opens it again, and checks the job is still there and still Applied; then it deletes it, so a developer's own tracker is left as it was. Until now that test only opened screens and read PDFs, and none of it saved anything, so a broken database update would have passed it. Backups are still not driven: export and import open your computer's own file window, which the test cannot click. No app change.
-
-- Colour contrast is now measured on the real, styled app (L-300). Until now it was only checked by matching class names in the code, which cannot see a background painted by a surrounding box, and the accessibility check from L-297 runs in a test browser that paints nothing. Now every main screen, at a desktop and a phone width, plus the sample result, a board with applications and an opened application, is drawn in WebKit and checked with axe against WCAG 2.1 AA (4.5:1 for normal text). Everything passes today. The check first confirms the app's colours actually loaded, because an unstyled page is black on white and would pass every time — that is exactly what the first version of this check measured, until a screenshot showed it. It also proves it can fail, on a deliberately pale sentence. No app change.
+Changes waiting for the next release are in [`changes/unreleased/`](changes/unreleased/), one file per change, so two pull requests never edit the same lines here (L-303). `pnpm changelog:preview` shows them as they will appear; `pnpm changelog:release <version> <date>` writes them in below. See [CONTRIBUTING.md](CONTRIBUTING.md#the-changelog).
 
 ## [0.11.0] — 2026-10-27
 

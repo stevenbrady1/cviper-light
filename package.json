@@ -21,6 +21,8 @@
     "webkit": "pnpm webkit:build && node --test apps/light/e2e/pdfjs-webkit.spec.ts apps/light/e2e/contrast-webkit.spec.ts",
     "verify:updater-manifest": "node apps/light/src/release/verifyUpdaterManifest.ts",
     "check:l-numbers": "node apps/light/src/numbering/checkLNumbers.ts",
+    "changelog:preview": "node apps/light/src/release/releaseChangelog.ts preview",
+    "changelog:release": "node apps/light/src/release/releaseChangelog.ts release",
     "assets:msix": "node apps/light/src/packaging/generateMsixAssets.ts",
     "check:msix-manifest": "node apps/light/src/packaging/checkAppxManifestVersion.ts",
     "build:msix": "pnpm --filter @cviper/light exec tauri build --no-bundle --features microsoft-store --config src-tauri/tauri.microsoft-store.conf.json -- --no-default-features",

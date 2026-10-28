@@ -123,6 +123,12 @@ docs/                Plan and feature matrix
   them consistent with each other.
 - **Do not run `pnpm tauri dev` in an agent session.** It opens a GUI window and
   blocks.
+- **Never edit `## [Unreleased]` in `CHANGELOG.md`.** Add
+  `changes/unreleased/L-NNN.md` (front matter `section: Added|Changed|Fixed|Security`,
+  then `- ` bullet lines naming L-NNN). Every PR used to insert at the same spot,
+  so any two open at once conflicted (L-303).
+  `changes-unreleased.contract.test.ts` fails the build on the old habit. See
+  CONTRIBUTING.md, "The changelog".
 
 ## Testing
 
