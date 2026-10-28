@@ -1,0 +1,13 @@
+/*
+ * The app's own stylesheet, for the contrast harness (L-300).
+ *
+ * Tailwind 4 finds the classes to generate by scanning from the build's root.
+ * The app builds from `apps/light`, so it sees `src/`; this page builds from
+ * `e2e/contrast`, so without the `@source` lines below it would generate
+ * almost nothing, and axe would measure an unstyled page — black on white,
+ * which passes every time. The spec checks a known token is painted, so that
+ * failure cannot be silent.
+ */
+@import '../../src/styles/theme.css';
+@source '../../src';
+@source '../../../../packages/ui/src';

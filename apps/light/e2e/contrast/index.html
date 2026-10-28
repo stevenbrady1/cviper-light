@@ -1,0 +1,22 @@
+<!doctype html>
+<!--
+  The page Playwright's WebKit loads for `apps/light/e2e/contrast-webkit.spec.ts`
+  (L-300). It mounts the REAL app — the same components, the same Tailwind
+  build, the same theme tokens and fonts — so axe can measure the colours a user
+  actually sees, including backgrounds a parent sets that a grep cannot pair.
+
+  Two things are not the app's: the Tauri IPC bridge is a stub that answers "no
+  AI, no keys" (every user's first launch), and the tracker, profile and tailor
+  stores are the in-memory fakes the unit tests use. See harness.tsx.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CViper Light</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./harness.tsx"></script>
+  </body>
+</html>
