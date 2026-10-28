@@ -642,9 +642,11 @@ function cardIn(column: string): By {
 /**
  * Close the app and start it again.
  *
- * Ending the session closes the window the WebDriver server lives in, which is
- * how a user closes the app; a process still running after QUIT_TIMEOUT is
- * then killed. Either way the next launch reads the same database file.
+ * The session is ended first, then the process is given QUIT_TIMEOUT to exit
+ * and killed if it has not. On the first CI run it had not: ending the session
+ * leaves the app running, so in practice this is a forced close — the harder
+ * case, like a crash or Task Manager, for anything not yet written to disk.
+ * Either way the next launch reads the same database file.
  */
 async function restart(): Promise<void> {
   restarting = true;
@@ -982,7 +984,21 @@ describe('the built CViper Light binary', () => {
 
   it('moves it to Applied', { timeout: 60_000 }, async () => {
     await visible('[data-testid="detail-status"]');
-    await click('[data-testid="detail-status"] option[value="applied"]');
+    // The status picker is a native <select>. Clicking its <option> through the
+    // app's own WebDriver server did not change it (first CI run of this test:
+    // the card stayed in Saved), because the open list is drawn by the OS, not
+    // the page. So the pick is made the way the browser reports one: the value
+    // set and a bubbling `change` fired, which is the event React's handler
+    // listens for. Everything after that is real — the handler, the IPC call
+    // and the SQLite write that the restart below reads back.
+    const changed = await session().executeScript<string>(
+      `const select = document.querySelector('[data-testid="detail-status"]');
+       if (!(select instanceof HTMLSelectElement)) return 'no select';
+       select.value = 'applied';
+       select.dispatchEvent(new Event('change', { bubbles: true }));
+       return select.value;`,
+    );
+    assert.equal(changed, 'applied');
     await session().wait(until.elementLocated(cardIn('applied')), ELEMENT_TIMEOUT);
   });
 
