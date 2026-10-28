@@ -19,6 +19,7 @@ import {
   type KeyProvider,
 } from './model';
 import { createTauriKeyPort, type KeyPort } from './port';
+import { LiveStatus } from '../../../app/LiveStatus';
 
 /**
  * Setting up a job-board key: one card per board, and no key saved until it has
@@ -331,9 +332,9 @@ function KeyCard({ provider, port, browser }: KeyCardProps) {
         </button>
       </div>
 
+      <LiveStatus text={outcome.passed} />
       {outcome.passed === null ? null : (
         <p
-          role="status"
           data-testid={`key-result-${provider.id}`}
           className="mt-3 rounded-control bg-teal/10 px-3 py-2 text-teal-ink"
         >

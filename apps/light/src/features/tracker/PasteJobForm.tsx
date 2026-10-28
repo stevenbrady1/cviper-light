@@ -26,6 +26,7 @@ import { urlOnlyNote, urlOnlyPaste } from './pastedUrl';
 import { FETCH_CAPPED_NOTE, FETCH_DISCLOSURE, FETCH_SUCCESS_NOTE, runFetch } from './runFetch';
 import { runExtraction } from './runExtraction';
 import { type ApplicationDraft } from './model';
+import { LiveStatus } from '../../app/LiveStatus';
 
 /**
  * Paste a job advert; a model reads it; YOU check it before anything is saved.
@@ -413,10 +414,12 @@ export function PasteJobForm({
         happens, and what happened afterwards. A fetch on a bad connection is
         fifteen seconds of nothing otherwise, which reads as a crash.
       */}
+      <LiveStatus
+        text={fetching ? 'Opening that page and reading the advert text out of it.' : fetchNote}
+      />
       {fetching ? (
         <p
           data-testid="paste-job-fetch-progress"
-          role="status"
           className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
           Opening that page and reading the advert text out of it.{' '}
@@ -427,7 +430,6 @@ export function PasteJobForm({
       ) : fetchNote === null ? null : (
         <p
           data-testid="paste-job-fetch-note"
-          role="status"
           className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
           {fetchNote}
@@ -459,10 +461,10 @@ export function PasteJobForm({
         STATUS, not an alert: nothing is broken, nobody did anything wrong, and
         the address has already been moved somewhere useful.
       */}
+      <LiveStatus text={urlNote} />
       {urlNote === null ? null : (
         <p
           data-testid="paste-job-url-only-note"
-          role="status"
           className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
           {urlNote}
@@ -517,6 +519,7 @@ export function PasteJobForm({
           data-testid="paste-job-extract"
           data-primary="true"
           disabled={busy || nothingConfigured || emptyPaste}
+          aria-describedby={disabledReason === null ? undefined : 'paste-job-reason'}
           onClick={() => void onExtract()}
           className={PRIMARY_BUTTON}
         >
@@ -554,7 +557,11 @@ export function PasteJobForm({
             Not an alert. A machine with no AI on it is the default state of a
             freshly installed app, and everything else on this screen works.
           */}
-          <p data-testid="paste-job-reason" className="text-xs text-ink-faint">
+          <p
+            id="paste-job-reason"
+            data-testid="paste-job-reason"
+            className="text-xs text-ink-faint"
+          >
             {disabledReason}
           </p>
           {nothingConfigured && onOpenSettings !== undefined ? (
@@ -575,20 +582,20 @@ export function PasteJobForm({
         A STATUS, not an alert: the user did nothing wrong, and the next press
         simply asks again.
       */}
+      <LiveStatus text={consentNote} />
       {consentNote === null ? null : (
         <p
           data-testid="paste-job-consent-note"
-          role="status"
           className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
           {consentNote}
         </p>
       )}
 
+      <LiveStatus text={running && selected !== null ? extractionProgressNote(selected) : null} />
       {running && selected !== null ? (
         <p
           data-testid="paste-job-progress"
-          role="status"
           className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
           {extractionProgressNote(selected)}{' '}
