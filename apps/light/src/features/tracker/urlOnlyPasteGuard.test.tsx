@@ -39,6 +39,7 @@ import { type Availability } from '../analysis/providers';
 import { Tracker } from './Tracker';
 import { URL_ONLY_BLOCKED_NOTE, URL_ONLY_NOTE } from './pastedUrl';
 import { createFakeTrackerPort, type FakeTrackerPort } from './test/fakePort';
+import { expectSpoken } from '../../app/test/spoken';
 
 const NOW = new Date(2026, 7, 19, 9, 0, 0);
 
@@ -225,7 +226,7 @@ describe('a link pasted into the advert box', () => {
     await pasteAndExtract(user, OPEN_URL);
 
     const note = await screen.findByTestId('paste-job-url-only-note');
-    expect(note.getAttribute('role')).toBe('status');
+    expectSpoken(note, note.textContent ?? '');
     expect(screen.queryAllByRole('alert')).toEqual([]);
     // No raw address, no status code, no jargon on screen.
     expect(note.textContent).not.toMatch(/error|invalid|failed|400|404/i);

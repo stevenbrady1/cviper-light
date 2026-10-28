@@ -225,6 +225,16 @@ describe('the empty screen', () => {
     expect(screen.getByTestId('analysis-run')).toHaveProperty('disabled', true);
     expect(screen.getByTestId('analysis-run-reason').textContent).toBe('Choose a CV first.');
   });
+
+  // L-299 (from L-238): a screen reader reading the grey button hears why.
+  it('the disabled button is described by its reason', async () => {
+    await renderView();
+
+    const run = screen.getByTestId('analysis-run');
+    const reason = screen.getByTestId('analysis-run-reason');
+    expect(reason.id).not.toBe('');
+    expect(run.getAttribute('aria-describedby')).toBe(reason.id);
+  });
 });
 
 describe('the run button explains its own disabled state', () => {
@@ -256,6 +266,8 @@ describe('the run button explains its own disabled state', () => {
 
     expect(screen.getByTestId('analysis-run')).toHaveProperty('disabled', false);
     expect(screen.queryByTestId('analysis-run-reason')).toBeNull();
+    // NEGATIVE — no description pointing at a reason that is not there.
+    expect(screen.getByTestId('analysis-run').getAttribute('aria-describedby')).toBeNull();
   });
 
   it('a CV whose text could not be read says what to upload instead', async () => {

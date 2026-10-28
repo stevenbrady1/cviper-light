@@ -48,6 +48,7 @@ import {
   type TrackerEntry,
 } from './model';
 import { createDbTrackerPort, type TrackerPort } from './port';
+import { LiveStatus } from '../../app/LiveStatus';
 
 /**
  * The application tracker: five columns, one card per application.
@@ -701,9 +702,15 @@ export function Tracker({
                   </button>
                 )}
               </div>
+              <LiveStatus
+                text={
+                  normalizedQuery !== '' && visibleEntries.length === 0
+                    ? 'No applications match your search.'
+                    : null
+                }
+              />
               {normalizedQuery !== '' && visibleEntries.length === 0 ? (
                 <p
-                  role="status"
                   data-testid="tracker-search-no-results"
                   className="shrink-0 text-sm text-ink-muted"
                 >
@@ -815,9 +822,15 @@ export function Tracker({
             }
             onClose={() => setPane({ kind: 'closed' })}
           >
+            <LiveStatus
+              text={
+                pane.notice === undefined
+                  ? null
+                  : `${pane.notice} Your paste is in the description below.`
+              }
+            />
             {pane.notice === undefined ? null : (
               <p
-                role="status"
                 data-testid="tracker-extract-notice"
                 className="mb-3 rounded-control bg-sunken px-3 py-2 text-ink-muted"
               >
