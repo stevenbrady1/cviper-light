@@ -1,44 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
-import {
-  checkFabrication,
-  checkLetterClaims,
-  type ChatTransport,
-  type FabricationFlag,
-  promptKeywordGaps,
-} from '@cviper/ai-providers';
-import {
-  renderCoverLetter,
-  renderTailoredCv,
-  wordCount,
-  type Application,
-  type Cv,
-  type Job,
-  type Profile,
-} from '@cviper/core-types';
+import { type ChatTransport, promptKeywordGaps } from '@cviper/ai-providers';
+import { type Application, type Cv, type Job, type Profile } from '@cviper/core-types';
 
-import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
-import { cardClasses, IconTile } from '../../ui';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
 
 import { readAvailability } from '../analysis/availability';
-import { ConsentGate, ConsentStatus } from '../analysis/ConsentGate';
+import { ConsentGate } from '../analysis/ConsentGate';
 import { cvCutNote } from '../analysis/cvCutNote';
 import {
   createTauriConsentPort,
-  isCloudKind,
   NO_CONSENT,
   type ConsentPort,
-  type ConsentProviderKind,
   type ConsentState,
 } from '../analysis/consent';
 import { jobAdvertText, providerInSentence } from '../analysis/model';
-import { OllamaDownloadLink } from '../analysis/OllamaDownloadLink';
-import { CvUpload } from '../cv/CvUpload';
 import {
   ollamaHint,
   optionByKey,
@@ -46,7 +26,6 @@ import {
   type ProviderOption,
 } from '../analysis/providers';
 import { gapsForTailor, type TailorHandoff } from '../flow/handoff';
-import { FLOW_HINT } from '../../app/hints';
 import { JobStepBar } from '../flow/JobStepBar';
 import {
   NO_SAVED_PROGRESS,
@@ -56,38 +35,26 @@ import {
 } from '../flow/progress';
 import { type StepId } from '../flow/steps';
 
-import { lineDiff } from './diff';
-import { MetricPromptBoxes } from './MetricPromptBoxes';
 import {
   EMPTY_METRIC_STATE,
   approvedMetrics,
   metricPromptsForGaps,
   metricsChanged,
-  stillApproved,
 } from './metricPrompts';
 import { createJobSessions, sessionIn, type JobSessions, type TailorJobState } from './jobSessions';
-import { AtsStep } from './AtsStep';
-import { CvTextPanel } from './CvTextPanel';
 import { compareAts } from './atsComparison';
-import { buildCoverLetterPdf, buildCvPdf } from './pdf';
-import {
-  LETTER_WORD_LIMIT,
-  NO_AI_REASON,
-  documentTitle,
-  editedAdvertTitle,
-  exportFileName,
-  newDocument,
-  newSavedApplication,
-  profileNotes,
-  savedMessage,
-  runDisabledReason,
-  tailorOptions,
-} from './model';
+import { profileNotes, runDisabledReason, tailorOptions } from './model';
 import { createDbTailorPort, type TailorPort } from './port';
-import { runCoverLetter } from './runCoverLetter';
-import { runReview } from './runReview';
-import { runTailor } from './runTailor';
-import { LiveStatus } from '../../app/LiveStatus';
+import { TailorAdvert } from './TailorAdvert';
+import { TailorCvPicker } from './TailorCvPicker';
+import { TailorEngine } from './TailorEngine';
+import { TailorResultView } from './TailorResultView';
+import { TailorRunBar } from './TailorRunBar';
+import { STEP_ANCHOR, isTailorStep, type TailorStep } from './tailorSteps';
+import { useTailorRuns } from './useTailorRuns';
+import { useTailorSaving } from './useTailorSaving';
+
+export type { TailorStep } from './tailorSteps';
 
 /**
  * The tailor view (L-160, L-161): pick a CV, pick or paste the advert, choose
@@ -121,13 +88,20 @@ import { LiveStatus } from '../../app/LiveStatus';
  * screen uses, recorded in the same store — and whichever action was pending
  * runs when the user says yes. Each run module holds its own gate too, so a
  * refusal cannot depend on this screen remembering to ask.
+ *
+ * ============================================================================
+ * WHERE THE PIECES LIVE (L-305)
+ * ============================================================================
+ * This file owns the state and the loading. Each panel on the page is its own
+ * component (`TailorCvPicker`, `TailorAdvert`, `TailorEngine`, `TailorRunBar`,
+ * `TailorResultView` and the parts it lays out), the AI runs and the consent
+ * gate are `useTailorRuns`, and every save is `useTailorSaving`. Two features
+ * on this screen then usually edit two different files, which is the point:
+ * `component-size.contract.test.ts` keeps any screen file under 800 lines.
  */
 
 /** How often the elapsed counter ticks while a model is thinking. */
 const TICK_MS = 1000;
-
-/** What the gate is waiting to run, once the user has answered. */
-type PendingAction = 'tailor' | 'review' | 'letter';
 
 export interface TailorProps {
   /** Injected by tests. Defaults to the real SQLite-backed port. */
@@ -188,31 +162,6 @@ export interface TailorProps {
   /** "◀ Tracker" on the step bar. */
   readonly onTracker?: (() => void) | undefined;
 }
-
-/** The three steps that are this screen's own (L-200). */
-export type TailorStep = 'tailor' | 'ats' | 'export';
-
-/** Where each of this screen's steps is on the page, to scroll to. */
-const STEP_ANCHOR: Readonly<Record<TailorStep, string>> = {
-  tailor: 'tailor-step-tailor',
-  ats: 'tailor-step-ats',
-  export: 'tailor-step-export',
-};
-
-function isTailorStep(step: StepId): step is TailorStep {
-  return step === 'tailor' || step === 'ats' || step === 'export';
-}
-
-function consentKindFor(kind: ProviderOption['kind']): ConsentProviderKind | null {
-  return isCloudKind(kind) ? kind : null;
-}
-
-const FLAG_LABELS: Readonly<Record<FabricationFlag['kind'], string>> = {
-  employer: 'Employer not in your CV',
-  date: 'Year not in your CV',
-  certification: 'Certification not in your CV',
-  metric: 'Figure not in your CV',
-};
 
 export function Tailor({
   port,
@@ -314,24 +263,12 @@ export function Tailor({
     [patchActive],
   );
   /**
-   * Which save is running, if any: one at a time. A file save is mostly the
-   * user choosing a place in the save window, so the screen says that rather
-   * than "Saving…" — which used to appear on "Save to an application" for
-   * every save, pointing at the wrong button (L-217).
-   */
-  const [saving, setSaving] = useState<'application' | 'file' | null>(null);
-  /**
    * Whether the chosen CV's text is shown (L-192). Starts open, and is NOT
    * reset when the CV changes: a user who folded it away did so on purpose.
    */
   const [cvPreviewOpen, setCvPreviewOpen] = useState(true);
 
   const [consent, setConsent] = useState<ConsentState>(NO_CONSENT);
-  const [pendingConsent, setPendingConsent] = useState<{
-    readonly option: ProviderOption;
-    readonly kind: ConsentProviderKind;
-    readonly action: PendingAction;
-  } | null>(null);
 
   // ── Loading ──────────────────────────────────────────────────────────────
 
@@ -583,368 +520,42 @@ export function Tailor({
     [onJobStep, selectedJob],
   );
 
-  /** The fresh consent check every run module gets — the store, not a snapshot. */
-  const hasConsent = useCallback(
-    (kind: ConsentProviderKind) => consentStore.read().then((read) => read.ok && read.value[kind]),
-    [consentStore],
-  );
+  const { gated, pendingConsent, onConsentAccept, onConsentDecline, onWithdrawConsent } =
+    useTailorRuns({
+      sessions,
+      consentStore,
+      consent,
+      setConsent,
+      createTransport,
+      selectedOption,
+      cvText,
+      jobText,
+      notes,
+      keywordGaps,
+      userMetrics,
+      result,
+      setError,
+      setSaveMessage,
+    });
 
-  const performTailor = useCallback(
-    async (option: ProviderOption) => {
-      // The job this run is FOR. Its answer is filed there, whatever is on
-      // screen by the time it arrives (L-199).
-      const jobId = sessions.get().activeJobId;
-      setError(null);
-      setSaveMessage(null);
-      sessions.patch(jobId, { phase: 'tailoring', error: null });
-
-      const run = await runTailor(
-        { option, cvText, jobText, profileNotes: notes, keywordGaps, userMetrics },
-        createTransport,
-        hasConsent,
-      );
-
-      if (!run.ok) {
-        sessions.patch(jobId, { phase: 'idle', result: null, error: run.error.message });
-        return;
-      }
-
-      const text = renderTailoredCv(run.value.cv, null);
-      const tailored = {
-        cv: run.value.cv,
-        text,
-        // Deterministic, on the original text, before anything is shown.
-        // The figures the user typed and approved are theirs (L-205); the
-        // employer, year and certification checks still use the CV alone.
-        report: checkFabrication(
-          cvText,
-          run.value.cv,
-          userMetrics.map((metric) => metric.text),
-        ),
-        provider: run.value.provider,
-        model: run.value.model,
-        retried: run.value.retried,
-        userMetrics,
-      };
-      sessions.patch(jobId, { phase: 'idle', result: tailored, review: null, letter: null });
-    },
-    [createTransport, cvText, hasConsent, jobText, keywordGaps, notes, sessions, userMetrics],
-  );
-
-  const performReview = useCallback(
-    async (option: ProviderOption) => {
-      if (result === null) return;
-      const jobId = sessions.get().activeJobId;
-      setError(null);
-      sessions.patch(jobId, { phase: 'reviewing', error: null });
-
-      const run = await runReview(
-        {
-          option,
-          draftText: result.text,
-          jobText,
-          cvText,
-          kind: 'cv',
-          userMetrics: stillApproved(result.userMetrics, userMetrics),
-        },
-        createTransport,
-        hasConsent,
-      );
-
-      if (!run.ok) {
-        sessions.patch(jobId, { phase: 'idle', error: run.error.message });
-        return;
-      }
-      sessions.patch(jobId, { phase: 'idle', review: run.value.review });
-    },
-    [createTransport, cvText, hasConsent, jobText, result, sessions, userMetrics],
-  );
-
-  const performLetter = useCallback(
-    async (option: ProviderOption) => {
-      const jobId = sessions.get().activeJobId;
-      setError(null);
-      sessions.patch(jobId, { phase: 'writing', error: null });
-
-      const run = await runCoverLetter(
-        {
-          option,
-          cvText,
-          jobText,
-          tailoredCvText: result?.text ?? null,
-          profileNotes: notes,
-          userMetrics: stillApproved(result?.userMetrics ?? [], userMetrics),
-        },
-        createTransport,
-        hasConsent,
-      );
-
-      if (!run.ok) {
-        sessions.patch(jobId, { phase: 'idle', error: run.error.message });
-        return;
-      }
-
-      const text = renderCoverLetter(run.value.letter);
-      const written = {
-        letter: run.value.letter,
-        text,
-        words: wordCount(text),
-        claims: checkLetterClaims(
-          cvText,
-          run.value.letter,
-          stillApproved(result?.userMetrics ?? [], userMetrics).map((metric) => metric.text),
-        ),
-      };
-      sessions.patch(jobId, { phase: 'idle', letter: written });
-    },
-    [createTransport, cvText, hasConsent, jobText, notes, result, sessions, userMetrics],
-  );
-
-  const perform = useCallback(
-    async (action: PendingAction, option: ProviderOption) => {
-      if (action === 'tailor') await performTailor(option);
-      else if (action === 'review') await performReview(option);
-      else await performLetter(option);
-    },
-    [performLetter, performReview, performTailor],
-  );
-
-  /** Ask first, if the option is a cloud one the user has not agreed to. */
-  const gated = useCallback(
-    async (action: PendingAction) => {
-      if (selectedOption === null) return;
-      const kind = consentKindFor(selectedOption.kind);
-      if (kind !== null && !consent[kind]) {
-        setPendingConsent({ option: selectedOption, kind, action });
-        return;
-      }
-      await perform(action, selectedOption);
-    },
-    [consent, perform, selectedOption],
-  );
-
-  const onConsentAccept = useCallback(async () => {
-    const pending = pendingConsent;
-    setPendingConsent(null);
-    if (pending === null) return;
-
-    const granted = await consentStore.grant(pending.kind);
-    if (!granted.ok) {
-      setError(granted.error.message);
-      return;
-    }
-    setConsent(granted.value);
-    await perform(pending.action, pending.option);
-  }, [consentStore, pendingConsent, perform]);
-
-  const onConsentDecline = useCallback(() => setPendingConsent(null), []);
-
-  const onWithdrawConsent = useCallback(
-    async (kind: ConsentProviderKind) => {
-      const revoked = await consentStore.revoke(kind);
-      if (revoked.ok) setConsent(revoked.value);
-      else setError(revoked.error.message);
-    },
-    [consentStore],
-  );
-
-  const onSaveToApplication = useCallback(async () => {
-    if (result === null) return;
-    // A paste has no job, so no application to save into. A tracked job with
-    // none gets one, below: the user should never be sent to the tracker first.
-    if (selectedApplicationId === null && selectedJob === null) return;
-    setError(null);
-    setSaveMessage(null);
-    setSaving('application');
-
-    const stamp = (now ?? new Date()).toISOString();
-
-    let applicationId = selectedApplicationId;
-    if (applicationId === null && selectedJob !== null) {
-      const application = newSavedApplication({
-        id: crypto.randomUUID(),
-        jobId: selectedJob.id,
-        now: stamp,
-      });
-      const created = await tailorPort.createApplication(application);
-      if (!created.ok) {
-        setSaving(null);
-        setError(`The tailored CV could not be saved: ${created.error.message}`);
-        return;
-      }
-      setApplications([application]);
-      setSelectedApplicationId(application.id);
-      applicationId = application.id;
-    }
-    if (applicationId === null) return;
-
-    const saved = await tailorPort.saveDocument(
-      newDocument({
-        id: crypto.randomUUID(),
-        applicationId,
-        kind: 'cv',
-        title: documentTitle('cv', jobTitle),
-        text: result.text,
-        now: stamp,
-      }),
-    );
-    if (!saved.ok) {
-      setSaving(null);
-      setError(`The tailored CV could not be saved: ${saved.error.message}`);
-      return;
-    }
-
-    // The CV was written for THIS text, so the record keeps it (L-199, owner
-    // decision 2026-10-01): an edited advert is saved beside the CV, marked.
-    let advertSaved = false;
-    if (advertEdited) {
-      const savedAdvert = await tailorPort.saveDocument(
-        newDocument({
-          id: crypto.randomUUID(),
-          applicationId,
-          kind: 'advert',
-          title: editedAdvertTitle(jobTitle),
-          text: jobText,
-          now: stamp,
-        }),
-      );
-      if (!savedAdvert.ok) {
-        setSaving(null);
-        setError(`The CV was saved, but the edited advert was not: ${savedAdvert.error.message}`);
-        return;
-      }
-      advertSaved = true;
-    }
-
-    let letterSaved = false;
-    if (letter !== null) {
-      const savedLetter = await tailorPort.saveDocument(
-        newDocument({
-          id: crypto.randomUUID(),
-          applicationId,
-          kind: 'cover_letter',
-          title: documentTitle('cover_letter', jobTitle),
-          text: letter.text,
-          now: stamp,
-        }),
-      );
-      if (!savedLetter.ok) {
-        setSaving(null);
-        setError(`The CV was saved, but the letter was not: ${savedLetter.error.message}`);
-        return;
-      }
-      letterSaved = true;
-    }
-
-    setSaving(null);
-    setSaveMessage(savedMessage({ advert: advertSaved, letter: letterSaved }));
-    setSaved((current) => ({ ...current, exported: true }));
-  }, [
-    advertEdited,
-    jobText,
-    jobTitle,
-    letter,
+  const { saving, onSaveToApplication, onSaveCv, onSaveText, onSaveDocument } = useTailorSaving({
+    tailorPort,
+    files,
     now,
     result,
-    selectedApplicationId,
+    letter,
+    jobText,
+    jobTitle,
+    advertEdited,
     selectedJob,
-    tailorPort,
-  ]);
-
-  /** Store a corrected (or restored) CV, and show it at once (L-218). */
-  const onSaveCv = useCallback(
-    async (next: Cv): Promise<string | null> => {
-      const saved = await tailorPort.saveCv(next);
-      if (!saved.ok) return `That could not be saved: ${saved.error.message}`;
-      setCvs((current) => current.map((cv) => (cv.id === next.id ? next : cv)));
-      return null;
-    },
-    [tailorPort],
-  );
-
-  const onSaveText = useCallback(
-    async (kind: 'cv' | 'cover_letter') => {
-      const text = kind === 'cv' ? result?.text : letter?.text;
-      if (text === undefined) return;
-      setError(null);
-      setSaveMessage(null);
-      setSaving('file');
-
-      const saved = await files.saveText(text, exportFileName(kind, jobTitle), 'txt');
-      setSaving(null);
-
-      if (!saved.ok) {
-        setError(`That could not be saved: ${saved.error.message}`);
-        return;
-      }
-      // Cancelled. Nothing was written, and nothing is said about it.
-      if (saved.value === null) return;
-      setSaveMessage(`Saved to ${saved.value}.`);
-    },
-    [files, jobTitle, letter, result],
-  );
-
-  // The Word (L-165) and PDF (L-201) exports: the same structured result the
-  // text render reads, built into a file on this machine and handed to the
-  // same dialog-in-Rust save. Success and cancel are worded exactly as the
-  // text path's, so the buttons side by side behave as one feature.
-  const onSaveDocument = useCallback(
-    async (kind: 'cv' | 'cover_letter', format: 'docx' | 'pdf') => {
-      // `null` for the name: the app never asks the model for one, and this
-      // screen has nothing else to offer (see `renderTailoredCv`).
-      const build = async (): Promise<{ bytes: Uint8Array; missing: readonly string[] }> => {
-        // The Word builder (`docx` + `jszip`, ~400 kB) is loaded on the first
-        // Word export, not at launch: `word-code-loads-on-demand.contract.test.ts`.
-        if (kind === 'cv' && result !== null) {
-          if (format === 'pdf') return buildCvPdf(result.cv, null);
-          const { buildCvDocx } = await import('./docx');
-          return { bytes: await buildCvDocx(result.cv, null), missing: [] };
-        }
-        if (kind === 'cover_letter' && letter !== null) {
-          if (format === 'pdf') return buildCoverLetterPdf(letter.letter);
-          const { buildCoverLetterDocx } = await import('./docx');
-          return { bytes: await buildCoverLetterDocx(letter.letter), missing: [] };
-        }
-        throw new Error('nothing to export');
-      };
-      if ((kind === 'cv' ? result : letter) === null) return;
-      setError(null);
-      setSaveMessage(null);
-      setSaving('file');
-
-      let built: { bytes: Uint8Array; missing: readonly string[] };
-      try {
-        built = await build();
-      } catch {
-        // The builder runs over our own validated result, so this is our bug;
-        // it still ends in a sentence on screen rather than a stuck spinner.
-        setSaving(null);
-        setError('That document could not be built. Try running the tailoring again.');
-        return;
-      }
-
-      const saved = await files.saveBytes(
-        built.bytes,
-        exportFileName(kind, jobTitle, format),
-        format,
-      );
-      setSaving(null);
-
-      if (!saved.ok) {
-        setError(`That could not be saved: ${saved.error.message}`);
-        return;
-      }
-      if (saved.value === null) return;
-      setSaveMessage(
-        built.missing.length === 0
-          ? `Saved to ${saved.value}.`
-          : `Saved to ${saved.value}. The PDF's built-in font cannot show ` +
-              `${built.missing.join(' ')}, so they appear as ? or a plain letter. ` +
-              'Save as Word to keep them exactly.',
-      );
-    },
-    [files, jobTitle, letter, result],
-  );
+    selectedApplicationId,
+    setApplications,
+    setSelectedApplicationId,
+    setCvs,
+    setSaved,
+    setError,
+    setSaveMessage,
+  });
 
   // ── Rendering ────────────────────────────────────────────────────────────
 
@@ -1024,638 +635,105 @@ export function Tailor({
         className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 md:px-6 md:py-5"
       >
         <span id={STEP_ANCHOR.tailor} aria-hidden="true" />
-        {/* ── 1. The CV ───────────────────────────────────────────────── */}
-        <div>
-          <label htmlFor="tailor-cv-pick" className="block text-xs font-medium text-ink-muted">
-            Your CV
-          </label>
-          <select
-            id="tailor-cv-pick"
-            data-testid="tailor-cv-pick"
-            value={selectedCvId ?? ''}
-            disabled={cvs.length === 0 || !cvsLoaded}
-            onChange={(event) => {
-              const id = event.currentTarget.value;
-              // A draft written from another CV is not this CV's draft.
-              patchActive({
-                cvId: id === '' ? null : id,
-                result: null,
-                review: null,
-                letter: null,
-                error: null,
-              });
-              setSaveMessage(null);
-            }}
-            className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
-          >
-            {cvs.length > 0 ? null : (
-              <option value="">{cvsLoaded ? 'No CV uploaded yet' : 'Reading your CVs…'}</option>
-            )}
-            {cvs.map((cv) => (
-              <option key={cv.id} value={cv.id}>
-                {cv.name}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs text-ink-faint">
-            The CVs you have uploaded here, on Analysis or on Profile. The rewrite uses only what is
-            written in the one you choose.
-          </p>
-          {/*
-           * Here too, not only on Analysis (L-240) — and never disabled for
-           * want of a model: a first run with nothing set up can still get
-           * its CV ready, and it lands in the one store every screen reads.
-           */}
-          <div className="mt-2">
-            <CvUpload
-              idPrefix="tailor"
-              files={files}
-              saveCv={(cv) => tailorPort.saveCv(cv)}
-              now={now}
-              onUploaded={onCvUploaded}
-            />
-          </div>
-
-          {/*
-           * The chosen CV, as the rewrite will read it (L-192): the stored
-           * `extracted_text` — the same `cvText` every run is sent — not the
-           * file, so anything the parser dropped is visible BEFORE the run.
-           * Read-only by look until the user chooses "Correct the text"; a
-           * correction is kept on the CV, so every screen and job uses it
-           * (L-218, `CvTextPanel`). No CV at all draws nothing: the picker
-           * says so.
-           */}
-          {selectedCv === null ? null : (
-            <div className="mt-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p id="tailor-cv-preview-heading" className="text-xs font-medium text-ink-muted">
-                  Your CV as the rewrite reads it
-                </p>
-                <button
-                  type="button"
-                  data-testid="tailor-cv-preview-toggle"
-                  aria-expanded={cvPreviewOpen}
-                  aria-controls="tailor-cv-preview"
-                  onClick={() => setCvPreviewOpen((open) => !open)}
-                  className={QUIET_BUTTON}
-                >
-                  {cvPreviewOpen ? 'Hide CV' : 'Show CV'}
-                </button>
-              </div>
-              <section
-                id="tailor-cv-preview"
-                data-testid="tailor-cv-preview"
-                aria-labelledby="tailor-cv-preview-heading"
-                hidden={!cvPreviewOpen}
-                className="mt-1"
-              >
-                <CvTextPanel
-                  // A fresh panel per CV: an edit in progress never follows the
-                  // picker to another CV.
-                  key={selectedCv.id}
-                  cv={selectedCv}
-                  disabled={running}
-                  onSave={onSaveCv}
-                />
-              </section>
-            </div>
-          )}
-        </div>
-
-        {/* ── 2. The advert ───────────────────────────────────────────── */}
-        <div>
-          <label htmlFor="tailor-job-text" className="block text-xs font-medium text-ink-muted">
-            The job advert
-          </label>
-          <textarea
-            id="tailor-job-text"
-            data-testid="tailor-job-text"
-            rows={7}
-            value={jobText}
-            placeholder="Paste the whole advert, including the requirements list."
-            onChange={(event) => {
-              // Edited by hand. The job link is KEPT (L-199, owner decision
-              // 2026-10-01): it is still that job, and the marker below says
-              // the text is the user's version of its advert.
-              patchActive({ advert: event.currentTarget.value });
-            }}
-            className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
-          />
-
-          {!advertEdited || selectedJob === null ? null : (
-            <div
-              data-testid="tailor-advert-edited"
-              className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-muted"
-            >
-              <span>Advert edited — the tailoring uses your version.</span>
-              <button
-                type="button"
-                data-testid="tailor-advert-restore"
-                onClick={() => patchActive({ advert: jobAdvertText(selectedJob) })}
-                className={QUIET_BUTTON}
-              >
-                Restore the original
-              </button>
-            </div>
-          )}
-
-          {jobs.length === 0 ? null : (
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <label htmlFor="tailor-job-pick" className="text-xs text-ink-faint">
-                Or use one you are already tracking
-              </label>
-              <select
-                id="tailor-job-pick"
-                data-testid="tailor-job-pick"
-                value={selectedJobId ?? ''}
-                onChange={(event) => {
-                  const picked = jobs.find(
-                    (candidate) => candidate.id === event.currentTarget.value,
-                  );
-                  if (picked === undefined) return;
-                  // A job seen before comes back as it was left (L-199); a new
-                  // one starts from its advert, with the CV and model the user
-                  // already chose — those are choices, not this job's work.
-                  // Another job starts on its own Tailor step. Set HERE, on
-                  // the user's pick, not on any change of job: a hand-off
-                  // from another screen's step bar sets the job too, and
-                  // must keep the step it asked for (L-200).
-                  if (picked.id !== selectedJobId) setStep('tailor');
-                  sessions.open(picked.id, () => ({
-                    advert: jobAdvertText(picked),
-                    cvId: selectedCvId,
-                    optionKey: work.optionKey,
-                  }));
-                  setError(null);
-                  setSaveMessage(null);
-                }}
-                className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1 text-ink"
-              >
-                <option value="">Choose a tracked job…</option>
-                {jobs.map((job) => (
-                  <option key={job.id} value={job.id}>
-                    {job.title} — {job.company}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {keywordGaps === null ? null : (
-            <p data-testid="tailor-keyword-gaps-note" className="mt-1 text-xs text-ink-faint">
-              From your analysis: {keywordGaps.length} {keywordGaps.length === 1 ? 'word' : 'words'}{' '}
-              in the advert that your CV does not use yet. The draft uses them only where your CV
-              already shows the experience.
-            </p>
-          )}
-          <MetricPromptBoxes
-            prompts={metricPrompts}
-            state={metricState}
-            onChange={(next) => patchActive({ metricState: next })}
-            disabled={running}
-          />
-        </div>
-
-        {/* ── 3. How to run it ────────────────────────────────────────── */}
-        <div>
-          <label htmlFor="tailor-provider" className="block text-xs font-medium text-ink-muted">
-            How to write it
-          </label>
-          <select
-            id="tailor-provider"
-            data-testid="tailor-provider"
-            value={optionKey}
-            disabled={!aiAvailable}
-            onChange={(event) => patchActive({ optionKey: event.currentTarget.value })}
-            className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
-          >
-            {aiAvailable ? null : (
-              <option value="">
-                {availabilityRead ? 'No AI set up yet' : 'Checking what is set up…'}
-              </option>
-            )}
-            {options.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <p data-testid="tailor-provider-note" className="mt-1 text-xs text-ink-faint">
-            {selectedOption?.note ??
-              'Writing needs AI. AI on this PC keeps your CV here; AI from a company sends it to that company.'}
-          </p>
-          {cvCut === null ? null : (
-            <p
-              data-testid="tailor-cv-cut"
-              className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
-            >
-              {cvCut}
-            </p>
-          )}
-
-          {localModelHint === null ? null : (
-            <p
-              data-testid="tailor-ollama-hint"
-              className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
-            >
-              {localModelHint}
-              <OllamaDownloadLink idPrefix="tailor" browser={browserPort} />
-            </p>
-          )}
-
-          <ConsentStatus
-            granted={grantedConsents}
-            onWithdraw={(kind) => void onWithdrawConsent(kind)}
-          />
-        </div>
-
-        {/* ── 4. Run ──────────────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            data-testid="tailor-run"
-            data-primary="true"
-            disabled={disabledReason !== null}
-            aria-describedby={disabledReason === null ? undefined : 'tailor-run-reason'}
-            onClick={() => void gated('tailor')}
-            className={PRIMARY_BUTTON}
-          >
-            {phase === 'tailoring' ? 'Tailoring…' : 'Tailor CV'}
-          </button>
-
-          {disabledReason === null ? null : (
-            <p id="tailor-run-reason" data-testid="tailor-run-reason" className="text-ink-muted">
-              {disabledReason}
-            </p>
-          )}
-        </div>
-
-        {/*
-          Not a dead end (L-175, L-240). Tailoring writes new text, so it
-          needs an AI and there is no keyword fallback to offer. What there
-          is: two ways forward, in plain words, and a note that the CV can go
-          in now. No provider is named (L-148).
-        */}
-        {disabledReason === NO_AI_REASON ? (
-          <div
-            data-testid="tailor-no-ai"
-            className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
-          >
-            <p>You can still upload your CV now, so it is ready. Then choose one of these:</p>
-            <ul className="mt-2 space-y-3">
-              <li className="flex flex-wrap items-center gap-2">
-                {onOpenSettings === undefined ? (
-                  <span className="font-medium text-ink">Add an AI key in Settings.</span>
-                ) : (
-                  <button
-                    type="button"
-                    data-testid="tailor-open-settings"
-                    onClick={onOpenSettings}
-                    className={SECONDARY_BUTTON}
-                  >
-                    Add an AI key
-                  </button>
-                )}
-                <span>You get the key from the AI company you choose.</span>
-              </li>
-              <li data-testid="tailor-free-local">
-                <span className="font-medium text-ink">Use a free AI on your own PC.</span> A model
-                running on this PC keeps your CV on this computer. If one is already running, come
-                back to this screen and CViper will find it. You can also add one in Settings.
-              </li>
-            </ul>
-          </div>
-        ) : null}
-
-        <LiveStatus text={running && selectedOption !== null ? progressSentence : null} />
-        {running && selectedOption !== null ? (
-          <p
-            data-testid="tailor-progress"
-            className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
-          >
-            {progressSentence}{' '}
-            <span aria-hidden="true" className="font-mono tabular-nums">
-              {elapsed}s
-            </span>
-          </p>
-        ) : null}
-
-        <LiveStatus
-          text={saving === 'file' ? 'Choose where to save it in the save window.' : null}
+        <TailorCvPicker
+          cvs={cvs}
+          cvsLoaded={cvsLoaded}
+          selectedCvId={selectedCvId}
+          selectedCv={selectedCv}
+          onPick={(id) => {
+            // A draft written from another CV is not this CV's draft.
+            patchActive({ cvId: id, result: null, review: null, letter: null, error: null });
+            setSaveMessage(null);
+          }}
+          files={files}
+          saveCv={(cv) => tailorPort.saveCv(cv)}
+          now={now}
+          onUploaded={onCvUploaded}
+          previewOpen={cvPreviewOpen}
+          onTogglePreview={() => setCvPreviewOpen((open) => !open)}
+          running={running}
+          onSaveCv={onSaveCv}
         />
-        {saving === 'file' ? (
-          <p
-            data-testid="tailor-save-choosing"
-            className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
-          >
-            Choose where to save it in the save window.
-          </p>
-        ) : null}
 
-        <LiveStatus text={saveMessage} />
-        {saveMessage === null ? null : (
-          <p
-            data-testid="tailor-save-message"
-            className="rounded-control bg-teal/10 px-3 py-2 break-all text-teal-ink"
-          >
-            {saveMessage}
-          </p>
-        )}
+        <TailorAdvert
+          jobText={jobText}
+          onAdvertChange={(advert) => patchActive({ advert })}
+          advertEdited={advertEdited}
+          selectedJob={selectedJob}
+          onRestoreAdvert={(job) => patchActive({ advert: jobAdvertText(job) })}
+          jobs={jobs}
+          selectedJobId={selectedJobId}
+          onPickJob={(picked) => {
+            // A job seen before comes back as it was left (L-199); a new
+            // one starts from its advert, with the CV and model the user
+            // already chose — those are choices, not this job's work.
+            // Another job starts on its own Tailor step. Set HERE, on
+            // the user's pick, not on any change of job: a hand-off
+            // from another screen's step bar sets the job too, and
+            // must keep the step it asked for (L-200).
+            if (picked.id !== selectedJobId) setStep('tailor');
+            sessions.open(picked.id, () => ({
+              advert: jobAdvertText(picked),
+              cvId: selectedCvId,
+              optionKey: work.optionKey,
+            }));
+            setError(null);
+            setSaveMessage(null);
+          }}
+          keywordGaps={keywordGaps}
+          metricPrompts={metricPrompts}
+          metricState={metricState}
+          onMetricStateChange={(next) => patchActive({ metricState: next })}
+          running={running}
+        />
 
-        {/* ── 5. The result ───────────────────────────────────────────── */}
-        {result === null ? (
-          <div
-            data-testid="tailor-empty"
-            className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
-          >
-            <div className="mb-3 flex justify-center">
-              <IconTile icon="tailor" />
-            </div>
-            <p className="font-medium text-ink">Nothing tailored yet.</p>
-            <p className="mt-1 text-ink-muted">
-              Pick a CV and an advert, then press the button. Every employer, date, figure and
-              certification in the result is checked against your original CV before you see it.
-            </p>
-          </div>
-        ) : (
-          <div data-testid="tailor-result" className="space-y-4">
-            {/* The fabrication report — FIRST, and never red. */}
-            <div
-              data-testid="tailor-fabrication"
-              data-clean={result.report.clean ? 'true' : 'false'}
-              className={
-                result.report.clean
-                  ? 'rounded-control bg-teal/10 px-3 py-2 text-teal-ink'
-                  : 'rounded-control bg-gold/10 px-3 py-2 text-gold-ink'
-              }
-            >
-              {result.report.clean ? (
-                <p>
-                  Checked: every employer, year, certification and figure in this draft is in your
-                  original CV.
-                </p>
-              ) : (
-                <>
-                  <p className="font-medium">
-                    Check these before you use it — the model wrote things your CV does not say:
-                  </p>
-                  <ul className="mt-1 space-y-0.5">
-                    {result.report.flagged.map((flag) => (
-                      <li key={`${flag.kind}:${flag.text}`}>
-                        <span className="text-xs uppercase">{FLAG_LABELS[flag.kind]}</span>
-                        {': '}
-                        <span className="font-medium">{flag.text}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </div>
+        <TailorEngine
+          options={options}
+          optionKey={optionKey}
+          selectedOption={selectedOption}
+          onOptionChange={(key) => patchActive({ optionKey: key })}
+          aiAvailable={aiAvailable}
+          availabilityRead={availabilityRead}
+          cvCut={cvCut}
+          localModelHint={localModelHint}
+          browser={browserPort}
+          grantedConsents={grantedConsents}
+          onWithdrawConsent={(kind) => void onWithdrawConsent(kind)}
+        />
 
-            <p data-testid="tailor-provenance" className="text-xs text-ink-faint">
-              Written by {providerInSentence(result.provider)} · {result.model}
-              {result.retried ? ' · recovered on retry' : ''}
-            </p>
+        <TailorRunBar
+          phase={phase}
+          disabledReason={disabledReason}
+          onRun={() => void gated('tailor')}
+          onOpenSettings={onOpenSettings}
+          progressSentence={running && selectedOption !== null ? progressSentence : null}
+          elapsed={elapsed}
+          choosingFile={saving === 'file'}
+          saveMessage={saveMessage}
+        />
 
-            <pre
-              data-testid="tailor-cv"
-              className={`${cardClasses({ padding: 'none' })} px-4 py-3 font-sans text-ink whitespace-pre-wrap`}
-            >
-              {result.text}
-            </pre>
-
-            <details className={`${cardClasses({ padding: 'none' })} px-4 py-3`}>
-              <summary className="cursor-pointer font-medium text-ink">
-                What changed against your original
-              </summary>
-              <p data-testid="tailor-diff-legend" className="mt-2 text-xs text-ink-muted">
-                {FLOW_HINT.diff}
-              </p>
-              <ol data-testid="tailor-diff" className="mt-2 space-y-0.5 font-mono text-xs">
-                {lineDiff(cvText, result.text).map((line, index) => (
-                  <li
-                    key={`${index}:${line.kind}`}
-                    data-diff={line.kind}
-                    className={
-                      line.kind === 'added'
-                        ? 'bg-teal/10 text-ink'
-                        : line.kind === 'removed'
-                          ? 'bg-danger/10 text-ink-muted line-through'
-                          : 'text-ink-muted'
-                    }
-                  >
-                    {line.text}
-                  </li>
-                ))}
-              </ol>
-            </details>
-
-            {/*
-              The ATS Score step (L-198): this draft re-scored against the same
-              advert, before → after, so the last thing read before saving is
-              whether tailoring helped. Pure and offline — see `atsComparison.ts`.
-            */}
-            <span id={STEP_ANCHOR.ats} aria-hidden="true" />
-            {atsComparison === null ? null : (
-              <AtsStep
-                comparison={atsComparison}
-                fabrication={{ clean: result.report.clean, flagged: result.report.flagged.length }}
-              />
-            )}
-
-            {metricsChanged(result.userMetrics, userMetrics) ? (
-              <p data-testid="tailor-metrics-changed-note" className="text-xs text-ink-muted">
-                Your added results changed since this draft. Re-run tailoring to use them.
-              </p>
-            ) : null}
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                data-testid="tailor-review-run"
-                disabled={running || saving !== null}
-                onClick={() => void gated('review')}
-                className={SECONDARY_BUTTON}
-              >
-                {phase === 'reviewing' ? 'Reviewing…' : 'Review the draft'}
-              </button>
-              <button
-                type="button"
-                data-testid="tailor-letter-run"
-                disabled={running || saving !== null}
-                onClick={() => void gated('letter')}
-                className={SECONDARY_BUTTON}
-              >
-                {phase === 'writing' ? 'Writing…' : 'Write the cover letter'}
-              </button>
-              <button
-                type="button"
-                data-testid="tailor-save-text"
-                disabled={running || saving !== null}
-                onClick={() => void onSaveText('cv')}
-                className={SECONDARY_BUTTON}
-              >
-                Save CV as text…
-              </button>
-              <button
-                type="button"
-                data-testid="tailor-save-docx-cv"
-                disabled={running || saving !== null}
-                onClick={() => void onSaveDocument('cv', 'docx')}
-                className={SECONDARY_BUTTON}
-              >
-                Save CV as Word…
-              </button>
-              <button
-                type="button"
-                data-testid="tailor-save-pdf-cv"
-                disabled={running || saving !== null}
-                onClick={() => void onSaveDocument('cv', 'pdf')}
-                className={SECONDARY_BUTTON}
-              >
-                Save CV as PDF…
-              </button>
-            </div>
-
-            {review === null ? null : (
-              <div
-                data-testid="tailor-review"
-                data-verdict={review.verdict}
-                className={`${cardClasses({ padding: 'none' })} px-4 py-3`}
-              >
-                <p className="font-medium text-ink">
-                  {review.verdict === 'ready'
-                    ? 'A hiring manager would call this ready.'
-                    : 'A hiring manager would send this back.'}
-                </p>
-                {review.issues.length === 0 ? (
-                  <p className="mt-1 text-ink-muted">Nothing serious to fix.</p>
-                ) : (
-                  <ul className="mt-2 space-y-2">
-                    {review.issues.map((issue, index) => (
-                      <li key={`${index}:${issue.section}`} data-testid="tailor-review-issue">
-                        <span className="font-medium text-ink">{issue.section}</span>
-                        <span className="block text-ink-muted">{issue.problem}</span>
-                        <span className="block text-ink">{issue.suggestion}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            {letter === null ? null : (
-              <div className="space-y-2">
-                {letter.claims.length === 0 ? null : (
-                  <div
-                    data-testid="tailor-letter-claims"
-                    className="rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
-                  >
-                    <p className="font-medium">
-                      Check these figures — they are not in your original CV:
-                    </p>
-                    <ul className="mt-1">
-                      {letter.claims.map((flag) => (
-                        <li key={flag.text} className="font-medium">
-                          {flag.text}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <pre
-                  data-testid="tailor-letter"
-                  className={`${cardClasses({ padding: 'none' })} px-4 py-3 font-sans text-ink whitespace-pre-wrap`}
-                >
-                  {letter.text}
-                </pre>
-                <p data-testid="tailor-letter-words" className="text-xs text-ink-faint">
-                  <span className="font-mono tabular-nums">{letter.words}</span> words
-                </p>
-                {letter.words > LETTER_WORD_LIMIT ? (
-                  <p
-                    data-testid="tailor-letter-long"
-                    className="rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
-                  >
-                    Over {LETTER_WORD_LIMIT} words. A letter this long is a second page most readers
-                    skip — cut a paragraph.
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  data-testid="tailor-save-letter-text"
-                  disabled={running || saving !== null}
-                  onClick={() => void onSaveText('cover_letter')}
-                  className={SECONDARY_BUTTON}
-                >
-                  Save letter as text…
-                </button>
-                <button
-                  type="button"
-                  data-testid="tailor-save-docx-letter"
-                  disabled={running || saving !== null}
-                  onClick={() => void onSaveDocument('cover_letter', 'docx')}
-                  className={SECONDARY_BUTTON}
-                >
-                  Save letter as Word…
-                </button>
-                <button
-                  type="button"
-                  data-testid="tailor-save-pdf-letter"
-                  disabled={running || saving !== null}
-                  onClick={() => void onSaveDocument('cover_letter', 'pdf')}
-                  className={SECONDARY_BUTTON}
-                >
-                  Save letter as PDF…
-                </button>
-              </div>
-            )}
-
-            {/* ── Save to an application ─────────────────────────────── */}
-            <span id={STEP_ANCHOR.export} aria-hidden="true" />
-            <div className="flex flex-wrap items-center gap-2">
-              {applications.length === 0 ? null : (
-                <select
-                  data-testid="tailor-application"
-                  aria-label="Application to save into"
-                  value={selectedApplicationId ?? ''}
-                  onChange={(event) => setSelectedApplicationId(event.currentTarget.value || null)}
-                  className="min-w-0 rounded-control border border-field-line bg-card px-2.5 py-1 text-ink"
-                >
-                  {applications.map((application) => (
-                    <option key={application.id} value={application.id}>
-                      {application.status}
-                      {application.applied_date === null
-                        ? ''
-                        : ` · applied ${application.applied_date}`}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button
-                type="button"
-                data-testid="tailor-save-application"
-                disabled={
-                  running ||
-                  saving !== null ||
-                  selectedJobId === null ||
-                  // Wait for the job's applications, so a quick press cannot
-                  // start a second one beside the one it already has.
-                  applicationsFor !== selectedJobId
-                }
-                onClick={() => void onSaveToApplication()}
-                className={SECONDARY_BUTTON}
-              >
-                {saving === 'application' ? 'Saving…' : 'Save to an application'}
-              </button>
-              {selectedJobId !== null ? null : (
-                <p data-testid="tailor-save-application-reason" className="text-xs text-ink-muted">
-                  Choose a tracked job above to save into one of its applications.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+        <TailorResultView
+          result={result}
+          cvText={cvText}
+          atsComparison={atsComparison}
+          metricsChanged={result !== null && metricsChanged(result.userMetrics, userMetrics)}
+          review={review}
+          letter={letter}
+          phase={phase}
+          busy={running || saving !== null}
+          onRun={(action) => void gated(action)}
+          onSaveText={(kind) => void onSaveText(kind)}
+          onSaveDocument={(kind, format) => void onSaveDocument(kind, format)}
+          saveApplication={{
+            applications,
+            selectedApplicationId,
+            onSelectApplication: setSelectedApplicationId,
+            selectedJobId,
+            applicationsFor,
+            saving: saving === 'application',
+            onSave: () => void onSaveToApplication(),
+          }}
+        />
       </div>
 
       {pendingConsent === null ? null : (
