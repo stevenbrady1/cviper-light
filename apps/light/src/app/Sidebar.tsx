@@ -107,7 +107,7 @@ export function Sidebar({ activeView, onSelect, status }: SidebarProps) {
         <CViperMark size={32} />
         <div>
           <p className="text-base font-semibold tracking-tight">CViper</p>
-          <p className="font-mono text-[10px] font-medium tracking-[0.18em] text-ink-inverse-muted uppercase">
+          <p className="font-mono text-[11px] font-medium tracking-[0.18em] text-ink-inverse-muted uppercase">
             Light
           </p>
         </div>

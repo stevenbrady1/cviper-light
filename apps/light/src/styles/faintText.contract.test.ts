@@ -11,8 +11,9 @@
  *
  * So faint text carries a second cue, in the same class string:
  *
- *   * SIZE — `text-xs`, `text-[11px]` or `text-[10px]`: smaller than the 14px
- *     body, where `text-sm` is the same 14px and is NOT a cue; or
+ *   * SIZE — `text-xs` (13px), `text-[11px]` or `text-[10px]`: clearly smaller
+ *     than the 16px body (L-241). `text-sm` (14px) is only a step below it and
+ *     is deliberately still NOT counted as a cue; or
  *   * WEIGHT — `font-normal`, used where the faint words sit inside a medium
  *     label (" (optional)" after a field name).
  *
@@ -47,7 +48,7 @@ const LITERAL =
 /** `text-ink-faint` with no state prefix in front of it. */
 const RESTING_FAINT = /(?<![\w:-])text-ink-faint(?![\w-])/;
 
-/** A second cue: smaller than the 14px body, or a weight against a medium label. */
+/** A second cue: clearly smaller than the 16px body, or a weight against a medium label. */
 const CUE = /(?<![\w:-])(text-xs|text-\[1[01]px\]|font-normal)(?![\w-])/;
 
 /**

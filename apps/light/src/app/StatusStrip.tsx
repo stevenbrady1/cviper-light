@@ -123,7 +123,7 @@ export function StatusStrip({ status, onOpenSettings }: StatusStripProps) {
       className="border-t border-canvas/10 px-4 py-3 text-xs text-ink-inverse-muted"
       data-testid="status-strip"
     >
-      <h2 className="mb-2 font-mono text-[10px] font-medium tracking-[0.14em] uppercase">Set up</h2>
+      <h2 className="mb-2 font-mono text-[11px] font-medium tracking-[0.14em] uppercase">Set up</h2>
 
       <ul className="space-y-1.5">
         {showOllama ? (
