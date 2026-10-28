@@ -31,6 +31,7 @@ import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser
 import { AnalysisResult } from './AnalysisResult';
 import { readAvailability } from './availability';
 import { ConsentGate, ConsentStatus } from './ConsentGate';
+import { cvCutNote } from './cvCutNote';
 import { GateNotice } from './GateNotice';
 import { OllamaDownloadLink } from './OllamaDownloadLink';
 import {
@@ -775,6 +776,9 @@ export function Analysis({
     [onJobStep, stepJob, tailorHandoff],
   );
 
+  /** Said by the picker when the chosen AI will not read the whole CV (L-302). */
+  const cvCut = cvCutNote(selectedCv?.extracted_text ?? null, selectedOption?.kind ?? null);
+
   /** What the run is doing, in words: shown with a counter, and spoken (L-299). */
   const progressText =
     running && selectedOption !== null && selectedOption.kind !== 'keyword'
@@ -1027,6 +1031,14 @@ export function Analysis({
             <p data-testid="analysis-provider-note" className="mt-1 text-xs text-ink-faint">
               {selectedOption?.note ?? 'Choose how to run this.'}
             </p>
+            {cvCut === null ? null : (
+              <p
+                data-testid="analysis-cv-cut"
+                className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
+              >
+                {cvCut}
+              </p>
+            )}
 
             {/*
               Shown in ONE state only: the daemon answered and nothing in it can

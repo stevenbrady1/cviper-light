@@ -12,6 +12,8 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Fixed
 
+- A long CV is no longer cut to its first 6,000 characters when it goes to an AI company (L-302). That limit was set for the small AI that runs on your own PC, but every AI got it, and nobody was told. When tailoring, it meant the new CV was rewritten from the first 6,000 characters only, so later jobs and your education could be missing from it. Now an AI company is sent up to 16,000 characters — a long, four-page CV — and is given room to send the whole tailored CV back. The AI on your PC still reads 6,000, because that is what it can hold. When your CV is longer than the AI you picked will read, the CV check and Tailor screens now say so before you start: "Your CV is 9,200 characters long. This AI is sent the first 6,000, so anything after that is not read." A CV under 6,000 characters is sent exactly as before.
+
 - Screen readers now read status messages out (L-299). About 25 messages — "Key saved", "Sending your CV to…", "Drafting the letter", "No applications match your search" and the rest — appeared on screen with their words already in them, and a screen reader often stays silent about a message that arrives that way. Each screen now keeps a hidden message area ready from the start and writes the words into it, so the message is read out once. Nothing changes on screen. The grey "Check this CV", "Tailor CV" and "Read the advert" buttons are now linked to the sentence beside them that says why they cannot be pressed, so a screen reader reading the button reads the reason too. A test fails the build if a status message is ever added the old way again.
 
 ### Added

@@ -15,6 +15,7 @@ import {
   type Result,
 } from '@cviper/core-types';
 
+import { cvCharBudget } from './prompt/budget';
 import { buildReviewPrompt, type ReviewKind } from './prompt/build-review-prompt';
 import type { UserSuppliedMetric } from './prompt/user-metrics';
 import {
@@ -67,6 +68,7 @@ export async function reviewDraft(
     draftText: options.draftText,
     jobText: options.jobText,
     cvText: options.cvText,
+    cvBudget: cvCharBudget(options.provider.id),
     kind: options.kind,
     userMetrics: options.userMetrics,
   });

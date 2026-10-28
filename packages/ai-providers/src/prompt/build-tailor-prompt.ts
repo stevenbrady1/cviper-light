@@ -100,6 +100,11 @@ export interface TailorPromptInput {
   readonly cvText: string;
   readonly jobText: string;
   /**
+   * Characters of CV to send (L-302). Defaults to `MAX_CV_CHARS`, the local
+   * budget; the orchestrator passes `cvCharBudget(provider.id)`.
+   */
+  readonly cvBudget?: number | undefined;
+  /**
    * The candidate's own words about how they write and what to emphasise —
    * `Profile.writing_style` and the like. `null` when the profile is empty.
    */
@@ -345,7 +350,12 @@ export function buildTailorPrompt(input: TailorPromptInput): TailorPrompt {
     '',
     hasUserMetrics ? criticalWithUserFacts() : CRITICAL,
     '',
-    fence(fences, 'BASE CV (the ONLY source of truth)', input.cvText, MAX_CV_CHARS),
+    fence(
+      fences,
+      'BASE CV (the ONLY source of truth)',
+      input.cvText,
+      input.cvBudget ?? MAX_CV_CHARS,
+    ),
     '',
     fence(
       fences,
