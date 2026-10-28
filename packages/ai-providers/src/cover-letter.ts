@@ -17,6 +17,7 @@ import {
   type Result,
 } from '@cviper/core-types';
 
+import { cvCharBudget } from './prompt/budget';
 import { buildCoverLetterPrompt } from './prompt/build-cover-letter-prompt';
 import type { UserSuppliedMetric } from './prompt/user-metrics';
 import {
@@ -71,6 +72,7 @@ export async function writeCoverLetter(
   const { system, user } = buildCoverLetterPrompt({
     cvText: options.cvText,
     jobText: options.jobText,
+    cvBudget: cvCharBudget(options.provider.id),
     tailoredCvText: options.tailoredCvText,
     profileNotes: options.profileNotes,
     userMetrics: options.userMetrics,

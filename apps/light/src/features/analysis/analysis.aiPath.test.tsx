@@ -145,6 +145,35 @@ async function renderReady(createTransport: () => ChatTransport) {
   return { port, user };
 }
 
+// L-302: a CV longer than a local model is sent is said BEFORE the run.
+describe('a CV longer than this AI reads', () => {
+  it('says how much of it the local model will read, next to the picker', async () => {
+    const long: Cv = { ...CV, extracted_text: `${CV_TEXT} `.repeat(80) };
+    expect((long.extracted_text ?? '').length).toBeGreaterThan(6_000);
+    render(
+      <Analysis
+        port={createFakeAnalysisPort({ cvs: [long] })}
+        filePort={createFakeFilePort()}
+        createTransport={() => heldTransport().transport}
+        now={NOW}
+      />,
+    );
+    await vi.waitFor(() =>
+      expect((screen.getByTestId('analysis-provider') as HTMLSelectElement).value).toBe(
+        'ollama:llama3.2:3b',
+      ),
+    );
+    const note = await screen.findByTestId('analysis-cv-cut');
+    expect(note.textContent).toContain('first 6,000');
+  });
+
+  // NEGATIVE — the ordinary CV above fits, and no note is shown.
+  it('negative: a CV that fits shows no note', async () => {
+    await renderReady(() => heldTransport().transport);
+    expect(screen.queryByTestId('analysis-cv-cut')).toBeNull();
+  });
+});
+
 describe('while a local model is thinking', () => {
   it('says what is happening, why it is slow, and that nothing is leaving', async () => {
     const held = heldTransport();

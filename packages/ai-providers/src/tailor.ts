@@ -26,6 +26,7 @@ import {
   type TailoredCv,
 } from '@cviper/core-types';
 
+import { cvCharBudget, tailorAnswerTokens } from './prompt/budget';
 import { buildTailorPrompt } from './prompt/build-tailor-prompt';
 import type { UserSuppliedMetric } from './prompt/user-metrics';
 import {
@@ -43,6 +44,9 @@ import type { AiProvider } from './types';
  * five bullets each, education — lands around 1,500-2,500 tokens. 4096 leaves
  * headroom for a long career without inviting an essay, and with the ~3,000
  * token prompt sits inside the 8192-token context the Ollama adapter asks for.
+ *
+ * This is the LOCAL budget. An AI company is sent a longer CV (L-302), so it
+ * gets twice this — see `tailorAnswerTokens` in `prompt/budget.ts`.
  */
 export const DEFAULT_MAX_TAILOR_TOKENS = 4096;
 
@@ -85,6 +89,7 @@ export async function tailorCv(
   const { system, user } = buildTailorPrompt({
     cvText: options.cvText,
     jobText: options.jobText,
+    cvBudget: cvCharBudget(options.provider.id),
     profileNotes: options.profileNotes,
     keywordGaps: options.keywordGaps,
     userMetrics: options.userMetrics,
@@ -98,7 +103,7 @@ export async function tailorCv(
       schema: TAILORED_CV_JSON_SCHEMA as object,
       schemaName: SCHEMA_NAME,
       temperature: 0,
-      maxOutputTokens: options.maxOutputTokens ?? DEFAULT_MAX_TAILOR_TOKENS,
+      maxOutputTokens: options.maxOutputTokens ?? tailorAnswerTokens(options.provider.id),
     },
     user,
     requiredKeys: TAILORED_CV_JSON_SCHEMA.required,

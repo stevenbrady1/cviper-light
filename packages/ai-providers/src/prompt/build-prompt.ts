@@ -59,6 +59,10 @@ import {
  * The job description gets the smaller budget because adverts are padded with
  * boilerplate — benefits, equal-opportunities statements, application
  * instructions — while a CV is nearly all signal.
+ *
+ * `MAX_CV_CHARS` is the LOCAL budget. Since L-302 an AI company is sent up to
+ * 16,000 characters of CV (`prompt/budget.ts`), because the reasoning above is
+ * about a small local model's window; the builders take it as `cvBudget`.
  */
 export const MAX_CV_CHARS = 6000;
 export const MAX_JOB_CHARS = 4000;
@@ -66,6 +70,11 @@ export const MAX_JOB_CHARS = 4000;
 export interface AnalysisPromptInput {
   readonly cvText: string;
   readonly jobText: string;
+  /**
+   * Characters of CV to send (L-302). Defaults to `MAX_CV_CHARS`, the local
+   * budget; the orchestrator passes `cvCharBudget(provider.id)`.
+   */
+  readonly cvBudget?: number | undefined;
 }
 
 export interface AnalysisPrompt {
@@ -168,7 +177,7 @@ export function buildAnalysisPrompt(input: AnalysisPromptInput): AnalysisPrompt 
   const user = [
     fences.rule,
     '',
-    fence(fences, 'CV', input.cvText, MAX_CV_CHARS),
+    fence(fences, 'CV', input.cvText, input.cvBudget ?? MAX_CV_CHARS),
     '',
     fence(fences, 'JOB', input.jobText, MAX_JOB_CHARS),
     '',

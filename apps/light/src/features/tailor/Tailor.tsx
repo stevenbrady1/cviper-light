@@ -27,6 +27,7 @@ import { createTauriFilePort, type FilePort } from '../../platform/files';
 
 import { readAvailability } from '../analysis/availability';
 import { ConsentGate, ConsentStatus } from '../analysis/ConsentGate';
+import { cvCutNote } from '../analysis/cvCutNote';
 import {
   createTauriConsentPort,
   isCloudKind,
@@ -968,6 +969,13 @@ export function Tailor({
         : `Sending your CV and the advert to ${providerInSentence(selectedOption.kind)}. ` +
           'This usually takes a few seconds.';
 
+  /**
+   * Said by the picker when the chosen AI will not read the whole CV (L-302).
+   * It matters most here: the tailored CV is rewritten from what was sent, so
+   * anything past the cut is not in it.
+   */
+  const cvCut = cvCutNote(cvText, selectedOption?.kind ?? null);
+
   const grantedConsents = (['anthropic', 'openai'] as const).filter((kind) => consent[kind]);
 
   return (
@@ -1227,6 +1235,14 @@ export function Tailor({
             {selectedOption?.note ??
               'Writing needs AI. AI on this PC keeps your CV here; AI from a company sends it to that company.'}
           </p>
+          {cvCut === null ? null : (
+            <p
+              data-testid="tailor-cv-cut"
+              className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
+            >
+              {cvCut}
+            </p>
+          )}
 
           {localModelHint === null ? null : (
             <p

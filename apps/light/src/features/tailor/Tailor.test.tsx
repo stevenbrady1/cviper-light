@@ -210,6 +210,36 @@ async function renderReady(replies: readonly unknown[]) {
   return { port, filePort, user };
 }
 
+// L-302: the tailored CV is a rewrite of what the AI was sent, so a CV longer
+// than a local model reads is said BEFORE the run.
+describe('a CV longer than this AI reads', () => {
+  it('says how much the local model will read, next to the picker', async () => {
+    const long: Cv = { ...CV, extracted_text: `${CV_TEXT}\n`.repeat(60) };
+    expect((long.extracted_text ?? '').length).toBeGreaterThan(6_000);
+    render(
+      <Tailor
+        port={createFakeTailorPort({ cvs: [long], jobs: [JOB], applications: [APPLICATION] })}
+        filePort={createFakeFilePort()}
+        createTransport={() => queuedTransport([])}
+        consentPort={createFakeConsentPort()}
+        now={NOW}
+      />,
+    );
+    await vi.waitFor(() =>
+      expect((screen.getByTestId('tailor-provider') as HTMLSelectElement).value).toBe(
+        'ollama:llama3.2:3b',
+      ),
+    );
+    expect((await screen.findByTestId('tailor-cv-cut')).textContent).toContain('first 6,000');
+  });
+
+  // NEGATIVE — a CV that fits says nothing.
+  it('negative: a CV that fits shows no note', async () => {
+    await renderReady([]);
+    expect(screen.queryByTestId('tailor-cv-cut')).toBeNull();
+  });
+});
+
 describe('the empty screen', () => {
   it('has exactly one primary button, and it explains why it cannot be pressed', async () => {
     await renderReady([]);
