@@ -168,6 +168,10 @@ is not newer than the last one, and a date that is not a real day.
   If they must, merge one first and start the other from the result.
 - **A new export in an `index.ts` goes in alphabetical order, not at the end**, so two additions
   land on different lines.
+- **No screen file over 800 lines.** `component-size.contract.test.ts` fails the build on a
+  new one. The four already over it (Analysis, Search, Tracker, Profile) are capped at their
+  size and may only shrink. A big screen is split into one file per panel, plus hooks for its
+  actions, as `Tailor.tsx` was (L-305).
 
 ## Layout, and the conventions that bite
 
