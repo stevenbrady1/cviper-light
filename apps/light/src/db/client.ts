@@ -27,10 +27,11 @@
  * real `sqlx::Transaction`, not a retry loop here.
  * ============================================================================
  */
-import Database from '@tauri-apps/plugin-sql';
+import Database, { type SqlConnection } from './sqlBridge';
 
 import { err, ok, type Result } from '@cviper/core-types';
 
+import { FOREIGN_KEYS_ON, isApproved } from './approved';
 import { DB_URL } from './constants';
 import { dbError, describeUnknown, fromThrown, type DbError } from './errors';
 
@@ -39,13 +40,41 @@ import { dbError, describeUnknown, fromThrown, type DbError } from './errors';
  * not connecting" — including after a failure, so a user who frees the disk or
  * closes the other copy of the app can simply try again.
  */
-let connecting: Promise<Database> | null = null;
+let connecting: Promise<SqlConnection> | null = null;
 
 /** The tail of the operation queue. See the note at the top of the file. */
 let queue: Promise<unknown> = Promise.resolve();
 
-async function connect(): Promise<Database> {
-  const db = await Database.load(DB_URL);
+/**
+ * Refuse a statement that is not on the approved list (L-243), on THIS side.
+ *
+ * Rust refuses it too, and Rust is the check that matters. This one exists so
+ * the failure lands in a test: every database test reaches its statements
+ * through here, so a statement nobody registered with `approved()` fails the
+ * suite instead of failing for a user.
+ */
+function approvedOnly(db: SqlConnection): SqlConnection {
+  const check = (query: string): void => {
+    if (!isApproved(query)) {
+      throw new Error(
+        `Not an approved statement (L-243) — register it with approved(): ${query.slice(0, 120)}`,
+      );
+    }
+  };
+  return {
+    execute: async (query, values) => {
+      check(query);
+      return db.execute(query, values);
+    },
+    select: async <T>(query: string, values?: unknown[]) => {
+      check(query);
+      return db.select<T>(query, values);
+    },
+  };
+}
+
+async function connect(): Promise<SqlConnection> {
+  const db = approvedOnly(await Database.load(DB_URL));
 
   // Foreign key enforcement is per-CONNECTION in SQLite and is not stored in
   // the database file, which is why it is not in `0001_init.sql`.
@@ -56,7 +85,7 @@ async function connect(): Promise<Database> {
   // holding, and — more importantly — states the requirement in our own code
   // instead of leaving it inherited from a dependency's defaults, where a
   // version bump could remove it without anything here noticing.
-  await db.execute('PRAGMA foreign_keys = ON;');
+  await db.execute(FOREIGN_KEYS_ON);
 
   return db;
 }
@@ -67,7 +96,7 @@ async function connect(): Promise<Database> {
  * Prefer `withDb()`. Reach for `getDb()` only when you need the handle itself
  * and have already taken responsibility for ordering.
  */
-export async function getDb(): Promise<Result<Database, DbError>> {
+export async function getDb(): Promise<Result<SqlConnection, DbError>> {
   if (connecting === null) {
     const attempt = connect();
     connecting = attempt;
@@ -99,7 +128,7 @@ export async function getDb(): Promise<Result<Database, DbError>> {
  * way.
  */
 export function withDb<T>(
-  run: (db: Database) => Promise<T>,
+  run: (db: SqlConnection) => Promise<T>,
   table: string | null = null,
 ): Promise<Result<T, DbError>> {
   const next = queue.then(async (): Promise<Result<T, DbError>> => {

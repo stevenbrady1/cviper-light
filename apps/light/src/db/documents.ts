@@ -13,6 +13,7 @@
  */
 import { ok, type Document, type Result } from '@cviper/core-types';
 
+import { approved } from './approved';
 import { withDb } from './client';
 import { type DbError } from './errors';
 import { documentFromRow, documentToValues, mapRows } from './rows';
@@ -20,8 +21,10 @@ import { deleteFrom, selectFrom, upsertInto } from './statements';
 
 const TABLE = 'documents';
 
-const LIST = `${selectFrom(TABLE)} ORDER BY created_at DESC, id`;
-const LIST_FOR_APPLICATION = `${selectFrom(TABLE)} WHERE application_id = $1 ORDER BY created_at DESC, id`;
+const LIST = approved(`${selectFrom(TABLE)} ORDER BY created_at DESC, id`);
+const LIST_FOR_APPLICATION = approved(
+  `${selectFrom(TABLE)} WHERE application_id = $1 ORDER BY created_at DESC, id`,
+);
 const UPSERT = upsertInto(TABLE);
 const DELETE = deleteFrom(TABLE);
 

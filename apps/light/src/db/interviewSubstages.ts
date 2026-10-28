@@ -15,6 +15,7 @@
  */
 import { ok, type InterviewSubstage, type Result } from '@cviper/core-types';
 
+import { approved } from './approved';
 import { withDb } from './client';
 import { type DbError } from './errors';
 import { interviewSubstageFromRow, interviewSubstageToValues, mapRows } from './rows';
@@ -23,8 +24,20 @@ import { selectFrom, upsertInto } from './statements';
 const TABLE = 'interview_substages';
 
 /** `id` as the tie-break so two equal positions always read in the same order. */
-const LIST = `${selectFrom(TABLE)} ORDER BY position, id`;
+const LIST = approved(`${selectFrom(TABLE)} ORDER BY position, id`);
 const UPSERT = upsertInto(TABLE);
+const DELETE_ALL = approved(`DELETE FROM ${TABLE}`);
+/**
+ * Delete every sub-stage whose id is not in the JSON array bound as `$1`.
+ *
+ * One JSON array rather than `NOT IN ($1, $2, ...)`: a placeholder per id
+ * made the statement's TEXT change with the count, and only a fixed text can
+ * be on the approved list Rust checks (L-243). The ids are still bound, never
+ * interpolated. `interviewSubstages.sqlite.test.ts` runs it on a real SQLite.
+ */
+export const KEEP_ONLY = approved(
+  `DELETE FROM ${TABLE} WHERE id NOT IN (SELECT value FROM json_each($1))`,
+);
 
 export async function listInterviewSubstages(): Promise<Result<InterviewSubstage[], DbError>> {
   const rows = await withDb((db) => db.select<unknown[]>(LIST), TABLE);
@@ -52,13 +65,9 @@ export async function replaceInterviewSubstages(
       }
 
       if (substages.length === 0) {
-        await db.execute(`DELETE FROM ${TABLE}`);
+        await db.execute(DELETE_ALL);
       } else {
-        const placeholders = substages.map((_, index) => `$${index + 1}`).join(', ');
-        await db.execute(
-          `DELETE FROM ${TABLE} WHERE id NOT IN (${placeholders})`,
-          substages.map((substage) => substage.id),
-        );
+        await db.execute(KEEP_ONLY, [JSON.stringify(substages.map((substage) => substage.id))]);
       }
 
       await db.execute('COMMIT;');

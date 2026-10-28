@@ -13,6 +13,7 @@
  */
 import { ok, type Analysis, type Result } from '@cviper/core-types';
 
+import { approved } from './approved';
 import { withDb } from './client';
 import { type DbError } from './errors';
 import { analysisFromRow, analysisToValues, mapRows } from './rows';
@@ -20,9 +21,9 @@ import { deleteFrom, selectFrom, upsertInto } from './statements';
 
 const TABLE = 'analyses';
 
-const LIST = `${selectFrom(TABLE)} ORDER BY created_at DESC, id`;
-const LIST_FOR_CV = `${selectFrom(TABLE)} WHERE cv_id = $1 ORDER BY created_at DESC, id`;
-const GET = `${selectFrom(TABLE)} WHERE id = $1`;
+const LIST = approved(`${selectFrom(TABLE)} ORDER BY created_at DESC, id`);
+const LIST_FOR_CV = approved(`${selectFrom(TABLE)} WHERE cv_id = $1 ORDER BY created_at DESC, id`);
+const GET = approved(`${selectFrom(TABLE)} WHERE id = $1`);
 const UPSERT = upsertInto(TABLE);
 const DELETE = deleteFrom(TABLE);
 

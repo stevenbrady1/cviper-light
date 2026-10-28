@@ -13,7 +13,7 @@ const sql = vi.hoisted(() => {
   return { execute, select, load, db: { execute, select } };
 });
 
-vi.mock('@tauri-apps/plugin-sql', () => ({ default: { load: sql.load } }));
+vi.mock('./sqlBridge', () => ({ default: { load: sql.load } }));
 
 const PRAGMA = /^PRAGMA/i;
 

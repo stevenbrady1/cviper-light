@@ -11,6 +11,7 @@ import {
   type Result,
 } from '@cviper/core-types';
 
+import { approved } from './approved';
 import { withDb } from './client';
 import { type DbError } from './errors';
 import { applicationFromRow, applicationToValues, mapRows } from './rows';
@@ -18,8 +19,10 @@ import { deleteFrom, selectFrom, upsertInto } from './statements';
 
 const TABLE = 'applications';
 
-const LIST = `${selectFrom(TABLE)} ORDER BY updated_at DESC, id`;
-const LIST_BY_STATUS = `${selectFrom(TABLE)} WHERE status = $1 ORDER BY updated_at DESC, id`;
+const LIST = approved(`${selectFrom(TABLE)} ORDER BY updated_at DESC, id`);
+const LIST_BY_STATUS = approved(
+  `${selectFrom(TABLE)} WHERE status = $1 ORDER BY updated_at DESC, id`,
+);
 
 /**
  * `next_action_date IS NOT NULL` is NOT redundant next to `<= $1`.
@@ -34,11 +37,12 @@ const LIST_BY_STATUS = `${selectFrom(TABLE)} WHERE status = $1 ORDER BY updated_
  * order and calendar order are the same. This is the convention paying for
  * itself; a `DD/MM/YYYY` column would sort by day of the month.
  */
-const LIST_DUE_BY =
+const LIST_DUE_BY = approved(
   `${selectFrom(TABLE)} WHERE next_action_date IS NOT NULL AND next_action_date <= $1 ` +
-  `ORDER BY next_action_date, id`;
+    `ORDER BY next_action_date, id`,
+);
 
-const GET = `${selectFrom(TABLE)} WHERE id = $1`;
+const GET = approved(`${selectFrom(TABLE)} WHERE id = $1`);
 const UPSERT = upsertInto(TABLE);
 const DELETE = deleteFrom(TABLE);
 

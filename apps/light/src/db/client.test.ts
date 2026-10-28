@@ -19,7 +19,7 @@ const sql = vi.hoisted(() => {
   return { execute, select, load, db: { execute, select } };
 });
 
-vi.mock('@tauri-apps/plugin-sql', () => ({ default: { load: sql.load } }));
+vi.mock('./sqlBridge', () => ({ default: { load: sql.load } }));
 
 /** Fresh module registry per test: the client caches its connection forever. */
 async function loadClient() {
@@ -129,7 +129,7 @@ describe('withDb', () => {
     const { withDb } = await loadClient();
 
     const result = await withDb(async (db) => {
-      await db.execute('SELECT 1');
+      await db.execute('COMMIT;');
       return 'done';
     });
 
@@ -139,12 +139,42 @@ describe('withDb', () => {
   it('runs the pragma before the operation, never after', async () => {
     const { withDb } = await loadClient();
 
-    await withDb(async (db) => db.execute('DELETE FROM jobs'));
+    await withDb(async (db) => db.execute('COMMIT;'));
 
     expect(executedQueries()).toEqual([
       expect.stringMatching(/PRAGMA\s+foreign_keys\s*=\s*ON/i),
-      'DELETE FROM jobs',
+      'COMMIT;',
     ]);
+  });
+});
+
+describe('only approved statements reach the database (L-243)', () => {
+  it('negative: ATTACH DATABASE is refused before it is sent', async () => {
+    const { withDb } = await loadClient();
+
+    const result = await withDb(async (db) =>
+      db.execute("ATTACH DATABASE 'C:/Users/x/Startup/evil.db' AS evil"),
+    );
+
+    expect(isErr(result) && result.error.message).toContain('Not an approved statement');
+    expect(executedQueries().some((query) => query.includes('ATTACH'))).toBe(false);
+  });
+
+  it('negative: a select is checked as well as an execute', async () => {
+    const { withDb } = await loadClient();
+
+    const result = await withDb(async (db) => db.select('SELECT name FROM sqlite_master'));
+
+    expect(isErr(result) && result.error.message).toContain('Not an approved statement');
+    expect(sql.select).not.toHaveBeenCalled();
+  });
+
+  it('boundary: an approved statement with one extra character is not approved', async () => {
+    const { withDb } = await loadClient();
+
+    expect(isErr(await withDb(async (db) => db.execute('COMMIT; ')))).toBe(true);
+    expect(isErr(await withDb(async (db) => db.execute('COMMIT;; ATTACH x AS y')))).toBe(true);
+    expect(isOk(await withDb(async (db) => db.execute('COMMIT;')))).toBe(true);
   });
 
   it('never lets two operations interleave', async () => {
