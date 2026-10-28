@@ -77,7 +77,8 @@ pnpm smoke    # drives the BUILT Windows binary (WebView2). Needs `tauri build`
               # first, which CLAUDE.md forbids an agent from running.
               # CI: smoke.yml.
 pnpm webkit   # drives the app's own pdf.js under Playwright's WebKit, with the
-              # production CSP read out of tauri.conf.json. Needs a ~60 MB
+              # production CSP read out of tauri.conf.json, and measures colour
+              # contrast on the real styled app with axe (L-300). Needs a ~60 MB
               # browser: `pnpm --filter @cviper/light exec playwright-core
               # install webkit`. CI: ci.yml's `webkit` job.
 ```
