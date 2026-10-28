@@ -99,11 +99,18 @@ export function TrackerColumn({
         over ? 'bg-sunken' : 'bg-transparent'
       }`}
     >
-      <header className="flex items-baseline justify-between gap-2 px-2 pt-2 pb-1.5">
-        <h2 className="font-mono text-[11px] font-medium tracking-[0.12em] text-ink-muted uppercase">
+      {/*
+        Wraps (L-311). A column shrinks to its minimum when an application is
+        open, and the Interviewing heading — name, "Edit stages" and count — is
+        wider than that: on one line the count ran into the next column's name
+        ("1OFFER"). Now the button and count drop under the name instead, kept
+        to the right. `contrast-webkit.spec.ts` measures it in a real engine.
+      */}
+      <header className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 px-2 pt-2 pb-1.5">
+        <h2 className="min-w-0 font-mono text-[11px] font-medium tracking-[0.12em] text-ink-muted uppercase">
           {STATUS_LABELS[status]}
         </h2>
-        <span className="flex items-baseline gap-2">
+        <span className="ml-auto flex items-baseline gap-2">
           {status !== 'interviewing' || onEditSubstages === undefined ? null : (
             <button
               type="button"
