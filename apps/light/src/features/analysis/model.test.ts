@@ -36,8 +36,8 @@ const [BASIC] = providerOptions({
 
 const CV: Cv = {
   id: 'cv-1',
-  name: 'Steven Brady CV.pdf',
-  file_path: 'C:\\Users\\steve\\Documents\\CV.pdf',
+  name: 'Jordan Lewis CV.pdf',
+  file_path: 'C:\\Users\\jamie\\Documents\\CV.pdf',
   extracted_text: 'Credit risk analyst with eight years in London banking. SQL, Python, Basel III.',
   json_resume: null,
   created_at: NOW,

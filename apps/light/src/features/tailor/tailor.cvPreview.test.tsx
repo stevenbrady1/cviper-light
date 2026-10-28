@@ -26,11 +26,11 @@ const { createFakeTailorPort } = await import('./test/fakePort');
 const { createFakeConsentPort } = await import('../analysis/test/fakeConsentPort');
 const { createFakeFilePort } = await import('../../platform/test/fakeFilePort');
 
-const RISK_TEXT = `Steve Brady
+const RISK_TEXT = `Jamie Lewis
 Senior Credit Risk Analyst, Lloyds Banking Group, London, Jan 2020 – Present
 - Built IFRS 9 impairment models in Python, cutting run time by 40%.`;
 
-const DATA_TEXT = `Steve Brady
+const DATA_TEXT = `Jamie Lewis
 Data Engineer, Monzo, London, 2021 – Present
 - Moved the nightly batch to streaming, cutting report lag from a day to minutes.`;
 

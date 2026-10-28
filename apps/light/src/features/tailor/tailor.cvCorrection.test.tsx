@@ -21,8 +21,8 @@ const { createFakeTailorPort } = await import('./test/fakePort');
 const { createFakeConsentPort } = await import('../analysis/test/fakeConsentPort');
 const { createFakeFilePort } = await import('../../platform/test/fakeFilePort');
 
-const MISREAD = 'Steve Brady\nCredit Risk Analyst Lloyds 20202024\nPython SQL';
-const FIXED = 'Steve Brady\nCredit Risk Analyst, Lloyds, 2020 – 2024\nPython, SQL';
+const MISREAD = 'Jamie Lewis\nCredit Risk Analyst Lloyds 20202024\nPython SQL';
+const FIXED = 'Jamie Lewis\nCredit Risk Analyst, Lloyds, 2020 – 2024\nPython, SQL';
 
 function cv(id: string, name: string, text: string): Cv {
   return {

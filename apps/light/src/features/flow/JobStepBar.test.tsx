@@ -134,11 +134,11 @@ describe('JobStepBar', () => {
         current="tailor"
         progress={{ analysed: false, tailored: false, exported: false }}
         onStep={() => undefined}
-        choice={{ cv: 'steve-cv-2026.docx', engine: 'Ollama · llama3.1:8b' }}
+        choice={{ cv: 'jamie-cv-2026.docx', engine: 'Ollama · llama3.1:8b' }}
       />,
     );
     expect(screen.getByTestId('job-steps-choice').textContent).toBe(
-      'CV: steve-cv-2026.docx · , Engine: Ollama · llama3.1:8b',
+      'CV: jamie-cv-2026.docx · , Engine: Ollama · llama3.1:8b',
     );
   });
 

@@ -152,7 +152,7 @@ const MAX_SUGGESTED_NAME_CHARS: usize = 128;
 /// can be tested without a running WebView.
 #[derive(Clone, Serialize)]
 pub struct CvFile {
-    /// The file's own name, e.g. `Steven Brady CV.pdf`. What the CV is labelled
+    /// The file's own name, e.g. `Jordan Lewis CV.pdf`. What the CV is labelled
     /// with on screen.
     name: String,
     /// Where the user took it from, for the `file_path` column on the CV row.
@@ -401,7 +401,7 @@ fn bare_file_name(suggested: &str) -> String {
 
 /// The same rule with the caller's fallback: a backup falls back to
 /// `cviper-backup.json`, a CV export to `cv.json`. A CV's name is the user's
-/// own file name, so `Steve Brady CV.json` is welcome and `..\CV.json` is not.
+/// own file name, so `Jamie Lewis CV.json` is welcome and `..\CV.json` is not.
 fn bare_json_name(suggested: &str, fallback: &str) -> String {
     bare_name(suggested, "json", fallback)
 }
@@ -1687,7 +1687,7 @@ mod tests {
     #[test]
     fn a_cv_export_writes_the_text_verbatim() {
         let path = temp_path("resume.json");
-        let text = "{\n  \"basics\": { \"name\": \"Steve\" }\n}\n";
+        let text = "{\n  \"basics\": { \"name\": \"Jamie\" }\n}\n";
         write_cv_json_at(&path, text).unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), text);
         let _ = fs::remove_file(&path);
@@ -1699,8 +1699,8 @@ mod tests {
         // on the end, so separators, `..` and control characters are plausible
         // and every one of them lands on the fallback, never a repaired path.
         assert_eq!(
-            bare_json_name("Steve Brady CV.json", FALLBACK_CV_JSON_NAME),
-            "Steve Brady CV.json"
+            bare_json_name("Jamie Lewis CV.json", FALLBACK_CV_JSON_NAME),
+            "Jamie Lewis CV.json"
         );
         for hostile in [
             "../CV.json",

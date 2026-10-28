@@ -4,7 +4,7 @@
  *
  * Reproduced on the L-281 eval set: the care and charity-shop adverts each
  * yield ONE recognised requirement, so a CV that has it scores 92 "strong" —
- * an all-or-nothing verdict on a single phrase. Steven chose the cap
+ * an all-or-nothing verdict on a single phrase. The owner chose the cap
  * (26 Oct 2026): fewer than three requirements found -> at most 74, the top of
  * "possible", and the summary says why.
  */

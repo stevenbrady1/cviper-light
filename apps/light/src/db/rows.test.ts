@@ -161,7 +161,7 @@ const APPLICATION: Application = {
 const CV: Cv = {
   id: 'cv-0001',
   name: 'Credit risk CV',
-  file_path: 'C:\\Users\\steve\\Documents\\cv.pdf',
+  file_path: 'C:\\Users\\jamie\\Documents\\cv.pdf',
   extracted_text: 'SENIOR CREDIT RISK ANALYST \u2014 \u00a385,000',
   json_resume: null,
   created_at: '2026-08-19T09:15:00.000Z',

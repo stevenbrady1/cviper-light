@@ -168,8 +168,8 @@ export function originalJsonResume(name: string, bytes: Uint8Array): string | nu
 export const FALLBACK_JSON_RESUME_NAME = 'cv.json';
 
 /**
- * `Steve Brady CV.json` for `Steve Brady CV.json`, `Steve Brady CV.json` for
- * `Steve Brady CV.pdf`, and `cv.json` when there is no name left once the
+ * `Jamie Lewis CV.json` for `Jamie Lewis CV.json`, `Jamie Lewis CV.json` for
+ * `Jamie Lewis CV.pdf`, and `cv.json` when there is no name left once the
  * extension goes. Only a SUGGESTION: Rust re-checks it for separators and
  * control characters and falls back to `cv.json` itself (`bare_json_name`).
  */

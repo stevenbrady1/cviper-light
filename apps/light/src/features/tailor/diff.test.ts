@@ -4,11 +4,11 @@ import { lineDiff } from './diff';
 
 describe('lineDiff', () => {
   it('marks kept, added and removed lines, in order', () => {
-    const original = 'Steve Brady\nAnalyst, Barclays\n- Ran stress tests.\nBSc Mathematics';
+    const original = 'Jamie Lewis\nAnalyst, Barclays\n- Ran stress tests.\nBSc Mathematics';
     const revised =
-      'Steve Brady\nAnalyst, Barclays\n- Ran stress tests for 12 portfolios.\nBSc Mathematics';
+      'Jamie Lewis\nAnalyst, Barclays\n- Ran stress tests for 12 portfolios.\nBSc Mathematics';
     expect(lineDiff(original, revised)).toEqual([
-      { kind: 'same', text: 'Steve Brady' },
+      { kind: 'same', text: 'Jamie Lewis' },
       { kind: 'same', text: 'Analyst, Barclays' },
       { kind: 'removed', text: '- Ran stress tests.' },
       { kind: 'added', text: '- Ran stress tests for 12 portfolios.' },

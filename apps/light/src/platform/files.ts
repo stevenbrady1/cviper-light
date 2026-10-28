@@ -48,7 +48,7 @@ import { err, ok, type Result } from '@cviper/core-types';
 
 /** A CV, read off the disk. */
 export interface PickedCv {
-  /** The file's own name, e.g. `Steven Brady CV.pdf`. Used to label the CV. */
+  /** The file's own name, e.g. `Jordan Lewis CV.pdf`. Used to label the CV. */
   readonly name: string;
   /** The full path, kept so the CV row can record where it came from. */
   readonly path: string;

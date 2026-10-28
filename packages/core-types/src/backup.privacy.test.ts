@@ -35,7 +35,7 @@ const BASE: Omit<BackupPayload, 'cvs'> = {
 const CV_WITH_PATH = {
   id: 'cv-1',
   name: 'Risk CV.pdf',
-  file_path: 'C:\\Users\\steve\\Documents\\Risk CV.pdf',
+  file_path: 'C:\\Users\\jamie\\Documents\\Risk CV.pdf',
   extracted_text: 'Some text',
   created_at: '2026-08-10T07:15:00.000Z',
   json_resume: null,
@@ -54,7 +54,7 @@ describe('exporting cvs.file_path (L-133)', () => {
     });
 
     // W1 (coordinator review): `JSON.stringify` doubles every backslash in a
-    // Windows path, so a literal `.not.toContain('C:\\Users\\steve')` here —
+    // Windows path, so a literal `.not.toContain('C:\\Users\\jamie')` here —
     // a JS string with ONE backslash per separator — could never appear in
     // output that always has TWO, and would pass whether or not the leak
     // exists. Strip the quotes off the same `JSON.stringify` the export path
@@ -63,7 +63,7 @@ describe('exporting cvs.file_path (L-133)', () => {
     expect(exported).not.toContain(JSON.stringify(CV_WITH_PATH.file_path).slice(1, -1));
     // The plain username needs no escaping at all — the most literal form
     // the leak could take, and immune to the same mistake.
-    expect(exported).not.toContain('steve');
+    expect(exported).not.toContain('jamie');
 
     const reimported = importBackup(exported);
     expect(reimported.ok).toBe(true);
@@ -93,7 +93,7 @@ describe('exporting cvs.file_path (L-133)', () => {
     if (!imported.ok) return;
 
     const cv = imported.value.cvs[0];
-    expect(cv?.file_path).toBe('C:\\Users\\steve\\Documents\\Risk CV.pdf');
+    expect(cv?.file_path).toBe('C:\\Users\\jamie\\Documents\\Risk CV.pdf');
     expect(cv?.extracted_text).toBe('Some text');
     expect(cv?.name).toBe('Risk CV.pdf');
   });

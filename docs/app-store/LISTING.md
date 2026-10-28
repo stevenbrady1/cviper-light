@@ -30,7 +30,7 @@ delete the other before pasting.
 | Content rights     | Does not contain, show or access third-party content                                                            |
 | Age rating         | 4+ (see `PRIVACY-LABEL.md`)                                                                                     |
 | Licence agreement  | Apple's standard EULA                                                                                           |
-| Copyright          | `© 2026 Steven Brady`                                                                                           |
+| Copyright          | `© 2026 CViper`                                                                                                 |
 | Price              | Free. No in-app purchases. Nothing is sold inside the app, so there is nothing for Guideline 3.1.1 to apply to. |
 
 ### Subtitle (30 characters max)
@@ -120,7 +120,7 @@ them.)
 **Sign-in required:** No. Leave the demo account fields empty and tick
 "Sign-in not required".
 
-**Contact:** Steve Brady, the developer account's phone and email.
+**Contact:** the owner, on the developer account's phone and email.
 
 **Notes for the reviewer** (paste as written):
 

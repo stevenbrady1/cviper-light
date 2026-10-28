@@ -66,7 +66,7 @@ export function createFakeFilePort(): FakeFilePort {
   let cvFailure: string | null = null;
   let backup: PickedBackup | null = null;
   let backupFailure: string | null = null;
-  let savePath: string | null = 'C:\\Users\\steve\\Documents\\cviper-backup.json';
+  let savePath: string | null = 'C:\\Users\\jamie\\Documents\\cviper-backup.json';
   let saveFailure: string | null = null;
   const written: { path: string; contents: string }[] = [];
   const writtenCvJson: { path: string; contents: string }[] = [];

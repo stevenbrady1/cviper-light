@@ -39,7 +39,7 @@ describe('backups and cvs.json_resume', () => {
   });
 
   it('a new export carries the original text, and it survives a round trip', () => {
-    const original = '{"basics":{"name":"Steve"}}\n';
+    const original = '{"basics":{"name":"Jamie"}}\n';
     const exported = exportBackup({
       ...BASE,
       cvs: [{ ...OLD_CV, name: 'CV.json', json_resume: original }],

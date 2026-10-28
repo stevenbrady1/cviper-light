@@ -28,7 +28,7 @@ const CV_TEXT =
 
 const SAVED_CV: Cv = {
   id: 'cv-1',
-  name: 'Steven Brady CV.pdf',
+  name: 'Jordan Lewis CV.pdf',
   file_path: null,
   extracted_text: CV_TEXT,
   json_resume: null,
@@ -79,7 +79,7 @@ describe('Your CV, on Profile', () => {
     await renderView({ cvPort: createFakeAnalysisPort({ cvs: [SAVED_CV] }) });
 
     const current = await screen.findByTestId('profile-cv-current');
-    expect(current.textContent).toContain('Steven Brady CV.pdf');
+    expect(current.textContent).toContain('Jordan Lewis CV.pdf');
   });
 
   it('says plainly when there is no CV yet', async () => {
@@ -96,7 +96,7 @@ describe('Your CV, on Profile', () => {
       cvPort: createFakeAnalysisPort({ cvs: [SAVED_CV] }),
     });
     await vi.waitFor(() =>
-      expect(screen.getByTestId('profile-cv-current').textContent).toContain('Steven Brady'),
+      expect(screen.getByTestId('profile-cv-current').textContent).toContain('Jordan Lewis'),
     );
 
     files.nextCv({ name: 'New CV.docx', path: 'C:\\New CV.docx', bytes: new Uint8Array([1]) });
@@ -107,7 +107,7 @@ describe('Your CV, on Profile', () => {
     await vi.waitFor(() =>
       expect(screen.getByTestId('profile-cv-current').textContent).toContain('New CV.docx'),
     );
-    expect(cvPort.storedCvs().map((cv) => cv.name)).toEqual(['New CV.docx', 'Steven Brady CV.pdf']);
+    expect(cvPort.storedCvs().map((cv) => cv.name)).toEqual(['New CV.docx', 'Jordan Lewis CV.pdf']);
   });
 
   it('boundary: an empty file is refused in the parser’s words and the current CV is unchanged', async () => {
@@ -116,7 +116,7 @@ describe('Your CV, on Profile', () => {
       cvPort: createFakeAnalysisPort({ cvs: [SAVED_CV] }),
     });
     await vi.waitFor(() =>
-      expect(screen.getByTestId('profile-cv-current').textContent).toContain('Steven Brady'),
+      expect(screen.getByTestId('profile-cv-current').textContent).toContain('Jordan Lewis'),
     );
 
     files.nextCv({ name: 'CV.docx', path: 'C:\\CV.docx', bytes: new Uint8Array(0) });
@@ -129,7 +129,7 @@ describe('Your CV, on Profile', () => {
       'That file is empty.',
     );
     expect(cvPort.storedCvs()).toEqual([SAVED_CV]);
-    expect(screen.getByTestId('profile-cv-current').textContent).toContain('Steven Brady');
+    expect(screen.getByTestId('profile-cv-current').textContent).toContain('Jordan Lewis');
   });
 
   it('negative: a file the app cannot read is reported and nothing is stored', async () => {

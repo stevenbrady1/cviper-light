@@ -157,7 +157,7 @@ describe('pickCv', () => {
   it('asks Rust to run the dialog, and never names a file', async () => {
     tauri.invoke.mockResolvedValue({
       name: 'CV.pdf',
-      path: 'C:\\Users\\steve\\Documents\\CV.pdf',
+      path: 'C:\\Users\\jamie\\Documents\\CV.pdf',
       bytes_base64: 'Zm9vYmFy',
     });
 
@@ -166,7 +166,7 @@ describe('pickCv', () => {
     expect(picked.ok).toBe(true);
     if (!picked.ok) return;
     expect(picked.value?.name).toBe('CV.pdf');
-    expect(picked.value?.path).toBe('C:\\Users\\steve\\Documents\\CV.pdf');
+    expect(picked.value?.path).toBe('C:\\Users\\jamie\\Documents\\CV.pdf');
     expect(picked.value?.bytes).toEqual(bytesOf('foobar'));
 
     // ONE call, and no arguments at all. An argument here would be the hole
@@ -282,11 +282,11 @@ describe('pickBackup', () => {
 
 describe('saveBackup', () => {
   it('hands Rust the contents and a suggested NAME, never a path', async () => {
-    tauri.invoke.mockResolvedValue('C:\\Users\\steve\\Documents\\cviper-backup.json');
+    tauri.invoke.mockResolvedValue('C:\\Users\\jamie\\Documents\\cviper-backup.json');
 
     const saved = await createTauriFilePort().saveBackup('{}', 'cviper-backup-2026-08-19.json');
 
-    expect(saved).toEqual({ ok: true, value: 'C:\\Users\\steve\\Documents\\cviper-backup.json' });
+    expect(saved).toEqual({ ok: true, value: 'C:\\Users\\jamie\\Documents\\cviper-backup.json' });
     // `suggestion`, one word, because Tauri camelCases a Rust command's
     // snake_case parameters and a two-word name would silently need two
     // spellings. `the_frontend_calls_these_commands_by_these_names` in
@@ -328,7 +328,7 @@ describe('saveBackup', () => {
 
 describe('saveText (L-160)', () => {
   it('hands Rust the contents, a suggested NAME and the extension, never a path', async () => {
-    tauri.invoke.mockResolvedValue('C:\\Users\\steve\\Documents\\Tailored CV.txt');
+    tauri.invoke.mockResolvedValue('C:\\Users\\jamie\\Documents\\Tailored CV.txt');
 
     const saved = await createTauriFilePort().saveText(
       'PROFESSIONAL SUMMARY',
@@ -336,7 +336,7 @@ describe('saveText (L-160)', () => {
       'txt',
     );
 
-    expect(saved).toEqual({ ok: true, value: 'C:\\Users\\steve\\Documents\\Tailored CV.txt' });
+    expect(saved).toEqual({ ok: true, value: 'C:\\Users\\jamie\\Documents\\Tailored CV.txt' });
     // Three one-word keys, pinned against the Rust signature by
     // `the_frontend_calls_these_commands_by_these_names` in files.rs.
     expect(tauri.invoke).toHaveBeenCalledWith('pick_and_write_text', {
@@ -375,7 +375,7 @@ describe('saveText (L-160)', () => {
 
 describe('saveBytes (L-165)', () => {
   it('hands Rust the bytes as base64, a suggested NAME and the extension, never a path', async () => {
-    tauri.invoke.mockResolvedValue('C:\\Users\\steve\\Documents\\Tailored CV.docx');
+    tauri.invoke.mockResolvedValue('C:\\Users\\jamie\\Documents\\Tailored CV.docx');
 
     const saved = await createTauriFilePort().saveBytes(
       bytesOf('PK\u0003\u0004'),
@@ -383,7 +383,7 @@ describe('saveBytes (L-165)', () => {
       'docx',
     );
 
-    expect(saved).toEqual({ ok: true, value: 'C:\\Users\\steve\\Documents\\Tailored CV.docx' });
+    expect(saved).toEqual({ ok: true, value: 'C:\\Users\\jamie\\Documents\\Tailored CV.docx' });
     // Three one-word keys, pinned against the Rust signature by
     // `the_frontend_calls_these_commands_by_these_names` in files.rs. The
     // bytes travel as base64 because a zip is not a string.

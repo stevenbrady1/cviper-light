@@ -108,7 +108,7 @@ issues a new identity too, so Step 5 becomes a live step again on the same day.
 
 Partner Center → **Account settings** → **Publisher display name**.
 
-**This was done. It is `Steven Brady`** — the owner's own personal name, not
+**This was done. It is the owner's own personal name** (exactly as in the manifest's `<PublisherDisplayName>`), not
 "CViper". The same string was pasted into the manifest's
 `<PublisherDisplayName>`, which is why it appears again in Step 5.
 
@@ -335,11 +335,11 @@ strings, and go on to Step 6.
 | ------------------------------ | ------------------------------------------------ | ----------------------------------------- |
 | **Package/Identity/Name**      | `<Identity Name="…">`                            | `StBr.CViperLight`                        |
 | **Package/Identity/Publisher** | `<Identity Publisher="…">`                       | `CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399` |
-| **Publisher display name**     | `<PublisherDisplayName>…</PublisherDisplayName>` | `Steven Brady`                            |
+| **Publisher display name**     | `<PublisherDisplayName>…</PublisherDisplayName>` | as Partner Center shows it (see manifest) |
 
 `Identity/@Publisher` is case sensitive and has to match the reservation
 character for character. `StBr` is the publisher id Partner Center issued, not
-an abbreviation somebody chose — it must not be tidied into `StevenBrady`.
+an abbreviation somebody chose — and the display name must keep its space; it must not be tidied into one word.
 
 ### If the name is ever re-reserved
 
@@ -694,14 +694,14 @@ when the advert really asked for it.
 - [ ] Enrolled as an **individual** developer at `storedeveloper.microsoft.com`
 - [ ] Country is correct (it cannot be changed later)
 - [x] Publisher display name is **the owner's own name**, not "CViper" —
-      `Steven Brady`, pasted from Partner Center into the manifest in
+      pasted from Partner Center into the manifest in
       [#76](https://github.com/stevenbrady1/cviper-light/pull/76)
 - [x] Name `CViper Light` reserved — the reservation is what issued the identity
       below and the Store ID `9PKWNV9CGPWV`
 - [ ] `https://cviper.ai/privacy/` is **live** and shows the policy
 - [x] Identity: all three fields pasted from Product identity —
       `StBr.CViperLight`, `CN=F08F8DD5-FEF4-41DC-84E4-37C56C36B399` and
-      `Steven Brady`, merged in
+      the publisher display name, merged in
       [#76](https://github.com/stevenbrady1/cviper-light/pull/76)
 - [x] Version ends `.0` and matches the app version — pinned to
       `tauri.conf.json` by `appxManifestVersion.contract.test.ts` since L-168,

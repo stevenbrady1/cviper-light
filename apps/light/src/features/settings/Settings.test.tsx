@@ -63,8 +63,8 @@ const APPLICATION: Application = {
 
 const CV: Cv = {
   id: 'cv-1',
-  name: 'Steven Brady CV.pdf',
-  file_path: 'C:\\Users\\steve\\Documents\\CV.pdf',
+  name: 'Jordan Lewis CV.pdf',
+  file_path: 'C:\\Users\\jamie\\Documents\\CV.pdf',
   extracted_text: 'Credit risk analyst with eight years in London banking.',
   json_resume: null,
   created_at: '2026-08-01T09:00:00.000Z',
@@ -163,7 +163,7 @@ describe('export', () => {
     await user.click(screen.getByTestId('settings-export'));
 
     const message = await screen.findByTestId('settings-message');
-    expect(message.textContent).toContain('C:\\Users\\steve\\Documents\\cviper-backup.json');
+    expect(message.textContent).toContain('C:\\Users\\jamie\\Documents\\cviper-backup.json');
     expect(message.textContent).toContain('1 job, 1 application and 1 CV');
     expect(message.textContent).toContain('never left this machine');
 

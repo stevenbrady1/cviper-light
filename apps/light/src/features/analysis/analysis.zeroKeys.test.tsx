@@ -121,14 +121,14 @@ describe('the analysis view on a machine with no keys and no Ollama', () => {
 
     // --- Upload ------------------------------------------------------------
     filePort.nextCv({
-      name: 'Steven Brady CV.docx',
-      path: 'C:\\Users\\steve\\Documents\\CV.docx',
+      name: 'Jordan Lewis CV.docx',
+      path: 'C:\\Users\\jamie\\Documents\\CV.docx',
       bytes: new Uint8Array([80, 75, 3, 4]),
     });
     parsing.extractText.mockResolvedValue(ok({ text: CV_TEXT, pageCount: null, warnings: [] }));
 
     await user.click(screen.getByTestId('analysis-upload'));
-    await screen.findByDisplayValue('Steven Brady CV.docx');
+    await screen.findByDisplayValue('Jordan Lewis CV.docx');
     expect(port.storedCvs()).toHaveLength(1);
 
     // --- Paste the advert --------------------------------------------------

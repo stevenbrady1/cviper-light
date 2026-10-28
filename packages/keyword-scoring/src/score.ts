@@ -117,7 +117,7 @@ function plural(count: number, singular: string, pluralWord: string): string {
  * phrase scores 92 "strong" (the care and charity-shop adverts in the L-281
  * eval set did exactly that). Below this many, the score is capped at
  * `THIN_ADVERT_SCORE_CAP`, the top of "possible", and the summary says so.
- * A Light-only divergence from the web app's formula, chosen by Steven on
+ * A Light-only divergence from the web app's formula, chosen by the owner on
  * 26 Oct 2026 over shrinking towards 50 or a note alone.
  */
 export const MIN_REQUIREMENTS_FOR_STRONG = 3;

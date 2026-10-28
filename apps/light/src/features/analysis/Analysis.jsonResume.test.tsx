@@ -30,7 +30,7 @@ const NOW = new Date('2026-09-08T10:00:00.000Z');
 
 const RESUME_TEXT = `{
   "basics": {
-    "name": "Steve Brady"
+    "name": "Jamie Lewis"
   },
   "skills": [
     {
@@ -42,18 +42,18 @@ const RESUME_TEXT = `{
 
 const JSON_CV: Cv = {
   id: 'cv-json',
-  name: 'Steve Brady CV.json',
-  file_path: 'C:\\Users\\steve\\Documents\\Steve Brady CV.json',
-  extracted_text: 'Steve Brady SQL',
+  name: 'Jamie Lewis CV.json',
+  file_path: 'C:\\Users\\jamie\\Documents\\Jamie Lewis CV.json',
+  extracted_text: 'Jamie Lewis SQL',
   created_at: '2026-09-01T09:00:00.000Z',
   json_resume: RESUME_TEXT,
 };
 
 const PDF_CV: Cv = {
   id: 'cv-pdf',
-  name: 'Steve Brady CV.pdf',
-  file_path: 'C:\\Users\\steve\\Documents\\Steve Brady CV.pdf',
-  extracted_text: 'Steve Brady SQL',
+  name: 'Jamie Lewis CV.pdf',
+  file_path: 'C:\\Users\\jamie\\Documents\\Jamie Lewis CV.pdf',
+  extracted_text: 'Jamie Lewis SQL',
   created_at: '2026-09-01T09:00:00.000Z',
   json_resume: null,
 };
@@ -102,7 +102,7 @@ describe('Save as JSON Resume', () => {
   it('happy: writes the stored file back out, stamped, under the CV’s own name', async () => {
     const user = userEvent.setup();
     const { filePort } = await renderWith([JSON_CV]);
-    filePort.nextSavePath('C:\\Users\\steve\\Desktop\\Steve Brady CV.json');
+    filePort.nextSavePath('C:\\Users\\jamie\\Desktop\\Jamie Lewis CV.json');
 
     expect(saveButton().disabled).toBe(false);
     await user.click(saveButton());
@@ -114,7 +114,7 @@ describe('Save as JSON Resume', () => {
       skills: unknown[];
       meta: { cviper: { app: string; exportedAt: string; sourceCvId: string } };
     };
-    expect(document.basics.name).toBe('Steve Brady');
+    expect(document.basics.name).toBe('Jamie Lewis');
     expect(document.skills).toHaveLength(1);
     expect(document.meta.cviper).toEqual({
       app: 'cviper-light',
@@ -127,7 +127,7 @@ describe('Save as JSON Resume', () => {
     expect(filePort.calls.saveBackup).toBe(0);
 
     const message = await screen.findByTestId('analysis-export-message');
-    expect(message.textContent).toContain('Steve Brady CV.json');
+    expect(message.textContent).toContain('Jamie Lewis CV.json');
   });
 
   it('negative: a cancelled dialog writes nothing and says nothing', async () => {
@@ -177,7 +177,7 @@ describe('uploading keeps the original only for a JSON Resume', () => {
       bytes: new TextEncoder().encode(RESUME_TEXT),
     });
     parsing.extractText.mockResolvedValue(
-      ok({ text: 'Steve Brady SQL', pageCount: null, warnings: [] }),
+      ok({ text: 'Jamie Lewis SQL', pageCount: null, warnings: [] }),
     );
 
     await user.click(screen.getByTestId('analysis-upload'));
@@ -192,7 +192,7 @@ describe('uploading keeps the original only for a JSON Resume', () => {
     const { port, filePort } = await renderWith([]);
     filePort.nextCv({ name: 'New CV.docx', path: 'C:\\New CV.docx', bytes: new Uint8Array([1]) });
     parsing.extractText.mockResolvedValue(
-      ok({ text: 'Steve Brady SQL', pageCount: 2, warnings: [] }),
+      ok({ text: 'Jamie Lewis SQL', pageCount: 2, warnings: [] }),
     );
 
     await user.click(screen.getByTestId('analysis-upload'));

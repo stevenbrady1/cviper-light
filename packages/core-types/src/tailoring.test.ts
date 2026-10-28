@@ -50,7 +50,7 @@ function makeLetter(): CoverLetter {
   return {
     greeting: 'Dear Hiring Manager,',
     paragraphs: ['First paragraph.', 'Second paragraph.'],
-    sign_off: 'Yours sincerely,\nSteve',
+    sign_off: 'Yours sincerely,\nJamie',
   };
 }
 
@@ -150,9 +150,9 @@ describe('the Zod schemas validate what a model actually sent', () => {
 
 describe('renderTailoredCv', () => {
   it('follows the mandatory section order, with the name first when given', () => {
-    const text = renderTailoredCv(makeTailoredCv(), 'Steve Brady');
+    const text = renderTailoredCv(makeTailoredCv(), 'Jamie Lewis');
     const order = [
-      'Steve Brady',
+      'Jamie Lewis',
       'PROFESSIONAL SUMMARY',
       'KEY SKILLS',
       'PROFESSIONAL EXPERIENCE',
@@ -160,7 +160,7 @@ describe('renderTailoredCv', () => {
     ].map((heading) => text.indexOf(heading));
     expect(order.every((at) => at >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    expect(text.startsWith('Steve Brady\n\nPROFESSIONAL SUMMARY\n')).toBe(true);
+    expect(text.startsWith('Jamie Lewis\n\nPROFESSIONAL SUMMARY\n')).toBe(true);
   });
 
   it('renders each role as title, then company | location | dates, then dashed bullets', () => {
@@ -198,14 +198,14 @@ describe('renderTailoredCv', () => {
 describe('renderCoverLetter', () => {
   it('separates greeting, paragraphs and sign-off with blank lines', () => {
     expect(renderCoverLetter(makeLetter())).toBe(
-      'Dear Hiring Manager,\n\nFirst paragraph.\n\nSecond paragraph.\n\nYours sincerely,\nSteve\n',
+      'Dear Hiring Manager,\n\nFirst paragraph.\n\nSecond paragraph.\n\nYours sincerely,\nJamie\n',
     );
   });
 
   it('boundary: an empty paragraph is dropped rather than left as a double gap', () => {
     const letter = { ...makeLetter(), paragraphs: ['Only.', '   '] };
     expect(renderCoverLetter(letter)).toBe(
-      'Dear Hiring Manager,\n\nOnly.\n\nYours sincerely,\nSteve\n',
+      'Dear Hiring Manager,\n\nOnly.\n\nYours sincerely,\nJamie\n',
     );
   });
 });

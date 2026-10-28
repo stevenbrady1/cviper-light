@@ -9,7 +9,7 @@ import { type CoverLetter, type TailoredCv } from '@cviper/core-types';
 
 import { METRIC_PATTERN, checkFabrication, checkLetterClaims } from './fabrication';
 
-const ORIGINAL = `Steve Brady
+const ORIGINAL = `Jamie Lewis
 Senior Credit Risk Analyst, Lloyds Banking Group, London, Jan 2020 – Present
 - Built IFRS 9 impairment models in Python, cutting run time by 40%.
 - Reported to the CRO across a £2bn book.

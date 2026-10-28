@@ -27,7 +27,7 @@ function existingDatabase(): DatabaseSync {
   for (const file of BEFORE) db.exec(sqlOf(file));
   db.exec(`
     INSERT INTO cvs (id, name, file_path, extracted_text, created_at, json_resume, original_text)
-      VALUES ('cv-1', 'CV.pdf', 'C:\\Users\\steve\\Documents\\CV.pdf', 'Steve Brady.', '2026-08-01T09:00:00.000Z', NULL, NULL),
+      VALUES ('cv-1', 'CV.pdf', 'C:\\Users\\jamie\\Documents\\CV.pdf', 'Jamie Lewis.', '2026-08-01T09:00:00.000Z', NULL, NULL),
              ('cv-2', 'Pasted', NULL, 'Pasted text.', '2026-08-02T09:00:00.000Z', NULL, 'Original.');
     INSERT INTO jobs (id, source, title, company, description, created_at)
       VALUES ('job-1', 'manual', 'Analyst', 'Barclays', 'SQL.', '2026-09-01T09:00:00.000Z');
@@ -48,7 +48,7 @@ describe('0009: stored CV file paths are cleared (L-147)', () => {
         id: 'cv-1',
         name: 'CV.pdf',
         file_path: null,
-        extracted_text: 'Steve Brady.',
+        extracted_text: 'Jamie Lewis.',
         created_at: '2026-08-01T09:00:00.000Z',
         json_resume: null,
         original_text: null,
