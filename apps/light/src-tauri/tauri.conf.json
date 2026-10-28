@@ -54,6 +54,9 @@
       "windows": {
         "installMode": "passive"
       }
+    },
+    "sql": {
+      "preload": ["sqlite:cviper.db"]
     }
   }
 }

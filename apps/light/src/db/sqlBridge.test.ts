@@ -5,37 +5,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fakes = vi.hoisted(() => ({
-  load: vi.fn<(url: string) => Promise<unknown>>(),
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
 }));
 
-vi.mock('@tauri-apps/plugin-sql', () => ({ default: { load: fakes.load } }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: fakes.invoke }));
 
 const { default: bridge } = await import('./sqlBridge');
 const { DB_URL } = await import('./constants');
 
 beforeEach(() => {
-  fakes.load.mockReset();
   fakes.invoke.mockReset();
-  fakes.load.mockResolvedValue({
-    execute: () => {
-      throw new Error('the plugin connection must never run a query');
-    },
-    select: () => {
-      throw new Error('the plugin connection must never run a query');
-    },
-  });
 });
 
 describe('sqlBridge (L-243)', () => {
-  it('opens the database through the plugin, then sends execute to db_execute', async () => {
+  it('opens nothing itself — Rust did at startup — and sends execute to db_execute', async () => {
     fakes.invoke.mockResolvedValue([2, 7]);
     const db = await bridge.load(DB_URL);
+    expect(fakes.invoke).not.toHaveBeenCalled();
 
     const result = await db.execute('COMMIT;', ['a', 1, null]);
 
-    expect(fakes.load).toHaveBeenCalledWith(DB_URL);
     expect(fakes.invoke).toHaveBeenCalledWith('db_execute', {
       sql: 'COMMIT;',
       values: ['a', 1, null],
@@ -66,7 +55,7 @@ describe('sqlBridge (L-243)', () => {
     await expect(bridge.load('sqlite:C:/Users/x/AppData/Roaming/Startup/evil.db')).rejects.toThrow(
       /Only sqlite:cviper\.db/,
     );
-    expect(fakes.load).not.toHaveBeenCalled();
+    expect(fakes.invoke).not.toHaveBeenCalled();
   });
 
   it('negative: a refusal from Rust reaches the caller as an error', async () => {

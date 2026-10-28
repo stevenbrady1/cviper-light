@@ -112,14 +112,15 @@ docs/                Plan and feature matrix
   `npx tailwindcss init`.
 - **`tauri-plugin-sql` needs `features = ["sqlite"]`.** `pnpm tauri add sql`
   does NOT add a database backend, and the plugin is inert without one.
-- **The page cannot run SQL (L-243).** It holds only `sql:allow-load` and
-  `sql:allow-close` — never `sql:default` (it grants `allow-select`, and the
-  plugin's select runs ANY statement, `ATTACH DATABASE` included) and never
-  `sql:allow-execute`. Queries go through the app's own `db_execute` /
-  `db_select`, which run a statement only if its exact text is in
-  `src-tauri/src/approved_sql.rs`. A new statement is registered with
-  `approved()` in `src/db/`, then `pnpm approved-sql` rewrites the Rust list;
-  `approved-sql.contract.test.ts` fails until both agree.
+- **The page cannot run SQL (L-243).** It holds no `sql:` permission at all.
+  Never `sql:default` (it grants `allow-select`, and the plugin's select runs ANY
+  statement, `ATTACH DATABASE` included) and never `sql:allow-execute`. Rust
+  opens the database at startup — the plugin is registered inside `.setup()`,
+  AFTER the safety copy, and preloads `sqlite:cviper.db` — and queries go
+  through the app's own `db_execute` / `db_select`, which run a statement only
+  if its exact text is in `src-tauri/src/approved_sql.rs`. A new statement is
+  registered with `approved()` in `src/db/`, then `pnpm approved-sql` rewrites
+  the Rust list; `approved-sql.contract.test.ts` fails until both agree.
 - **`dialog:default` excludes `dialog:allow-ask` and `dialog:allow-confirm`.**
   Both are pinned in `apps/light/src-tauri/capabilities/default.json` — do not
   remove them.

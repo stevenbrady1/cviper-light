@@ -1,3 +1,5 @@
+use tauri::Manager;
+
 mod approved_sql;
 mod custom_provider;
 mod db;
@@ -22,15 +24,8 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        // The migrations are registered against `db::DB_URL`, and the frontend
-        // opens the database with the same string from `src/db/constants.ts`.
-        // A mismatch does not error — it silently skips every migration. See
-        // the note on `db::DB_URL`.
-        .plugin(
-            tauri_plugin_sql::Builder::default()
-                .add_migrations(db::DB_URL, db::migrations())
-                .build(),
-        )
+        // NOT tauri-plugin-sql: it is registered in `.setup()` below, after the
+        // safety copy (L-243). See there.
         .plugin(tauri_plugin_opener::init());
 
     // `tauri add updater` declares tauri-plugin-updater as a desktop-only Cargo
@@ -105,6 +100,28 @@ pub fn run() {
         .setup(|app| {
             if let Some(dir) = safety_copy::data_dir(app.handle()) {
                 let _ = safety_copy::make_safety_copy(&dir, db::db_file(), db::latest_version());
+            }
+
+            // THEN the database (L-243). The plugin opens `db::DB_URL`, listed
+            // in `plugins.sql.preload` in tauri.conf.json, and runs its
+            // migrations inside its own setup — so it is registered HERE,
+            // after the copy above. On the builder with the others, it would
+            // be set up before this closure runs, and an update would migrate
+            // the database before the copy of it was made.
+            //
+            // The page holds no `sql:` permission at all: it cannot open,
+            // close or query anything through the plugin. Every query goes
+            // through `sql_gate`. The migrations are keyed by the same
+            // `db::DB_URL` the preload names; a mismatch would skip them all
+            // silently (see the note on `db::DB_URL`).
+            //
+            // A database that will not open never blocks startup: the reason
+            // is kept, and every query says it (`sql_gate::DbOpenFailed`).
+            let sql = tauri_plugin_sql::Builder::default()
+                .add_migrations(db::DB_URL, db::migrations())
+                .build();
+            if let Err(error) = app.handle().plugin(sql) {
+                app.manage(sql_gate::DbOpenFailed(error.to_string()));
             }
             Ok(())
         })

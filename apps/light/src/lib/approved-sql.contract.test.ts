@@ -9,8 +9,9 @@
  * user. `pnpm approved-sql` rewrites the file (it runs this test with `-u`).
  *
  * It also holds the line the whole change exists for: the page keeps NO
- * plugin permission that runs SQL. `sql:default` grants `allow-select`, and
- * the plugin's select runs whatever it is given — ATTACH DATABASE included.
+ * `sql:` permission at all. `sql:default` grants `allow-select`, and the
+ * plugin's select runs whatever it is given — ATTACH DATABASE included; and
+ * since part 2, Rust opens the database, so not even `allow-load` is left.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -49,8 +50,9 @@ describe('the approved SQL list (L-243)', () => {
         typeof entry === 'string' ? entry : entry.identifier,
       );
     });
+    // None at all since part 2 (L-243): Rust opens the database itself.
     const sql = granted.filter((permission) => permission.startsWith('sql:'));
-    expect(sql).toEqual(['sql:allow-load', 'sql:allow-close']);
+    expect(sql).toEqual([]);
   });
 });
 
