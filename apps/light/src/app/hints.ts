@@ -77,6 +77,11 @@ export const FLOW_HINT = {
   diff: 'Green lines are new in the draft. Struck-through lines were in your original CV and are not in the draft.',
 } as const;
 
+/** "JSON Resume", on the Analysis screen's CV picker (L-241). */
+export const JSON_RESUME_HINT =
+  'A standard file format for CVs, used by some CV builders and job sites. Most people never ' +
+  'need it: a PDF or Word file works just as well.';
+
 export const RAIL_HINT = {
   dots: 'Green: ready to use. Amber: needs attention in Settings. A service that is not set up is not listed.',
   requests:

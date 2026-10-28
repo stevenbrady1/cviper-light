@@ -1,6 +1,8 @@
 import { type Cv } from '@cviper/core-types';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { Hint } from '../../app/Hint';
+import { JSON_RESUME_HINT } from '../../app/hints';
 import { LiveStatus } from '../../app/LiveStatus';
 
 export interface AnalysisCvPickerProps {
@@ -93,9 +95,13 @@ export function AnalysisCvPicker({
       </div>
 
       <p className="mt-1 text-xs text-ink-faint">
-        PDF, Word (.docx) or JSON Resume (.json). The file is read on this computer. Its text only
-        goes to an AI you choose, and only when you ask it to read your CV. A CV that arrived as a
-        JSON Resume can be saved back out as one, unchanged, to take anywhere that reads the format.
+        PDF, Word (.docx) or{' '}
+        <Hint text={JSON_RESUME_HINT}>
+          <span data-testid="json-resume-hint">JSON Resume</span>
+        </Hint>{' '}
+        (.json). The file is read on this computer. Its text only goes to an AI you choose, and only
+        when you ask it to read your CV. A CV that arrived as a JSON Resume can be saved back out as
+        one, unchanged, to take anywhere that reads the format.
       </p>
 
       <LiveStatus text={exportMessage} />
