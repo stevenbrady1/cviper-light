@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import { buildBoardUrl } from '@cviper/job-apis';
 import { BOARD_ENCODINGS, type BoardEncoding } from '@cviper/core-types';
@@ -63,10 +63,41 @@ const PREVIEW_INPUT = { keywords: 'business analyst', location: 'Milton Keynes' 
 export interface BoardSettingsProps {
   /** Injected by tests. Defaults to the real `tauri-plugin-store` port. */
   readonly port?: BoardPreferencesPort | undefined;
+  /**
+   * Arrived from Search's "Manage job boards" (L-310): scroll this section
+   * into view and move focus to it, once, when it is drawn.
+   */
+  readonly focused?: boolean | undefined;
+  /**
+   * Told once that it has been focused, with the section, so the screen that
+   * owns the scroll area can bring it into view and the shell can forget the
+   * request.
+   */
+  readonly onFocused?: ((section: HTMLElement) => void) | undefined;
 }
 
-export function BoardSettings({ port }: BoardSettingsProps = {}) {
+export function BoardSettings({ port, focused = false, onFocused }: BoardSettingsProps = {}) {
   const boardsPort = useMemo(() => port ?? createTauriBoardPreferencesPort(), [port]);
+
+  /*
+    Focus, not just scroll: a keyboard or screen-reader user pressed a button
+    on another screen, and focus is what tells them where they have landed.
+    The section is named by its heading, so it is announced as "Job boards".
+    Once only — the shell clears the request through `onFocused`.
+
+    `preventScroll`, and no `scrollIntoView` (L-216): both would scroll every
+    box up to the window, the app shell included. The screen that owns the
+    scroll area moves it, with `scrollWithin`, in `onFocused`.
+  */
+  const section = useRef<HTMLElement>(null);
+  const focusDone = useRef(false);
+  useEffect(() => {
+    const element = section.current;
+    if (!focused || focusDone.current || element === null) return;
+    focusDone.current = true;
+    element.focus({ preventScroll: true });
+    onFocused?.(element);
+  }, [focused, onFocused]);
 
   const [preferences, setPreferences] = useState<BoardPreferences>(NO_PREFERENCES);
   /*
@@ -155,8 +186,13 @@ export function BoardSettings({ port }: BoardSettingsProps = {}) {
         );
 
   return (
-    <section data-testid="boards-settings">
-      <SectionHeading icon="boards" title="Job boards" />
+    <section
+      ref={section}
+      data-testid="boards-settings"
+      aria-labelledby="boards-settings-heading"
+      tabIndex={-1}
+    >
+      <SectionHeading id="boards-settings-heading" icon="boards" title="Job boards" />
       <p className="mt-1 text-ink-muted">
         The buttons under the search box send whatever you have typed to one of these sites, opened
         in your own browser. No key and no account is needed for any of them. Untick the ones you

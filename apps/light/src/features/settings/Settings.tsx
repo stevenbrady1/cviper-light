@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import {
   BACKUP_SCHEMA_VERSION,
@@ -9,6 +9,7 @@ import {
 } from '@cviper/core-types';
 
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { cardClasses, SectionHeading } from '../../ui';
@@ -105,6 +106,10 @@ export interface SettingsProps {
   readonly browser?: BrowserPort | undefined;
   /** Injected by tests: the real one reads and writes the board-choices file. */
   readonly boardsPort?: BoardPreferencesPort | undefined;
+  /** Open at a section rather than the top (L-310): Search's "Manage job boards". */
+  readonly openAt?: 'job-boards' | undefined;
+  /** Told once the section asked for has been reached, so the shell can forget it. */
+  readonly onOpened?: (() => void) | undefined;
   /**
    * Injected by tests: the real one talks to the updater plugin.
    *
@@ -163,7 +168,21 @@ export function Settings({
   now,
   erasePort,
   onErased,
+  openAt,
+  onOpened,
 }: SettingsProps = {}) {
+  /*
+    Opened at Job boards (L-310): this screen's own scroll area brings the
+    section to its top. Only this area moves — never the window (L-216).
+  */
+  const scrollArea = useRef<HTMLDivElement>(null);
+  const onBoardsFocused = useCallback(
+    (section: HTMLElement) => {
+      if (scrollArea.current !== null) scrollWithin(scrollArea.current, section);
+      onOpened?.();
+    },
+    [onOpened],
+  );
   const backupPort = useMemo(() => port ?? createDbBackupPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
   // One port for every link on this screen: the key signup pages, the privacy
@@ -332,7 +351,7 @@ export function Settings({
         }
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+      <div ref={scrollArea} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
         <div className="max-w-2xl space-y-6">
           {/*
             First, because it is what most people open Settings for (L-176).
@@ -440,7 +459,11 @@ export function Settings({
             </div>
           ) : null}
 
-          <BoardSettings port={boardsPort} />
+          <BoardSettings
+            port={boardsPort}
+            focused={openAt === 'job-boards'}
+            onFocused={onBoardsFocused}
+          />
 
           {/*
             The job-board keys, behind a fold (L-176). Both are optional and

@@ -168,9 +168,21 @@ interface KeylessBarProps {
   readonly onToggle: (id: string, on: boolean) => void;
   /** While a search is running. */
   readonly disabled?: boolean | undefined;
+  /**
+   * Go to Settings → Job boards (L-310). The shell owns which view shows, so
+   * it is handed in; left undefined, no button is drawn rather than one that
+   * does nothing.
+   */
+  readonly onManageBoards?: (() => void) | undefined;
 }
 
-export function KeylessBar({ boards, ticked, onToggle, disabled = false }: KeylessBarProps) {
+export function KeylessBar({
+  boards,
+  ticked,
+  onToggle,
+  disabled = false,
+  onManageBoards,
+}: KeylessBarProps) {
   const [showAll, setShowAll] = useState(false);
   const shown = boards.filter((board) => board.enabled);
   const { main, rest } = mainBoards(shown);
@@ -186,9 +198,26 @@ export function KeylessBar({ boards, ticked, onToggle, disabled = false }: Keyle
       aria-labelledby="keyless-heading"
       className="rounded-card border border-line bg-sunken px-4 py-3"
     >
-      <h2 id="keyless-heading" className="font-medium text-ink">
-        Search job boards with these filters
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <h2 id="keyless-heading" className="font-medium text-ink">
+          Search job boards with these filters
+        </h2>
+        {/*
+          Where the boards are chosen, ordered and added (L-310). It used to be
+          a sentence at the bottom of this box; now it is one press, and it is
+          here even when every board is switched off — the state that needs it.
+        */}
+        {onManageBoards === undefined ? null : (
+          <button
+            type="button"
+            data-testid="keyless-manage"
+            onClick={onManageBoards}
+            className={`${QUIET_BUTTON} text-xs`}
+          >
+            Manage job boards
+          </button>
+        )}
+      </div>
       <p className="mt-0.5 text-xs text-ink-muted">
         Tick the boards you want, then press Search. Each one opens in your browser, where you are
         already signed in, with the words and filters above. Point at a board to see which filters
