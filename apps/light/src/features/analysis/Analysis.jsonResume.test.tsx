@@ -5,11 +5,13 @@
  * has its own exhaustive tests), the file port and the analysis port are the
  * inspectable fakes.
  */
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ok, type Cv } from '@cviper/core-types';
+
+import { JSON_RESUME_HINT } from '../../app/hints';
 
 const tauri = vi.hoisted(() => ({
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
@@ -200,5 +202,40 @@ describe('uploading keeps the original only for a JSON Resume', () => {
     await vi.waitFor(() => expect(port.storedCvs()).toHaveLength(1));
     expect(port.storedCvs()[0]?.json_resume).toBeNull();
     expect(saveButton().disabled).toBe(true);
+  });
+});
+
+describe('what "JSON Resume" means (L-241)', () => {
+  /** The words a hint gives its mark, through `aria-describedby` on the mark or its wrapper. */
+  function describedText(element: Element): string {
+    const id = element.closest('[aria-describedby]')?.getAttribute('aria-describedby') ?? '';
+    return document.getElementById(id)?.textContent ?? '';
+  }
+
+  it('the CV picker’s help line explains it in plain words, for every way in', async () => {
+    await renderWith([PDF_CV]);
+    const mark = screen.getByTestId('json-resume-hint');
+    expect(mark.textContent).toBe('JSON Resume');
+    expect(describedText(mark)).toBe(JSON_RESUME_HINT);
+    expect(JSON_RESUME_HINT).toMatch(/standard file format for CVs/);
+  });
+
+  it('touch: a tap shows the explanation, a second tap hides it', async () => {
+    await renderWith([PDF_CV]);
+    const wrapper = screen.getByTestId('json-resume-hint').closest('[aria-describedby]');
+    const tip = document.getElementById(wrapper?.getAttribute('aria-describedby') ?? '');
+    expect(tip?.hidden).toBe(true);
+    // A tap is a click with no hover before it — as Hint.test.tsx models it.
+    fireEvent.click(screen.getByTestId('json-resume-hint'));
+    expect(tip?.hidden).toBe(false);
+    fireEvent.click(screen.getByTestId('json-resume-hint'));
+    expect(tip?.hidden).toBe(true);
+  });
+
+  it('negative: no "JSON Resume" mark is left unexplained on the screen', async () => {
+    await renderWith([PDF_CV]);
+    const marks = screen.getAllByTestId('json-resume-hint');
+    expect(marks).toHaveLength(1);
+    for (const mark of marks) expect(describedText(mark)).not.toBe('');
   });
 });
