@@ -1123,9 +1123,30 @@ describe('the built CViper Light binary', () => {
       mkdirSync(join(SMOKE_BACKUP_FILE, '..'), { recursive: true });
       writeFileSync(SMOKE_BACKUP_FILE, demoBackup(new Date()));
 
+      // Ask for the window the app opens at. The CI runner's screen is about
+      // 1024x768 and Windows may hold the window to it; whatever it gets is
+      // logged, so the pictures' size is never a surprise.
+      try {
+        await session().manage().window().setRect({ x: 0, y: 0, width: 1280, height: 800 });
+      } catch (error) {
+        console.log(`smoke: window   = resize refused (${String(error)})`);
+      }
+      try {
+        const rect = await session().manage().window().getRect();
+        console.log(`smoke: window   = ${String(rect.width)}x${String(rect.height)}`);
+      } catch (error) {
+        console.log(`smoke: window   = size unknown (${String(error)})`);
+      }
+
       const shot = async (name: string): Promise<void> => {
         // A beat for fonts and layout to settle after a view change.
         await session().sleep(600);
+        // No focus ring in a picture: the app moves focus to each screen's
+        // heading (WCAG 2.4.3), and WebDriver's clicks do not count as a
+        // mouse, so the ring a pointer user never sees is drawn here.
+        await session().executeScript(
+          'if (document.activeElement instanceof HTMLElement) document.activeElement.blur();',
+        );
         const png = await session().takeScreenshot();
         writeFileSync(join(SCREENSHOT_DIR, `${name}.png`), Buffer.from(png, 'base64'));
         console.log(`smoke: screenshot = ${name}.png`);
@@ -1151,6 +1172,16 @@ describe('the built CViper Light binary', () => {
       if (sample.length > 0) {
         await sample[0]!.click();
         await visible('[data-testid="analysis-sample"]');
+        // The result is below the form. Scroll the screen's OWN area to it —
+        // never scrollIntoView, which moves the shell too (L-216).
+        await session().executeScript(`
+          const result = document.querySelector('[data-testid="analysis-sample"]');
+          let area = result && result.parentElement;
+          while (area && getComputedStyle(area).overflowY !== 'auto') area = area.parentElement;
+          if (result && area) {
+            area.scrollTop += result.getBoundingClientRect().top - area.getBoundingClientRect().top - 16;
+          }
+        `);
       }
       await shot('3-analysis');
 
