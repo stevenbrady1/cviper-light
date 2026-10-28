@@ -55,6 +55,14 @@
      never by hand, or it drifts within a release. */
   --font-display: 'Newsreader', 'Source Serif 4', Georgia, 'Times New Roman', serif;
 
+  /*
+   * Sizes (L-241, owner 28 Oct 2026). Body text is 16px (the `body` rule
+   * below); the small style is 13px rather than Tailwind's 12px; nothing is
+   * under 11px. `type-scale.contract.test.ts` holds all three.
+   */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: calc(1.125 / 0.8125);
+
   /* --- Brand: the five meanings ----------------------------------------- */
   --color-navy: #0f2044;
   --color-blue: #1a56db;
@@ -208,7 +216,7 @@
     background-color: var(--color-canvas);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: 16px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
