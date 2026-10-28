@@ -25,6 +25,7 @@ import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser
 import { readJobKeyStates, type KeyState } from '../../status/environment';
 
 import {
+  chooseBoards,
   openBoards,
   readBoardChoice,
   searchButtonLabel,
@@ -56,10 +57,18 @@ import {
   type SearchForm,
 } from './model';
 import { createDbSearchPort, type SearchPort } from './port';
+import {
+  deleteSavedSearch,
+  readSavedSearches,
+  saveSearch,
+  suggestedName,
+  type SavedSearch,
+} from './savedSearches';
 import { SearchFields } from './SearchFields';
 import { SearchRecent } from './SearchRecent';
 import { SearchResults } from './SearchResults';
 import { SearchResultsHeader } from './SearchResultsHeader';
+import { SearchSaved } from './SearchSaved';
 import { useSearchRanking } from './useSearchRanking';
 import { useSearchSaving } from './useSearchSaving';
 
@@ -197,6 +206,9 @@ export function Search({
   const [boardChoice, setBoardChoice] = useState<readonly string[]>(() => readBoardChoice());
   /** Boards that would not open on the last Search, named so the user can retry them. */
   const [boardsProblem, setBoardsProblem] = useState<readonly string[]>([]);
+  /** Saved searches (L-309), newest first, and what happened to them last. */
+  const [saved, setSaved] = useState<readonly SavedSearch[]>(() => readSavedSearches());
+  const [savedNote, setSavedNote] = useState<string | null>(null);
 
   // ── Loading ──────────────────────────────────────────────────────────────
 
@@ -299,10 +311,17 @@ export function Search({
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
-  const onSubmit = useCallback(
-    async (event: FormEvent) => {
-      event.preventDefault();
-
+  /**
+   * Run a search: the ticked boards' tabs, then the keyed boards and the free
+   * feeds. Called by the Search button with what is on screen, and by a saved
+   * search (L-309) with what it saved — so both run exactly the same path.
+   */
+  const runSearch = useCallback(
+    async (
+      formValue: SearchForm,
+      boardsValue: readonly Board[],
+      keylessValue: readonly KeylessSourceId[],
+    ) => {
       /*
         The "type something first" rule belongs to the KEYED half only. Adzuna
         and Reed are query endpoints and an empty form is a mistake to point at;
@@ -310,7 +329,7 @@ export function Search({
         published with both boxes empty is the most natural thing a new user
         does. See `ValidateOptions` in model.ts.
       */
-      const found = validateForm(form, { requireQuery: usableChosen.length > 0 });
+      const found = validateForm(formValue, { requireQuery: usableChosen.length > 0 });
       setErrors(found);
       if (!formIsValid(found)) return;
 
@@ -322,12 +341,12 @@ export function Search({
         One that will not open is named; the rest still open.
       */
       setBoardsProblem([]);
-      if (boardsToOpen.length > 0) {
-        const failed = await openBoards(browserPort, boardsToOpen, boardSearchInput(form));
+      if (boardsValue.length > 0) {
+        const failed = await openBoards(browserPort, boardsValue, boardSearchInput(formValue));
         setBoardsProblem(failed);
       }
 
-      if (usableChosen.length === 0 && keylessWanted.length === 0) return;
+      if (usableChosen.length === 0 && keylessValue.length === 0) return;
 
       setRunning(true);
       clearCardNotes();
@@ -354,19 +373,22 @@ export function Search({
               // does skip its call — see `searchJobs`, which contacts nothing
               // it is not given.
               providers: usableChosen,
-              input: toSearchInput(form),
+              input: toSearchInput(formValue),
               quota: readQuota(clock),
               today: utcToday,
               createdAt,
               newId: nextId,
             }),
-        keylessWanted.length === 0
+        keylessValue.length === 0
           ? Promise.resolve(null)
           : searchPort.browseKeyless({
-              sources: keylessWanted,
+              sources: keylessValue,
               // The feeds cannot filter, so this narrows what comes back, HERE,
               // on this machine. Nothing typed below ever leaves the process.
-              filter: { keywords: form.keywords.trim(), location: form.location.trim() },
+              filter: {
+                keywords: formValue.keywords.trim(),
+                location: formValue.location.trim(),
+              },
               createdAt,
               newId: nextId,
             }),
@@ -378,23 +400,82 @@ export function Search({
         writeQuota(keyed.quota);
         setQuota(keyed.quota);
       }
-      setRecent(rememberSearch(form).recent);
+      setRecent(rememberSearch(formValue).recent);
       setOutcome(keyed);
       setKeylessOutcome(keyless);
       setRunning(false);
     },
-    [
-      boardsToOpen,
-      browserPort,
-      clearCardNotes,
-      clock,
-      form,
-      keylessWanted,
-      newId,
-      quota.date,
-      searchPort,
-      usableChosen,
-    ],
+    [browserPort, clearCardNotes, clock, newId, quota.date, searchPort, usableChosen],
+  );
+
+  const onSubmit = useCallback(
+    async (event: FormEvent) => {
+      event.preventDefault();
+      await runSearch(form, boardsToOpen, keylessWanted);
+    },
+    [boardsToOpen, form, keylessWanted, runSearch],
+  );
+
+  /**
+   * Save what is in the boxes and the ticked boards under a name (L-309).
+   * A form with a mistake in it is not saved: the field says what is wrong,
+   * exactly as pressing Search would, and the name box stays open.
+   */
+  const onSaveSearch = useCallback(
+    (name: string): string | null => {
+      const found = validateForm(form, { requireQuery: false });
+      setErrors(found);
+      if (!formIsValid(found)) return 'Fix the search above, then save it.';
+
+      const outcome = saveSearch(
+        saved,
+        name,
+        form,
+        boardsToOpen.map((board) => board.id),
+        newId ?? (() => crypto.randomUUID()),
+      );
+      if (!outcome.ok) return outcome.problem;
+
+      setSaved(outcome.list);
+      const kept = name.trim();
+      setSavedNote(outcome.replaced ? `Updated “${kept}”.` : `Saved “${kept}”.`);
+      return null;
+    },
+    [boardsToOpen, form, newId, saved],
+  );
+
+  /**
+   * One click: fill the boxes, tick its boards, and run Search. A board since
+   * switched off or deleted is dropped here, as a remembered tick is.
+   */
+  const onRunSaved = useCallback(
+    (entry: SavedSearch) => {
+      setForm(entry.form);
+      setErrors({});
+      setSavedNote(null);
+      const boardsValue = tickedBoards(jobBoards, entry.boards);
+      setBoardChoice(
+        chooseBoards(
+          boardsValue.map((board) => board.id),
+          jobBoards,
+        ),
+      );
+      const feeds = chosenFeeds(feedChoice, entry.form.location);
+      void runSearch(
+        entry.form,
+        boardsValue,
+        KEYLESS_SOURCE_IDS.filter((source) => feeds.has(source)),
+      );
+    },
+    [feedChoice, jobBoards, runSearch],
+  );
+
+  const onDeleteSaved = useCallback(
+    (entry: SavedSearch) => {
+      setSaved(deleteSavedSearch(saved, entry.id));
+      setSavedNote(`Deleted “${entry.name}”.`);
+    },
+    [saved],
   );
 
   const onToggleBoard = useCallback(
@@ -533,6 +614,16 @@ export function Search({
             ticked={ticked}
             onToggle={onToggleBoard}
             disabled={running}
+          />
+
+          <SearchSaved
+            saved={saved}
+            suggestedName={suggestedName(form)}
+            disabled={running}
+            note={savedNote}
+            onSave={onSaveSearch}
+            onRun={onRunSaved}
+            onDelete={onDeleteSaved}
           />
 
           <SearchRecent recent={recent} onPick={setForm} />
