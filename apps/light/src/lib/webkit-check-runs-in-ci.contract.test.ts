@@ -185,6 +185,19 @@ describe('the WebKit check runs in CI', () => {
     ).toContain(SPEC_PATH);
     expect(existsSync(join(REPO_ROOT, SPEC_PATH)), `${SPEC_PATH} does not exist`).toBe(true);
   });
+
+  // L-300: the rendered colour-contrast check rides the same job. It is the only
+  // check that measures colours on a painted screen (jsdom paints nothing), so
+  // dropping it from the script would leave contrast checked by grep alone.
+  it('`pnpm webkit` also builds and drives the rendered contrast check', () => {
+    const parsed: unknown = JSON.parse(read(MANIFEST_PATH));
+    const scripts = (parsed as { scripts?: Record<string, string> }).scripts ?? {};
+    const contrastSpec = 'apps/light/e2e/contrast-webkit.spec.ts';
+
+    expect(scripts['webkit']).toContain(contrastSpec);
+    expect(scripts['webkit:build']).toContain('vite.contrast-harness.config.ts');
+    expect(existsSync(join(REPO_ROOT, contrastSpec)), `${contrastSpec} does not exist`).toBe(true);
+  });
 });
 
 /**
