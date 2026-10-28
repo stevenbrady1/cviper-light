@@ -16,6 +16,8 @@ All notable changes to CViper Light are recorded here. The format follows
 
 ### Added
 
+- The test that runs the real, built Windows app now uses it the way a person does (L-301). It adds a job to the tracker, moves it to Applied, closes the app, opens it again, and checks the job is still there and still Applied; then it deletes it, so a developer's own tracker is left as it was. Until now that test only opened screens and read PDFs, and none of it saved anything, so a broken database update would have passed it. Backups are still not driven: export and import open your computer's own file window, which the test cannot click. No app change.
+
 - Colour contrast is now measured on the real, styled app (L-300). Until now it was only checked by matching class names in the code, which cannot see a background painted by a surrounding box, and the accessibility check from L-297 runs in a test browser that paints nothing. Now every main screen, at a desktop and a phone width, plus the sample result, a board with applications and an opened application, is drawn in WebKit and checked with axe against WCAG 2.1 AA (4.5:1 for normal text). Everything passes today. The check first confirms the app's colours actually loaded, because an unstyled page is black on white and would pass every time — that is exactly what the first version of this check measured, until a screenshot showed it. It also proves it can fail, on a deliberately pale sentence. No app change.
 
 ## [0.11.0] — 2026-10-27
