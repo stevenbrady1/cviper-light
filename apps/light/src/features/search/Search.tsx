@@ -136,6 +136,8 @@ export interface SearchProps {
   readonly newId?: (() => string) | undefined;
   /** Take the user to the key wizard. Owned by the shell, which owns the view. */
   readonly onOpenSettings?: (() => void) | undefined;
+  /** Take the user to Settings → Job boards (L-310). Owned by the shell, likewise. */
+  readonly onOpenJobBoards?: (() => void) | undefined;
   /**
    * Take a saved job to the Analysis screen (L-190). The shell owns which view
    * is showing, so the job goes back to it. Left undefined, the cards draw no
@@ -152,6 +154,7 @@ export function Search({
   now,
   newId,
   onOpenSettings,
+  onOpenJobBoards,
   onAnalyse,
 }: SearchProps = {}) {
   // Built once. A new port every render would restart the load effects on every
@@ -614,6 +617,7 @@ export function Search({
             ticked={ticked}
             onToggle={onToggleBoard}
             disabled={running}
+            onManageBoards={onOpenJobBoards}
           />
 
           <SearchSaved

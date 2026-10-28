@@ -191,6 +191,12 @@ export default function App({
   boardProgressPort,
 }: AppProps = {}) {
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
+  /**
+   * A section for Settings to open at, set by Search's "Manage job boards"
+   * (L-310) and cleared by Settings once it is there, so the next ordinary
+   * visit opens at the top.
+   */
+  const [settingsOpenAt, setSettingsOpenAt] = useState<'job-boards' | null>(null);
 
   // Focus follows the view (WCAG 2.4.3). Switching view unmounts whatever had
   // focus, which dropped it to <body>: a keyboard or screen-reader user heard
@@ -203,11 +209,14 @@ export default function App({
   useEffect(() => {
     if (focusedView.current === activeView) return;
     focusedView.current = activeView;
+    // Settings opened at a section puts focus there itself (L-310). Child
+    // effects run first, so taking it back here would undo that.
+    if (activeView === 'settings' && settingsOpenAt !== null) return;
     const heading = mainRef.current?.querySelector('h1');
     if (!(heading instanceof HTMLElement)) return;
     if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
     heading.focus({ preventScroll: true });
-  }, [activeView]);
+  }, [activeView, settingsOpenAt]);
   const [status, setStatus] = useState<EnvironmentStatus | null>(null);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !hasSeenWelcome());
   const [incomingCv, setIncomingCv] = useState<Result<PickedCv, FileError> | null>(null);
@@ -672,6 +681,11 @@ export default function App({
               // showing, so "no Adzuna key — open Settings" has to come back here
               // to be acted on.
               onOpenSettings: () => setActiveView('settings'),
+              // Settings → Job boards (L-310): the same hand-back, with a section.
+              onOpenJobBoards: () => {
+                setSettingsOpenAt('job-boards');
+                setActiveView('settings');
+              },
               onAnalyse: onAnalyseJob,
             },
             tracker: {
@@ -736,6 +750,8 @@ export default function App({
               onShowWelcome,
               onErased,
               now,
+              openAt: settingsOpenAt ?? undefined,
+              onOpened: () => setSettingsOpenAt(null),
             },
           })}
         </ErrorBoundary>
