@@ -6,10 +6,12 @@
  * THIS MUST BYTE-MATCH `DB_URL` IN `src-tauri/src/db.rs`.
  * ============================================================================
  * tauri-plugin-sql keys its registered migrations by the exact `db_url` string
- * passed to `add_migrations`, and looks them up with the exact string passed to
- * `Database.load()`:
+ * passed to `add_migrations`, and looks them up with the exact string it opens.
+ * Since L-243 that is the one in `plugins.sql.preload` in `tauri.conf.json`
+ * (Rust opens the database at startup; the page opens nothing), and
+ * `db-opens-after-safety-copy.contract.test.ts` holds it equal to this one:
  *
- *     migrations.0.lock().await.remove(&db)      // commands.rs::load
+ *     self.migrations.as_mut().and_then(|mm| mm.remove(&db))   // lib.rs, preload
  *
  * A `HashMap::remove` on a key that does not match returns `None`, and the
  * plugin treats that as "this database has no migrations". So a one-character

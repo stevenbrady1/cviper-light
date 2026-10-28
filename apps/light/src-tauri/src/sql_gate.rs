@@ -10,9 +10,9 @@
 //! for instance. If script ever got into the page, that is a step to code
 //! execution. The defence until now was only that injecting script is hard.
 //!
-//! So the page no longer holds the plugin's query permissions (see
-//! `capabilities/default.json`; it keeps only `sql:allow-load` and
-//! `sql:allow-close` to open the file and run the migrations). It calls these
+//! So the page holds no `sql:` permission at all (see
+//! `capabilities/default.json`): Rust opens the file and runs the migrations
+//! at startup (`lib.rs`, after the safety copy). The page calls these
 //! two commands instead, and they run a statement ONLY when its exact text is
 //! in `APPROVED_SQL` — generated from the `approved()` calls in `src/db/`,
 //! and checked against them by `approved-sql.contract.test.ts`. Anything else
@@ -161,11 +161,28 @@ pub(crate) async fn select_on(
     Ok(out)
 }
 
+/// Why the database did not open at startup, when it did not (L-243, part 2).
+///
+/// Managed by `lib.rs` only when registering the SQL plugin failed — a full
+/// disk, a locked file, a migration that would not apply. Every query then
+/// returns this reason rather than a bare "not loaded", so the screen can say
+/// what is actually wrong.
+pub(crate) struct DbOpenFailed(pub(crate) String);
+
+/// What a query hears when there is no database to run on.
+fn not_open(failed: Option<&str>) -> String {
+    match failed {
+        Some(reason) => format!("the database could not be opened when CViper started: {reason}"),
+        None => format!("database {DB_URL} not loaded"),
+    }
+}
+
 /// The plugin's pool for the app's own database. Errors read as the plugin's.
 async fn app_pool(app: &AppHandle) -> Result<Pool<Sqlite>, String> {
-    let instances = app
-        .try_state::<DbInstances>()
-        .ok_or_else(|| format!("database {DB_URL} not loaded"))?;
+    let Some(instances) = app.try_state::<DbInstances>() else {
+        let failed = app.try_state::<DbOpenFailed>();
+        return Err(not_open(failed.as_deref().map(|f| f.0.as_str())));
+    };
     let instances = instances.0.read().await;
     // `DbPool::sqlite()` is commented out in the published 2.6.0, so match
     // the public variant. The app builds the plugin with `sqlite` only.
@@ -226,6 +243,15 @@ mod tests {
             }
             pool
         })
+    }
+
+    #[test]
+    fn a_database_that_did_not_open_says_why() {
+        assert_eq!(
+            not_open(Some("disk full")),
+            "the database could not be opened when CViper started: disk full"
+        );
+        assert_eq!(not_open(None), format!("database {DB_URL} not loaded"));
     }
 
     #[test]

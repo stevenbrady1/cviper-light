@@ -6,9 +6,6 @@
   "permissions": [
     "core:default",
 
-    "sql:allow-load",
-    "sql:allow-close",
-
     "store:default",
 
     "opener:default",
