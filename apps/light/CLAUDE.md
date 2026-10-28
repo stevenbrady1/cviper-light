@@ -31,13 +31,17 @@ Two permissions in that file are load-bearing and easy to delete by accident:
 | `dialog:allow-ask`     | Not in `dialog:default`, despite the docs. |
 | `dialog:allow-confirm` | Not in `dialog:default`, despite the docs. |
 
-The SQL plugin gets `sql:allow-load` and `sql:allow-close` and NOTHING else
-(L-243). `sql:default` and `sql:allow-execute` used to be here; together they
-let the page run any SQL, and `ATTACH DATABASE` can write a file anywhere the
-user can. Every query now goes through `db_execute` / `db_select` in
-`src/sql_gate.rs`, which runs only the exact statements listed in
-`src/approved_sql.rs` (generated from `approved()` in `src/db/`). Re-adding a
-`sql:` permission fails `approved-sql.contract.test.ts`.
+The SQL plugin gets NO permission here (L-243). `sql:default` and
+`sql:allow-execute` used to be here; together they let the page run any SQL,
+and `ATTACH DATABASE` can write a file anywhere the user can. Rust opens the
+database at startup: `tauri-plugin-sql` is registered inside `.setup()` in
+`src/lib.rs`, AFTER the safety copy (registered on the builder, its preload
+would migrate first), and preloads `sqlite:cviper.db` from `tauri.conf.json`.
+Every query goes through `db_execute` / `db_select` in `src/sql_gate.rs`, which
+run only the exact statements listed in `src/approved_sql.rs` (generated from
+`approved()` in `src/db/`). Re-adding any `sql:` permission fails
+`approved-sql.contract.test.ts`; moving the plugin back onto the builder fails
+`db-opens-after-safety-copy.contract.test.ts`.
 
 `updater:default` lives in `capabilities/desktop.json`, scoped with
 `"platforms": ["macOS", "windows", "linux"]`, and must never move into
