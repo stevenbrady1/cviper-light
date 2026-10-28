@@ -4,7 +4,14 @@ name: CI
 # rule that skips the frontend job on a "backend-only" commit is how latent
 # failures end up sitting on a green main.
 on:
+  # `push` on main only. Every other branch is checked through its pull
+  # request: a push to a branch with an open one is BOTH events, so listening
+  # to push everywhere ran every job twice — CI #974 and #975 for one commit,
+  # in two concurrency groups that never cancel each other (L-214, #202).
+  # ci-runs-once-per-push.contract.test.ts holds this, as smoke.yml and
+  # ios.yml already were.
   push:
+    branches: [main]
   pull_request:
 
 # Least privilege, and `contents: read` is named explicitly. A job with a
