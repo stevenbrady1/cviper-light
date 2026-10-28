@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import {
-  ADZUNA_ATTRIBUTION_URL,
-  ARBEITNOW_ATTRIBUTION,
   JOB_PROVIDER_IDS,
   KEYLESS_SOURCE_IDS,
-  PROVIDER_LABEL,
-  REED_DAILY_LIMIT,
   quotaVerdict,
   utcDateOf,
   type JobProviderId,
@@ -16,12 +12,10 @@ import {
   type QuotaState,
 } from '@cviper/job-apis';
 
-import { PRIMARY_BUTTON, QUIET_BUTTON } from '../../app/buttons';
+import { PRIMARY_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
-import { IconTile } from '../../ui';
 import { SHIPPED_BOARDS } from '../boards/defaults';
-import { ANALYSE_DISCLOSURE, isPreviewAdvert } from '../flow/advert';
 import { type AnalyseHandoff } from '../flow/handoff';
 import { NO_PREFERENCES, mergeBoards, type Board } from '../boards/model';
 import { createTauriBoardPreferencesPort, type BoardPreferencesPort } from '../boards/port';
@@ -37,8 +31,7 @@ import {
   tickedBoards,
   toggleBoard,
 } from './boardChoice';
-import { FewResults, KeylessBar, NothingMatchedNotes, fewResultsText } from './KeylessBar';
-import { LiveStatus } from '../../app/LiveStatus';
+import { KeylessBar } from './KeylessBar';
 import {
   chosenFeeds,
   isUkLocation,
@@ -48,15 +41,10 @@ import {
 } from './feedDefaults';
 import { KeylessFeedToggles } from './KeylessFeedToggles';
 import { ProviderToggles } from './ProviderToggles';
-import { ResultCard } from './ResultCard';
 import { readSearchMemory, rememberSearch, writeDraft } from './memory';
-import { combineResults, nothingMatchedNote } from './keylessModel';
-import { dealBreakersIn, isScorable, rankResult, sortByBand, type RankBand } from './rank';
+import { combineResults } from './keylessModel';
 import {
-  CONTRACT_CHOICES,
   EMPTY_FORM,
-  clusterSiblings,
-  externalKey,
   formIsValid,
   hasAnyJobBoardKey,
   providerAvailability,
@@ -64,11 +52,16 @@ import {
   toSearchInput,
   boardSearchInput,
   validateForm,
-  type ContractChoice,
   type FormErrors,
   type SearchForm,
 } from './model';
 import { createDbSearchPort, type SearchPort } from './port';
+import { SearchFields } from './SearchFields';
+import { SearchRecent } from './SearchRecent';
+import { SearchResults } from './SearchResults';
+import { SearchResultsHeader } from './SearchResultsHeader';
+import { useSearchRanking } from './useSearchRanking';
+import { useSearchSaving } from './useSearchSaving';
 
 /**
  * The search screen.
@@ -118,9 +111,6 @@ import { createDbSearchPort, type SearchPort } from './port';
 
 /** How long after the last keystroke the draft is written to `localStorage`. */
 const DRAFT_DEBOUNCE_MS = 400;
-
-/** What happened the last time Save was pressed, per advert. */
-type CardNotes = Readonly<Record<string, string>>;
 
 export interface SearchProps {
   /** Injected by tests. Defaults to the real SQLite-and-transport port. */
@@ -189,20 +179,7 @@ export function Search({
   const [running, setRunning] = useState(false);
   const [outcome, setOutcome] = useState<JobSearchOutcome | null>(null);
   const [keylessOutcome, setKeylessOutcome] = useState<KeylessBrowseOutcome | null>(null);
-  const [tracked, setTracked] = useState<ReadonlySet<string>>(new Set());
-  const [trackedProblem, setTrackedProblem] = useState<string | null>(null);
-  const [notes, setNotes] = useState<CardNotes>({});
-  const [problems, setProblems] = useState<CardNotes>({});
-  const [savingId, setSavingId] = useState<string | null>(null);
   const [quota, setQuota] = useState<QuotaState>(() => readQuota(now ?? new Date()));
-  /*
-    `undefined` until the port has answered, so the screen draws NEITHER the
-    toggle nor the "upload a CV" hint for the half-second before it knows —
-    a hint that flashes and vanishes on every open would be read as a bug.
-  */
-  const [cvText, setCvText] = useState<string | null | undefined>(undefined);
-  const [dealBreakers, setDealBreakers] = useState<readonly string[]>([]);
-  const [bestFirst, setBestFirst] = useState(true);
   /*
     Seeded with the SHIPPED list rather than an empty one, so the buttons are
     there on the first paint instead of appearing a moment later. The user's own
@@ -247,54 +224,6 @@ export function Search({
       cancelled = true;
     };
   }, [readStates]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void searchPort.loadTracked().then((loaded) => {
-      if (cancelled) return;
-      if (!loaded.ok) {
-        // Deliberately NOT an alert. What is lost is the "already in your
-        // tracker" label; saving still works and reports its own failure if it
-        // hits one. A red banner over a screen that otherwise works perfectly
-        // would be the larger error.
-        setTrackedProblem(
-          `CViper could not check which adverts are already in your tracker. ${loaded.error.message}`,
-        );
-        return;
-      }
-      setTracked(loaded.value);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [searchPort]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    /*
-      Two reads, once, and SILENT on failure. What is lost if either fails is
-      the band on each card and the deal-breaker chips; the search itself is
-      untouched, and a banner saying "could not read your CV" over a working
-      search screen would be the larger error. `null` on failure means the
-      screen shows the same quiet hint it shows when there is no CV — which is
-      true enough: there is no CV it can rank against.
-    */
-    void searchPort.latestCvText().then((loaded) => {
-      if (cancelled) return;
-      setCvText(loaded.ok ? loaded.value : null);
-    });
-    void searchPort.dealBreakers().then((loaded) => {
-      if (cancelled) return;
-      setDealBreakers(loaded.ok ? loaded.value : []);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [searchPort]);
 
   useEffect(() => {
     let cancelled = false;
@@ -356,31 +285,17 @@ export function Search({
   */
   const results = useMemo(() => combineResults(outcome, keylessOutcome), [outcome, keylessOutcome]);
 
-  /*
-    Is there a CV worth ranking against? A CV shorter than the scorer accepts
-    counts as none: the toggle would otherwise sit there over a list with no
-    bands on it, and the hint says the true thing — upload a CV.
-  */
-  const rankable = cvText !== undefined && isScorable(cvText);
-
-  /*
-    One band per advert, computed ONCE per list rather than once per render:
-    the scorer is a few hundred regex tests per advert, and this runs over a
-    whole page of results. Keyed by advert id so the sort and the cards read
-    the same map. `null` entries are "no pill", never "weak" — see `rank.ts`.
-  */
-  const bands = useMemo(() => {
-    const computed = new Map<string, RankBand | null>();
-    for (const item of results.jobs) {
-      computed.set(item.job.id, rankable ? rankResult(cvText, item.job) : null);
-    }
-    return computed;
-  }, [cvText, rankable, results]);
-
-  const ordered = useMemo(
-    () => (rankable && bestFirst ? sortByBand(results.jobs, bands) : results.jobs),
-    [bands, bestFirst, rankable, results],
-  );
+  const {
+    tracked,
+    trackedProblem,
+    notes,
+    problems,
+    savingId,
+    onSave,
+    onAnalyseJob,
+    clearCardNotes,
+  } = useSearchSaving(searchPort, results, clock, newId, onAnalyse);
+  const ranking = useSearchRanking(searchPort, results);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -415,8 +330,7 @@ export function Search({
       if (usableChosen.length === 0 && keylessWanted.length === 0) return;
 
       setRunning(true);
-      setNotes({});
-      setProblems({});
+      clearCardNotes();
 
       const utcToday = utcDateOf(clock) ?? quota.date;
       const createdAt = clock.toISOString();
@@ -472,6 +386,7 @@ export function Search({
     [
       boardsToOpen,
       browserPort,
+      clearCardNotes,
       clock,
       form,
       keylessWanted,
@@ -487,104 +402,6 @@ export function Search({
       setBoardChoice((current) => toggleBoard(current, id, on, jobBoards));
     },
     [jobBoards],
-  );
-
-  const onSave = useCallback(
-    async (jobId: string) => {
-      const entry = results.jobs.find((candidate) => candidate.job.id === jobId);
-      if (entry === undefined) return;
-
-      setSavingId(jobId);
-      setProblems((current) => ({ ...current, [jobId]: '' }));
-
-      const saved = await searchPort.saveToTracker(
-        entry.job,
-        { applicationId: (newId ?? (() => crypto.randomUUID()))() },
-        clock.toISOString(),
-      );
-      setSavingId(null);
-
-      if (!saved.ok) {
-        setProblems((current) => ({
-          ...current,
-          [jobId]: `That advert could not be saved. ${saved.error.message}`,
-        }));
-        return;
-      }
-
-      const key = externalKey(entry.job.source, entry.job.external_id);
-      if (key !== null) setTracked((current) => new Set(current).add(key));
-
-      setNotes((current) => ({
-        ...current,
-        [jobId]:
-          saved.value.outcome === 'already-saved'
-            ? // NOT an error. The same advert reached the user twice, which is
-              // exactly what cross-posting looks like, and the database already
-              // has it. Nothing is duplicated and nothing has gone wrong.
-              'That advert is already in your tracker — nothing has been added twice.'
-            : 'Saved to your tracker, under “Saved”.',
-      }));
-    },
-    [clock, newId, results, searchPort],
-  );
-
-  /**
-   * "Analyse this job" (L-190): save it, make the advert whole, hand it on.
-   *
-   * SAVED FIRST, so the analysis, the tailored CV and the letter all attach to
-   * one tracker record — and the STORED job is what goes on, because an advert
-   * saved last week has a different id from this search's copy of it.
-   *
-   * A PREVIEW has its full advert read from its own page next: one page, on
-   * this press, through the fetch rules the tracker already uses. The card
-   * says so while it happens, because a page can take a few seconds and a
-   * button that does nothing visible for that long reads as broken. Whatever
-   * the page gave, the job goes on — with a note when all there is is the
-   * preview, which the Analysis screen shows above the advert.
-   */
-  const onAnalyseJob = useCallback(
-    async (jobId: string) => {
-      if (onAnalyse === undefined) return;
-      const entry = results.jobs.find((candidate) => candidate.job.id === jobId);
-      if (entry === undefined) return;
-
-      setSavingId(jobId);
-      setProblems((current) => ({ ...current, [jobId]: '' }));
-      setNotes((current) => ({ ...current, [jobId]: '' }));
-
-      const saved = await searchPort.saveToTracker(
-        entry.job,
-        { applicationId: (newId ?? (() => crypto.randomUUID()))() },
-        clock.toISOString(),
-      );
-
-      if (!saved.ok) {
-        setSavingId(null);
-        setProblems((current) => ({
-          ...current,
-          [jobId]: `That advert could not be saved. ${saved.error.message}`,
-        }));
-        return;
-      }
-
-      const key = externalKey(entry.job.source, entry.job.external_id);
-      if (key !== null) setTracked((current) => new Set(current).add(key));
-
-      let job = saved.value.job;
-      let note: string | null = null;
-      if (isPreviewAdvert(job)) {
-        setNotes((current) => ({ ...current, [jobId]: 'Reading the full advert…' }));
-        const read = await searchPort.readFullAdvert(job);
-        job = read.job;
-        note = read.note;
-      }
-
-      setSavingId(null);
-      setNotes((current) => ({ ...current, [jobId]: '' }));
-      onAnalyse({ job, applicationId: saved.value.applicationId, note });
-    },
-    [clock, newId, onAnalyse, results, searchPort],
   );
 
   const onOpen = useCallback(
@@ -616,30 +433,6 @@ export function Search({
   // ── Rendering ────────────────────────────────────────────────────────────
 
   const view = viewById('search');
-  const failures = (outcome?.outcomes ?? []).filter((entry) => entry.error !== null);
-  /*
-    ============================================================================
-    A FEED THAT FAILED GETS A LINE OF ITS OWN. THIS IS THE POINT OF L-110.
-    ============================================================================
-    Free feeds rot: they move, they change shape, they get switched off. Every
-    one of those failures reaches this screen as an empty list unless it is
-    rendered, and an empty list reads as "there are no jobs like that" — a
-    sentence the user cannot question and cannot act on.
-
-    So `keylessFailures` is drawn above the results, exactly like the keyed
-    boards' failures, and `nothingMatched` is a SEPARATE and differently worded
-    line for the case where the feed worked and the filter matched none of what
-    it published. Blurring the two is the bug this feature exists to prevent.
-  */
-  const keylessFailures = (keylessOutcome?.outcomes ?? []).filter((entry) => entry.error !== null);
-  const nothingMatched = (keylessOutcome?.outcomes ?? [])
-    .map((entry) => ({ source: entry.source, note: nothingMatchedNote(entry) }))
-    .filter((entry): entry is { source: KeylessSourceId; note: string } => entry.note !== null);
-
-  const showsAdzuna = results.jobs.some((entry) => entry.job.source === 'adzuna');
-  // Arbeitnow's own terms ask for a link back to the site, so their credit is
-  // shown wherever their adverts are — the same treatment Adzuna's terms get.
-  const showsArbeitnow = results.jobs.some((entry) => entry.job.source === 'arbeitnow');
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-search">
@@ -653,69 +446,7 @@ export function Search({
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         <div className="max-w-3xl space-y-5">
           <form data-testid="search-form" onSubmit={(event) => void onSubmit(event)}>
-            <div className="flex flex-wrap gap-3">
-              <Field
-                id="search-keywords"
-                label="Job title or keywords"
-                value={form.keywords}
-                error={errors.keywords}
-                onChange={(value) => setField('keywords', value)}
-                placeholder="Credit risk analyst"
-                grow
-              />
-              <Field
-                id="search-location"
-                label="Location"
-                value={form.location}
-                error={errors.location}
-                onChange={(value) => setField('location', value)}
-                placeholder="London"
-                grow
-              />
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-3">
-              <Field
-                id="search-distance"
-                label="Within (miles)"
-                value={form.distanceMiles}
-                error={errors.distanceMiles}
-                onChange={(value) => setField('distanceMiles', value)}
-                placeholder="Any"
-              />
-              <Field
-                id="search-salary"
-                label="Minimum salary (£)"
-                value={form.salaryMin}
-                error={errors.salaryMin}
-                onChange={(value) => setField('salaryMin', value)}
-                placeholder="Any"
-              />
-
-              <div className="min-w-0">
-                <label
-                  htmlFor="search-contract"
-                  className="block text-xs font-medium text-ink-muted"
-                >
-                  Contract type
-                </label>
-                <select
-                  id="search-contract"
-                  data-testid="search-contract"
-                  value={form.contractType}
-                  onChange={(event) =>
-                    setField('contractType', event.currentTarget.value as ContractChoice)
-                  }
-                  className="mt-1 rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
-                >
-                  {CONTRACT_CHOICES.map((choice) => (
-                    <option key={choice.value} value={choice.value}>
-                      {choice.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <SearchFields form={form} errors={errors} onField={setField} />
 
             {/*
               Only once a job-board key exists (L-276). With none, the free
@@ -804,27 +535,7 @@ export function Search({
             disabled={running}
           />
 
-          {recent.length === 0 ? null : (
-            <div data-testid="search-recent" className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-ink-faint">Recent</span>
-              {recent.map((entry, index) => (
-                <button
-                  key={`${entry.keywords}|${entry.location}|${index}`}
-                  type="button"
-                  data-testid={`search-recent-${index}`}
-                  /*
-                    Fills the boxes and stops. It does NOT search: a click that
-                    silently spent one of Reed's hundred would be the same
-                    mistake as searching on startup.
-                  */
-                  onClick={() => setForm(entry)}
-                  className={`${QUIET_BUTTON} rounded-pill border border-line px-2 py-0.5 text-xs`}
-                >
-                  {[entry.keywords, entry.location].filter((part) => part !== '').join(' · ')}
-                </button>
-              ))}
-            </div>
-          )}
+          <SearchRecent recent={recent} onPick={setForm} />
 
           {reedVerdict.message === null ? null : (
             <p
@@ -846,222 +557,36 @@ export function Search({
             </p>
           )}
 
-          {/*
-            The toggle when there is a CV to rank against; one quiet line when
-            there is not; NOTHING until the port has said which. The toggle is
-            hidden rather than disabled because a disabled "Best match first"
-            with no explanation is a promise the screen is visibly not keeping.
-          */}
-          {/* The results' own bookkeeping, beside them rather than above the search (L-219). */}
-          <div
-            data-testid="search-results-header"
-            className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1"
-          >
-            {cvText === undefined ? null : rankable ? (
-              <label className="flex items-center gap-2 text-ink-muted">
-                <input
-                  type="checkbox"
-                  data-testid="search-sort-best"
-                  checked={bestFirst}
-                  onChange={(event) => setBestFirst(event.currentTarget.checked)}
-                />
-                Best match first
-              </label>
-            ) : (
-              <p data-testid="search-rank-hint" className="text-xs text-ink-faint">
-                Upload a CV on the Analysis screen and results will be ranked against it.
-              </p>
-            )}
-            <div data-testid="search-quota" className="text-xs text-ink-faint sm:text-right">
-              Requests today — {PROVIDER_LABEL.reed}{' '}
-              <span className="font-mono tabular-nums">{quota.counts.reed}</span> of{' '}
-              <span className="font-mono tabular-nums">{REED_DAILY_LIMIT}</span> ·{' '}
-              {PROVIDER_LABEL.adzuna}{' '}
-              <span className="font-mono tabular-nums">{quota.counts.adzuna}</span>{' '}
-              {/*
-                A bare count for Adzuna, with no denominator. Their allowance
-                depends on the plan the user bought and cannot be queried, so any
-                figure here would be a confident wrong number on screen for ever.
-                Counted, shown, never enforced.
-              */}
-              (allowance depends on your plan)
-            </div>
-          </div>
-
-          {/*
-            One line per board that failed, ABOVE results that are still there.
-            Losing a whole page of Adzuna adverts because Reed was down is the
-            failure this shape exists to prevent.
-          */}
-          {failures.map((entry) => (
-            <p
-              key={entry.provider}
-              role="alert"
-              data-testid={`search-error-${entry.provider}`}
-              data-kind={entry.error?.kind}
-              className="rounded-control bg-danger/5 px-3 py-2 text-danger"
-            >
-              {entry.error?.message}
-            </p>
-          ))}
-
-          {/*
-            One line per FEED that failed, in exactly the same place and shape.
-            A 404, a feed that changed its payload, and a feed that answered
-            with no jobs at all are three different sentences and all three are
-            failures — none of them may reach the user as an empty list.
-          */}
-          {keylessFailures.map((entry) => (
-            <p
-              key={entry.source}
-              role="alert"
-              data-testid={`keyless-error-${entry.source}`}
-              data-kind={entry.error?.kind}
-              className="rounded-control bg-danger/5 px-3 py-2 text-danger"
-            >
-              {entry.error?.message}
-            </p>
-          ))}
-
-          <NothingMatchedNotes entries={nothingMatched} />
-
-          {/* The few-results message, spoken from here (L-238) — see `fewResultsText`. */}
-          <LiveStatus
-            text={results.ran && !running ? fewResultsText(results.jobs.length, jobBoards) : null}
+          <SearchResultsHeader
+            cvText={ranking.cvText}
+            rankable={ranking.rankable}
+            bestFirst={ranking.bestFirst}
+            onBestFirst={ranking.setBestFirst}
+            quota={quota}
           />
-          {!results.ran ? (
-            <div
-              data-testid="search-empty"
-              className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
-            >
-              <div className="mb-3 flex justify-center">
-                <IconTile icon="search" />
-              </div>
-              <p className="font-medium text-ink">Nothing looked at yet.</p>
-              <p className="mt-1 text-ink-muted">
-                Type a job title and press Search to see the newest adverts from the free feeds. Or
-                open the same search on a whole job board with the buttons above.
-              </p>
-            </div>
-          ) : (
-            <>
-              {running ? null : (
-                <FewResults
-                  count={results.jobs.length}
-                  form={form}
-                  browser={browserPort}
-                  boards={jobBoards}
-                />
-              )}
 
-              {showsAdzuna ? (
-                // Attribution, wherever Adzuna's data appears. A condition of
-                // their API terms, and it belongs on screen rather than in a
-                // licence file nobody opens.
-                <p data-testid="adzuna-attribution" className="text-xs text-ink-faint">
-                  Jobs from Adzuna
-                </p>
-              ) : null}
-
-              {showsArbeitnow ? (
-                // The same, for Arbeitnow, whose own `meta.terms` say "I would
-                // appreciate linking back to the site". Every card also keeps
-                // its link to their page for that advert.
-                <p data-testid="arbeitnow-attribution" className="text-xs text-ink-faint">
-                  {ARBEITNOW_ATTRIBUTION}
-                </p>
-              ) : null}
-
-              {/*
-                Once, above the list, not on every card: "Analyse this job" can
-                open the advert's own page (L-190), and that request is said
-                out loud before it is made — see `ANALYSE_DISCLOSURE`.
-              */}
-              {onAnalyse === undefined || results.jobs.length === 0 ? null : (
-                <p data-testid="search-analyse-disclosure" className="text-xs text-ink-faint">
-                  {ANALYSE_DISCLOSURE}
-                </p>
-              )}
-
-              {results.jobs.length === 0 &&
-              failures.length === 0 &&
-              keylessFailures.length === 0 &&
-              nothingMatched.length === 0 ? (
-                <p data-testid="search-no-results" className="text-ink-muted">
-                  No adverts matched that. Try broader keywords, a wider radius, or send the same
-                  words to your browser with the buttons above.
-                </p>
-              ) : null}
-
-              <div data-testid="search-results" className="space-y-3">
-                {ordered.map((entry) => {
-                  const siblings = clusterSiblings(entry.job.id, results.clusters);
-                  const key = externalKey(entry.job.source, entry.job.external_id);
-
-                  return (
-                    <ResultCard
-                      key={entry.job.id}
-                      entry={entry}
-                      today={today}
-                      clusterSize={siblings === null ? null : siblings.length}
-                      tracked={key !== null && tracked.has(key)}
-                      busy={savingId === entry.job.id}
-                      note={notes[entry.job.id] || null}
-                      problem={problems[entry.job.id] || null}
-                      rank={bands.get(entry.job.id) ?? null}
-                      dealBreakers={dealBreakersIn(dealBreakers, entry.job)}
-                      onSave={() => void onSave(entry.job.id)}
-                      onOpen={() => onOpen(entry.job.url)}
-                      onOpenSource={
-                        entry.job.source === 'adzuna'
-                          ? () => onOpen(ADZUNA_ATTRIBUTION_URL)
-                          : undefined
-                      }
-                      onAnalyse={
-                        onAnalyse === undefined ? undefined : () => void onAnalyseJob(entry.job.id)
-                      }
-                    />
-                  );
-                })}
-              </div>
-            </>
-          )}
+          <SearchResults
+            outcome={outcome}
+            keylessOutcome={keylessOutcome}
+            results={results}
+            ordered={ranking.ordered}
+            running={running}
+            form={form}
+            jobBoards={jobBoards}
+            browser={browserPort}
+            today={today}
+            tracked={tracked}
+            savingId={savingId}
+            notes={notes}
+            problems={problems}
+            bands={ranking.bands}
+            dealBreakers={ranking.dealBreakers}
+            onSave={(jobId) => void onSave(jobId)}
+            onOpen={onOpen}
+            onAnalyse={onAnalyse === undefined ? undefined : (jobId) => void onAnalyseJob(jobId)}
+          />
         </div>
       </div>
     </section>
-  );
-}
-
-interface FieldProps {
-  readonly id: string;
-  readonly label: string;
-  readonly value: string;
-  readonly error: string | undefined;
-  readonly placeholder: string;
-  readonly onChange: (value: string) => void;
-  readonly grow?: boolean;
-}
-
-function Field({ id, label, value, error, placeholder, onChange, grow = false }: FieldProps) {
-  return (
-    <div className={grow ? 'min-w-0 flex-1' : 'min-w-0'}>
-      <label htmlFor={id} className="block text-xs font-medium text-ink-muted">
-        {label}
-      </label>
-      <input
-        id={id}
-        data-testid={id}
-        type="text"
-        value={value}
-        placeholder={placeholder}
-        onChange={(event) => onChange(event.currentTarget.value)}
-        className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
-      />
-      {error === undefined ? null : (
-        <p data-testid={`${id}-error`} className="mt-1 text-xs text-danger">
-          {error}
-        </p>
-      )}
-    </div>
   );
 }
