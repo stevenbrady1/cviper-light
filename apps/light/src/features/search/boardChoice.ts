@@ -81,6 +81,16 @@ export function toggleBoard(
   return kept;
 }
 
+/**
+ * Tick exactly these boards and remember them — a saved search being run
+ * (L-309). Ids of boards that are gone or switched off are dropped, as above.
+ */
+export function chooseBoards(ids: readonly string[], boards: readonly Board[]): string[] {
+  const kept = tickedBoards(boards, ids).map((board) => board.id);
+  writeBoardChoice(kept);
+  return kept;
+}
+
 /** What the page's one Search button says: the count of tabs it will open. */
 export function searchButtonLabel(boardCount: number): string {
   if (boardCount === 0) return 'Search';

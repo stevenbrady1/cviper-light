@@ -83,7 +83,7 @@ function asContractChoice(value: unknown): ContractChoice {
  * React ends up reporting that an input switched to uncontrolled — a warning
  * about a bug three layers away from the file that caused it.
  */
-function parseForm(raw: unknown): SearchForm | null {
+export function parseForm(raw: unknown): SearchForm | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
 
   const record = raw as Record<string, unknown>;
