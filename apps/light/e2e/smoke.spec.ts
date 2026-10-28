@@ -150,8 +150,9 @@
  */
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { connect } from 'node:net';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -623,6 +624,13 @@ const JOURNEY_TITLE = 'L301 Smoke Journey Analyst Quillwort';
 /** How long the app may take to quit on its own once the session ends. */
 const QUIT_TIMEOUT = 15_000;
 
+/**
+ * Where the backup export writes and the import reads, in place of the native
+ * file dialog the WebDriver session cannot click (L-242). Read by Rust only in
+ * a `wdio` build — see `smoke_backup_file` in `files.rs`.
+ */
+const SMOKE_BACKUP_FILE = join(tmpdir(), `cviper-smoke-${String(process.pid)}`, 'backup.json');
+
 /** Type into a field the way a person does: click it, then keys. */
 async function typeInto(selector: string, text: string): Promise<void> {
   const element = await session().wait(until.elementLocated(By.css(selector)), ELEMENT_TIMEOUT);
@@ -703,7 +711,11 @@ async function launch(): Promise<void> {
   // somebody dismisses the welcome for real.
   app = spawn(application, [], {
     stdio: ['ignore', 'inherit', 'inherit'],
-    env: { ...process.env, TAURI_WEBDRIVER_PORT: String(DRIVER_PORT) },
+    env: {
+      ...process.env,
+      TAURI_WEBDRIVER_PORT: String(DRIVER_PORT),
+      CVIPER_SMOKE_BACKUP: SMOKE_BACKUP_FILE,
+    },
   });
 
   app.on('exit', (code) => {
@@ -959,10 +971,11 @@ describe('the built CViper Light binary', () => {
   // does in their first minute: add a job, move it on, close the app, open it
   // again, and find the job where they left it.
   //
-  // NOT driven, by design: the backup export and import #251 also asked for.
-  // Both open a native file dialog from Rust (`files.rs`), which a WebDriver
-  // session inside the web view cannot answer — the same reason the upload
-  // button is not driven (see the header).
+  // The backup export and import (L-242, #251) open a native file dialog from
+  // Rust, which a WebDriver session inside the web view cannot answer. In this
+  // `wdio` build only, Rust takes the file from CVIPER_SMOKE_BACKUP instead
+  // (`smoke_backup_file` in files.rs); the write, the read and the import are
+  // the shipped code.
 
   let journeyCard = '';
 
@@ -1020,7 +1033,19 @@ describe('the built CViper Light binary', () => {
     },
   );
 
-  it('deletes it, so a developer machine is left as it was', { timeout: 60_000 }, async () => {
+  /** Wait for the Settings message to say `words`, and return all of it. */
+  async function settingsMessage(words: string): Promise<string> {
+    let text = '';
+    await session().wait(async () => {
+      const found = await session().findElements(By.css('[data-testid="settings-message"]'));
+      text = found.length === 0 ? '' : await found[0]!.getText();
+      return text.includes(words);
+    }, ELEMENT_TIMEOUT);
+    return text;
+  }
+
+  async function deleteJourneyCard(): Promise<void> {
+    await click('[data-testid="nav-tracker"]');
     await click(`[data-testid="${journeyCard}"]`);
     await click('[data-testid="detail-delete"]');
     await click('[data-testid="confirm-delete-confirm"]');
@@ -1028,5 +1053,48 @@ describe('the built CViper Light binary', () => {
       const left = await session().findElements(By.css(`[data-testid="${journeyCard}"]`));
       return left.length === 0;
     }, ELEMENT_TIMEOUT);
+  }
+
+  it(
+    'exports a backup through the real write, with the application in it',
+    { timeout: 60_000 },
+    async () => {
+      mkdirSync(join(SMOKE_BACKUP_FILE, '..'), { recursive: true });
+      rmSync(SMOKE_BACKUP_FILE, { force: true });
+
+      await click('[data-testid="nav-settings"]');
+      await click('[data-testid="settings-export"]');
+      const said = await settingsMessage('Saved to');
+      console.log(`smoke: export   = ${said}`);
+
+      // The FILE, read back off the disk — not the message about it.
+      assert.ok(existsSync(SMOKE_BACKUP_FILE), `no backup at ${SMOKE_BACKUP_FILE}`);
+      const written = readFileSync(SMOKE_BACKUP_FILE, 'utf8');
+      assert.ok(written.includes(JOURNEY_TITLE), 'the backup does not hold the application');
+    },
+  );
+
+  it(
+    'imports it after the application is deleted, and the application comes back, still Applied',
+    { timeout: 120_000 },
+    async () => {
+      await deleteJourneyCard();
+
+      await click('[data-testid="nav-settings"]');
+      await click('[data-testid="settings-import"]');
+      await visible('[data-testid="settings-confirm"]');
+      await click('[data-testid="settings-confirm-import"]');
+      const said = await settingsMessage('Imported');
+      console.log(`smoke: import   = ${said}`);
+
+      await click('[data-testid="nav-tracker"]');
+      const card = await session().wait(until.elementLocated(cardIn('applied')), ELEMENT_TIMEOUT);
+      assert.equal(await card.getAttribute('data-testid'), journeyCard);
+    },
+  );
+
+  it('deletes it, so a developer machine is left as it was', { timeout: 60_000 }, async () => {
+    await deleteJourneyCard();
+    rmSync(join(SMOKE_BACKUP_FILE, '..'), { recursive: true, force: true });
   });
 });
