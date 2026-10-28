@@ -10,6 +10,10 @@ All notable changes to CViper Light are recorded here. The format follows
 
 - No person is named in the app's source, test data or docs any more (L-298), at the owner's request. Example CVs in the tests use an invented name, comments and docs say "the owner", the licence reads "The CViper Light authors", and the App Store copyright line is "© 2026 CViper". A test fails the build if a banned name comes back; it keeps the names only as SHA-256 hashes, so it does not name anyone itself. Some places still name the owner, each for a reason: the privacy policy (UK GDPR asks it to name who controls the data, and changing that is a legal decision), the Microsoft Store publisher name (it must match Partner Center exactly), and the GitHub account name in every link, including the one the updater checks. Nothing about how the app works changes.
 
+### Added
+
+- The test that runs the real, built Windows app now uses it the way a person does (L-301). It adds a job to the tracker, moves it to Applied, closes the app, opens it again, and checks the job is still there and still Applied; then it deletes it, so a developer's own tracker is left as it was. Until now that test only opened screens and read PDFs, and none of it saved anything, so a broken database update would have passed it. Backups are still not driven: export and import open your computer's own file window, which the test cannot click. No app change.
+
 ## [0.11.0] — 2026-10-27
 
 The launch release. The free CV check reads skills it used to miss, now including UK qualifications, licences and checks such as NVQ, DBS and C+E; it shows the line of your CV behind each match and how much the advert gave it to go on, and it no longer counts a skill your CV says you lack. A new user sees a full result in one click, is no longer asked for job-board keys, and is told in plain words how to add AI. There is a tenth UK job board, and three security fixes: AI requests no longer follow redirects, a local Ollama run never goes through a proxy, and a memory issue in backup validation is patched.

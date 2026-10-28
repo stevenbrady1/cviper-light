@@ -1,5 +1,6 @@
 /**
- * Nine questions asked of the REAL built binary (L-88, extended by L-103, L-104).
+ * Thirteen questions asked of the REAL built binary (L-88, extended by L-103,
+ * L-104 and L-301).
  *
  * ============================================================================
  * WHY THIS EXISTS
@@ -35,7 +36,7 @@
  *      which is the difference between a useful red and a confusing one.
  *
  * ============================================================================
- * NINE ASSERTIONS, ONE SESSION, IN ORDER
+ * NINE ASSERTIONS, ONE SESSION, IN ORDER — THEN A RESTART (L-301)
  * ============================================================================
  * The window opens, the first-run welcome is shown, Settings opens, and the
  * Privacy section is visible. Then an observer goes into the page, a generated
@@ -46,6 +47,12 @@
  * along, so they run in declaration order — `node:test` guarantees that within a
  * file. No API key, no network: everything asserted here is true of a machine
  * that has never seen this app and is offline.
+ *
+ * Then L-301 walks the first minute of real use through the real IPC and
+ * SQLite: add an application, move it to Applied, close the app and open it
+ * again, find it still Applied, and delete it. That is the only part of this
+ * file that WRITES, and the only part that survives a restart — which is the
+ * point, because nothing above can fail on a broken database.
  *
  * ============================================================================
  * WHY THE PDF HALF EXISTS (L-103)
@@ -291,6 +298,8 @@ async function waitForDriver(port: number, timeoutMs: number): Promise<void> {
 let driver: WebDriver | undefined;
 let app: ChildProcess | undefined;
 let shuttingDown = false;
+/** True while L-301 closes the app on purpose, so its exit is not a failure. */
+let restarting = false;
 
 /**
  * The session, or a sentence saying why there isn't one.
@@ -603,65 +612,126 @@ const SCANNED_PAGE_COUNT = 2;
  */
 const SCANNED_RESULT_KEY = '__l104run';
 
-describe('the built CViper Light binary', () => {
-  before(
-    async () => {
-      const application = resolveApplication();
+// ── L-301: a user journey through the real IPC and SQLite ───────────────────
 
-      // ------------------------------------------------------------------
-      // THE APP IS THE SERVER. NOTHING ELSE IS SPAWNED.
-      // ------------------------------------------------------------------
-      // Runs #1-#3 spawned `tauri-driver`, which spawned `msedgedriver`, which
-      // launched the app and tried to attach to it over the Chrome DevTools
-      // Protocol. All three died identically, sixty seconds in:
-      // `session not created: DevToolsActivePort file doesn't exist`. The
-      // version pairing was exact and the paths were right; the CDP handoff
-      // was the thing that did not happen. WebdriverIO's ADR-0002 records the
-      // same symptom on Windows CI and calls `tauri-driver` the deprecated
-      // `external` provider.
-      //
-      // The app now carries its own W3C WebDriver server — 47 endpoints, via
-      // `tauri-plugin-wdio-webdriver` behind the `wdio` Cargo feature — so
-      // there is no external driver, no CDP, and no second version to keep in
-      // step with the WebView2 runtime for ever. Launch the binary, talk to it.
-      //
-      // `WEBVIEW2_USER_DATA_FOLDER` is deliberately still NOT set: run #1 was
-      // lost to it clashing with the driver's own `--user-data-dir`. The
-      // first-run assertion below is guaranteed on a CI runner, which has
-      // never run this app, and on a developer machine it holds only until
-      // somebody dismisses the welcome for real.
-      app = spawn(application, [], {
-        stdio: ['ignore', 'inherit', 'inherit'],
-        env: { ...process.env, TAURI_WEBDRIVER_PORT: String(DRIVER_PORT) },
-      });
+/**
+ * The job title the journey saves. Like L-103's sentinel, a string found
+ * nowhere else, so finding it proves THIS run saved it.
+ */
+const JOURNEY_TITLE = 'L301 Smoke Journey Analyst Quillwort';
 
-      app.on('exit', (code) => {
-        if (shuttingDown) return;
-        // Loud, not swallowed: an app that died is not a test that passed.
-        console.error(`the app exited unexpectedly with code ${String(code)}`);
-        process.exitCode = 1;
-      });
+/** How long the app may take to quit on its own once the session ends. */
+const QUIT_TIMEOUT = 15_000;
 
-      // Printed because run #1 spent sixty seconds failing without anything in
-      // the log saying what it was pointed at.
-      console.log(`smoke: application = ${application}`);
-      console.log(`smoke: webdriver   = ${DRIVER_URL}`);
+/** Type into a field the way a person does: click it, then keys. */
+async function typeInto(selector: string, text: string): Promise<void> {
+  const element = await session().wait(until.elementLocated(By.css(selector)), ELEMENT_TIMEOUT);
+  await session().wait(until.elementIsVisible(element), ELEMENT_TIMEOUT);
+  await element.click();
+  await element.sendKeys(text);
+}
 
-      await waitForDriver(DRIVER_PORT, DRIVER_STARTUP_TIMEOUT);
-
-      const capabilities = new Capabilities();
-      capabilities.set('tauri:options', { application });
-      capabilities.setBrowserName('tauri');
-
-      // The port being open does not mean the window exists yet (L-206).
-      driver = await createSessionWhenWindowReady({
-        create: () => new Builder().withCapabilities(capabilities).usingServer(DRIVER_URL).build(),
-        timeoutMs: WINDOW_STARTUP_TIMEOUT,
-        intervalMs: 500,
-      });
-    },
-    { timeout: 120_000 },
+/** The `tracker-card-<id>` element in a column, found by the journey's title. */
+function cardIn(column: string): By {
+  return By.xpath(
+    `//*[@data-testid="tracker-column-${column}"]//*[starts-with(@data-testid, "tracker-card-")]` +
+      `[.//text()[contains(., "${JOURNEY_TITLE}")]]`,
   );
+}
+
+/**
+ * Close the app and start it again.
+ *
+ * Ending the session closes the window the WebDriver server lives in, which is
+ * how a user closes the app; a process still running after QUIT_TIMEOUT is
+ * then killed. Either way the next launch reads the same database file.
+ */
+async function restart(): Promise<void> {
+  restarting = true;
+  const running = app;
+  const exited =
+    running === undefined || running.exitCode !== null
+      ? Promise.resolve()
+      : new Promise<void>((done) => running.once('exit', () => done()));
+  await driver?.quit();
+  driver = undefined;
+  const quitInTime = await Promise.race([
+    exited.then(() => true),
+    new Promise<boolean>((done) => setTimeout(() => done(false), QUIT_TIMEOUT)),
+  ]);
+  if (!quitInTime) {
+    running?.kill();
+    await exited;
+  }
+  console.log(
+    `smoke: restart  = ${quitInTime ? 'closed with its window' : 'killed after timeout'}`,
+  );
+  restarting = false;
+  await launch();
+}
+
+/**
+ * Start the binary and open a WebDriver session on it. Called once by `before`,
+ * and again by L-301 to prove what was saved survives a restart.
+ */
+async function launch(): Promise<void> {
+  const application = resolveApplication();
+
+  // ------------------------------------------------------------------
+  // THE APP IS THE SERVER. NOTHING ELSE IS SPAWNED.
+  // ------------------------------------------------------------------
+  // Runs #1-#3 spawned `tauri-driver`, which spawned `msedgedriver`, which
+  // launched the app and tried to attach to it over the Chrome DevTools
+  // Protocol. All three died identically, sixty seconds in:
+  // `session not created: DevToolsActivePort file doesn't exist`. The
+  // version pairing was exact and the paths were right; the CDP handoff
+  // was the thing that did not happen. WebdriverIO's ADR-0002 records the
+  // same symptom on Windows CI and calls `tauri-driver` the deprecated
+  // `external` provider.
+  //
+  // The app now carries its own W3C WebDriver server — 47 endpoints, via
+  // `tauri-plugin-wdio-webdriver` behind the `wdio` Cargo feature — so
+  // there is no external driver, no CDP, and no second version to keep in
+  // step with the WebView2 runtime for ever. Launch the binary, talk to it.
+  //
+  // `WEBVIEW2_USER_DATA_FOLDER` is deliberately still NOT set: run #1 was
+  // lost to it clashing with the driver's own `--user-data-dir`. The
+  // first-run assertion below is guaranteed on a CI runner, which has
+  // never run this app, and on a developer machine it holds only until
+  // somebody dismisses the welcome for real.
+  app = spawn(application, [], {
+    stdio: ['ignore', 'inherit', 'inherit'],
+    env: { ...process.env, TAURI_WEBDRIVER_PORT: String(DRIVER_PORT) },
+  });
+
+  app.on('exit', (code) => {
+    if (shuttingDown || restarting) return;
+    // Loud, not swallowed: an app that died is not a test that passed.
+    console.error(`the app exited unexpectedly with code ${String(code)}`);
+    process.exitCode = 1;
+  });
+
+  // Printed because run #1 spent sixty seconds failing without anything in
+  // the log saying what it was pointed at.
+  console.log(`smoke: application = ${application}`);
+  console.log(`smoke: webdriver   = ${DRIVER_URL}`);
+
+  await waitForDriver(DRIVER_PORT, DRIVER_STARTUP_TIMEOUT);
+
+  const capabilities = new Capabilities();
+  capabilities.set('tauri:options', { application });
+  capabilities.setBrowserName('tauri');
+
+  // The port being open does not mean the window exists yet (L-206).
+  driver = await createSessionWhenWindowReady({
+    create: () => new Builder().withCapabilities(capabilities).usingServer(DRIVER_URL).build(),
+    timeoutMs: WINDOW_STARTUP_TIMEOUT,
+    intervalMs: 500,
+  });
+}
+
+describe('the built CViper Light binary', () => {
+  before(launch, { timeout: 120_000 });
 
   after(async () => {
     shuttingDown = true;
@@ -878,4 +948,69 @@ describe('the built CViper Light binary', () => {
       );
     },
   );
+
+  // ── L-301: a user journey through the real IPC and SQLite ─────────────────
+  //
+  // Everything above opens screens and parses files. None of it writes to the
+  // database, so a broken migration, a missing `sql:allow-execute` or a bad
+  // write path would leave every check above green. These four do what a user
+  // does in their first minute: add a job, move it on, close the app, open it
+  // again, and find the job where they left it.
+  //
+  // NOT driven, by design: the backup export and import #251 also asked for.
+  // Both open a native file dialog from Rust (`files.rs`), which a WebDriver
+  // session inside the web view cannot answer — the same reason the upload
+  // button is not driven (see the header).
+
+  let journeyCard = '';
+
+  it('adds an application, saved by the real database', { timeout: 60_000 }, async () => {
+    await click('[data-testid="nav-tracker"]');
+    // An empty board on a fresh runner; the header button on a machine that
+    // already has applications.
+    await click('[data-testid="tracker-empty-add"], [data-testid="tracker-add"]');
+    await typeInto('#new-title', JOURNEY_TITLE);
+    await typeInto('#new-company', 'Smoke Test Ltd');
+    await typeInto('#new-location', 'London');
+    await click('[data-testid="new-application-form"] button[type="submit"]');
+
+    const card = await session().wait(until.elementLocated(cardIn('saved')), ELEMENT_TIMEOUT);
+    journeyCard = (await card.getAttribute('data-testid')) ?? '';
+    console.log(`smoke: journey  = ${journeyCard}`);
+    assert.match(journeyCard, /^tracker-card-.+/);
+  });
+
+  it('moves it to Applied', { timeout: 60_000 }, async () => {
+    await visible('[data-testid="detail-status"]');
+    await click('[data-testid="detail-status"] option[value="applied"]');
+    await session().wait(until.elementLocated(cardIn('applied')), ELEMENT_TIMEOUT);
+  });
+
+  it(
+    'is still there, still Applied, after the app is closed and opened again',
+    { timeout: 180_000 },
+    async () => {
+      assert.notEqual(journeyCard, '', 'the add step did not record which card it made');
+      await restart();
+
+      // The welcome was skipped before the restart. If the web view lost that
+      // on the way down, skip it again: that is a different question.
+      const welcome = await session().findElements(By.css('[data-testid="welcome-skip"]'));
+      if (welcome.length > 0) await click('[data-testid="welcome-skip"]');
+
+      await click('[data-testid="nav-tracker"]');
+      const card = await session().wait(until.elementLocated(cardIn('applied')), ELEMENT_TIMEOUT);
+      assert.equal(await card.getAttribute('data-testid'), journeyCard);
+    },
+  );
+
+  it('deletes it, so a developer machine is left as it was', { timeout: 60_000 }, async () => {
+    await click(`[data-testid="${journeyCard}"]`);
+    await click('[data-testid="detail-delete"]');
+    await click('[data-testid="confirm-delete-confirm"]');
+    await session().wait(async () => {
+      const left = await session().findElements(By.css(`[data-testid="${journeyCard}"]`));
+      return left.length === 0;
+    }, ELEMENT_TIMEOUT);
+  });
 });
