@@ -8,45 +8,45 @@
 export const RESUME_SCHEMA_PACKAGE = '@cviper/resume-schema' as const;
 
 export {
-  JsonResumeSchema,
-  BasicsSchema,
-  LocationSchema,
-  ProfileSchema,
-  WorkSchema,
-  VolunteerSchema,
-  EducationSchema,
   AwardSchema,
+  BasicsSchema,
   CertificateSchema,
-  PublicationSchema,
-  SkillSchema,
-  LanguageSchema,
-  InterestSchema,
-  ReferenceSchema,
-  ProjectSchema,
-  MetaSchema,
   CviperMetaSchema,
-  RESUME_SECTION_KEYS,
+  EducationSchema,
+  InterestSchema,
   JSON_RESUME_SCHEMA_VERSION,
-  type JsonResume,
-  type Basics,
-  type Work,
-  type Volunteer,
-  type Education,
+  JsonResumeSchema,
+  LanguageSchema,
+  LocationSchema,
+  MetaSchema,
+  ProfileSchema,
+  ProjectSchema,
+  PublicationSchema,
+  RESUME_SECTION_KEYS,
+  ReferenceSchema,
+  SkillSchema,
+  VolunteerSchema,
+  WorkSchema,
   type Award,
+  type Basics,
   type Certificate,
-  type Publication,
-  type Skill,
-  type Language,
-  type Interest,
-  type Reference,
-  type Project,
   type CviperMeta,
+  type Education,
+  type Interest,
+  type JsonResume,
+  type Language,
+  type Project,
+  type Publication,
+  type Reference,
   type ResumeSectionKey,
+  type Skill,
+  type Volunteer,
+  type Work,
 } from './schema';
 
-export { type ResumeError, type ResumeErrorCode, MAX_ISSUES_IN_MESSAGE } from './errors';
+export { MAX_ISSUES_IN_MESSAGE, type ResumeError, type ResumeErrorCode } from './errors';
 
-export { parseJsonResume, parseJsonResumeBytes, describePath } from './parse';
+export { describePath, parseJsonResume, parseJsonResumeBytes } from './parse';
 
 export { flattenJsonResume } from './flatten';
 

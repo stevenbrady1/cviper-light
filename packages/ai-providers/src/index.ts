@@ -176,8 +176,8 @@ export {
 } from './prompt/build-tailor-prompt';
 
 export {
-  MAX_USER_METRIC_CHARS,
   MAX_USER_METRICS,
+  MAX_USER_METRIC_CHARS,
   promptUserMetrics,
   type UserSuppliedMetric,
 } from './prompt/user-metrics';
