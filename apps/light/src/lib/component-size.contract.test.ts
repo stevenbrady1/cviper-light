@@ -28,7 +28,6 @@ export const LINE_LIMIT = 800;
 
 /** Over the limit on the day the guard arrived (28 Oct 2026). May only shrink. */
 export const CEILINGS: Readonly<Record<string, number>> = {
-  'apps/light/src/features/analysis/Analysis.tsx': 1275,
   'apps/light/src/features/search/Search.tsx': 1076,
   'apps/light/src/features/tracker/Tracker.tsx': 1000,
   'apps/light/src/features/profile/Profile.tsx': 890,

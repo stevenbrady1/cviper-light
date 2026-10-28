@@ -1,16 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 
-import {
-  type Analysis as AnalysisRow,
-  type Cv,
-  type Job,
-  type Profile,
-  type Result,
-} from '@cviper/core-types';
-import { KEYWORD_SCORING_VERSION, runGates } from '@cviper/keyword-scoring';
+import { type Analysis as AnalysisRow, type Cv, type Job, type Result } from '@cviper/core-types';
+import { runGates } from '@cviper/keyword-scoring';
 
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
-import { DetailPane } from '../../app/DetailPane';
+import { SECONDARY_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { IconTile } from '../../ui';
@@ -22,18 +15,20 @@ import {
   type PickedCv,
 } from '../../platform/files';
 
-import { ingestCv, uploadCv, type IngestedCv, type IngestProblem } from '../cv/ingestCv';
 import { createDbProfilePort, type ProfilePort } from '../profile/port';
-import { APP_NAME } from '../settings/backup';
 
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 
+import { AnalysisAdvert } from './AnalysisAdvert';
+import { AnalysisCvPicker } from './AnalysisCvPicker';
+import { AnalysisEngine } from './AnalysisEngine';
+import { AnalysisHistory } from './AnalysisHistory';
 import { AnalysisResult } from './AnalysisResult';
-import { readAvailability } from './availability';
-import { ConsentGate, ConsentStatus } from './ConsentGate';
+import { AnalysisRunBar } from './AnalysisRunBar';
+import { AnalysisSample } from './AnalysisSample';
+import { ConsentGate } from './ConsentGate';
 import { cvCutNote } from './cvCutNote';
 import { GateNotice } from './GateNotice';
-import { OllamaDownloadLink } from './OllamaDownloadLink';
 import {
   createTauriConsentPort,
   isCloudKind,
@@ -42,37 +37,20 @@ import {
   type ConsentProviderKind,
   type ConsentState,
 } from './consent';
-import {
-  exportJsonResume,
-  jobAdvertText,
-  jsonResumeFileName,
-  newAnalysisRecord,
-  providerInSentence,
-  providerLabel,
-  runDisabledReason,
-} from './model';
+import { jobAdvertText, newAnalysisRecord, providerInSentence, runDisabledReason } from './model';
 import { createDbAnalysisPort, type AnalysisPort } from './port';
-import {
-  defaultOptionKey,
-  ollamaHint,
-  optionByKey,
-  providerOptions,
-  type ProviderOption,
-} from './providers';
+import { defaultOptionKey, optionByKey, type ProviderOption } from './providers';
 import { runAnalysis } from './runAnalysis';
-import { SAMPLE_ADVERT_TEXT, SAMPLE_CV_TEXT, runSample, type SampleResult } from './sample';
+import { runSample, type SampleResult } from './sample';
 import { createAnalysisSession, type AnalysisSession } from './session';
-import { gapsFromAnalysis, type TailorHandoff } from '../flow/handoff';
+import { useAnalysisCvFiles } from './useAnalysisCvFiles';
+import { useAnalysisLibrary } from './useAnalysisLibrary';
+import { useAnalysisStepBar } from './useAnalysisStepBar';
+import { type TailorHandoff } from '../flow/handoff';
 import { JobStepBar } from '../flow/JobStepBar';
-import {
-  NO_SAVED_PROGRESS,
-  createDbJobProgressPort,
-  type JobProgressPort,
-  type SavedProgress,
-} from '../flow/progress';
+import { NO_SAVED_PROGRESS, createDbJobProgressPort, type JobProgressPort } from '../flow/progress';
 import { type StepId } from '../flow/steps';
 import { type ChatTransport } from '@cviper/ai-providers';
-import { LiveStatus } from '../../app/LiveStatus';
 
 /**
  * The analysis view: pick a CV, paste an advert, choose how to run it, run it.
@@ -103,6 +81,17 @@ import { LiveStatus } from '../../app/LiveStatus';
  * several gigabytes into memory before it emits a single token. Thirty seconds
  * of a still screen is indistinguishable from a crash, so the wait says what is
  * happening, says why it is slow, and counts.
+ *
+ * ============================================================================
+ * WHERE THE PIECES LIVE (L-306)
+ * ============================================================================
+ * This file owns the run, the consent gate in front of it and the result. Each
+ * input panel is its own component (`AnalysisCvPicker`, `AnalysisAdvert`,
+ * `AnalysisEngine`, `AnalysisRunBar`), as are the sample and past checks; what
+ * the screen reads on opening is `useAnalysisLibrary`, CV files in and out are
+ * `useAnalysisCvFiles`, and the step bar is `useAnalysisStepBar`. The run stays
+ * HERE on purpose: `ai-call-sites-consent.contract.test.ts` names this file as
+ * the one that hands the transport to `runAnalysis`.
  */
 
 /** How often the elapsed counter ticks while a model is thinking. */
@@ -256,41 +245,10 @@ export function Analysis({
     running,
   } = useSyncExternalStore(session.watch, session.get);
 
-  const [cvs, setCvs] = useState<readonly Cv[]>([]);
-  /**
-   * False until the first read of the CV list comes back.
-   *
-   * Without it the picker says "No CV uploaded yet" — and disables itself —
-   * during the read, which is not an empty state but a wrong answer with a
-   * dead control attached.
-   */
-  const [cvsLoaded, setCvsLoaded] = useState(false);
-  const [jobs, setJobs] = useState<readonly Job[]>([]);
-  /** "Saved to …" after a JSON Resume export (L-20b). */
-  const [exportMessage, setExportMessage] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [options, setOptions] = useState(() =>
-    providerOptions({
-      ollamaRunning: false,
-      ollamaModels: [],
-      anthropicKey: false,
-      openaiKey: false,
-    }),
-  );
-  /**
-   * The one sentence worth saying about Ollama, or `null`.
-   *
-   * Held as the computed string rather than as the whole `Availability`, so
-   * there is exactly one place — `ollamaHint` — that decides when it is said.
-   */
-  const [localModelHint, setLocalModelHint] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  /** The saved profile, or `null` — never saved, or could not be read. */
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [history, setHistory] = useState<readonly AnalysisRow[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [uploadProblem, setUploadProblem] = useState<string | null>(null);
   /** The one-click sample (L-277): shown and forgotten, never saved. */
   const [sample, setSample] = useState<SampleResult | null>(null);
   /** Per-provider agreement to send a CV to a named cloud AI (Apple 5.1.2(i)). */
@@ -304,6 +262,13 @@ export function Analysis({
     readonly option: ProviderOption;
     readonly kind: ConsentProviderKind;
   } | null>(null);
+
+  const { cvs, setCvs, cvsLoaded, jobs, options, localModelHint, profile } = useAnalysisLibrary({
+    analysisPort,
+    profiles,
+    session,
+    setError,
+  });
 
   // ── Loading ──────────────────────────────────────────────────────────────
 
@@ -329,72 +294,6 @@ export function Analysis({
       cancelled = true;
     };
   }, [consentStore]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void profiles.load().then((loaded) => {
-      // A failed read is SILENT here, and deliberately so: the gates then run
-      // with no languages and no work rights, which `runGates` treats as
-      // silence — every requirement becomes "check this", never a hard stop.
-      // A red banner over a screen that scores perfectly well would be the
-      // wrong lesson, and the profile view reports its own read failures.
-      if (!cancelled && loaded.ok) setProfile(loaded.value);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [profiles]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void analysisPort.loadCvs().then((loaded) => {
-      if (cancelled) return;
-      // Set on both branches: a failed read is still a finished read, and the
-      // error banner below is the honest thing to show, not a permanent
-      // "Reading…".
-      setCvsLoaded(true);
-      if (!loaded.ok) {
-        // Never swallowed. A screen that shows no CVs when the database will
-        // not open is indistinguishable from a screen with no CVs on it.
-        setError(`${loaded.error.message} Your data is still on this machine.`);
-        return;
-      }
-      setCvs(loaded.value);
-      // Only when nothing is selected: coming back to this view (L-187) keeps
-      // the CV the user was working on.
-      session.update((current) => ({
-        selectedCvId: current.selectedCvId ?? loaded.value[0]?.id ?? null,
-      }));
-    });
-
-    void analysisPort.loadJobs().then((loaded) => {
-      // A failure here is NOT surfaced: the tracked-job shortcut is a
-      // convenience, and losing it must not put a red banner over a screen that
-      // otherwise works perfectly with a pasted advert.
-      if (!cancelled && loaded.ok) setJobs(loaded.value);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [analysisPort, session]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void readAvailability().then((availability) => {
-      if (cancelled) return;
-      setOptions(providerOptions(availability));
-      setLocalModelHint(ollamaHint(availability));
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (selectedCvId === null) {
@@ -439,125 +338,18 @@ export function Analysis({
 
   const selectedCv = cvs.find((cv) => cv.id === selectedCvId) ?? null;
 
-  /** What an upload came to — a stored CV, a message, or (cancelled) nothing — on screen. */
-  const settle = useCallback(
-    (ingested: Result<IngestedCv | null, IngestProblem>) => {
-      if (!ingested.ok) {
-        if (ingested.error.kind === 'not-saved') {
-          setError(ingested.error.message);
-          return;
-        }
-        // VERBATIM. Every message in `@cviper/cv-parsing` says what happened,
-        // why, and what to do — "that PDF has 2 pages but no readable text at
-        // all, which means it is almost certainly a scan". Replacing that with
-        // "could not read file" throws away the only useful thing on the
-        // screen.
-        setUploadProblem(ingested.error.message);
-        session.update({ warnings: [] });
-        return;
-      }
-      // Cancelled. Nothing happened, and nothing is said about it.
-      if (ingested.value === null) return;
-
-      const { cv, warnings: cvWarnings } = ingested.value;
-      setCvs((current) => [cv, ...current]);
-      // A run still in flight was for the previous CV: its answer is dropped.
-      session.supersede();
-      session.update({
-        selectedCvId: cv.id,
-        result: null,
-        runError: null,
-        // Warnings ride along with a SUCCESSFUL extraction — some pages were
-        // images and their contents are missing from the text. The user has to
-        // be told, because the analysis below is about to be run on a partial CV.
-        warnings: cvWarnings,
-      });
-      setExportMessage(null);
-    },
-    [session],
-  );
-
-  /** The same CV store, the same parser, as every other screen's upload (L-240). */
-  const ingestDeps = useMemo(
-    () => ({ saveCv: (cv: Cv) => analysisPort.saveCv(cv), now: now ?? new Date() }),
-    [analysisPort, now],
-  );
-
-  /**
-   * A file's bytes, wherever they came from — the dialog or the share sheet —
-   * become a CV row, or a message.
-   */
-  const ingest = useCallback(
-    async (picked: PickedCv) => settle(await ingestCv(picked, ingestDeps)),
-    [ingestDeps, settle],
-  );
-
-  /**
-   * Save the selected CV back out as the JSON Resume it arrived as (L-20b).
-   *
-   * Only reachable when `selectedCv.json_resume` is a string — the button is
-   * disabled otherwise — but `exportJsonResume` re-checks, because a disabled
-   * button is a UI fact and this is a data one.
-   */
-  const onSaveJsonResume = useCallback(async () => {
-    if (selectedCv === null) return;
-    setError(null);
-    setExportMessage(null);
-
-    const text = exportJsonResume({
-      cv: selectedCv,
-      app: APP_NAME,
-      exportedAt: (now ?? new Date()).toISOString(),
+  const { exportMessage, exporting, uploadProblem, clearCvMessages, onUpload, onSaveJsonResume } =
+    useAnalysisCvFiles({
+      analysisPort,
+      files,
+      now,
+      session,
+      selectedCv,
+      incomingCv,
+      onIncomingCvHandled,
+      setCvs,
+      setError,
     });
-    if (!text.ok) {
-      setError(text.error.message);
-      return;
-    }
-
-    setExporting(true);
-    const saved = await files.saveCvJson(text.value, jsonResumeFileName(selectedCv.name));
-    setExporting(false);
-
-    if (!saved.ok) {
-      setError(`That CV could not be saved as a JSON Resume: ${saved.error.message}`);
-      return;
-    }
-    // Cancelled. Nothing was written, and nothing is said about it.
-    if (saved.value === null) return;
-
-    setExportMessage(
-      `Saved to ${saved.value}. The file is the one that came in, with a note of when it left.`,
-    );
-  }, [files, now, selectedCv]);
-
-  const onUpload = useCallback(async () => {
-    setError(null);
-    setUploadProblem(null);
-    settle(await uploadCv(files, ingestDeps));
-  }, [files, ingestDeps, settle]);
-
-  // A file the OS opened for us (L-83). Same path as a pick from here on.
-  useEffect(() => {
-    if (incomingCv === undefined || incomingCv === null) return;
-
-    let cancelled = false;
-    setError(null);
-    setUploadProblem(null);
-
-    void (async () => {
-      if (!incomingCv.ok) {
-        setUploadProblem(incomingCv.error.message);
-        session.update({ warnings: [] });
-      } else {
-        await ingest(incomingCv.value);
-      }
-      if (!cancelled) onIncomingCvHandled?.();
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [incomingCv, ingest, onIncomingCvHandled, session]);
 
   /**
    * Run one option that has ALREADY cleared the consent question — either it
@@ -709,72 +501,21 @@ export function Analysis({
 
   // ── The step bar (L-200) ─────────────────────────────────────────────────
 
-  /** The tracked job the advert belongs to, if it is on the board. */
-  const stepJob =
-    jobId === null ? null : (jobs.find((candidate) => candidate.id === jobId) ?? null);
-  const [saved, setSaved] = useState<SavedProgress>(NO_SAVED_PROGRESS);
-  useEffect(() => {
-    setSaved(NO_SAVED_PROGRESS);
-    if (jobId === null) return;
-    let cancelled = false;
-    void progress.load(jobId).then((loaded) => {
-      if (!cancelled) setSaved(loaded);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [jobId, progress]);
-
-  /**
-   * A job arriving brings back its own CV and engine (L-200, "pick once"),
-   * once, after the CVs are read so a deleted CV is never selected. A job
-   * with no choice yet keeps whatever is picked now.
-   */
-  const choiceAppliedFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (jobId === null) {
-      choiceAppliedFor.current = null;
-      return;
-    }
-    if (!cvsLoaded || choiceAppliedFor.current === jobId) return;
-    choiceAppliedFor.current = jobId;
-    const choice = jobChoice?.(jobId) ?? null;
-    if (choice === null) return;
-    const current = session.get();
-    const cvId =
-      choice.cvId !== null && cvs.some((cv) => cv.id === choice.cvId) ? choice.cvId : null;
-    if (cvId !== null && cvId !== current.selectedCvId) {
-      // Another CV: a result on screen was for the one being left.
-      session.supersede();
-      session.update({ selectedCvId: cvId, result: null, runError: null, warnings: [] });
-    }
-    if (choice.optionKey !== null && choice.optionKey !== current.optionKey) {
-      session.update({ optionKey: choice.optionKey });
-    }
-  }, [cvs, cvsLoaded, jobChoice, jobId, session]);
-
-  /** What "Tailor my CV for this job" hands over — the same, whichever button. */
-  const tailorHandoff = useCallback(
-    (): TailorHandoff => ({
-      jobId,
-      jobText,
-      cvId: selectedCvId,
-      optionKey,
-      // The gaps this result found, for the advert it CHECKED (L-202). Never
-      // `missing_skills`: see `gapsFromAnalysis`.
-      keywordGaps:
-        result === null ? null : gapsFromAnalysis(result.analysis, selectedCvId, checkedAdvert),
-    }),
-    [checkedAdvert, jobId, jobText, optionKey, result, selectedCvId],
-  );
-
-  const onBarStep = useCallback(
-    (step: StepId) => {
-      if (step === 'analyse' || stepJob === null) return;
-      onJobStep?.(step, stepJob, tailorHandoff());
-    },
-    [onJobStep, stepJob, tailorHandoff],
-  );
+  const { stepJob, saved, tailorHandoff, onBarStep } = useAnalysisStepBar({
+    session,
+    progress,
+    jobs,
+    cvs,
+    cvsLoaded,
+    jobId,
+    jobText,
+    selectedCvId,
+    optionKey,
+    result,
+    checkedAdvert,
+    jobChoice,
+    onJobStep,
+  });
 
   /** Said by the picker when the chosen AI will not read the whole CV (L-302). */
   const cvCut = cvCutNote(selectedCv?.extracted_text ?? null, selectedOption?.kind ?? null);
@@ -830,297 +571,70 @@ export function Analysis({
 
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
-          {/* ── 1. The CV ─────────────────────────────────────────────── */}
-          <div>
-            <label htmlFor="analysis-cv" className="block text-xs font-medium text-ink-muted">
-              Your CV
-            </label>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <select
-                id="analysis-cv"
-                data-testid="analysis-cv"
-                value={selectedCvId ?? ''}
-                disabled={cvs.length === 0 || !cvsLoaded}
-                onChange={(event) => {
-                  const id = event.currentTarget.value;
-                  // A run still in flight was for the CV being left: dropped.
-                  session.supersede();
-                  session.update({
-                    selectedCvId: id === '' ? null : id,
-                    result: null,
-                    runError: null,
-                    warnings: [],
-                  });
-                  setUploadProblem(null);
-                  setExportMessage(null);
-                  // Picked once, for the job (L-200).
-                  if (stepJob !== null) onJobChoice?.(stepJob, { cvId: id === '' ? null : id });
-                }}
-                className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
-              >
-                {cvs.length > 0 ? null : (
-                  <option value="">{cvsLoaded ? 'No CV uploaded yet' : 'Reading your CVs…'}</option>
-                )}
-                {cvs.map((cv) => (
-                  <option key={cv.id} value={cv.id}>
-                    {cv.name}
-                  </option>
-                ))}
-              </select>
+          <AnalysisCvPicker
+            cvs={cvs}
+            cvsLoaded={cvsLoaded}
+            selectedCvId={selectedCvId}
+            selectedCv={selectedCv}
+            onPick={(id) => {
+              // A run still in flight was for the CV being left: dropped.
+              session.supersede();
+              session.update({ selectedCvId: id, result: null, runError: null, warnings: [] });
+              clearCvMessages();
+              // Picked once, for the job (L-200).
+              if (stepJob !== null) onJobChoice?.(stepJob, { cvId: id });
+            }}
+            onUpload={() => void onUpload()}
+            onSaveJsonResume={() => void onSaveJsonResume()}
+            exporting={exporting}
+            exportMessage={exportMessage}
+            uploadProblem={uploadProblem}
+            warnings={warnings}
+          />
 
-              <button
-                type="button"
-                data-testid="analysis-upload"
-                onClick={() => void onUpload()}
-                className={SECONDARY_BUTTON}
-              >
-                Upload a CV
-              </button>
+          <AnalysisAdvert
+            jobNote={jobNote}
+            jobText={jobText}
+            onJobTextChange={(value) =>
+              // Still that job while there is an advert in the box — pasting
+              // the full advert over a preview is the edit the note asks for.
+              // An empty box belongs to nothing.
+              session.update(
+                value === '' ? { jobText: '', jobId: null, jobNote: null } : { jobText: value },
+              )
+            }
+            jobs={jobs}
+            onPickJob={(job) =>
+              session.update({ jobText: jobAdvertText(job), jobId: job.id, jobNote: null })
+            }
+          />
 
-              {/*
-                Disabled, never hidden, for a CV that came from a PDF or a
-                .docx: there is no JSON Resume to give back for those, and a
-                control that comes and goes is one the user cannot learn.
-              */}
-              <button
-                type="button"
-                data-testid="analysis-save-json"
-                disabled={selectedCv === null || selectedCv.json_resume === null || exporting}
-                title={
-                  selectedCv !== null && selectedCv.json_resume === null
-                    ? 'Only a CV that arrived as a JSON Resume can be saved as one.'
-                    : undefined
-                }
-                onClick={() => void onSaveJsonResume()}
-                className={SECONDARY_BUTTON}
-              >
-                {exporting ? 'Saving…' : 'Save as JSON Resume'}
-              </button>
-            </div>
+          <AnalysisEngine
+            options={options}
+            optionKey={optionKey}
+            selectedOption={selectedOption}
+            onOptionChange={(picked) => {
+              session.update({ optionKey: picked });
+              // Picked once, for the job (L-200).
+              if (stepJob !== null) onJobChoice?.(stepJob, { optionKey: picked });
+            }}
+            cvCut={cvCut}
+            localModelHint={localModelHint}
+            browser={browserPort}
+            grantedConsents={grantedConsents}
+            onWithdrawConsent={(kind) => void onWithdrawConsent(kind)}
+          />
 
-            <p className="mt-1 text-xs text-ink-faint">
-              PDF, Word (.docx) or JSON Resume (.json). The file is read on this computer. Its text
-              only goes to an AI you choose, and only when you ask it to read your CV. A CV that
-              arrived as a JSON Resume can be saved back out as one, unchanged, to take anywhere
-              that reads the format.
-            </p>
-
-            <LiveStatus text={exportMessage} />
-            {exportMessage === null ? null : (
-              <p
-                data-testid="analysis-export-message"
-                className="mt-2 rounded-control bg-teal/10 px-3 py-2 break-all text-teal-ink"
-              >
-                {exportMessage}
-              </p>
-            )}
-
-            {uploadProblem === null ? null : (
-              <p
-                role="alert"
-                data-testid="analysis-upload-problem"
-                className="mt-2 rounded-control bg-danger/5 px-3 py-2 text-danger"
-              >
-                {uploadProblem}
-              </p>
-            )}
-
-            {warnings.length === 0 ? null : (
-              <ul
-                data-testid="analysis-cv-warnings"
-                className="mt-2 space-y-1 rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
-              >
-                {warnings.map((warning) => (
-                  <li key={warning}>{warning}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* ── 2. The advert ─────────────────────────────────────────── */}
-          <div>
-            {/*
-              What came with a job handed over from Search (L-190) — usually
-              that only a preview of the advert arrived. ABOVE the box, because
-              it is about what is in the box and has to be read first; gold,
-              because it is something to act on, not a failure.
-            */}
-            <LiveStatus text={jobNote} />
-            {jobNote === null ? null : (
-              <p
-                data-testid="analysis-job-note"
-                className="mb-2 rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
-              >
-                {jobNote}
-              </p>
-            )}
-            <label htmlFor="analysis-job-text" className="block text-xs font-medium text-ink-muted">
-              The job advert
-            </label>
-            <textarea
-              id="analysis-job-text"
-              data-testid="analysis-job-text"
-              rows={7}
-              value={jobText}
-              placeholder="Paste the whole advert, including the requirements list."
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                // Still that job while there is an advert in the box — pasting
-                // the full advert over a preview is the edit the note asks for.
-                // An empty box belongs to nothing.
-                session.update(
-                  value === '' ? { jobText: '', jobId: null, jobNote: null } : { jobText: value },
-                );
-              }}
-              className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
-            />
-
-            {jobs.length === 0 ? null : (
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <label htmlFor="analysis-job-pick" className="text-xs text-ink-faint">
-                  Or use one you are already tracking
-                </label>
-                <select
-                  id="analysis-job-pick"
-                  data-testid="analysis-job-pick"
-                  value=""
-                  onChange={(event) => {
-                    const job = jobs.find(
-                      (candidate) => candidate.id === event.currentTarget.value,
-                    );
-                    if (job !== undefined) {
-                      session.update({ jobText: jobAdvertText(job), jobId: job.id, jobNote: null });
-                    }
-                  }}
-                  className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1 text-ink"
-                >
-                  <option value="">Choose a tracked job…</option>
-                  {jobs.map((job) => (
-                    <option key={job.id} value={job.id}>
-                      {job.title} — {job.company}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-
-          {/* ── 3. How to run it ──────────────────────────────────────── */}
-          <div>
-            <label htmlFor="analysis-provider" className="block text-xs font-medium text-ink-muted">
-              How to check it
-            </label>
-            <select
-              id="analysis-provider"
-              data-testid="analysis-provider"
-              value={optionKey}
-              onChange={(event) => {
-                const picked = event.currentTarget.value;
-                session.update({ optionKey: picked });
-                // Picked once, for the job (L-200).
-                if (stepJob !== null) onJobChoice?.(stepJob, { optionKey: picked });
-              }}
-              className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
-            >
-              {options.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <p data-testid="analysis-provider-note" className="mt-1 text-xs text-ink-faint">
-              {selectedOption?.note ?? 'Choose how to run this.'}
-            </p>
-            {cvCut === null ? null : (
-              <p
-                data-testid="analysis-cv-cut"
-                className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
-              >
-                {cvCut}
-              </p>
-            )}
-
-            {/*
-              Shown in ONE state only: the daemon answered and nothing in it can
-              chat. Not an error — gold, because it is something the user can
-              act on — and it says what to do, with a link to Ollama's download
-              page (L-240), because "no chat models found" on its own is a dead
-              end in an app with no support inbox.
-            */}
-            {localModelHint === null ? null : (
-              <p
-                data-testid="analysis-ollama-hint"
-                className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
-              >
-                {localModelHint}
-                <OllamaDownloadLink idPrefix="analysis" browser={browserPort} />
-              </p>
-            )}
-
-            {/*
-              Reachable regardless of which option is currently picked — a
-              consent granted earlier must stay visible and revocable even
-              after switching to Ollama or the basic match. See
-              `ConsentGate.tsx` for why this lives here and not in Settings.
-            */}
-            <ConsentStatus
-              granted={grantedConsents}
-              onWithdraw={(kind) => void onWithdrawConsent(kind)}
-            />
-          </div>
-
-          {/* ── 4. Run ────────────────────────────────────────────────── */}
-          <div className="flex items-center gap-3">
-            {/*
-              The view's ONE blue button. Disabled, never hidden — and the
-              reason is right next to it, because a grey button that says
-              nothing is where a user's session ends.
-            */}
-            <button
-              type="button"
-              data-testid="analysis-run"
-              data-primary="true"
-              disabled={disabledReason !== null}
-              aria-describedby={disabledReason === null ? undefined : 'analysis-run-reason'}
-              onClick={() => void onRun()}
-              className={PRIMARY_BUTTON}
-            >
-              {running ? 'Checking…' : 'Check this CV'}
-            </button>
-
-            <button
-              type="button"
-              data-testid="analysis-history-open"
-              disabled={selectedCv === null || historyOpen}
-              onClick={() => setHistoryOpen(true)}
-              className={SECONDARY_BUTTON}
-            >
-              Past checks <span className="font-mono tabular-nums">({history.length})</span>
-            </button>
-
-            {disabledReason === null ? null : (
-              <p
-                id="analysis-run-reason"
-                data-testid="analysis-run-reason"
-                className="text-ink-muted"
-              >
-                {disabledReason}
-              </p>
-            )}
-          </div>
-
-          <LiveStatus text={progressText} />
-          {running && selectedOption !== null && selectedOption.kind !== 'keyword' ? (
-            <p
-              data-testid="analysis-progress"
-              className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
-            >
-              {progressText}{' '}
-              <span aria-hidden="true" className="font-mono tabular-nums">
-                {elapsed}s
-              </span>
-            </p>
-          ) : null}
+          <AnalysisRunBar
+            running={running}
+            disabledReason={disabledReason}
+            onRun={() => void onRun()}
+            historyCount={history.length}
+            historyDisabled={selectedCv === null || historyOpen}
+            onOpenHistory={() => setHistoryOpen(true)}
+            progressText={progressText}
+            elapsed={elapsed}
+          />
 
           {/* ── 5. The result ─────────────────────────────────────────── */}
           {result === null ? (
@@ -1193,73 +707,20 @@ export function Analysis({
           )}
 
           {sample !== null && result === null ? (
-            <section
-              data-testid="analysis-sample"
-              aria-label="Sample check"
-              className="space-y-4 rounded-card border border-line bg-sunken p-4"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <p className="text-ink-muted">
-                  <span className="font-medium text-ink">A sample check.</span> A made-up data
-                  analyst&rsquo;s CV against a made-up advert, using the basic match. Nothing was
-                  saved. Add your own CV above to check it for real.
-                </p>
-                <button
-                  type="button"
-                  data-testid="analysis-sample-hide"
-                  onClick={() => setSample(null)}
-                  className={SECONDARY_BUTTON}
-                >
-                  Hide the sample
-                </button>
-              </div>
-              <AnalysisResult
-                analysis={sample.analysis}
-                provider="keyword"
-                model={`keyword-v${KEYWORD_SCORING_VERSION}`}
-                aiAvailable={aiAvailable}
-                atsKeywordScore={sample.atsKeywordScore}
-                cvText={SAMPLE_CV_TEXT}
-                advertText={SAMPLE_ADVERT_TEXT}
-              />
-            </section>
+            <AnalysisSample
+              sample={sample}
+              aiAvailable={aiAvailable}
+              onHide={() => setSample(null)}
+            />
           ) : null}
         </div>
 
         {historyOpen && selectedCv !== null ? (
-          <DetailPane
-            title="Past checks"
-            subtitle={selectedCv.name}
+          <AnalysisHistory
+            cvName={selectedCv.name}
+            history={history}
             onClose={() => setHistoryOpen(false)}
-          >
-            {history.length === 0 ? (
-              <p data-testid="analysis-history-empty" className="text-ink-muted">
-                This CV has not been checked against anything yet.
-              </p>
-            ) : (
-              <ul data-testid="analysis-history" className="space-y-2">
-                {history.map((row) => (
-                  <li
-                    key={row.id}
-                    data-testid="analysis-history-row"
-                    className="flex items-baseline justify-between gap-2 rounded-card border border-line px-3 py-2"
-                  >
-                    <span className="min-w-0">
-                      <span className="block font-medium text-ink">
-                        {providerLabel(row.provider)}
-                      </span>
-                      <span className="block font-mono text-xs tabular-nums text-ink-faint">
-                        {row.created_at.slice(0, 10)}
-                      </span>
-                    </span>
-                    <span className="font-mono text-lg tabular-nums text-ink">
-                      {row.match_score}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </DetailPane>
+          />
         ) : null}
       </div>
 
