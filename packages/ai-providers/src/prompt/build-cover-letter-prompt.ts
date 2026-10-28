@@ -69,6 +69,11 @@ import {
 export interface CoverLetterPromptInput {
   readonly cvText: string;
   readonly jobText: string;
+  /**
+   * Characters of CV to send (L-302). Defaults to `MAX_CV_CHARS`, the local
+   * budget; the orchestrator passes `cvCharBudget(provider.id)`.
+   */
+  readonly cvBudget?: number | undefined;
   /** The tailored CV as text, when the tailor step ran first. `null` otherwise. */
   readonly tailoredCvText: string | null;
   /** The candidate's own words on how they write. `null` when the profile is empty. */
@@ -171,7 +176,12 @@ export function buildCoverLetterPrompt(input: CoverLetterPromptInput): CoverLett
     '',
     'Write a professional cover letter for this job application.',
     '',
-    fence(fences, 'CV (the ONLY source of facts about the candidate)', input.cvText, MAX_CV_CHARS),
+    fence(
+      fences,
+      'CV (the ONLY source of facts about the candidate)',
+      input.cvText,
+      input.cvBudget ?? MAX_CV_CHARS,
+    ),
     '',
     fence(fences, 'JOB ADVERT', input.jobText, MAX_JOB_CHARS),
     ...(tailored === null ? [] : ['', tailored]),

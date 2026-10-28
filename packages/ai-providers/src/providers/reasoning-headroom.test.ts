@@ -8,6 +8,7 @@ import { extractJson } from '../extract-json';
 import { DEFAULT_MAX_FOLLOW_UP_TOKENS } from '../follow-up';
 import { DEFAULT_MAX_INTERVIEW_TOKENS } from '../interview';
 import { DEFAULT_MAX_REVIEW_TOKENS } from '../review';
+import { tailorAnswerTokens } from '../prompt/budget';
 import { DEFAULT_MAX_TAILOR_TOKENS } from '../tailor';
 import { fakeTransport, sentBody } from '../test/fake-transport';
 import type { AiProvider, ChatTransport } from '../types';
@@ -106,6 +107,8 @@ describe('wireOutputCap — the answer budget plus room to think', () => {
       DEFAULT_MAX_INTERVIEW_TOKENS,
       DEFAULT_MAX_REVIEW_TOKENS,
       DEFAULT_MAX_TAILOR_TOKENS,
+      // L-302: an AI company's tailor budget, the largest any job asks for.
+      tailorAnswerTokens('anthropic'),
     ];
     for (const budget of budgets) {
       // The whole headroom, not a sliver of it: the ceiling must never be

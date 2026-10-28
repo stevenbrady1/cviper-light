@@ -35,6 +35,7 @@ import {
 } from '@cviper/core-types';
 import { clampAnalysis } from './clamp';
 import { extractJson, type JsonFailureKind, type RepairStrategy } from './extract-json';
+import { cvCharBudget } from './prompt/budget';
 import { buildAnalysisPrompt, buildRepairPrompt } from './prompt/build-prompt';
 import { reasoningFirstSchema } from './schema-order';
 import type { AiProvider, ProviderErrorKind } from './types';
@@ -173,6 +174,7 @@ export async function analyzeCv(
   const { system, user } = buildAnalysisPrompt({
     cvText: options.cvText,
     jobText: options.jobText,
+    cvBudget: cvCharBudget(options.provider.id),
   });
   const maxOutputTokens = options.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
 

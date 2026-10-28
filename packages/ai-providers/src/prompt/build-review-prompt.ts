@@ -39,6 +39,11 @@ export interface ReviewPromptInput {
   readonly kind: ReviewKind;
   /** Achievements the candidate typed and approved (L-205). Absent or empty: none. */
   readonly userMetrics?: readonly UserSuppliedMetric[] | null | undefined;
+  /**
+   * Characters of CV, and of the draft, to send (L-302). Defaults to `MAX_CV_CHARS`, the local
+   * budget; the orchestrator passes `cvCharBudget(provider.id)`.
+   */
+  readonly cvBudget?: number | undefined;
 }
 
 export interface ReviewPrompt {
@@ -93,11 +98,16 @@ export function buildReviewPrompt(input: ReviewPromptInput): ReviewPrompt {
     'Review this draft against the advert and the original CV.',
     JSON_ONLY,
     '',
-    fence(fences, draftLabel, input.draftText, MAX_DRAFT_CHARS),
+    fence(fences, draftLabel, input.draftText, input.cvBudget ?? MAX_DRAFT_CHARS),
     '',
     fence(fences, 'JOB ADVERT', input.jobText, MAX_JOB_CHARS),
     '',
-    fence(fences, 'ORIGINAL CV (the only source a claim may rest on)', input.cvText, MAX_CV_CHARS),
+    fence(
+      fences,
+      'ORIGINAL CV (the only source a claim may rest on)',
+      input.cvText,
+      input.cvBudget ?? MAX_CV_CHARS,
+    ),
     ...(userMetrics === null ? [] : ['', userMetrics]),
     '',
     whatToLookFor(input.kind, userMetrics !== null),
