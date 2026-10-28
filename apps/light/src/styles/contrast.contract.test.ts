@@ -25,7 +25,9 @@
  *
  * It CANNOT see: a text colour whose background is set by a parent in another
  * component or file (the parent's surface is invisible to a grep), classes built
- * by string concatenation, or inline `style`. Those need a rendered check.
+ * by string concatenation, or inline `style`. Those need a rendered check, and
+ * since L-300 there is one: `e2e/contrast-webkit.spec.ts` runs axe on the real,
+ * styled app under WebKit in `pnpm webkit` (CI's `webkit` job).
  *
  * ============================================================================
  * NON-TEXT: 3:1 FOR WHAT IDENTIFIES A CONTROL (L-212, WCAG 1.4.11)
