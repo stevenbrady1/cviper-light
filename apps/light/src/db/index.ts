@@ -29,31 +29,31 @@ export {
   type TableName,
 } from './rows';
 
-export { findJobByExternalId, getJob, listJobs, upsertJob, deleteJob } from './jobs';
+export { deleteJob, findJobByExternalId, getJob, listJobs, upsertJob } from './jobs';
 export {
+  deleteApplication,
   getApplication,
   listApplications,
   listApplicationsByStatus,
   listApplicationsDueBy,
   upsertApplication,
-  deleteApplication,
 } from './applications';
-export { getCv, listCvs, upsertCv, deleteCv } from './cvs';
+export { deleteCv, getCv, listCvs, upsertCv } from './cvs';
 export {
+  deleteAnalysis,
   getAnalysis,
   listAnalyses,
   listAnalysesForCv,
   upsertAnalysis,
-  deleteAnalysis,
 } from './analyses';
 export { listInterviewSubstages, replaceInterviewSubstages } from './interviewSubstages';
 export { getProfile, upsertProfile } from './profile';
 export {
+  deleteDocument,
   listDocuments,
   listDocumentsForApplication,
   upsertDocument,
-  deleteDocument,
 } from './documents';
 export { readAll, writeAll, type DbSnapshot } from './backup';
-export { wipeAll, WIPE_ORDER } from './wipe';
+export { WIPE_ORDER, wipeAll } from './wipe';
 export { listJobWorkflows, upsertJobWorkflow, type JobWorkflowRow } from './workflow';

@@ -8,7 +8,7 @@
  * checked by nothing.
  */
 export { Card, cardClasses, type CardProps } from './Card';
-export { Icon, ICON_NAMES, type IconName } from './Icon';
+export { ICON_NAMES, Icon, type IconName } from './Icon';
 export { IconTile, type IconTileTone } from './IconTile';
 export {
   AiKeyIcon,

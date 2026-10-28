@@ -14,7 +14,7 @@ export const CV_PARSING_PACKAGE = '@cviper/cv-parsing' as const;
 
 export { MAX_FILE_BYTES } from './constants';
 
-export { sniffFileKind, fileExtension, kindFromExtension, type FileKind } from './detect';
+export { fileExtension, kindFromExtension, sniffFileKind, type FileKind } from './detect';
 
 export type { ExtractedDocument } from './document';
 
@@ -25,15 +25,15 @@ export { extractDocxText } from './docx';
 export { extractJsonResumeText } from './json-resume';
 export { extractText } from './extract';
 
-export { normalizeWhitespace, truncateForPrompt, TRUNCATION_MARKER } from './text';
+export { TRUNCATION_MARKER, normalizeWhitespace, truncateForPrompt } from './text';
 
 export {
+  MAX_SANITIZE_INPUT_CHARS,
+  injectionPatterns,
   sanitizeForPrompt,
   sanitizeWithStats,
-  type SanitizeStats,
-  injectionPatterns,
-  MAX_SANITIZE_INPUT_CHARS,
   type InjectionPattern,
+  type SanitizeStats,
 } from './sanitize';
 export {
   foldedText,
@@ -46,8 +46,8 @@ export {
 export {
   configurePdfJs,
   getPdfJsAssetUrls,
-  setPdfJsLoader,
   resetPdfJs,
+  setPdfJsLoader,
   type PdfJsAssetUrls,
   type PdfJsLike,
   type PdfJsLoader,
