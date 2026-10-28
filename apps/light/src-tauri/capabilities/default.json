@@ -6,8 +6,8 @@
   "permissions": [
     "core:default",
 
-    "sql:default",
-    "sql:allow-execute",
+    "sql:allow-load",
+    "sql:allow-close",
 
     "store:default",
 

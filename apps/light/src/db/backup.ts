@@ -27,6 +27,7 @@ import {
   type Result,
 } from '@cviper/core-types';
 
+import { approved } from './approved';
 import { withDb } from './client';
 import { type DbError } from './errors';
 import {
@@ -71,15 +72,17 @@ export interface DbSnapshot {
 // `ORDER BY id` because the export format is deterministic and sorts by id.
 // Reading in that order means a re-export of untouched data is byte-identical
 // without anything having to sort it again.
-const SELECT_JOBS = `${selectFrom('jobs')} ORDER BY id`;
-const SELECT_CVS = `${selectFrom('cvs')} ORDER BY id`;
-const SELECT_APPLICATIONS = `${selectFrom('applications')} ORDER BY id`;
-const SELECT_ANALYSES = `${selectFrom('analyses')} ORDER BY id`;
-const SELECT_DOCUMENTS = `${selectFrom('documents')} ORDER BY id`;
+const SELECT_JOBS = approved(`${selectFrom('jobs')} ORDER BY id`);
+const SELECT_CVS = approved(`${selectFrom('cvs')} ORDER BY id`);
+const SELECT_APPLICATIONS = approved(`${selectFrom('applications')} ORDER BY id`);
+const SELECT_ANALYSES = approved(`${selectFrom('analyses')} ORDER BY id`);
+const SELECT_DOCUMENTS = approved(`${selectFrom('documents')} ORDER BY id`);
 // Display order, not id order: the export sorts them by position itself.
-const SELECT_INTERVIEW_SUBSTAGES = `${selectFrom('interview_substages')} ORDER BY position, id`;
+const SELECT_INTERVIEW_SUBSTAGES = approved(
+  `${selectFrom('interview_substages')} ORDER BY position, id`,
+);
 // One row, by its fixed id. No ORDER BY: there is nothing to order.
-const SELECT_PROFILE = `${selectFrom('profile')} WHERE id = $1`;
+const SELECT_PROFILE = approved(`${selectFrom('profile')} WHERE id = $1`);
 
 const UPSERT_JOB = upsertInto('jobs');
 const UPSERT_CV = upsertInto('cvs');

@@ -23,6 +23,7 @@
  */
 import { type Result } from '@cviper/core-types';
 
+import { approved } from './approved';
 import { withDb } from './client';
 import { type DbError } from './errors';
 import { type TableName } from './rows';
@@ -47,6 +48,12 @@ export const WIPE_ORDER: readonly TableName[] = [
   'profile',
 ];
 
+/** One fixed statement per table, so each is on the approved list Rust checks (L-243). */
+const DELETE_EVERY_ROW: readonly string[] = WIPE_ORDER.map((table) =>
+  approved(`DELETE FROM ${table};`),
+);
+const VACUUM = approved('VACUUM;');
+
 export async function wipeAll(): Promise<Result<void, DbError>> {
   return withDb(async (db) => {
     // IMMEDIATE takes the write lock up front, for the same reason `writeAll`
@@ -55,8 +62,8 @@ export async function wipeAll(): Promise<Result<void, DbError>> {
     await db.execute('BEGIN IMMEDIATE;');
 
     try {
-      for (const table of WIPE_ORDER) {
-        await db.execute(`DELETE FROM ${table};`);
+      for (const statement of DELETE_EVERY_ROW) {
+        await db.execute(statement);
       }
       await db.execute('COMMIT;');
     } catch (cause) {
@@ -66,6 +73,6 @@ export async function wipeAll(): Promise<Result<void, DbError>> {
       throw cause;
     }
 
-    await db.execute('VACUUM;');
+    await db.execute(VACUUM);
   });
 }

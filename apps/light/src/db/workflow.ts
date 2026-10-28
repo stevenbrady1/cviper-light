@@ -15,6 +15,7 @@
  */
 import { err, ok, type Result } from '@cviper/core-types';
 
+import { approved } from './approved';
 import { withDb } from './client';
 import { dbError, type DbError } from './errors';
 import { mapRows } from './rows';
@@ -22,7 +23,7 @@ import { selectFrom, upsertInto } from './statements';
 
 const TABLE = 'job_workflow';
 
-const LIST = `${selectFrom(TABLE)} ORDER BY updated_at DESC, id`;
+const LIST = approved(`${selectFrom(TABLE)} ORDER BY updated_at DESC, id`);
 const UPSERT = upsertInto(TABLE);
 
 export interface JobWorkflowRow {

@@ -371,7 +371,9 @@ Schemas need `additionalProperties: false` on **every** object, and cannot use `
 **Traps found that would each have cost an afternoon:**
 
 - `sql:default` does **not** include `allow-execute` → every INSERT/UPDATE fails silently.
-  Must add `sql:allow-execute` on day one.
+  Must add `sql:allow-execute` on day one. (Superseded by L-243: the page now holds neither
+  `sql:default` nor `sql:allow-execute`, and queries go through Rust's approved list — see
+  CLAUDE.md.)
 - `dialog:default` does **not** include `allow-ask`/`allow-confirm`, despite the docs saying so.
 - `tauri add sql` omits the `sqlite` feature from `Cargo.toml` — hand-edit immediately.
 - `MigrationKind::Down` is a **silent no-op** — the plugin filters it out. Append-only `Up`

@@ -1,3 +1,4 @@
+mod approved_sql;
 mod custom_provider;
 mod db;
 mod fetch_page;
@@ -7,6 +8,7 @@ mod keyless;
 mod providers;
 mod safety_copy;
 mod secrets;
+mod sql_gate;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -121,6 +123,11 @@ pub fn run() {
             // "Delete everything" removes the safety copy as well (L-227). It
             // takes no path: the folder and the name are fixed in Rust.
             safety_copy::safety_copy_delete,
+            // Every database query (L-243). The page holds no plugin
+            // permission that runs SQL; these run only the statements in
+            // `approved_sql.rs`. See sql_gate.rs.
+            sql_gate::db_execute,
+            sql_gate::db_select,
             // The provider transport. Rust owns every base URL and injects the
             // API key from the keyring, so a compromised frontend can still
             // only reach the APIs named in providers.rs.

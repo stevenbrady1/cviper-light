@@ -11,9 +11,16 @@
  * sqlx for SQLite and Postgres (MySQL would need `?`). No value is ever
  * interpolated into a statement.
  */
+import { approved } from './approved';
 import { TABLE_COLUMNS, type TableName } from './rows';
 
-/** `SELECT <every column, named> FROM <table>` — never `SELECT *`. */
+/**
+ * `SELECT <every column, named> FROM <table>` — never `SELECT *`.
+ *
+ * A PREFIX, not a statement: the caller adds its WHERE and ORDER BY and
+ * registers the whole thing with `approved()` (L-243). The two helpers below
+ * build whole statements, so they register their own.
+ */
 export function selectFrom(table: TableName): string {
   return `SELECT ${TABLE_COLUMNS[table].join(', ')} FROM ${table}`;
 }
@@ -38,12 +45,12 @@ export function upsertInto(table: TableName): string {
     .map((column) => `${column} = excluded.${column}`)
     .join(', ');
 
-  return (
+  return approved(
     `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders}) ` +
-    `ON CONFLICT (id) DO UPDATE SET ${updates}`
+      `ON CONFLICT (id) DO UPDATE SET ${updates}`,
   );
 }
 
 export function deleteFrom(table: TableName): string {
-  return `DELETE FROM ${table} WHERE id = $1`;
+  return approved(`DELETE FROM ${table} WHERE id = $1`);
 }

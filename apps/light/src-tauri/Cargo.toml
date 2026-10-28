@@ -82,6 +82,13 @@ serde_json = "1"
 # `tauri add sql` installs this WITHOUT a database backend feature, which leaves
 # the plugin inert at runtime. The "sqlite" feature is mandatory — do not remove.
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+# The plugin's own pool, used directly by `src/sql_gate.rs` (L-243), which runs
+# only approved statements. Already in the tree through tauri-plugin-sql; named
+# here at the same major versions because we call them directly. `time` decodes
+# DATE/TIME/DATETIME exactly as the plugin does.
+sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "time", "json"] }
+indexmap = { version = "2", features = ["serde"] }
+time = "0.3"
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-process = "2"

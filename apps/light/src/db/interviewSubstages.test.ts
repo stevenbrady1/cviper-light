@@ -15,7 +15,7 @@ const sql = vi.hoisted(() => {
   return { execute, select, load, db: { execute, select } };
 });
 
-vi.mock('@tauri-apps/plugin-sql', () => ({ default: { load: sql.load } }));
+vi.mock('./sqlBridge', () => ({ default: { load: sql.load } }));
 
 const PRAGMA = /^PRAGMA/i;
 
@@ -131,10 +131,12 @@ describe('replaceInterviewSubstages', () => {
     );
     expect(issued[1]?.values).toEqual(['sub-a', 'HR Screen', 0]);
     expect(issued[2]?.values).toEqual(['sub-b', 'Technical Test', 1]);
-    // Ids are BOUND, never interpolated.
+    // Ids are BOUND, never interpolated — as ONE JSON array, so the statement's
+    // text is the same however many there are and can be on the approved list
+    // Rust checks (L-243).
     expect(issued[3]).toEqual({
-      query: 'DELETE FROM interview_substages WHERE id NOT IN ($1, $2)',
-      values: ['sub-a', 'sub-b'],
+      query: 'DELETE FROM interview_substages WHERE id NOT IN (SELECT value FROM json_each($1))',
+      values: ['["sub-a","sub-b"]'],
     });
     expect(issued[4]?.query).toBe('COMMIT;');
   });

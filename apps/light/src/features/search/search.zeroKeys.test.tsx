@@ -42,7 +42,7 @@ const tauri = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 
 /**
- * The local database, mocked at the PLUGIN, the way `src/db`'s own tests do.
+ * The local database, mocked at `src/db/sqlBridge` (L-243), the way `src/db`'s own tests do.
  *
  * It used to be mocked one layer down, as `plugin:sql|select` handlers on
  * `invoke` — and they were never reached. `@tauri-apps/plugin-sql` resolves
@@ -79,7 +79,7 @@ const sql = vi.hoisted(() => {
   return { execute, select, load };
 });
 
-vi.mock('@tauri-apps/plugin-sql', () => ({ default: { load: sql.load } }));
+vi.mock('../../db/sqlBridge', () => ({ default: { load: sql.load } }));
 
 import ARBEITNOW_PAGE from '../../../../../packages/job-apis/src/fixtures/arbeitnow-page1.json';
 import GUARDIAN_FEED from '../../../../../packages/job-apis/src/fixtures/guardian-jobsrss.xml?raw';

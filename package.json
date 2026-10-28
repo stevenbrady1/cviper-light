@@ -23,6 +23,7 @@
     "check:l-numbers": "node apps/light/src/numbering/checkLNumbers.ts",
     "changelog:preview": "node apps/light/src/release/releaseChangelog.ts preview",
     "changelog:release": "node apps/light/src/release/releaseChangelog.ts release",
+    "approved-sql": "vitest run apps/light/src/lib/approved-sql.contract.test.ts -u",
     "assets:msix": "node apps/light/src/packaging/generateMsixAssets.ts",
     "check:msix-manifest": "node apps/light/src/packaging/checkAppxManifestVersion.ts",
     "build:msix": "pnpm --filter @cviper/light exec tauri build --no-bundle --features microsoft-store --config src-tauri/tauri.microsoft-store.conf.json -- --no-default-features",

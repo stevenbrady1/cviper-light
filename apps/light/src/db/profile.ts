@@ -15,6 +15,7 @@
  */
 import { PROFILE_ID, ok, type Profile, type Result } from '@cviper/core-types';
 
+import { approved } from './approved';
 import { withDb } from './client';
 import { type DbError } from './errors';
 import { mapRows, profileFromRow, profileToValues } from './rows';
@@ -22,7 +23,7 @@ import { selectFrom, upsertInto } from './statements';
 
 const TABLE = 'profile';
 
-const GET = `${selectFrom(TABLE)} WHERE id = $1`;
+const GET = approved(`${selectFrom(TABLE)} WHERE id = $1`);
 const UPSERT = upsertInto(TABLE);
 
 /** The profile, or `null` when it has never been saved. Absence is an answer. */

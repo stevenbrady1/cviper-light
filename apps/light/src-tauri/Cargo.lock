@@ -2556,12 +2556,14 @@ name = "light"
 version = "0.11.0"
 dependencies = [
  "apple-native-keyring-store",
+ "indexmap 2.14.0",
  "keyring",
  "keyring-core",
  "reqwest",
  "rustls",
  "serde",
  "serde_json",
+ "sqlx",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -2571,6 +2573,7 @@ dependencies = [
  "tauri-plugin-store",
  "tauri-plugin-updater",
  "tauri-plugin-wdio-webdriver",
+ "time",
  "url",
 ]
 

@@ -5,6 +5,7 @@
  */
 import { ok, type Job, type JobSource, type Result } from '@cviper/core-types';
 
+import { approved } from './approved';
 import { withDb } from './client';
 import { type DbError } from './errors';
 import { jobFromRow, jobToValues, mapRows } from './rows';
@@ -14,8 +15,8 @@ const TABLE = 'jobs';
 
 // Newest first, with `id` as a tie-break so two jobs saved in the same
 // millisecond do not swap places between renders.
-const LIST = `${selectFrom(TABLE)} ORDER BY created_at DESC, id`;
-const GET = `${selectFrom(TABLE)} WHERE id = $1`;
+const LIST = approved(`${selectFrom(TABLE)} ORDER BY created_at DESC, id`);
+const GET = approved(`${selectFrom(TABLE)} WHERE id = $1`);
 
 /**
  * The advert's provider identity, which is the other way into a job row.
@@ -24,7 +25,7 @@ const GET = `${selectFrom(TABLE)} WHERE id = $1`;
  * this is an index lookup rather than a scan. Both values are bound; neither is
  * ever concatenated into the statement.
  */
-const FIND_BY_EXTERNAL_ID = `${selectFrom(TABLE)} WHERE source = $1 AND external_id = $2`;
+const FIND_BY_EXTERNAL_ID = approved(`${selectFrom(TABLE)} WHERE source = $1 AND external_id = $2`);
 const UPSERT = upsertInto(TABLE);
 const DELETE = deleteFrom(TABLE);
 
