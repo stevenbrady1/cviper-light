@@ -13,6 +13,7 @@ import {
   type UpdateState,
 } from './model';
 import { createTauriUpdatePort, type UpdatePort } from './port';
+import { LiveStatus } from '../../../app/LiveStatus';
 
 /**
  * Updates: a switch, and a button that works whatever the switch says.
@@ -142,9 +143,9 @@ export function UpdateCheck({ port, version }: UpdateCheckProps = {}) {
         </span>
       </div>
 
+      <LiveStatus text={status} />
       {status === null ? null : (
         <p
-          role="status"
           data-testid="settings-update-status"
           className={
             state.kind === 'failed'

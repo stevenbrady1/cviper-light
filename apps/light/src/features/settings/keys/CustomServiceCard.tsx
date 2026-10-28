@@ -18,6 +18,7 @@ import {
   type CustomServiceStatus,
 } from './customServicePort';
 import { KEY_STATE_TONE } from './model';
+import { LiveStatus } from '../../../app/LiveStatus';
 
 /**
  * Any OpenAI-compatible AI service, at an address the user types (L-150).
@@ -322,9 +323,9 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
         </button>
       </div>
 
+      <LiveStatus text={passed} />
       {passed === null ? null : (
         <p
-          role="status"
           data-testid="custom-service-result"
           className="mt-3 rounded-control bg-teal/10 px-3 py-2 text-teal-ink"
         >
