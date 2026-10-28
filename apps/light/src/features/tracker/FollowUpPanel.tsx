@@ -31,6 +31,7 @@ import {
 import { type TrackerEntry } from './model';
 import { type TrackerPort } from './port';
 import { runFollowUp } from './runFollowUp';
+import { LiveStatus } from '../../app/LiveStatus';
 
 /**
  * Follow-up and thank-you DRAFTS, in the detail pane (L-162).
@@ -367,6 +368,14 @@ export function FollowUpPanel({
   const canDraftFollowUp = state === 'due' && selected !== null && !busy && draft === null;
   const canDraftThankYou = offer && selected !== null && !busy && draft === null;
 
+  /** What the draft is doing, in words: shown and spoken (L-299). */
+  const progressText =
+    busy && selected !== null
+      ? selected.local
+        ? `Drafting with ${selected.model} on this machine. Nothing is being sent anywhere.`
+        : `Drafting with ${selected.label}. This usually takes a few seconds.`
+      : null;
+
   return (
     <div data-testid="detail-followup" className="space-y-2 border-t border-line pt-3">
       <p className="block text-xs font-medium text-ink-muted">Follow-up</p>
@@ -375,10 +384,10 @@ export function FollowUpPanel({
         {sentence}
       </p>
 
+      <LiveStatus text={offer ? THANK_YOU_OFFER : null} />
       {offer ? (
         <p
           data-testid="detail-thankyou-offer"
-          role="status"
           className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
           {THANK_YOU_OFFER}
@@ -453,15 +462,13 @@ export function FollowUpPanel({
         </p>
       ) : null}
 
+      <LiveStatus text={progressText} />
       {busy && selected !== null ? (
         <p
           data-testid="detail-followup-progress"
-          role="status"
           className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
-          {selected.local
-            ? `Drafting with ${selected.model} on this machine. Nothing is being sent anywhere.`
-            : `Drafting with ${selected.label}. This usually takes a few seconds.`}
+          {progressText}
         </p>
       ) : null}
 
@@ -477,6 +484,8 @@ export function FollowUpPanel({
 
       {draft === null ? null : (
         <div data-testid="detail-followup-editor" className="space-y-2">
+          {/* First, not last: a hidden last child would add a gap under the buttons. */}
+          <LiveStatus text={note} />
           <div>
             <label
               htmlFor="detail-followup-subject"
@@ -547,7 +556,7 @@ export function FollowUpPanel({
             </button>
           </div>
           {note === null ? null : (
-            <p data-testid="detail-followup-note" role="status" className="text-xs text-ink-faint">
+            <p data-testid="detail-followup-note" className="text-xs text-ink-faint">
               {note}
             </p>
           )}

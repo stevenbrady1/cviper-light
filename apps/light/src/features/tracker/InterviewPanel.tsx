@@ -24,6 +24,7 @@ import { extractionOptions, extractionProgressNote } from './extraction';
 import { type TrackerEntry } from './model';
 import { type TrackerPort } from './port';
 import { runInterview } from './runInterview';
+import { LiveStatus } from '../../app/LiveStatus';
 
 /**
  * Interview preparation, in the detail pane (L-163).
@@ -389,10 +390,10 @@ export function InterviewPanel({
         ) : null}
       </div>
 
+      <LiveStatus text={running && selected !== null ? extractionProgressNote(selected) : null} />
       {running && selected !== null ? (
         <p
           data-testid="detail-interview-progress"
-          role="status"
           className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
           {extractionProgressNote(selected)}{' '}
@@ -402,10 +403,10 @@ export function InterviewPanel({
         </p>
       ) : null}
 
+      <LiveStatus text={note} />
       {note === null ? null : (
         <p
           data-testid="detail-interview-note"
-          role="status"
           className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
           {note}

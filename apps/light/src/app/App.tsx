@@ -50,6 +50,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { Sidebar } from './Sidebar';
 import { useViewportClass } from './viewport';
 import { DEFAULT_VIEW, viewForShortcut, type ViewId } from './views';
+import { LiveStatus } from './LiveStatus';
 
 /**
  * The application shell: a fixed navy rail on the left, one view to the right
@@ -612,9 +613,9 @@ export default function App({
           />
         )}
 
+        <LiveStatus text={keepProblem} />
         {keepProblem === null ? null : (
           <div
-            role="status"
             data-testid="workflow-keep-problem"
             className="flex flex-wrap items-center gap-3 border-b border-line bg-sunken px-4 py-2 md:px-6"
           >

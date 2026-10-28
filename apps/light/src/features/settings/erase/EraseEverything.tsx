@@ -13,6 +13,7 @@ import {
   type EraseSummary,
 } from './model';
 import { createTauriErasePort, type ErasePort } from './port';
+import { LiveStatus } from '../../../app/LiveStatus';
 
 /**
  * Delete everything — the local-first answer to "delete my account".
@@ -152,9 +153,9 @@ export function EraseEverything({ port, backupPort, onErased }: EraseEverythingP
         </div>
       ) : null}
 
+      <LiveStatus text={summary !== null && summary.allDone ? summary.headline : null} />
       {summary === null ? null : summary.allDone ? (
         <p
-          role="status"
           data-testid="settings-erase-message"
           className="mt-3 rounded-control bg-teal/10 px-3 py-2 text-teal-ink"
         >

@@ -55,6 +55,7 @@ import {
   type BackupPort,
   type BackupProblem,
 } from './backup';
+import { LiveStatus } from '../../app/LiveStatus';
 
 /**
  * Settings — for now, the one thing that matters most: getting your data out.
@@ -378,9 +379,9 @@ export function Settings({
             </div>
           </section>
 
+          <LiveStatus text={message} />
           {message === null ? null : (
             <p
-              role="status"
               data-testid="settings-message"
               className="rounded-control bg-teal/10 px-3 py-2 break-all text-teal-ink"
             >

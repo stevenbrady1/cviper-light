@@ -27,6 +27,7 @@ import { createTauriAiKeyPort, type AiKeyPort } from './aiKeyPort';
 import { CustomServiceCard } from './CustomServiceCard';
 import { type CustomServicePort } from './customServicePort';
 import { KEY_STATE_LABEL, KEY_STATE_TONE } from './model';
+import { LiveStatus } from '../../../app/LiveStatus';
 
 /**
  * Setting up an AI key: one card per provider Settings can actually configure,
@@ -423,9 +424,9 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
         </button>
       </div>
 
+      <LiveStatus text={outcome.passed} />
       {outcome.passed === null ? null : (
         <p
-          role="status"
           data-testid={`ai-key-result-${provider.id}`}
           className="mt-3 rounded-control bg-teal/10 px-3 py-2 text-teal-ink"
         >

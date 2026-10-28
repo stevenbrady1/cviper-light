@@ -35,6 +35,7 @@ import { Tracker } from './Tracker';
 import { FETCH_FALLBACK_NOTE, FETCH_SITE_REFUSES_NOTE } from './runFetch';
 import type { FetchedPage, PageFetchError, PageFetchTransport } from './pageFetch';
 import { createFakeTrackerPort, type FakeTrackerPort } from './test/fakePort';
+import { expectSpoken } from '../../app/test/spoken';
 
 const NOW = new Date(2026, 7, 19, 9, 0, 0);
 
@@ -276,7 +277,7 @@ describe('the whole link → fetch → review → save loop', () => {
     await user.click(screen.getByTestId('paste-job-fetch'));
 
     const note = await screen.findByTestId('paste-job-fetch-note');
-    expect(note.getAttribute('role')).toBe('status');
+    expectSpoken(note, 'only the first 50,000 characters');
     expect(note.textContent).toContain(
       'This page was very long, so only the first 50,000 characters were kept. ' +
         'Check the job details below.',
@@ -548,7 +549,7 @@ describe('the wait', () => {
 
     const progress = await screen.findByTestId('paste-job-fetch-progress');
     expect(progress.textContent).toMatch(/opening that page/i);
-    expect(progress.getAttribute('role')).toBe('status');
+    expectSpoken(progress, /opening that page/i);
     // A counter, so a long wait visibly IS a wait rather than a freeze.
     expect(progress.textContent).toMatch(/[0-9]+s/);
 
@@ -738,6 +739,12 @@ describe('the paste path, with the link box on screen and empty', () => {
 
     expect((screen.getByTestId('paste-job-extract') as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByTestId('paste-job-reason').textContent).toMatch(/paste the advert/i);
+    // L-299 (from L-238): a screen reader reading the grey button hears why.
+    const reason = screen.getByTestId('paste-job-reason');
+    expect(reason.id).not.toBe('');
+    expect(screen.getByTestId('paste-job-extract').getAttribute('aria-describedby')).toBe(
+      reason.id,
+    );
   });
 
   it('a typed address alone does not make the advert extractable', async () => {
