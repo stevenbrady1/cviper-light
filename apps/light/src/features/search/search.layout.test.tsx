@@ -23,6 +23,7 @@ import { mainBoards } from './KeylessBar';
 import { Search } from './Search';
 import { createFakeSearchPort, outcomeOf } from './test/fakeSearchPort';
 import { entry } from './test/fixtures';
+import { expectSpoken } from '../../app/test/spoken';
 
 const NOW = new Date('2026-08-19T09:00:00.000Z');
 const TODAY = '2026-08-19';
@@ -172,6 +173,8 @@ describe('fewer than five results: the boards are offered (L-219)', () => {
     const { browser } = await searchFor(0);
     const few = await screen.findByTestId('search-few-results');
     expect(few.textContent).toContain('No matches');
+    // Read out by a screen reader, from a region already on the page (L-238).
+    expectSpoken(few, 'No matches in CViper’s sources. Try the same search on a job board.');
     expect(boardIds(few)).toEqual(DEFAULT_FIVE);
     expect(browser.opened()).toEqual([]);
   });
@@ -180,6 +183,7 @@ describe('fewer than five results: the boards are offered (L-219)', () => {
     const { user, browser } = await searchFor(4);
     const few = await screen.findByTestId('search-few-results');
     expect(few.textContent).toContain('Only 4 matches');
+    expectSpoken(few, 'Only 4 matches in CViper’s sources. Try the same search on a job board.');
     await user.click(within(few).getByRole('button', { name: /Totaljobs/ }));
     expect(browser.opened()).toEqual([
       'https://www.totaljobs.com/jobs/software-tester?salary=60000&salarytypeid=1',
@@ -190,6 +194,9 @@ describe('fewer than five results: the boards are offered (L-219)', () => {
     await searchFor(5);
     await screen.findByTestId('search-results');
     expect(screen.queryByTestId('search-few-results')).toBeNull();
+    // Nothing to say, so nothing is spoken either.
+    const spoken = screen.queryAllByRole('status').map((region) => region.textContent ?? '');
+    expect(spoken.some((text) => text.includes('in CViper’s sources'))).toBe(false);
   });
 });
 

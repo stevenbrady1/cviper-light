@@ -23,6 +23,17 @@ import { PRIMARY_BUTTON, QUIET_BUTTON } from '../../../app/buttons';
  * answer rather than a reflex.
  */
 
+/**
+ * What a screen reader hears when the strip appears or changes (L-238): the
+ * same main sentence the strip shows. The strip itself carries no role; the
+ * shell speaks this through a `LiveStatus` that is always on the page.
+ */
+export function updateBannerText(version: string, installed: boolean): string {
+  return installed
+    ? `Version ${version} is installed. Restart CViper Light to finish — your data is untouched.`
+    : `Version ${version} is available.`;
+}
+
 export interface UpdateBannerProps {
   readonly version: string;
   readonly notes: string | null;
@@ -44,7 +55,6 @@ export function UpdateBanner({
 }: UpdateBannerProps) {
   return (
     <div
-      role="status"
       data-testid="update-banner"
       className="flex flex-wrap items-center gap-3 border-b border-line bg-sunken px-4 py-2 md:px-6"
     >

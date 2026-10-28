@@ -39,6 +39,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectSpoken } from '../../../app/test/spoken';
 
 const tauri = vi.hoisted(() => ({
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
@@ -210,6 +211,8 @@ describe('when there is an update, it is offered and never forced', () => {
 
     const banner = await screen.findByTestId('update-banner');
     expect(banner.textContent).toContain('0.2.0');
+    // Read out by a screen reader, from a region already on the page (L-238).
+    expectSpoken(banner, 'Version 0.2.0 is available.');
     // Not a modal: the thing the user opened the app to do is still there.
     expect(screen.getByTestId('view-tracker')).toBeTruthy();
   });

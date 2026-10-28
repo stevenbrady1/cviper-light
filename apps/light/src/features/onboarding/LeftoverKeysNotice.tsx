@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { LiveStatus } from '../../app/LiveStatus';
 import { type SecretKeyName } from '../../status/environment';
 
 import {
@@ -15,15 +16,21 @@ import {
  * "We found keys saved by an earlier install" — asked once, on the welcome
  * (L-251). See `leftoverKeys.ts` for when, and why it asks rather than acts.
  *
- * Renders nothing at all until it has decided, and nothing afterwards unless
- * there is a question to ask. It is not an overlay: it sits in the welcome's
- * own flow, so it needs no mutual exclusion with anything, and the welcome's
- * one primary button stays the only one.
+ * Shows nothing until it has decided, and nothing afterwards unless there is
+ * a question to ask. It is not an overlay: it sits in the welcome's own flow,
+ * so it needs no mutual exclusion with anything, and the welcome's one primary
+ * button stays the only one.
+ *
+ * The one thing it ALWAYS renders is a hidden `LiveStatus`, first, so "Done —
+ * those keys are removed" is spoken (L-238): a status element that arrives
+ * with its words already in it is not reliably announced.
  */
 export interface LeftoverKeysNoticeProps {
   /** Injected by tests. Defaults to the real credential store and database. */
   readonly port?: LeftoverKeysPort | undefined;
 }
+
+const REMOVED_TEXT = 'Done — those keys are removed from this computer.';
 
 type Stage =
   | { readonly kind: 'quiet' }
@@ -53,17 +60,23 @@ export function LeftoverKeysNotice({ port }: LeftoverKeysNoticeProps) {
     };
   }, [keysPort]);
 
-  if (stage.kind === 'quiet') return null;
+  const spoken = <LiveStatus text={stage.kind === 'removed' ? REMOVED_TEXT : null} />;
+
+  // A fragment in every branch, with the region first in each, so React keeps
+  // the SAME region node as the stage changes rather than mounting a new one.
+  if (stage.kind === 'quiet') return <>{spoken}</>;
 
   if (stage.kind === 'removed') {
     return (
-      <p
-        role="status"
-        data-testid="leftover-keys-done"
-        className="mx-auto mt-6 w-full max-w-5xl rounded-control bg-teal/10 px-3 py-2 text-teal-ink"
-      >
-        Done — those keys are removed from this computer.
-      </p>
+      <>
+        {spoken}
+        <p
+          data-testid="leftover-keys-done"
+          className="mx-auto mt-6 w-full max-w-5xl rounded-control bg-teal/10 px-3 py-2 text-teal-ink"
+        >
+          {REMOVED_TEXT}
+        </p>
+      </>
     );
   }
 
@@ -82,48 +95,51 @@ export function LeftoverKeysNotice({ port }: LeftoverKeysNoticeProps) {
   };
 
   return (
-    <section
-      data-testid="leftover-keys"
-      aria-labelledby="leftover-keys-heading"
-      className="mx-auto mt-6 w-full max-w-5xl rounded-card border border-line bg-card px-4 py-3"
-    >
-      <h2 id="leftover-keys-heading" className="font-medium text-ink">
-        Keys from an earlier install
-      </h2>
-      <p className="mt-1 text-ink-muted">
-        We found keys saved on this computer by an earlier CViper Light install:{' '}
-        <span className="font-medium text-ink">{names.join(', ')}</span>. Keep them, or remove them
-        from this computer?
-      </p>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          data-testid="leftover-keys-keep"
-          disabled={stage.busy}
-          onClick={() => setStage({ kind: 'quiet' })}
-          className={SECONDARY_BUTTON}
-        >
-          Keep them
-        </button>
-        <button
-          type="button"
-          data-testid="leftover-keys-remove"
-          disabled={stage.busy}
-          onClick={() => void onRemove()}
-          className={SECONDARY_BUTTON}
-        >
-          {stage.busy ? 'Removing…' : 'Remove them'}
-        </button>
-      </div>
-      {problem === null ? null : (
-        <p
-          role="alert"
-          data-testid="leftover-keys-problem"
-          className="mt-3 rounded-control bg-danger/5 px-3 py-2 text-danger"
-        >
-          {problem}
+    <>
+      {spoken}
+      <section
+        data-testid="leftover-keys"
+        aria-labelledby="leftover-keys-heading"
+        className="mx-auto mt-6 w-full max-w-5xl rounded-card border border-line bg-card px-4 py-3"
+      >
+        <h2 id="leftover-keys-heading" className="font-medium text-ink">
+          Keys from an earlier install
+        </h2>
+        <p className="mt-1 text-ink-muted">
+          We found keys saved on this computer by an earlier CViper Light install:{' '}
+          <span className="font-medium text-ink">{names.join(', ')}</span>. Keep them, or remove
+          them from this computer?
         </p>
-      )}
-    </section>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            data-testid="leftover-keys-keep"
+            disabled={stage.busy}
+            onClick={() => setStage({ kind: 'quiet' })}
+            className={SECONDARY_BUTTON}
+          >
+            Keep them
+          </button>
+          <button
+            type="button"
+            data-testid="leftover-keys-remove"
+            disabled={stage.busy}
+            onClick={() => void onRemove()}
+            className={SECONDARY_BUTTON}
+          >
+            {stage.busy ? 'Removing…' : 'Remove them'}
+          </button>
+        </div>
+        {problem === null ? null : (
+          <p
+            role="alert"
+            data-testid="leftover-keys-problem"
+            className="mt-3 rounded-control bg-danger/5 px-3 py-2 text-danger"
+          >
+            {problem}
+          </p>
+        )}
+      </section>
+    </>
   );
 }

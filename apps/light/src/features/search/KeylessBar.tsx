@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { boardFilterSupport, buildBoardUrl } from '@cviper/job-apis';
+import { boardFilterSupport, buildBoardUrl, type KeylessSourceId } from '@cviper/job-apis';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { Hint } from '../../app/Hint';
@@ -244,6 +244,22 @@ interface FewResultsProps {
 }
 
 /**
+ * What a screen reader hears when few results come back, or `null` when the
+ * message is not shown (L-238). `FewResults` carries no role: `Search` speaks
+ * this through a `LiveStatus` that is always on the page, because a message
+ * that arrives with its words already in it is not reliably announced.
+ */
+export function fewResultsText(count: number, boards: readonly Board[]): string | null {
+  const { main } = mainBoards(boards.filter((board) => board.enabled));
+  if (count >= FEW_RESULTS || main.length === 0) return null;
+  const found =
+    count === 0
+      ? 'No matches in CViper’s sources.'
+      : `Only ${count} ${count === 1 ? 'match' : 'matches'} in CViper’s sources.`;
+  return `${found} Try the same search on a job board.`;
+}
+
+/**
  * "Only 2 matches in CViper's sources. Try the same search on a job board:"
  * with the main boards, each one click and one tab (L-219, owner decision
  * 2026-10-08). Nothing is opened on its own: a search that suddenly opened
@@ -251,12 +267,11 @@ interface FewResultsProps {
  */
 export function FewResults({ count, form, browser, boards }: FewResultsProps) {
   const { main } = mainBoards(boards.filter((board) => board.enabled));
-  if (count >= FEW_RESULTS || main.length === 0) return null;
+  if (fewResultsText(count, boards) === null) return null;
 
   return (
     <div
       data-testid="search-few-results"
-      role="status"
       className="rounded-card border border-line bg-sunken px-4 py-3"
     >
       <p className="text-ink">
@@ -269,5 +284,33 @@ export function FewResults({ count, form, browser, boards }: FewResultsProps) {
         <BoardButtons boards={main} form={form} browser={browser} prefix="few" />
       </div>
     </div>
+  );
+}
+
+/**
+ * One line per free feed that answered but had nothing matching (L-219).
+ *
+ * NOT an alert, and deliberately worded so it cannot be mistaken for one: the
+ * feed answered, it published N jobs, and none of them matched. The only thing
+ * to change is what the user typed, and this is the one line on the screen
+ * that says so. (Moved here from `Search.tsx` with the keyless pieces, L-238.)
+ */
+export function NothingMatchedNotes({
+  entries,
+}: {
+  readonly entries: readonly { readonly source: KeylessSourceId; readonly note: string }[];
+}) {
+  return (
+    <>
+      {entries.map((entry) => (
+        <p
+          key={entry.source}
+          data-testid={`keyless-nothing-matched-${entry.source}`}
+          className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
+        >
+          {entry.note}
+        </p>
+      ))}
+    </>
   );
 }

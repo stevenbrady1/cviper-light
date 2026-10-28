@@ -16,11 +16,24 @@ export interface ResumeBannerProps {
   readonly onDismiss: () => void;
 }
 
+function jobName(title: string, company: string): string {
+  return [title.trim(), company.trim()].filter((part) => part !== '').join(' at ');
+}
+
+/**
+ * What a screen reader hears when the strip appears (L-238): the strip's own
+ * sentence. The strip carries no role; the shell speaks this through a
+ * `LiveStatus` that is always on the page.
+ */
+export function resumeBannerText(title: string, company: string): string {
+  const job = jobName(title, company);
+  return `Continue where you left off${job === '' ? ' — your tailored CV is still here.' : ` — Tailor for ${job}.`}`;
+}
+
 export function ResumeBanner({ title, company, onContinue, onDismiss }: ResumeBannerProps) {
-  const job = [title.trim(), company.trim()].filter((part) => part !== '').join(' at ');
+  const job = jobName(title, company);
   return (
     <div
-      role="status"
       data-testid="resume-banner"
       className="flex flex-wrap items-center gap-3 border-b border-line bg-sunken px-4 py-2 md:px-6"
     >
