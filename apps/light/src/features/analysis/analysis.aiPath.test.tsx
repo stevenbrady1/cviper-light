@@ -25,6 +25,7 @@ import {
   type ProviderError,
   type ProviderHttpResponse,
 } from '@cviper/ai-providers';
+import { expectSpoken } from '../../app/test/spoken';
 
 const tauri = vi.hoisted(() => ({
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
@@ -186,7 +187,7 @@ describe('while a local model is thinking', () => {
     expect(progress.textContent).toContain('5 to 30 seconds');
     expect(progress.textContent).toContain('Nothing is being sent anywhere');
     // Announced, not just painted: a status region so a screen reader hears it.
-    expect(progress.getAttribute('role')).toBe('status');
+    expectSpoken(progress, 'Nothing is being sent anywhere');
 
     // And the button says so too, rather than looking pressable again.
     expect(screen.getByTestId('analysis-run').textContent).toContain('Checking');

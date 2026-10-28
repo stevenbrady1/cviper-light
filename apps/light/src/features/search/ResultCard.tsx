@@ -7,6 +7,7 @@ import { cardClasses, StatusPill, type PillTone } from '../../ui';
 import { describeCluster, postedLabel } from './model';
 import { type RankBand } from './rank';
 import { describeSalary, formatSalary } from './salary';
+import { LiveStatus } from '../../app/LiveStatus';
 
 /**
  * One advert, as a card.
@@ -269,12 +270,9 @@ export function ResultCard({
         </button>
       </div>
 
+      <LiveStatus text={note} />
       {note === null ? null : (
-        <p
-          role="status"
-          data-testid={`result-note-${job.id}`}
-          className="mt-2 text-xs text-teal-ink"
-        >
+        <p data-testid={`result-note-${job.id}`} className="mt-2 text-xs text-teal-ink">
           {note}
         </p>
       )}

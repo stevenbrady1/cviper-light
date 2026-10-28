@@ -19,6 +19,7 @@ import {
   type ProviderError,
   type ProviderHttpResponse,
 } from '@cviper/ai-providers';
+import { expectSpoken } from '../../app/test/spoken';
 
 const tauri = vi.hoisted(() => ({
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
@@ -250,6 +251,15 @@ describe('the empty screen', () => {
     expect(screen.getByTestId('tailor-empty')).toBeTruthy();
   });
 
+  // L-299 (from L-238): a screen reader reading the grey button hears why.
+  it('the disabled button is described by its reason', async () => {
+    await renderReady([]);
+
+    const reason = screen.getByTestId('tailor-run-reason');
+    expect(reason.id).not.toBe('');
+    expect(screen.getByTestId('tailor-run').getAttribute('aria-describedby')).toBe(reason.id);
+  });
+
   it('does not offer the basic match', async () => {
     await renderReady([]);
     const picker = screen.getByTestId('tailor-provider') as HTMLSelectElement;
@@ -335,7 +345,7 @@ describe('tailoring', () => {
     const progress = await screen.findByTestId('tailor-progress');
     expect(progress.textContent).toContain('llama3.2:3b');
     expect(progress.textContent).toContain('5 to 30 seconds');
-    expect(progress.getAttribute('role')).toBe('status');
+    expectSpoken(progress, '5 to 30 seconds');
     expect(screen.getByTestId('tailor-run').textContent).toContain('Tailoring');
     expect(screen.getByTestId('tailor-run-reason').textContent).toContain('Already running');
 
@@ -735,7 +745,7 @@ describe('while a save window is open (L-217)', () => {
     await user.click(screen.getByTestId('tailor-save-pdf-cv'));
 
     const waiting = await screen.findByTestId('tailor-save-choosing');
-    expect(waiting.getAttribute('role')).toBe('status');
+    expectSpoken(waiting, 'save window');
     expect(waiting.textContent).toContain('save window');
     expect(screen.getByTestId('tailor-save-application').textContent).toBe(
       'Save to an application',

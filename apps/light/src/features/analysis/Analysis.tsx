@@ -72,6 +72,7 @@ import {
 } from '../flow/progress';
 import { type StepId } from '../flow/steps';
 import { type ChatTransport } from '@cviper/ai-providers';
+import { LiveStatus } from '../../app/LiveStatus';
 
 /**
  * The analysis view: pick a CV, paste an advert, choose how to run it, run it.
@@ -778,6 +779,17 @@ export function Analysis({
   /** Said by the picker when the chosen AI will not read the whole CV (L-302). */
   const cvCut = cvCutNote(selectedCv?.extracted_text ?? null, selectedOption?.kind ?? null);
 
+  /** What the run is doing, in words: shown with a counter, and spoken (L-299). */
+  const progressText =
+    running && selectedOption !== null && selectedOption.kind !== 'keyword'
+      ? selectedOption.local
+        ? `Asking ${selectedOption.model} on this machine. The first run after starting ` +
+          'your PC loads the model into memory, which takes 5 to 30 seconds. Nothing is ' +
+          'being sent anywhere.'
+        : `Sending your CV and the advert to ${providerInSentence(selectedOption.kind)}. ` +
+          'This usually takes a few seconds.'
+      : null;
+
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-analysis">
       {/*
@@ -893,9 +905,9 @@ export function Analysis({
               that reads the format.
             </p>
 
+            <LiveStatus text={exportMessage} />
             {exportMessage === null ? null : (
               <p
-                role="status"
                 data-testid="analysis-export-message"
                 className="mt-2 rounded-control bg-teal/10 px-3 py-2 break-all text-teal-ink"
               >
@@ -933,9 +945,9 @@ export function Analysis({
               it is about what is in the box and has to be read first; gold,
               because it is something to act on, not a failure.
             */}
+            <LiveStatus text={jobNote} />
             {jobNote === null ? null : (
               <p
-                role="status"
                 data-testid="analysis-job-note"
                 className="mb-2 rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
               >
@@ -1069,6 +1081,7 @@ export function Analysis({
               data-testid="analysis-run"
               data-primary="true"
               disabled={disabledReason !== null}
+              aria-describedby={disabledReason === null ? undefined : 'analysis-run-reason'}
               onClick={() => void onRun()}
               className={PRIMARY_BUTTON}
             >
@@ -1086,24 +1099,23 @@ export function Analysis({
             </button>
 
             {disabledReason === null ? null : (
-              <p data-testid="analysis-run-reason" className="text-ink-muted">
+              <p
+                id="analysis-run-reason"
+                data-testid="analysis-run-reason"
+                className="text-ink-muted"
+              >
                 {disabledReason}
               </p>
             )}
           </div>
 
+          <LiveStatus text={progressText} />
           {running && selectedOption !== null && selectedOption.kind !== 'keyword' ? (
             <p
               data-testid="analysis-progress"
-              role="status"
               className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
             >
-              {selectedOption.local
-                ? `Asking ${selectedOption.model} on this machine. The first run after starting ` +
-                  'your PC loads the model into memory, which takes 5 to 30 seconds. Nothing is ' +
-                  'being sent anywhere.'
-                : `Sending your CV and the advert to ${providerInSentence(selectedOption.kind)}. ` +
-                  'This usually takes a few seconds.'}{' '}
+              {progressText}{' '}
               <span aria-hidden="true" className="font-mono tabular-nums">
                 {elapsed}s
               </span>

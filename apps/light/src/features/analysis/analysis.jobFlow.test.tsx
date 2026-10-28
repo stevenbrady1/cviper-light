@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type Cv, type Job } from '@cviper/core-types';
 
 import type { TailorHandoff } from '../flow/handoff';
+import { expectSpoken } from '../../app/test/spoken';
 
 const tauri = vi.hoisted(() => ({
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
@@ -117,7 +118,7 @@ describe('a job that arrives with a note', () => {
     await renderWithJob({ note: NOTE });
 
     const note = screen.getByTestId('analysis-job-note');
-    expect(note.getAttribute('role')).toBe('status');
+    expectSpoken(note, NOTE);
     expect(note.textContent).toBe(NOTE);
     expect(advert().value).toContain('Credit Risk Analyst');
     // Above the box, where it is read before the advert is.

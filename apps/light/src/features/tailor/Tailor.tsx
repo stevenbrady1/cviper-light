@@ -87,6 +87,7 @@ import { createDbTailorPort, type TailorPort } from './port';
 import { runCoverLetter } from './runCoverLetter';
 import { runReview } from './runReview';
 import { runTailor } from './runTailor';
+import { LiveStatus } from '../../app/LiveStatus';
 
 /**
  * The tailor view (L-160, L-161): pick a CV, pick or paste the advert, choose
@@ -976,6 +977,14 @@ export function Tailor({
    */
   const cvCut = cvCutNote(cvText, selectedOption?.kind ?? null);
 
+  /** The whole progress sentence, shown with a counter and spoken (L-299). */
+  const progressSentence =
+    (phase === 'reviewing'
+      ? 'Reading the draft as a hiring manager would. '
+      : phase === 'writing'
+        ? 'Drafting the letter. '
+        : '') + progressText;
+
   const grantedConsents = (['anthropic', 'openai'] as const).filter((kind) => consent[kind]);
 
   return (
@@ -1267,6 +1276,7 @@ export function Tailor({
             data-testid="tailor-run"
             data-primary="true"
             disabled={disabledReason !== null}
+            aria-describedby={disabledReason === null ? undefined : 'tailor-run-reason'}
             onClick={() => void gated('tailor')}
             className={PRIMARY_BUTTON}
           >
@@ -1274,7 +1284,7 @@ export function Tailor({
           </button>
 
           {disabledReason === null ? null : (
-            <p data-testid="tailor-run-reason" className="text-ink-muted">
+            <p id="tailor-run-reason" data-testid="tailor-run-reason" className="text-ink-muted">
               {disabledReason}
             </p>
           )}
@@ -1317,27 +1327,24 @@ export function Tailor({
           </div>
         ) : null}
 
+        <LiveStatus text={running && selectedOption !== null ? progressSentence : null} />
         {running && selectedOption !== null ? (
           <p
             data-testid="tailor-progress"
-            role="status"
             className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
           >
-            {phase === 'reviewing'
-              ? 'Reading the draft as a hiring manager would. '
-              : phase === 'writing'
-                ? 'Drafting the letter. '
-                : ''}
-            {progressText}{' '}
+            {progressSentence}{' '}
             <span aria-hidden="true" className="font-mono tabular-nums">
               {elapsed}s
             </span>
           </p>
         ) : null}
 
+        <LiveStatus
+          text={saving === 'file' ? 'Choose where to save it in the save window.' : null}
+        />
         {saving === 'file' ? (
           <p
-            role="status"
             data-testid="tailor-save-choosing"
             className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
           >
@@ -1345,9 +1352,9 @@ export function Tailor({
           </p>
         ) : null}
 
+        <LiveStatus text={saveMessage} />
         {saveMessage === null ? null : (
           <p
-            role="status"
             data-testid="tailor-save-message"
             className="rounded-control bg-teal/10 px-3 py-2 break-all text-teal-ink"
           >
