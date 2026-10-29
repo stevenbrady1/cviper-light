@@ -42,6 +42,8 @@ Also in this release: you can save a search and run it again in one click, and S
 
 ### Changed
 
+- On Search, the Search button now comes after everything that changes what it does (L-313). The free feeds, any job boards with a key and the job boards that open in your browser are together in one "Where to look" box under the search boxes, then the button, then "Save this search". Before, the button sat above the job-board ticks it counted ("opens 3 boards"), so it was easy to press before choosing.
+
 - The test that drives the real, built Windows app now also photographs it (L-244). It imports six made-up applications, saves pictures of the Tracker, an open application, the CV check, Search and Settings, then deletes the made-up applications again. CI keeps the pictures for 30 days as "app-screenshots", for the website and the store listings. Nothing in the app changes.
 
 - "JSON Resume" on the Analysis screen now explains itself (L-312): tap it, hover on it or Tab to it to read that it is a standard CV file format some builders and job sites use, and that a PDF or Word file works just as well.
