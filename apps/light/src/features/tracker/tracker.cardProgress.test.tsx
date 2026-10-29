@@ -130,3 +130,27 @@ describe('tracker cards for started jobs (L-200)', () => {
     expect(screen.queryByTestId('tracker-card-progress-a')).toBeNull();
   });
 });
+
+describe('tracker cards say which step the job is on (L-331)', () => {
+  it('a mid-workflow card reads Step 3 of 5 · Tailor, in words, on the board', async () => {
+    await renderBoard({ saved: { 'job-a': { analysed: true } } });
+    const row = await screen.findByRole('group', { name: 'Step 3 of 5 · Tailor' });
+    expect(row).toBe(screen.getByTestId('tracker-card-progress-a'));
+    expect(screen.getByTestId('tracker-card-step-a').textContent).toBe('Step 3 of 5 · Tailor');
+  });
+
+  it('boundary (step 0): a job nothing has happened to says no step at all', async () => {
+    await renderBoard({ saved: { 'job-a': { analysed: true } } });
+    await screen.findByTestId('tracker-card-step-a');
+    expect(screen.queryByTestId('tracker-card-step-b')).toBeNull();
+    expect(screen.queryByTestId('tracker-card-step-c')).toBeNull();
+  });
+
+  it('negative: a card with no saved progress row draws no broken text', async () => {
+    await renderBoard({ saved: { 'job-a': { analysed: true } } });
+    await screen.findByTestId('tracker-card-step-a');
+    const column = screen.getByTestId('tracker-column-saved');
+    expect(column.textContent ?? '').not.toMatch(/Step undefined|NaN|undefined/);
+    expect(screen.getAllByText(/^Step \d of 5 · /)).toHaveLength(1);
+  });
+});
