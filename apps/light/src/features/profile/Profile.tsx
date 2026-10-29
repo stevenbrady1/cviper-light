@@ -527,7 +527,7 @@ function ProfileForm({
               id="profile-headline"
               data-testid="profile-headline"
               value={headline.draft}
-              placeholder="Credit risk analyst moving into quant development"
+              placeholder="e.g. Credit risk analyst moving into quant development"
               onChange={(event) => headline.setDraft(event.currentTarget.value)}
               onBlur={headline.flush}
               className={FIELD}
@@ -542,7 +542,7 @@ function ProfileForm({
               id="profile-work-rights"
               data-testid="profile-work-rights"
               value={workRights.draft}
-              placeholder="UK citizen, no sponsorship needed"
+              placeholder="e.g. UK citizen, no sponsorship needed"
               onChange={(event) => workRights.setDraft(event.currentTarget.value)}
               onBlur={workRights.flush}
               className={FIELD}
@@ -558,7 +558,7 @@ function ProfileForm({
               data-testid="profile-writing-style"
               rows={3}
               value={writingStyle.draft}
-              placeholder="Plain, short sentences. No buzzwords. British spelling."
+              placeholder="e.g. Plain, short sentences. No buzzwords. British spelling."
               onChange={(event) => writingStyle.setDraft(event.currentTarget.value)}
               onBlur={writingStyle.flush}
               className={FIELD}
@@ -618,7 +618,7 @@ function ProfileForm({
               data-testid="profile-deal-breakers"
               rows={3}
               value={dealBreakers.draft}
-              placeholder={'Fully on-site\nBelow GBP 70k'}
+              placeholder={'e.g. Fully on-site\nBelow GBP 70k'}
               onChange={(event) => dealBreakers.setDraft(event.currentTarget.value)}
               onBlur={dealBreakers.flush}
               className={FIELD}
@@ -634,7 +634,7 @@ function ProfileForm({
               data-testid="profile-target-sectors"
               rows={3}
               value={targetSectors.draft}
-              placeholder={'Banking\nHedge funds'}
+              placeholder={'e.g. Banking\nHedge funds'}
               onChange={(event) => targetSectors.setDraft(event.currentTarget.value)}
               onBlur={targetSectors.flush}
               className={FIELD}
@@ -650,7 +650,7 @@ function ProfileForm({
               data-testid="profile-career-goals"
               rows={3}
               value={careerGoals.draft}
-              placeholder="Lead a small modelling team within three years"
+              placeholder="e.g. Lead a small modelling team within three years"
               onChange={(event) => careerGoals.setDraft(event.currentTarget.value)}
               onBlur={careerGoals.flush}
               className={FIELD}
@@ -675,7 +675,7 @@ function ProfileForm({
               data-testid="profile-energising"
               rows={4}
               value={energising.draft}
-              placeholder="Hard technical problems"
+              placeholder="e.g. Hard technical problems"
               onChange={(event) => energising.setDraft(event.currentTarget.value)}
               onBlur={energising.flush}
               className={FIELD}
@@ -691,7 +691,7 @@ function ProfileForm({
               data-testid="profile-draining"
               rows={4}
               value={draining.draft}
-              placeholder="Status meetings"
+              placeholder="e.g. Status meetings"
               onChange={(event) => draining.setDraft(event.currentTarget.value)}
               onBlur={draining.flush}
               className={FIELD}
@@ -773,7 +773,7 @@ function LanguageRow({ index, language, onChange, onRemove }: LanguageRowProps) 
           id={`profile-language-name-${index}`}
           data-testid={`profile-language-name-${index}`}
           value={name.draft}
-          placeholder="French"
+          placeholder="e.g. French"
           onChange={(event) => name.setDraft(event.currentTarget.value)}
           onBlur={name.flush}
           className={FIELD}
@@ -787,7 +787,7 @@ function LanguageRow({ index, language, onChange, onRemove }: LanguageRowProps) 
           id={`profile-language-level-${index}`}
           data-testid={`profile-language-level-${index}`}
           value={level.draft}
-          placeholder="Conversational"
+          placeholder="e.g. Conversational"
           onChange={(event) => level.setDraft(event.currentTarget.value)}
           onBlur={level.flush}
           className={FIELD}
