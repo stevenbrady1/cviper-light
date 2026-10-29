@@ -1,12 +1,15 @@
 /**
- * Tick job boards, press Search, and each ticked board opens in the browser
- * with the search already filled in (L-219 part 4, owner request 2026-10-14).
+ * Tick job boards, press "Also open in N boards", and each ticked board opens
+ * in the browser with the search already filled in (L-219 part 4, owner
+ * request 2026-10-14). Until L-329 the Search button did this as well as
+ * searching; now Search only searches here, and opening the boards is its own
+ * button. A saved search's Run still does both.
  *
  * ============================================================================
  * ONE DELIBERATE ACTION
  * ============================================================================
- * Nothing opens on its own. The boards open only when the user presses the
- * page's Search button, one browser tab per ticked board, in the order the
+ * Nothing opens on its own. The boards open only when the user presses that
+ * button (or runs a saved search), one browser tab per ticked board, in the
  * boards are listed (Settings → Job boards decides that order), each through
  * the same `buildBoardUrl` the single-board buttons used — so a board's link
  * carries exactly the filters it always did, and nothing is added to it.
@@ -91,10 +94,20 @@ export function chooseBoards(ids: readonly string[], boards: readonly Board[]): 
   return kept;
 }
 
-/** What the page's one Search button says: the count of tabs it will open. */
-export function searchButtonLabel(boardCount: number): string {
-  if (boardCount === 0) return 'Search';
-  return `Search (opens ${boardCount} ${boardCount === 1 ? 'board' : 'boards'})`;
+/**
+ * What the button that opens the boards says: the count of tabs it will open
+ * (L-329). Search itself only searches here; this is the second, separate
+ * action, so its name says "also".
+ */
+export function openBoardsLabel(boardCount: number): string {
+  if (boardCount === 0) return 'Also open in job boards';
+  return `Also open in ${boardCount} ${boardCount === 1 ? 'board' : 'boards'}`;
+}
+
+/** Why that button cannot be pressed, or `null` when it can. */
+export function openBoardsDisabledReason(boardCount: number): string | null {
+  if (boardCount > 0) return null;
+  return 'Tick a job board above to open this search in your browser too.';
 }
 
 /**

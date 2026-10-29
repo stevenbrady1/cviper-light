@@ -12,7 +12,7 @@ import {
   type QuotaState,
 } from '@cviper/job-apis';
 
-import { PRIMARY_BUTTON } from '../../app/buttons';
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { SHIPPED_BOARDS } from '../boards/defaults';
@@ -27,8 +27,9 @@ import { readJobKeyStates, type KeyState } from '../../status/environment';
 import {
   chooseBoards,
   openBoards,
+  openBoardsDisabledReason,
+  openBoardsLabel,
   readBoardChoice,
-  searchButtonLabel,
   tickedBoards,
   toggleBoard,
 } from './boardChoice';
@@ -202,7 +203,7 @@ export function Search({
     mergeBoards(SHIPPED_BOARDS, NO_PREFERENCES),
   );
   /*
-    The boards ticked to open with the next Search (L-219 part 4), remembered
+    The boards ticked to open with "Also open in N boards" (L-219 part 4, L-329), remembered
     between visits. Ids of boards since switched off or deleted are ignored
     here and dropped on the next tick — see `boardChoice.ts`.
   */
@@ -285,10 +286,10 @@ export function Search({
     [jobBoards, boardChoice],
   );
   const ticked = useMemo(() => new Set(boardsToOpen.map((board) => board.id)), [boardsToOpen]);
-  // A ticked board is something to do, so the button is enabled for boards alone.
-  const disabledReason = searchDisabledReason(
-    usableChosen.length + keylessWanted.length + boardsToOpen.length,
-  );
+  // Search only looks HERE (L-329), so a ticked board is not something for it
+  // to do: the boards have their own button, with its own reason.
+  const disabledReason = searchDisabledReason(usableChosen.length + keylessWanted.length);
+  const openBoardsReason = openBoardsDisabledReason(boardsToOpen.length);
 
   const reedVerdict = quotaVerdict(quota, 'reed', utcDateOf(clock) ?? quota.date);
 
@@ -315,9 +316,23 @@ export function Search({
   // ── Actions ──────────────────────────────────────────────────────────────
 
   /**
-   * Run a search: the ticked boards' tabs, then the keyed boards and the free
-   * feeds. Called by the Search button with what is on screen, and by a saved
-   * search (L-309) with what it saved — so both run exactly the same path.
+   * Open the boards' tabs, one each, in the list's order, with the form's
+   * filters. A board that will not open is named; the rest still open.
+   */
+  const openTheseBoards = useCallback(
+    async (formValue: SearchForm, boardsValue: readonly Board[]) => {
+      setBoardsProblem([]);
+      if (boardsValue.length === 0) return;
+      setBoardsProblem(await openBoards(browserPort, boardsValue, boardSearchInput(formValue)));
+    },
+    [browserPort],
+  );
+
+  /**
+   * Run a search: the given boards' tabs, then the keyed boards and the free
+   * feeds. The Search button passes NO boards (L-329) — it only searches here;
+   * a saved search (L-309) passes the boards it saved, because the user saved
+   * them to be opened.
    */
   const runSearch = useCallback(
     async (
@@ -336,18 +351,8 @@ export function Search({
       setErrors(found);
       if (!formIsValid(found)) return;
 
-      /*
-        The ticked job boards (L-219 part 4): one tab each, in the list's
-        order, opened by this press and nothing else. Like the single-board
-        buttons before them they need no words in the boxes — an empty search
-        is a valid search on every board — but an invalid form opens nothing.
-        One that will not open is named; the rest still open.
-      */
-      setBoardsProblem([]);
-      if (boardsValue.length > 0) {
-        const failed = await openBoards(browserPort, boardsValue, boardSearchInput(formValue));
-        setBoardsProblem(failed);
-      }
+      // A saved search's boards (L-309). An invalid form opened nothing above.
+      await openTheseBoards(formValue, boardsValue);
 
       if (usableChosen.length === 0 && keylessValue.length === 0) return;
 
@@ -408,16 +413,30 @@ export function Search({
       setKeylessOutcome(keyless);
       setRunning(false);
     },
-    [browserPort, clearCardNotes, clock, newId, quota.date, searchPort, usableChosen],
+    [clearCardNotes, clock, newId, openTheseBoards, quota.date, searchPort, usableChosen],
   );
 
+  // The blue button: CViper's own search, and no browser tabs (L-329).
   const onSubmit = useCallback(
     async (event: FormEvent) => {
       event.preventDefault();
-      await runSearch(form, boardsToOpen, keylessWanted);
+      await runSearch(form, [], keylessWanted);
     },
-    [boardsToOpen, form, keylessWanted, runSearch],
+    [form, keylessWanted, runSearch],
   );
+
+  /*
+    "Also open in N boards" (L-219 part 4, its own button since L-329). Like
+    the single-board buttons before it, it needs no words in the boxes — an
+    empty search is a valid search on every board — but an invalid form opens
+    nothing, and the field says what is wrong.
+  */
+  const onOpenTicked = useCallback(async () => {
+    const found = validateForm(form, { requireQuery: false });
+    setErrors(found);
+    if (!formIsValid(found)) return;
+    await openTheseBoards(form, boardsToOpen);
+  }, [boardsToOpen, form, openTheseBoards]);
 
   /**
    * Save what is in the boxes and the ticked boards under a name (L-309).
@@ -542,7 +561,7 @@ export function Search({
             {/*
               WHERE TO LOOK, then the button (L-313). Everything that changes
               what Search does is in this one box, ABOVE the button: the button
-              says "Search (opens 3 boards)", and the boards it counts used to
+              said "Search (opens 3 boards)", and the boards it counts used to
               be ticked below it, so a person either pressed it before choosing
               or chose and scrolled back up. `search.actionOrder.test.tsx`
               fails if any field or tick in the form comes after the button.
@@ -614,15 +633,38 @@ export function Search({
               >
                 {/*
                   "Search" (L-219, owner decision 2026-10-08): one action, one
-                  name. With boards ticked it says how many tabs it will open
-                  (part 4), so pressing it never surprises anybody.
+                  name — and since L-329 one job: it searches here and opens
+                  no browser tabs, so pressing it always shows results here.
                 */}
-                {running ? 'Working…' : searchButtonLabel(boardsToOpen.length)}
+                {running ? 'Working…' : 'Search'}
               </button>
 
               {disabledReason === null ? null : (
                 <p data-testid="search-reason" className="text-ink-muted">
                   {disabledReason}
+                </p>
+              )}
+            </div>
+
+            {/*
+              The ticked boards, in the browser, with the same filters (L-329).
+              A second action, so not blue, and after the blue one. Disabled —
+              never hidden — with nothing ticked, and the reason beside it.
+            */}
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                data-testid="search-open-boards"
+                disabled={running || openBoardsReason !== null}
+                onClick={() => void onOpenTicked()}
+                className={SECONDARY_BUTTON}
+              >
+                {openBoardsLabel(boardsToOpen.length)}
+              </button>
+
+              {openBoardsReason === null ? null : (
+                <p data-testid="search-open-boards-reason" className="text-ink-muted">
+                  {openBoardsReason}
                 </p>
               )}
             </div>
@@ -633,7 +675,7 @@ export function Search({
                 data-testid="search-boards-problem"
                 className="mt-2 rounded-control bg-danger/5 px-3 py-2 text-danger"
               >
-                {`${boardsProblem.join(', ')} did not open in your browser. Check that a default browser is set, then press Search again.`}
+                {`${boardsProblem.join(', ')} did not open in your browser. Check that a default browser is set, then try again.`}
               </p>
             )}
           </form>

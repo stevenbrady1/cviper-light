@@ -248,6 +248,10 @@ export function providerAvailability(
  * untick everything — which is a thing the user just did and can undo, rather
  * than a wall they were born behind.
  *
+ * A job board ticked to open in the browser does NOT count (L-329): Search no
+ * longer opens boards, so a ticked board is nothing for it to look at. The
+ * boards have their own button, and the message points at it.
+ *
  * The message still points at what works before it points at Settings.
  */
 export function searchDisabledReason(usableSources: number): string | null {
@@ -255,7 +259,7 @@ export function searchDisabledReason(usableSources: number): string | null {
 
   return (
     'Nothing is ticked for CViper to look at. Tick one of the free feeds above ' +
-    '— they need no key at all — or tick a job site below to open it in your browser.'
+    '— they need no key at all. Job sites you tick open in your browser with the button below.'
   );
 }
 

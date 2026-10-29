@@ -13,8 +13,9 @@ import { type Board } from '../boards/model';
 import {
   BOARD_CHOICE_STORAGE_KEY,
   openBoards,
+  openBoardsDisabledReason,
+  openBoardsLabel,
   readBoardChoice,
-  searchButtonLabel,
   tickedBoards,
   toggleBoard,
 } from './boardChoice';
@@ -103,10 +104,16 @@ describe('which boards a Search opens', () => {
 });
 
 describe('the button says what will happen', () => {
-  it('"Search" with nothing ticked, and the count when boards are', () => {
-    expect(searchButtonLabel(0)).toBe('Search');
-    expect(searchButtonLabel(1)).toBe('Search (opens 1 board)');
-    expect(searchButtonLabel(3)).toBe('Search (opens 3 boards)');
+  // L-329: the count is on the boards' own button now; Search is just "Search".
+  it('no count with nothing ticked, and the count when boards are', () => {
+    expect(openBoardsLabel(0)).toBe('Also open in job boards');
+    expect(openBoardsLabel(1)).toBe('Also open in 1 board');
+    expect(openBoardsLabel(3)).toBe('Also open in 3 boards');
+  });
+
+  it('boundary: says why it cannot be pressed with none ticked, and nothing with one', () => {
+    expect(openBoardsDisabledReason(0)).toContain('Tick a job board');
+    expect(openBoardsDisabledReason(1)).toBeNull();
   });
 });
 
