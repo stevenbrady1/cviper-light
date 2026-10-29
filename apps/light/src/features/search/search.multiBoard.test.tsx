@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /**
- * L-219 part 4: tick job boards, press Search, and each ticked board opens in
- * the browser with the search filled in — alongside the normal search.
+ * L-219 part 4: tick job boards, press the boards' button, and each ticked
+ * board opens in the browser with the search filled in. Since L-329 that is
+ * "Also open in N boards", its own button: Search itself only searches here.
  */
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -89,13 +90,15 @@ describe('ticking boards', () => {
     const { user } = renderSearch();
     await screen.findByTestId('keyless-bar');
     await user.click(screen.getByTestId('keyless-reed'));
-    expect(screen.getByTestId('search-submit').textContent).toBe('Search (opens 1 board)');
+    expect(screen.getByTestId('search-open-boards').textContent).toBe('Also open in 1 board');
     await user.click(screen.getByTestId('keyless-indeed'));
-    expect(screen.getByRole('button', { name: 'Search (opens 2 boards)' })).toBe(
-      screen.getByTestId('search-submit'),
+    expect(screen.getByRole('button', { name: 'Also open in 2 boards' })).toBe(
+      screen.getByTestId('search-open-boards'),
     );
     await user.click(screen.getByTestId('keyless-reed'));
-    expect(screen.getByTestId('search-submit').textContent).toBe('Search (opens 1 board)');
+    expect(screen.getByTestId('search-open-boards').textContent).toBe('Also open in 1 board');
+    // L-329: the count is never on Search, which opens no tabs.
+    expect(screen.getByTestId('search-submit').textContent).toBe('Search');
   });
 
   it('keyboard: Space ticks a focused board', async () => {
@@ -107,8 +110,8 @@ describe('ticking boards', () => {
   });
 });
 
-describe('pressing Search', () => {
-  it('opens each ticked board once, in board order, alongside the normal search', async () => {
+describe('pressing "Also open in N boards"', () => {
+  it('opens each ticked board once, in board order; Search runs the normal search on its own', async () => {
     const { user, port, browser } = renderSearch();
     await screen.findByTestId('keyless-bar');
     await user.type(screen.getByTestId('search-keywords'), 'software tester');
@@ -116,15 +119,18 @@ describe('pressing Search', () => {
     // Ticked out of order: they still open in the list's order.
     await user.click(screen.getByTestId('keyless-reed'));
     await user.click(screen.getByTestId('keyless-indeed'));
-    await user.click(screen.getByTestId('search-submit'));
+    await user.click(screen.getByTestId('search-open-boards'));
 
     await vi.waitFor(() => expect(browser.opened()).toHaveLength(2));
     expect(browser.opened()).toEqual([
       'https://uk.indeed.com/jobs?q=software+tester&l=London',
       'https://www.reed.co.uk/jobs/software-tester-jobs-in-London',
     ]);
-    // And the normal search ran too.
+    // And the normal search runs from Search (L-329), which opens no more tabs.
+    expect(port.calls.search).toBe(0);
+    await user.click(screen.getByTestId('search-submit'));
     await vi.waitFor(() => expect(port.calls.search).toBe(1));
+    expect(browser.opened()).toHaveLength(2);
   });
 
   it('a custom board from Settings is a checkbox and opens its own link', async () => {
@@ -133,7 +139,7 @@ describe('pressing Search', () => {
     expect(screen.getByRole('checkbox', { name: 'My Board' })).toBe(box);
     await user.type(screen.getByTestId('search-keywords'), 'analyst');
     await user.click(box);
-    await user.click(screen.getByTestId('search-submit'));
+    await user.click(screen.getByTestId('search-open-boards'));
 
     await vi.waitFor(() =>
       expect(browser.opened()).toEqual(['https://my-board.invalid/search?q=analyst']),
@@ -155,7 +161,7 @@ describe('pressing Search', () => {
     await user.type(screen.getByTestId('search-keywords'), 'analyst');
     await user.type(screen.getByTestId('search-salary'), '45k');
     await user.click(screen.getByTestId('keyless-reed'));
-    await user.click(screen.getByTestId('search-submit'));
+    await user.click(screen.getByTestId('search-open-boards'));
 
     expect(await screen.findByTestId('search-salary-error')).toBeDefined();
     expect(browser.opened()).toEqual([]);
@@ -174,7 +180,7 @@ describe('pressing Search', () => {
     await user.click(screen.getByTestId('keyless-linkedin'));
     await user.click(screen.getByTestId('keyless-indeed'));
     browser.failNext();
-    await user.click(screen.getByTestId('search-submit'));
+    await user.click(screen.getByTestId('search-open-boards'));
 
     const problem = await screen.findByTestId('search-boards-problem');
     expect(problem.textContent).toContain('LinkedIn');
@@ -188,10 +194,13 @@ describe('pressing Search', () => {
     await untickFeeds(user);
     await user.click(screen.getByTestId('keyless-reed'));
 
-    const submit = screen.getByTestId('search-submit') as HTMLButtonElement;
-    expect(submit.disabled).toBe(false);
-    expect(screen.queryByTestId('search-reason')).toBeNull();
-    await user.click(submit);
+    const open = screen.getByTestId('search-open-boards') as HTMLButtonElement;
+    expect(open.disabled).toBe(false);
+    expect(screen.queryByTestId('search-open-boards-reason')).toBeNull();
+    // L-329: nothing for Search to look at here, so it is disabled and says why.
+    expect((screen.getByTestId('search-submit') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('search-reason')).toBeDefined();
+    await user.click(open);
 
     // An empty search, exactly as the single-board button used to send it.
     await vi.waitFor(() => expect(browser.opened()).toHaveLength(1));
@@ -207,7 +216,7 @@ describe('pressing Search', () => {
     await user.click(screen.getByTestId('keyless-more'));
     const boxes = within(screen.getByTestId('keyless-boards')).getAllByRole('checkbox');
     for (const box of boxes) await user.click(box);
-    await user.click(screen.getByTestId('search-submit'));
+    await user.click(screen.getByTestId('search-open-boards'));
 
     await vi.waitFor(() => expect(browser.opened()).toHaveLength(boxes.length));
     expect(new Set(browser.opened()).size).toBe(boxes.length);
@@ -232,7 +241,7 @@ describe('remembered between visits', () => {
     renderSearch();
     await screen.findByTestId('keyless-bar');
     await vi.waitFor(() =>
-      expect(screen.getByTestId('search-submit').textContent).toBe('Search (opens 1 board)'),
+      expect(screen.getByTestId('search-open-boards').textContent).toBe('Also open in 1 board'),
     );
   });
 });

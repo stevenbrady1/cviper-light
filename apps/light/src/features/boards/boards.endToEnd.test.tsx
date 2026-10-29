@@ -114,9 +114,10 @@ describe('changing the board list and using it', () => {
     await user.paste('business analyst');
     await user.click(screen.getByTestId('search-location'));
     await user.paste('Milton Keynes');
-    // L-219 part 4: ticked, then opened by the page's one Search.
+    // L-219 part 4: ticked, then opened by "Also open in 1 board" — its own
+    // button since L-329; Search itself only searches here.
     await user.click(await screen.findByTestId('keyless-custom-my-board'));
-    await user.click(screen.getByTestId('search-submit'));
+    await user.click(screen.getByTestId('search-open-boards'));
 
     await vi.waitFor(() =>
       expect(browser.opened()).toEqual([

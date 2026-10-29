@@ -177,9 +177,10 @@ describe('the search view on a machine with no keys', () => {
 
     await user.type(screen.getByTestId('search-keywords'), 'credit risk analyst');
     await user.type(screen.getByTestId('search-location'), 'London');
-    // L-219 part 4: tick the board, then the page's one Search opens it.
+    // L-219 part 4: tick the board, then "Also open in 1 board" opens it —
+    // its own button since L-329; Search itself only searches here.
     await user.click(screen.getByTestId('keyless-linkedin'));
-    await user.click(screen.getByTestId('search-submit'));
+    await user.click(screen.getByTestId('search-open-boards'));
 
     await vi.waitFor(() =>
       expect(browser.opened()).toEqual([
@@ -203,9 +204,10 @@ describe('the search view on a machine with no keys', () => {
     await screen.findByTestId('view-search');
 
     await user.type(screen.getByTestId('search-keywords'), 'quant developer');
-    // L-219 part 4: tick the board, then the page's one Search opens it.
+    // L-219 part 4: tick the board, then "Also open in 1 board" opens it —
+    // its own button since L-329; Search itself only searches here.
     await user.click(screen.getByTestId('keyless-indeed'));
-    await user.click(screen.getByTestId('search-submit'));
+    await user.click(screen.getByTestId('search-open-boards'));
 
     // No `&l=`. An empty box means "no location filter", and the builder drops
     // the parameter rather than sending an explicitly empty one.
@@ -228,9 +230,10 @@ describe('the search view on a machine with no keys', () => {
     await user.click(screen.getByTestId('nav-search'));
     await screen.findByTestId('view-search');
 
-    // L-219 part 4: tick the board, then the page's one Search opens it.
+    // L-219 part 4: tick the board, then "Also open in 1 board" opens it —
+    // its own button since L-329; Search itself only searches here.
     await user.click(screen.getByTestId('keyless-linkedin'));
-    await user.click(screen.getByTestId('search-submit'));
+    await user.click(screen.getByTestId('search-open-boards'));
 
     await vi.waitFor(() => expect(browser.opened()).toHaveLength(1));
     expect(invokedProviderCommands()).toEqual([]);
@@ -326,15 +329,16 @@ describe('the search view on a machine with no keys', () => {
     await user.click(screen.getByTestId('nav-search'));
     await screen.findByTestId('view-search');
     await user.type(screen.getByTestId('search-keywords'), 'analyst');
-    // L-219 part 4: a board is ticked and opened by the page's Search. Only the
-    // board is ticked here — the free feeds are a request of their own, and this
+    // L-219 part 4: a board is ticked and opened — by "Also open in 1 board"
+    // since L-329 (pressing the disabled Search here would test nothing). Only
+    // the board is ticked — the free feeds are a request of their own, and this
     // test is about the board.
     for (const feed of ['keyless-source-arbeitnow', 'keyless-source-guardian']) {
       const box = screen.getByTestId(feed) as HTMLInputElement;
       if (box.checked) await user.click(box);
     }
     await user.click(screen.getByTestId('keyless-linkedin'));
-    await user.click(screen.getByTestId('search-submit'));
+    await user.click(screen.getByTestId('search-open-boards'));
 
     expect(screen.getByTestId('search-quota').textContent ?? '').toContain('0');
     expect(localStorage.getItem('cviper.light.requests')).toBeNull();
@@ -354,9 +358,10 @@ describe('the search view on a machine with no keys', () => {
     await user.click(screen.getByTestId('nav-search'));
     await screen.findByTestId('view-search');
     await user.type(screen.getByTestId('search-keywords'), 'analyst');
-    // L-219 part 4: tick the board, then the page's one Search opens it.
+    // L-219 part 4: tick the board, then "Also open in 1 board" opens it —
+    // its own button since L-329; Search itself only searches here.
     await user.click(screen.getByTestId('keyless-indeed'));
-    await user.click(screen.getByTestId('search-submit'));
+    await user.click(screen.getByTestId('search-open-boards'));
 
     await vi.waitFor(() => expect(browser.opened()).toHaveLength(1));
     expect(browser.opened()[0]).not.toMatch(/utm_|cviper|affiliate/i);

@@ -163,7 +163,7 @@ function BoardCheckboxes({ boards, ticked, onToggle, disabled }: BoardCheckboxes
 interface KeylessBarProps {
   /** Shipped defaults with the user's choices applied. Disabled boards included. */
   readonly boards: readonly Board[];
-  /** The ticked board ids (the page owns them: its Search button opens them). */
+  /** The ticked board ids (the page owns them: its "Also open in N boards" button opens them). */
   readonly ticked: ReadonlySet<string>;
   readonly onToggle: (id: string, on: boolean) => void;
   /** While a search is running. */
@@ -220,9 +220,9 @@ export function KeylessBar({
         )}
       </div>
       <p className="mt-0.5 text-xs text-ink-muted">
-        Tick the boards you want, then press Search. Each one opens in your browser, where you are
-        already signed in, with the words and filters above. Point at a board to see which filters
-        it takes.
+        Tick the boards you want, then press “Also open” under Search. Each one opens in your
+        browser, where you are already signed in, with the words and filters above. Point at a board
+        to see which filters it takes.
       </p>
 
       {shown.length === 0 ? (

@@ -148,7 +148,7 @@ describe('job boards, right under the fields (L-219, L-313)', () => {
     expect(indeed).toContain('set those on the site');
   });
 
-  it('a ticked board opens with the form’s filters when Search is pressed', async () => {
+  it('a ticked board opens with the form’s filters when "Also open in 1 board" is pressed', async () => {
     const { user, browser } = renderSearch();
     await screen.findByTestId('keyless-bar');
     await user.type(screen.getByTestId('search-keywords'), 'software tester');
@@ -157,7 +157,8 @@ describe('job boards, right under the fields (L-219, L-313)', () => {
     await user.type(screen.getByTestId('search-salary'), '60000');
     await user.selectOptions(screen.getByTestId('search-contract'), 'Permanent');
     await user.click(screen.getByTestId('keyless-reed'));
-    await user.click(screen.getByTestId('search-submit'));
+    // Its own button since L-329; Search itself only searches here.
+    await user.click(screen.getByTestId('search-open-boards'));
     await vi.waitFor(() =>
       expect(browser.opened()).toEqual([
         'https://www.reed.co.uk/jobs/software-tester-jobs-in-London?proximity=10&salaryFrom=60000&perm=true',
