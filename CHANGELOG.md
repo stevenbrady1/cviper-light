@@ -42,6 +42,8 @@ Also in this release: you can save a search and run it again in one click, and S
 
 ### Changed
 
+- The test that drives the real, built Windows app now also photographs it (L-244). It imports six made-up applications, saves pictures of the Tracker, an open application, the CV check, Search and Settings, then deletes the made-up applications again. CI keeps the pictures for 30 days as "app-screenshots", for the website and the store listings. Nothing in the app changes.
+
 - "JSON Resume" on the Analysis screen now explains itself (L-312): tap it, hover on it or Tab to it to read that it is a standard CV file format some builders and job sites use, and that a PDF or Word file works just as well.
 - Search has a "Manage job boards" button on its job-board box (L-310). It opens Settings at the Job boards section, where you choose which boards appear, put them in order and add your own. Before, the only route was a sentence at the bottom of the box.
 - The Search screen's code is split into smaller files the same way, with no change to what you see or what it does (L-308). It was one 1,067-line file; it is now 592 lines plus one file per panel, so it comes off the list of screens allowed over the 800-line limit.
