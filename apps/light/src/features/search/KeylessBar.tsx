@@ -196,12 +196,13 @@ export function KeylessBar({
     <section
       data-testid="keyless-bar"
       aria-labelledby="keyless-heading"
-      className="rounded-card border border-line bg-sunken px-4 py-3"
+      // No box of its own: it sits in Search's "Where to look" box (L-313).
+      className="border-t border-line pt-3"
     >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <h2 id="keyless-heading" className="font-medium text-ink">
+        <h3 id="keyless-heading" className="font-medium text-ink">
           Search job boards with these filters
-        </h2>
+        </h3>
         {/*
           Where the boards are chosen, ordered and added (L-310). It used to be
           a sentence at the bottom of this box; now it is one press, and it is

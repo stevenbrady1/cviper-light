@@ -3,7 +3,8 @@
  * L-219: the Search page around one search.
  *
  *   * One blue button, always "Search".
- *   * "Search job boards with these filters" directly under the form: the
+ *   * "Search job boards with these filters" directly under the fields (in
+ *     the "Where to look" box, before the button since L-313): the
  *     first five boards, the rest under More, each saying which filters its
  *     link carries.
  *   * After a search that finds fewer than five jobs, the same boards are
@@ -105,13 +106,16 @@ describe('one search (L-219)', () => {
   });
 });
 
-describe('job boards, right under the form (L-219)', () => {
-  it('sits directly after the form, before recent searches and results', async () => {
+describe('job boards, right under the fields (L-219, L-313)', () => {
+  it('sit in the form under the fields, before the Search button, recent searches and results', async () => {
     renderSearch();
     const form = await screen.findByTestId('search-form');
     const boards = screen.getByTestId('keyless-bar');
+    const submit = screen.getByTestId('search-submit');
     const quota = screen.getByTestId('search-quota');
-    expect(form.compareDocumentPosition(boards) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Inside the form since L-313: the button that opens them comes after them.
+    expect(form.contains(boards)).toBe(true);
+    expect(boards.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(boards.compareDocumentPosition(quota) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(boards).getByRole('heading').textContent).toBe(
       'Search job boards with these filters',
