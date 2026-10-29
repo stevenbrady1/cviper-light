@@ -22,7 +22,7 @@ export function SearchFields({ form, errors, onField }: SearchFieldsProps) {
           value={form.keywords}
           error={errors.keywords}
           onChange={(value) => onField('keywords', value)}
-          placeholder="Credit risk analyst"
+          placeholder="e.g. Credit risk analyst"
           grow
         />
         <Field
@@ -31,7 +31,7 @@ export function SearchFields({ form, errors, onField }: SearchFieldsProps) {
           value={form.location}
           error={errors.location}
           onChange={(value) => onField('location', value)}
-          placeholder="London"
+          placeholder="e.g. London"
           grow
         />
       </div>
