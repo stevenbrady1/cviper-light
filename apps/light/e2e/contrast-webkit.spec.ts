@@ -248,3 +248,56 @@ describe('colour contrast on the rendered app (WCAG 2.1 AA)', () => {
     await page.context().close();
   });
 });
+
+/**
+ * Tracker column headings whose content is wider than the heading (L-311).
+ *
+ * With an application open the board's columns shrink to their minimum, and
+ * the Interviewing heading — its name, "Edit stages" and the count — was wider
+ * than that: the count ran into the next column's name ("1OFFER"). jsdom does
+ * no layout, so only a real engine can see this.
+ */
+async function overflowingColumnHeadings(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid^="tracker-count-"]')].flatMap((count) => {
+      const header = count.closest('header');
+      if (header === null) return [`${count.getAttribute('data-testid') ?? '?'}: no header`];
+      const over = header.scrollWidth - header.clientWidth;
+      return over > 0
+        ? [`${count.getAttribute('data-testid') ?? '?'}: ${String(over)}px too wide`]
+        : [];
+    }),
+  );
+}
+
+describe('the Tracker board lays out (L-311)', () => {
+  for (const width of [1024, 1280, 1440]) {
+    it(`every column heading fits its column at ${String(width)}px, with an application open`, async () => {
+      const page = await open('?seen=1&entries=1', { width, height: 800 });
+      await goTo(page, 'tracker');
+      await page.waitForSelector('[data-testid="tracker-card-c"]');
+      await page.click('[data-testid="tracker-card-c"]');
+      await page.waitForSelector('[data-testid="detail-pane"]');
+      const counts = await page.locator('[data-testid^="tracker-count-"]').count();
+      assert.ok(counts >= 5, `only ${String(counts)} column headings drawn`);
+      assert.deepEqual(await overflowingColumnHeadings(page), []);
+      await page.context().close();
+    });
+  }
+
+  it('the check can fail: a heading pushed wider than its column is reported', async () => {
+    const page = await open('?seen=1&entries=1', VIEWPORTS.desktop);
+    await goTo(page, 'tracker');
+    await page.waitForSelector('[data-testid="tracker-count-offer"]');
+    await page.evaluate(() => {
+      const count = document.querySelector('[data-testid="tracker-count-offer"]');
+      if (count !== null) count.textContent = '0'.repeat(400);
+    });
+    const report = await overflowingColumnHeadings(page);
+    assert.ok(
+      report.some((line) => line.startsWith('tracker-count-offer')),
+      `the widened heading was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+});
