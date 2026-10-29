@@ -121,8 +121,13 @@ export function AiKeySetup({ ports, browser, customServicePort }: AiKeySetupProp
         L-327. This used to say a key "adds one thing", the full reading. The
         same AI also drives five more, so the list names all six, each by the
         label the user meets on its own screen.
+        `ml-11` lines it up with the description: the heading's sm icon tile
+        (`size-8`) plus its `gap-3`.
       */}
-      <ul data-testid="ai-keys-unlocks" className="mt-2 list-disc space-y-1 pl-5 text-ink-muted">
+      <ul
+        data-testid="ai-keys-unlocks"
+        className="mt-2 ml-11 list-disc space-y-1 pl-5 text-ink-muted"
+      >
         {AI_UNLOCKS.map((line) => (
           <li key={line}>{line}</li>
         ))}
