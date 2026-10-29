@@ -1168,7 +1168,18 @@ describe('the built CViper Light binary', () => {
       await shot('2-tracker-application');
 
       await click('[data-testid="nav-analysis"]');
-      const sample = await session().findElements(By.css('[data-testid="analysis-try-sample"]'));
+      // The sample is offered only once the screen has loaded the CV list and
+      // found it empty, a moment after the view opens. The first run looked
+      // straight away, found nothing, and photographed the empty form.
+      const sample = await session()
+        .wait(until.elementLocated(By.css('[data-testid="analysis-try-sample"]')), ELEMENT_TIMEOUT)
+        .then(
+          (element) => [element],
+          () => [],
+        );
+      console.log(
+        `smoke: sample   = ${sample.length > 0 ? 'offered' : 'not offered (a CV is saved)'}`,
+      );
       if (sample.length > 0) {
         await sample[0]!.click();
         await visible('[data-testid="analysis-sample"]');
