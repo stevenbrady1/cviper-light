@@ -25,56 +25,67 @@
  * The floor in `lNumbers.ts` is the second half of the same idea, for the case
  * where the call SUCCEEDS and returns fewer rows than it should — a search
  * syntax that stopped matching, or a filter applied by accident.
+ *
+ * The third half (L-328) is `listing.ts`: the listing is paginated to the end
+ * and must not be shorter than the repository's own issue count. It used to be
+ * capped at 200, and the repository outgrew it.
  */
 import { execFileSync } from 'node:child_process';
 
 import { registryProblems, claimsIn, type IssueTitle } from './lNumbers.ts';
+import { PAGE_SIZE, completenessProblems, issuesFromPages, totalIssuesFrom } from './listing.ts';
+
+function gh(args: readonly string[]): unknown {
+  const raw = execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  return JSON.parse(raw) as unknown;
+}
 
 /**
- * The listing, from `gh`.
+ * How many issues the repository holds, in every state — the second source the
+ * listing is checked against. Fetched BEFORE the listing; see `listing.ts`.
+ */
+function fetchIssueCount(): number {
+  return totalIssuesFrom(
+    gh([
+      'api',
+      'graphql',
+      '-F',
+      'owner={owner}',
+      '-F',
+      'name={repo}',
+      '-f',
+      'query=query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues { totalCount } } }',
+    ]),
+  );
+}
+
+/**
+ * The listing: EVERY issue, page by page to the end (L-328).
  *
- * `--state all` on purpose: a number claimed by a CLOSED issue is still
+ * `state=all` on purpose: a number claimed by a CLOSED issue is still
  * claimed. Reusing it would put two different pieces of work under one
  * identifier in the history, which is the thing this prevents.
+ *
+ * No `--limit` and no search: this used to be `gh issue list --limit 200`, and
+ * the repository grew past it. `--paginate` follows GitHub's own next-page
+ * links until there are none, and the result is checked against the count.
  */
 function fetchIssues(): IssueTitle[] {
-  const raw = execFileSync(
-    'gh',
-    [
-      'issue',
-      'list',
-      '--state',
-      'all',
-      '--search',
-      '[L-',
-      '--limit',
-      '200',
-      '--json',
-      'number,title',
-    ],
-    { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
+  return issuesFromPages(
+    gh([
+      'api',
+      '--paginate',
+      '--slurp',
+      `repos/{owner}/{repo}/issues?state=all&per_page=${PAGE_SIZE}`,
+    ]),
   );
-
-  const parsed: unknown = JSON.parse(raw);
-  if (!Array.isArray(parsed)) {
-    throw new Error(`gh returned something that is not a list of issues: ${raw.slice(0, 200)}`);
-  }
-
-  return parsed.map((entry) => {
-    const record = entry as { number?: unknown; title?: unknown };
-    if (typeof record.number !== 'number' || typeof record.title !== 'string') {
-      throw new Error(
-        `gh returned an issue without a number and a title: ${JSON.stringify(entry)}`,
-      );
-    }
-    return { number: record.number, title: record.title };
-  });
 }
 
 function main(): void {
+  const total = fetchIssueCount();
   const issues = fetchIssues();
   const claims = claimsIn(issues);
-  const problems = registryProblems(issues);
+  const problems = [...completenessProblems(issues.length, total), ...registryProblems(issues)];
 
   if (problems.length > 0) {
     console.error('');
@@ -93,7 +104,7 @@ function main(): void {
   }
 
   console.log(
-    `check-l-numbers: ${claims.length} work-item numbers, each claimed once - ` +
+    `check-l-numbers: ${claims.length} work-item numbers in all ${total} issues, each claimed once - ` +
       `${claims.map((claim) => claim.label).join(', ')}`,
   );
 }
