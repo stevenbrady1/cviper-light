@@ -1,6 +1,7 @@
 /**
- * Thirteen questions asked of the REAL built binary (L-88, extended by L-103,
- * L-104 and L-301).
+ * Fifteen questions asked of the REAL built binary (L-88, extended by L-103,
+ * L-104, L-301 and L-242), and the screenshots of it the landing page uses
+ * (L-244).
  *
  * ============================================================================
  * WHY THIS EXISTS
@@ -150,7 +151,7 @@
  */
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -164,6 +165,7 @@ import { Builder, By, Capabilities, until, type WebDriver } from 'selenium-webdr
 // source a person can read. No binary fixture is ever committed here — see the
 // header of that file for why.
 import { makeMinimalPdf, makeScannedPdf } from '../../../packages/cv-parsing/src/test/fixtures.ts';
+import { DEMO_ID_PREFIX, demoApplicationIds, demoBackup } from './demoBackup.ts';
 import { createSessionWhenWindowReady } from './smoke-session.ts';
 
 /**
@@ -631,6 +633,13 @@ const QUIT_TIMEOUT = 15_000;
  */
 const SMOKE_BACKUP_FILE = join(tmpdir(), `cviper-smoke-${String(process.pid)}`, 'backup.json');
 
+/**
+ * Where the screenshots of the real app go (L-244). CI sets it and uploads the
+ * folder as the `app-screenshots` artefact; locally it is a temp folder.
+ */
+const SCREENSHOT_DIR =
+  process.env['SMOKE_SCREENSHOT_DIR'] ?? join(tmpdir(), 'cviper-smoke-screenshots');
+
 /** Type into a field the way a person does: click it, then keys. */
 async function typeInto(selector: string, text: string): Promise<void> {
   const element = await session().wait(until.elementLocated(By.css(selector)), ELEMENT_TIMEOUT);
@@ -1036,11 +1045,27 @@ describe('the built CViper Light binary', () => {
   /** Wait for the Settings message to say `words`, and return all of it. */
   async function settingsMessage(words: string): Promise<string> {
     let text = '';
-    await session().wait(async () => {
-      const found = await session().findElements(By.css('[data-testid="settings-message"]'));
-      text = found.length === 0 ? '' : await found[0]!.getText();
-      return text.includes(words);
-    }, ELEMENT_TIMEOUT);
+    const read = async (testId: string): Promise<string> => {
+      const found = await session().findElements(By.css(`[data-testid="${testId}"]`));
+      return found.length === 0 ? '' : await found[0]!.getText();
+    };
+    try {
+      await session().wait(async () => {
+        text = await read('settings-message');
+        return text.includes(words);
+      }, ELEMENT_TIMEOUT);
+    } catch (error) {
+      // Say what the screen DID show. A run on #447 timed out here twice with
+      // nothing in the log to tell an import that failed (a problem line)
+      // from one that never finished (no line at all).
+      const problem = await read('settings-problem');
+      const confirm = await read('settings-confirm');
+      throw new Error(
+        `"${words}" never appeared in Settings. message: "${text}" problem: "${problem}" ` +
+          `confirm box: "${confirm}"`,
+        { cause: error },
+      );
+    }
     return text;
   }
 
@@ -1097,4 +1122,116 @@ describe('the built CViper Light binary', () => {
     await deleteJourneyCard();
     rmSync(join(SMOKE_BACKUP_FILE, '..'), { recursive: true, force: true });
   });
+
+  /*
+    L-244: photographs of the REAL app, for the landing page and the store
+    listings — the owner has no Windows PC to take them on. Made-up
+    applications (`demoBackup.ts`) go in through the same test-only import
+    switch as above, each main screen is saved as a PNG, and the demo cards
+    are deleted again. The pictures are an artefact for a person, not a gate;
+    what this step asserts is that the import and the screens worked.
+  */
+  it(
+    'photographs the main screens with made-up applications, then removes them',
+    { timeout: 240_000 },
+    async () => {
+      mkdirSync(SCREENSHOT_DIR, { recursive: true });
+      mkdirSync(join(SMOKE_BACKUP_FILE, '..'), { recursive: true });
+      writeFileSync(SMOKE_BACKUP_FILE, demoBackup(new Date()));
+
+      // Ask for the window the app opens at. The CI runner's screen is about
+      // 1024x768 and Windows may hold the window to it; whatever it gets is
+      // logged, so the pictures' size is never a surprise.
+      try {
+        await session().manage().window().setRect({ x: 0, y: 0, width: 1280, height: 800 });
+      } catch (error) {
+        console.log(`smoke: window   = resize refused (${String(error)})`);
+      }
+      try {
+        const rect = await session().manage().window().getRect();
+        console.log(`smoke: window   = ${String(rect.width)}x${String(rect.height)}`);
+      } catch (error) {
+        console.log(`smoke: window   = size unknown (${String(error)})`);
+      }
+
+      const shot = async (name: string): Promise<void> => {
+        // A beat for fonts and layout to settle after a view change.
+        await session().sleep(600);
+        // No focus ring in a picture: the app moves focus to each screen's
+        // heading (WCAG 2.4.3), and WebDriver's clicks do not count as a
+        // mouse, so the ring a pointer user never sees is drawn here.
+        await session().executeScript(
+          'if (document.activeElement instanceof HTMLElement) document.activeElement.blur();',
+        );
+        const png = await session().takeScreenshot();
+        writeFileSync(join(SCREENSHOT_DIR, `${name}.png`), Buffer.from(png, 'base64'));
+        console.log(`smoke: screenshot = ${name}.png`);
+      };
+
+      await click('[data-testid="nav-settings"]');
+      await click('[data-testid="settings-import"]');
+      await visible('[data-testid="settings-confirm"]');
+      await click('[data-testid="settings-confirm-import"]');
+      console.log(`smoke: demo     = ${await settingsMessage('Imported')}`);
+
+      const ids = demoApplicationIds();
+      await click('[data-testid="nav-tracker"]');
+      for (const id of ids) await visible(`[data-testid="tracker-card-${id}"]`);
+      await shot('1-tracker');
+
+      await click(`[data-testid="tracker-card-${DEMO_ID_PREFIX}app-insight-analyst"]`);
+      await visible('[data-testid="detail-pane"]');
+      await shot('2-tracker-application');
+
+      await click('[data-testid="nav-analysis"]');
+      // The sample is offered only once the screen has loaded the CV list and
+      // found it empty, a moment after the view opens. The first run looked
+      // straight away, found nothing, and photographed the empty form.
+      const sample = await session()
+        .wait(until.elementLocated(By.css('[data-testid="analysis-try-sample"]')), ELEMENT_TIMEOUT)
+        .then(
+          (element) => [element],
+          () => [],
+        );
+      console.log(
+        `smoke: sample   = ${sample.length > 0 ? 'offered' : 'not offered (a CV is saved)'}`,
+      );
+      if (sample.length > 0) {
+        await sample[0]!.click();
+        await visible('[data-testid="analysis-sample"]');
+        // The result is below the form. Scroll the screen's OWN area to it —
+        // never scrollIntoView, which moves the shell too (L-216).
+        await session().executeScript(`
+          const result = document.querySelector('[data-testid="analysis-sample"]');
+          let area = result && result.parentElement;
+          while (area && getComputedStyle(area).overflowY !== 'auto') area = area.parentElement;
+          if (result && area) {
+            area.scrollTop += result.getBoundingClientRect().top - area.getBoundingClientRect().top - 16;
+          }
+        `);
+      }
+      await shot('3-analysis');
+
+      await click('[data-testid="nav-search"]');
+      await shot('4-search');
+
+      await click('[data-testid="nav-settings"]');
+      await shot('5-settings');
+
+      for (const id of ids) {
+        await click('[data-testid="nav-tracker"]');
+        await click(`[data-testid="tracker-card-${id}"]`);
+        await click('[data-testid="detail-delete"]');
+        await click('[data-testid="confirm-delete-confirm"]');
+        await session().wait(async () => {
+          const left = await session().findElements(By.css(`[data-testid="tracker-card-${id}"]`));
+          return left.length === 0;
+        }, ELEMENT_TIMEOUT);
+      }
+      rmSync(join(SMOKE_BACKUP_FILE, '..'), { recursive: true, force: true });
+
+      const saved = readdirSync(SCREENSHOT_DIR).filter((file) => file.endsWith('.png'));
+      assert.equal(saved.length, 5, `expected 5 screenshots, found ${saved.join(', ')}`);
+    },
+  );
 });
