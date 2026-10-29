@@ -72,6 +72,16 @@ import { LiveStatus } from '../../../app/LiveStatus';
  * enabled primaries and expects exactly one.
  */
 
+/** Everything AI adds (L-327), in the words of the screens that offer it. */
+const AI_UNLOCKS: readonly string[] = [
+  'A full reading of your CV against an advert, on the Analysis screen.',
+  '“Tailor my CV”: your CV, rewritten for one job.',
+  '“Write the cover letter”: a letter for that same job.',
+  '“Prepare for this interview”: likely questions, and things to say.',
+  '“Draft a follow-up”: a short note after you apply or meet them.',
+  '“Paste a job”: paste an advert, and its details are filled in for you to check.',
+];
+
 /** What a card is doing, and what it has to say about the last thing it did. */
 interface CardOutcome {
   /** A confirmation. Rendered as a `status`, never an alert. */
@@ -104,8 +114,19 @@ export function AiKeySetup({ ports, browser, customServicePort }: AiKeySetupProp
       <SectionHeading
         icon="key"
         title="AI provider keys"
-        description="Optional. The analysis screen already has a keyword match that needs no account, and the tracker is entirely offline. A key adds one thing: a full reading of your CV against an advert by a model that understands both."
+        description="Optional. The analysis screen already has a keyword match that needs no account, and the tracker is entirely offline. An AI key, or an AI service on your own computer, adds six things:"
       />
+
+      {/*
+        L-327. This used to say a key "adds one thing", the full reading. The
+        same AI also drives five more, so the list names all six, each by the
+        label the user meets on its own screen.
+      */}
+      <ul data-testid="ai-keys-unlocks" className="mt-2 list-disc space-y-1 pl-5 text-ink-muted">
+        {AI_UNLOCKS.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
 
       {/*
         Who pays for AI, and how, before the first key box — with no figure
