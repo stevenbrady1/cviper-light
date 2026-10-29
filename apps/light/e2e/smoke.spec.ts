@@ -1045,11 +1045,27 @@ describe('the built CViper Light binary', () => {
   /** Wait for the Settings message to say `words`, and return all of it. */
   async function settingsMessage(words: string): Promise<string> {
     let text = '';
-    await session().wait(async () => {
-      const found = await session().findElements(By.css('[data-testid="settings-message"]'));
-      text = found.length === 0 ? '' : await found[0]!.getText();
-      return text.includes(words);
-    }, ELEMENT_TIMEOUT);
+    const read = async (testId: string): Promise<string> => {
+      const found = await session().findElements(By.css(`[data-testid="${testId}"]`));
+      return found.length === 0 ? '' : await found[0]!.getText();
+    };
+    try {
+      await session().wait(async () => {
+        text = await read('settings-message');
+        return text.includes(words);
+      }, ELEMENT_TIMEOUT);
+    } catch (error) {
+      // Say what the screen DID show. A run on #447 timed out here twice with
+      // nothing in the log to tell an import that failed (a problem line)
+      // from one that never finished (no line at all).
+      const problem = await read('settings-problem');
+      const confirm = await read('settings-confirm');
+      throw new Error(
+        `"${words}" never appeared in Settings. message: "${text}" problem: "${problem}" ` +
+          `confirm box: "${confirm}"`,
+        { cause: error },
+      );
+    }
     return text;
   }
 
