@@ -164,6 +164,35 @@ function canBeSetUp(kind: ProviderKind): boolean {
 }
 
 /**
+ * L-333: words in a local model's id that mean it was built for something other
+ * than reading prose. Matched LITERALLY — "contains", ignoring case — so an id
+ * with "decoder" in it counts too. `providers.ollamaOrder.test.ts` pins that.
+ *
+ * Embedders rarely get this far: the Ollama adapter drops any model the daemon
+ * says cannot chat. "embed" is here for the one that slips past it.
+ */
+const SPECIALISED_MODEL_WORDS: readonly string[] = ['coder', 'code', 'embed', 'vision'];
+
+const SPECIALISED_MODEL_NOTE = 'Built for code — may read CVs less well';
+
+function isSpecialisedModel(id: string): boolean {
+  const lower = id.toLowerCase();
+  return SPECIALISED_MODEL_WORDS.some((word) => lower.includes(word));
+}
+
+/**
+ * General chat models first, specialised ones last, each group in the order
+ * Ollama reported. The first local option is the one `defaultOptionKey` starts
+ * on, so this decides which model a CV check opens with.
+ */
+function chatModelsFirst(models: readonly ModelInfo[]): readonly ModelInfo[] {
+  return [
+    ...models.filter((model) => !isSpecialisedModel(model.id)),
+    ...models.filter((model) => isSpecialisedModel(model.id)),
+  ];
+}
+
+/**
  * `models` is which model each cloud runs (L-183). It defaults to what the user
  * chose in Settings, read afresh on every call, so a choice made there reaches
  * the next screen that builds options without anything else being told.
@@ -175,7 +204,8 @@ export function providerOptions(
 ): ProviderOption[] {
   const options: ProviderOption[] = [KEYWORD_OPTION];
 
-  for (const model of availability.ollamaModels) {
+  for (const model of chatModelsFirst(availability.ollamaModels)) {
+    const specialised = isSpecialisedModel(model.id);
     options.push({
       // The model id is inside the key: two installed models are two options,
       // and switching between them must not be mistaken for the same choice.
@@ -187,7 +217,9 @@ export function providerOptions(
       // Anthropic" two entries below. Ollama's base URL is a &'static str
       // pinned to http://127.0.0.1:11434 in src-tauri/src/providers.rs, never
       // built from anything JavaScript sends, with a Rust test holding it there.
-      note: 'Private but weaker — your CV stays on your PC.',
+      note: specialised
+        ? `${SPECIALISED_MODEL_NOTE}. Your CV stays on your PC.`
+        : 'Private but weaker — your CV stays on your PC.',
       model: model.id,
       local: true,
       needsKey: false,
