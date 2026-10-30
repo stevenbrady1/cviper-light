@@ -256,3 +256,47 @@ describe('providerOptions — local model order (L-333)', () => {
     expect(options.find((option) => option.model === 'phi3:mini')?.note).not.toContain(CODE_NOTE);
   });
 });
+
+/**
+ * Vision models are built for pictures, not code, so they get their own note.
+ * An id that names both "vision" and a code word gets the IMAGES note: "vision"
+ * says what kind of model it is, and the code words can turn up as a variant
+ * tag on it. Ordering is untouched — all four words still sort last.
+ */
+describe('providerOptions — the note for a vision model (L-333)', () => {
+  const IMAGES_NOTE = 'Built for images — may read CVs less well. Your CV stays on your PC.';
+  const FULL_CODE_NOTE = 'Built for code — may read CVs less well. Your CV stays on your PC.';
+
+  function noteFor(id: string): string | undefined {
+    return providerOptions(
+      { ...NOTHING, ollamaRunning: true, ollamaModels: [{ id, label: id }] },
+      MODELS,
+      null,
+    ).find((option) => option.model === id)?.note;
+  }
+
+  it('a vision model says it is built for images', () => {
+    expect(noteFor('llama3.2-vision:11b')).toBe(IMAGES_NOTE);
+    expect(noteFor('Qwen2.5-VISION:7b')).toBe(IMAGES_NOTE);
+  });
+
+  it('a code, coder or embed model keeps the code note', () => {
+    expect(noteFor('qwen2.5-coder:7b')).toBe(FULL_CODE_NOTE);
+    expect(noteFor('codellama:7b')).toBe(FULL_CODE_NOTE);
+    expect(noteFor('some-embed-chat:1b')).toBe(FULL_CODE_NOTE);
+  });
+
+  it('an id naming both vision and code gets the images note', () => {
+    expect(noteFor('llava-code-vision:7b')).toBe(IMAGES_NOTE);
+  });
+
+  it('a vision model still sorts after a general one', () => {
+    expect(
+      ollamaIds({
+        ...NOTHING,
+        ollamaRunning: true,
+        ollamaModels: [{ id: 'llama3.2-vision:11b', label: 'v' }, CODER, LLAMA],
+      }),
+    ).toEqual(['llama3.2', 'llama3.2-vision:11b', 'qwen2.5-coder:7b']);
+  });
+});

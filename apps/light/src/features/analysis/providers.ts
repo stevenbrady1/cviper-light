@@ -173,11 +173,24 @@ function canBeSetUp(kind: ProviderKind): boolean {
  */
 const SPECIALISED_MODEL_WORDS: readonly string[] = ['coder', 'code', 'embed', 'vision'];
 
-const SPECIALISED_MODEL_NOTE = 'Built for code — may read CVs less well';
-
 function isSpecialisedModel(id: string): boolean {
   const lower = id.toLowerCase();
   return SPECIALISED_MODEL_WORDS.some((word) => lower.includes(word));
+}
+
+/**
+ * The note for a local model. A vision model is built for pictures, not code,
+ * so it says so; an id naming both "vision" and a code word gets the images
+ * note, because "vision" is what kind of model it is.
+ */
+function localModelNote(id: string): string {
+  if (id.toLowerCase().includes('vision')) {
+    return 'Built for images — may read CVs less well. Your CV stays on your PC.';
+  }
+  if (isSpecialisedModel(id)) {
+    return 'Built for code — may read CVs less well. Your CV stays on your PC.';
+  }
+  return 'Private but weaker — your CV stays on your PC.';
 }
 
 /**
@@ -205,7 +218,6 @@ export function providerOptions(
   const options: ProviderOption[] = [KEYWORD_OPTION];
 
   for (const model of chatModelsFirst(availability.ollamaModels)) {
-    const specialised = isSpecialisedModel(model.id);
     options.push({
       // The model id is inside the key: two installed models are two options,
       // and switching between them must not be mistaken for the same choice.
@@ -217,9 +229,7 @@ export function providerOptions(
       // Anthropic" two entries below. Ollama's base URL is a &'static str
       // pinned to http://127.0.0.1:11434 in src-tauri/src/providers.rs, never
       // built from anything JavaScript sends, with a Rust test holding it there.
-      note: specialised
-        ? `${SPECIALISED_MODEL_NOTE}. Your CV stays on your PC.`
-        : 'Private but weaker — your CV stays on your PC.',
+      note: localModelNote(model.id),
       model: model.id,
       local: true,
       needsKey: false,
