@@ -1,0 +1,119 @@
+name: Feed canary
+
+# ============================================================================
+# DOES EVERY FREE JOB FEED THE APP SHIPS STILL ANSWER? (L-339)
+# ============================================================================
+# Guardian Jobs closed on 2 Sep 2026. Its feed address started redirecting to
+# a web page that answered 200, and the app read that page for two months
+# before anybody noticed (retired in L-336/L-337). The app tells a USER when a
+# feed fails; nothing told us. This does, once a day.
+#
+# It reads the feed list out of apps/light/src-tauri/src/keyless.rs and reads
+# each feed through the app's own reader — the logic, and why, is at the top of
+# apps/light/src/feeds/feedCanary.ts, unit-tested offline by `pnpm test`.
+#
+# NOT ON PUSH OR PULL REQUEST, DELIBERATELY. It asks somebody else's free
+# service for two pages of jobs, and its result depends on that service, not on
+# the change under review. A pull request that cannot go green because a third
+# party is down is a pull request somebody merges anyway. The schedule and the
+# manual button are the only triggers.
+#
+# A FAILED CHECK IS NEVER A PASS. The check step goes red on any problem, and
+# only then does the issue step run, so the run stays red whether the issue is
+# opened or not — and if opening it fails, that step is red too. There is no
+# `|| true` anywhere in this file, and none may be added.
+on:
+  schedule:
+    # 06:17 UTC daily. Off the hour: GitHub queues every `0 * * * *` schedule at
+    # once and delays or drops some under load.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+# Least privilege, and `contents: read` is named explicitly. A job with a
+# `permissions:` block that omits it cannot check the repository out.
+permissions:
+  contents: read
+
+# Two runs at once would race to open the same issue twice.
+concurrency:
+  group: feed-canary
+  cancel-in-progress: false
+
+env:
+  # Corepack asks, interactively, before downloading a package manager it has
+  # not seen. On a runner that prompt is a hang ending in a timeout.
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+jobs:
+  canary:
+    name: every keyless feed answers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # `issues: write` to open the issue, or comment on the one already open.
+    # `contents: read` is named because the checkout needs it.
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      # The job's token can write issues, so it is not left in .git/config for
+      # an installed dependency to read.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Before setup-node, because `cache: pnpm` needs a pnpm binary to ask
+      # where the store lives.
+      - name: Enable pnpm through corepack
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # The checker loads the app's real reader through Vite, so it needs the
+      # workspace installed.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `pipefail` so `tee` cannot turn the canary's exit code into its own 0.
+      # The log is kept for the issue body below.
+      - name: Ask every keyless feed for its jobs
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm canary:feeds 2>&1 | tee feed-canary.log
+
+      # Runs only when something above failed, so this run is already red.
+      # One open issue at a time, found by its fixed title: a feed that stays
+      # dead for a week gets seven comments on one issue, not seven issues.
+      - name: Open or update the feed-canary issue
+        if: failure()
+        shell: bash
+        env:
+          # Without a repository to resolve, `gh` dies with "failed to determine
+          # base repo". This is the cheapest way to give it one.
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title='Feed canary: a free job feed stopped answering'
+          {
+            echo "The daily feed canary failed: $RUN_URL"
+            echo
+            if [ -s feed-canary.log ]; then
+              echo '```'
+              tail -c 60000 feed-canary.log
+              echo '```'
+            else
+              echo 'The canary did not get as far as asking a feed. The run log says why.'
+            fi
+          } > issue-body.md
+          existing=$(gh issue list --state open --limit 1000 --json number,title --jq "map(select(.title == \"$title\")) | first | .number // empty")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file issue-body.md
+          else
+            gh issue create --title "$title" --body-file issue-body.md
+          fi

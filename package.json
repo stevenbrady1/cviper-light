@@ -21,6 +21,7 @@
     "webkit": "pnpm webkit:build && node --test apps/light/e2e/pdfjs-webkit.spec.ts apps/light/e2e/contrast-webkit.spec.ts",
     "verify:updater-manifest": "node apps/light/src/release/verifyUpdaterManifest.ts",
     "check:l-numbers": "node apps/light/src/numbering/checkLNumbers.ts",
+    "canary:feeds": "node apps/light/src/feeds/runFeedCanary.ts",
     "changelog:preview": "node apps/light/src/release/releaseChangelog.ts preview",
     "changelog:release": "node apps/light/src/release/releaseChangelog.ts release",
     "approved-sql": "vitest run apps/light/src/lib/approved-sql.contract.test.ts -u",
