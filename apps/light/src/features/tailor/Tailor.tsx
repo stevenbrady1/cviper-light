@@ -263,10 +263,11 @@ export function Tailor({
     [patchActive],
   );
   /**
-   * Whether the chosen CV's text is shown (L-192). Starts open, and is NOT
-   * reset when the CV changes: a user who folded it away did so on purpose.
+   * Whether the user has opened the chosen CV's text (L-192). Starts folded,
+   * so the advert is above the fold (L-340), and is NOT reset when the CV
+   * changes: a user who opened or folded it did so on purpose.
    */
-  const [cvPreviewOpen, setCvPreviewOpen] = useState(true);
+  const [cvPreviewOpen, setCvPreviewOpen] = useState(false);
 
   const [consent, setConsent] = useState<ConsentState>(NO_CONSENT);
 

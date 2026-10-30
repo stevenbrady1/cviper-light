@@ -5,7 +5,7 @@
  * The rewrite works from the CV's stored `extracted_text`, not from the file
  * the user remembers uploading — so that text is what the screen shows, under
  * the picker, the moment a CV is chosen. It is read-only, collapsible, starts
- * open, and follows the picker (and an L-190 handoff) without a click.
+ * folded (L-340), and follows the picker (and an L-190 handoff) without a click.
  */
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -97,12 +97,12 @@ const previewText = () => screen.getByTestId('tailor-cv-preview-text');
 const toggle = () => screen.getByTestId('tailor-cv-preview-toggle');
 
 describe('the chosen CV, shown under the picker', () => {
-  it('happy: shows the default (first) CV’s stored text on load, open', async () => {
+  it('happy: shows the default (first) CV’s stored text on load, folded', async () => {
     await renderWith([cv('cv-1', 'Risk CV.docx', RISK_TEXT), cv('cv-2', 'Data CV.pdf', DATA_TEXT)]);
 
     await vi.waitFor(() => expect(previewText().textContent).toBe(RISK_TEXT));
     const panel = screen.getByTestId('tailor-cv-preview');
-    expect(panel.hidden).toBe(false);
+    expect(panel.hidden).toBe(true);
     expect(panel.getAttribute('aria-labelledby')).not.toBeNull();
     const heading = document.getElementById(panel.getAttribute('aria-labelledby') ?? '');
     expect(heading?.textContent).toBe('Your CV as the rewrite reads it');
@@ -144,8 +144,12 @@ describe('the chosen CV, shown under the picker', () => {
     await vi.waitFor(() => expect(previewText()).toBeTruthy());
 
     const panel = screen.getByTestId('tailor-cv-preview');
-    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
     expect(toggle().getAttribute('aria-controls')).toBe(panel.id);
+    expect(toggle().textContent).toBe('Show CV');
+
+    await user.click(toggle());
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
     expect(toggle().textContent).toBe('Hide CV');
 
     await user.click(toggle());

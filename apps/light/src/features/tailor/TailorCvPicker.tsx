@@ -1,4 +1,4 @@
-import { type Cv } from '@cviper/core-types';
+import { wordCount, type Cv } from '@cviper/core-types';
 
 import { QUIET_BUTTON } from '../../app/buttons';
 import { type FilePort } from '../../platform/files';
@@ -18,6 +18,7 @@ export interface TailorCvPickerProps {
   readonly saveCv: CvStorePort['saveCv'];
   readonly now?: Date | undefined;
   readonly onUploaded: (cv: Cv) => void;
+  /** Whether the user has opened the CV text. A CV with no text shows anyway. */
   readonly previewOpen: boolean;
   readonly onTogglePreview: () => void;
   readonly running: boolean;
@@ -95,40 +96,82 @@ export function TailorCvPicker({
        * says so.
        */}
       {selectedCv === null ? null : (
-        <div className="mt-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p id="tailor-cv-preview-heading" className="text-xs font-medium text-ink-muted">
-              Your CV as the rewrite reads it
-            </p>
-            <button
-              type="button"
-              data-testid="tailor-cv-preview-toggle"
-              aria-expanded={previewOpen}
-              aria-controls="tailor-cv-preview"
-              onClick={onTogglePreview}
-              className={QUIET_BUTTON}
-            >
-              {previewOpen ? 'Hide CV' : 'Show CV'}
-            </button>
-          </div>
-          <section
-            id="tailor-cv-preview"
-            data-testid="tailor-cv-preview"
-            aria-labelledby="tailor-cv-preview-heading"
-            hidden={!previewOpen}
-            className="mt-1"
-          >
-            <CvTextPanel
-              // A fresh panel per CV: an edit in progress never follows the
-              // picker to another CV.
-              key={selectedCv.id}
-              cv={selectedCv}
-              disabled={running}
-              onSave={onSaveCv}
-            />
-          </section>
-        </div>
+        <CvPreview
+          cv={selectedCv}
+          open={previewOpen}
+          onToggle={onTogglePreview}
+          running={running}
+          onSaveCv={onSaveCv}
+        />
       )}
+    </div>
+  );
+}
+
+interface CvPreviewProps {
+  readonly cv: Cv;
+  readonly open: boolean;
+  readonly onToggle: () => void;
+  readonly running: boolean;
+  readonly onSaveCv: (next: Cv) => Promise<string | null>;
+}
+
+/**
+ * Folded to one line until the user opens it (L-340), so the advert is above
+ * the fold: the heading, the file name, the word count and the toggle.
+ *
+ * A CV with no text is always shown, so "Type or paste your CV text" is never
+ * behind a toggle. That is derived from the CV, not a reset of the user's
+ * choice: a normal CV picked next is back to whatever they chose (L-192). It
+ * has no toggle, because one that cannot fold the panel would lie.
+ */
+function CvPreview({ cv, open, onToggle, running, onSaveCv }: CvPreviewProps) {
+  const text = cv.extracted_text ?? '';
+  const noText = text.trim() === '';
+  const shown = open || noText;
+  return (
+    <div className="mt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-ink-muted">
+          <span id="tailor-cv-preview-heading" className="font-medium">
+            Your CV as the rewrite reads it
+          </span>
+          {shown ? null : (
+            // Open, the panel's own line says this: no repeat.
+            <span data-testid="tailor-cv-preview-summary" className="text-xs text-ink-faint">
+              : {cv.name} · <span className="font-mono tabular-nums">{wordCount(text)}</span> words
+            </span>
+          )}
+        </p>
+        {noText ? null : (
+          <button
+            type="button"
+            data-testid="tailor-cv-preview-toggle"
+            aria-expanded={open}
+            aria-controls="tailor-cv-preview"
+            onClick={onToggle}
+            className={QUIET_BUTTON}
+          >
+            {open ? 'Hide CV' : 'Show CV'}
+          </button>
+        )}
+      </div>
+      <section
+        id="tailor-cv-preview"
+        data-testid="tailor-cv-preview"
+        aria-labelledby="tailor-cv-preview-heading"
+        hidden={!shown}
+        className="mt-1"
+      >
+        <CvTextPanel
+          // A fresh panel per CV: an edit in progress never follows the
+          // picker to another CV.
+          key={cv.id}
+          cv={cv}
+          disabled={running}
+          onSave={onSaveCv}
+        />
+      </section>
     </div>
   );
 }
