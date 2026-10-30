@@ -100,28 +100,20 @@ export function TrackerColumn({
       }`}
     >
       {/*
-        Wraps (L-311). A column shrinks to its minimum when an application is
-        open, and the Interviewing heading — name, "Edit stages" and count — is
-        wider than that: on one line the count ran into the next column's name
-        ("1OFFER"). Now the button and count drop under the name instead, kept
-        to the right. `contrast-webkit.spec.ts` measures it in a real engine.
+        Title, then count, and nothing between them (L-332) — the same in every
+        column. "Edit stages" used to sit between the two in Interviewing, and
+        the heading was then wider than a column at its minimum: first the count
+        ran into the next column's name ("1OFFER", L-311), then, wrapped, the
+        count dropped under the name with the button and no longer lined up with
+        its neighbours. The button lives in its own row under the heading, where
+        it takes no width from the count, and comes before the cards in focus
+        order. `contrast-webkit.spec.ts` measures the heading in a real engine.
       */}
       <header className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 px-2 pt-2 pb-1.5">
         <h2 className="min-w-0 font-mono text-[11px] font-medium tracking-[0.12em] text-ink-muted uppercase">
           {STATUS_LABELS[status]}
         </h2>
         <span className="ml-auto flex items-baseline gap-2">
-          {status !== 'interviewing' || onEditSubstages === undefined ? null : (
-            <button
-              type="button"
-              data-testid="tracker-edit-substages"
-              aria-label={substages.length === 0 ? undefined : 'Edit interview stages'}
-              onClick={(event) => onEditSubstages(event.currentTarget)}
-              className={`${QUIET_BUTTON} text-xs`}
-            >
-              {substages.length === 0 ? 'Edit stages' : 'Stages'}
-            </button>
-          )}
           <span
             data-testid={`tracker-count-${status}`}
             className="font-mono text-xs tabular-nums text-ink-faint"
@@ -130,6 +122,20 @@ export function TrackerColumn({
           </span>
         </span>
       </header>
+
+      {status !== 'interviewing' || onEditSubstages === undefined ? null : (
+        <div className="px-2 pb-1.5">
+          <button
+            type="button"
+            data-testid="tracker-edit-substages"
+            aria-label={substages.length === 0 ? undefined : 'Edit interview stages'}
+            onClick={(event) => onEditSubstages(event.currentTarget)}
+            className={`${QUIET_BUTTON} text-xs`}
+          >
+            {substages.length === 0 ? 'Edit stages' : 'Stages'}
+          </button>
+        </div>
+      )}
 
       <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-2">
         {entries.map((entry) => (
