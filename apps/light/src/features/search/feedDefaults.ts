@@ -14,7 +14,7 @@
  * A tick or untick the user makes is theirs: it wins over the default from
  * then on, and is remembered across restarts in a small store of its own.
  */
-import { KEYLESS_SOURCE_IDS, type KeylessSourceId } from '@cviper/job-apis';
+import { KEYLESS_SOURCE_IDS, KEYLESS_SOURCE_LABEL, type KeylessSourceId } from '@cviper/job-apis';
 
 export const FEED_CHOICE_KEY = 'cviper.light.search.feeds';
 
@@ -304,6 +304,31 @@ export function chosenFeeds(choice: FeedChoice, location: string): ReadonlySet<K
   return new Set(
     KEYLESS_SOURCE_IDS.filter((source) => choice[source] ?? (source === 'arbeitnow' ? !uk : true)),
   );
+}
+
+/**
+ * The feeds the default ticks for this location, as if nothing were stored
+ * (L-335): what "tick the free feed" means when the user has unticked it.
+ * Outside the UK that is Arbeitnow. For a UK location it is nothing at all
+ * since Guardian Jobs closed (L-336) — never Arbeitnow, which is mostly Europe.
+ */
+export function defaultFeeds(location: string): readonly KeylessSourceId[] {
+  const feeds = chosenFeeds({}, location);
+  return KEYLESS_SOURCE_IDS.filter((source) => feeds.has(source));
+}
+
+/**
+ * "Tick Arbeitnow" — named from the feeds' own labels — or `null` when there
+ * is nothing to tick, so no button ever says "Tick 0 free feeds" (L-336).
+ */
+export function tickFeedsLabel(sources: readonly KeylessSourceId[]): string | null {
+  if (sources.length === 0) return null;
+  return `Tick ${sources.map((source) => KEYLESS_SOURCE_LABEL[source]).join(' and ')}`;
+}
+
+/** Tick each of these as the user's own choice, remembered like a tick by hand. */
+export function tickFeeds(choice: FeedChoice, sources: readonly KeylessSourceId[]): FeedChoice {
+  return sources.reduce((next, source) => rememberFeedChoice(next, source, true), choice);
 }
 
 function storage(): Storage | null {
