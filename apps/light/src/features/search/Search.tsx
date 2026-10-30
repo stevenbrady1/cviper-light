@@ -19,6 +19,7 @@ import { SHIPPED_BOARDS } from '../boards/defaults';
 import { type AnalyseHandoff } from '../flow/handoff';
 import { NO_PREFERENCES, mergeBoards, type Board } from '../boards/model';
 import { createTauriBoardPreferencesPort, type BoardPreferencesPort } from '../boards/port';
+import { keyProvider } from '../settings/keys/model';
 import { readQuota, writeQuota } from '../../jobs/quotaStore';
 import { todayIsoDate } from '../../lib/dates';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
@@ -143,6 +144,8 @@ export interface SearchProps {
   readonly onOpenSettings?: (() => void) | undefined;
   /** Take the user to Settings → Job boards (L-310). Owned by the shell, likewise. */
   readonly onOpenJobBoards?: (() => void) | undefined;
+  /** Take the user to Settings → the Reed key (L-338). Owned by the shell, likewise. */
+  readonly onOpenReedKey?: (() => void) | undefined;
   /**
    * Take a saved job to the Analysis screen (L-190). The shell owns which view
    * is showing, so the job goes back to it. Left undefined, the cards draw no
@@ -160,6 +163,7 @@ export function Search({
   newId,
   onOpenSettings,
   onOpenJobBoards,
+  onOpenReedKey,
   onAnalyse,
 }: SearchProps = {}) {
   // Built once. A new port every render would restart the load effects on every
@@ -560,6 +564,16 @@ export function Search({
           label: fixLabel,
           onFix: () => setFeedChoice((current) => tickFeeds(current, fixFeeds)),
         };
+  // …so there the fix is the reason's own: the free Reed key, in Settings (L-338).
+  // Exactly when the Reed reason shows — the same `ukWithoutKey` decides both.
+  const reedFix =
+    disabledReason === null || !ukWithoutKey || onOpenReedKey === undefined
+      ? null
+      : {
+          label: keyProvider('reed').signupLabel,
+          onFix: onOpenReedKey,
+          testId: 'search-get-reed-key',
+        };
 
   // ── Rendering ────────────────────────────────────────────────────────────
 
@@ -647,7 +661,11 @@ export function Search({
             </section>
 
             {/* The blue button, and why it is grey right beside it (L-335). */}
-            <SearchSubmitRow running={running} disabledReason={disabledReason} fix={feedFix} />
+            <SearchSubmitRow
+              running={running}
+              disabledReason={disabledReason}
+              fix={reedFix ?? feedFix}
+            />
 
             {/*
               The ticked boards, in the browser, with the same filters (L-329).

@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { type JobProviderId } from '@cviper/job-apis';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
 import { cardClasses, SectionHeading, StatusPill } from '../../../ui';
@@ -72,9 +74,16 @@ export interface KeySetupProps {
   readonly port?: KeyPort | undefined;
   /** Injected by tests: the real one opens the user's browser. */
   readonly browser?: BrowserPort | undefined;
+  /**
+   * Arrived from Search's "Get a free Reed key" (L-338): move focus to this
+   * board's signup button, once, when its card is drawn.
+   */
+  readonly focused?: JobProviderId | undefined;
+  /** Told once that card has been focused, with the card, so Settings can scroll to it. */
+  readonly onFocused?: ((card: HTMLElement) => void) | undefined;
 }
 
-export function KeySetup({ port, browser }: KeySetupProps = {}) {
+export function KeySetup({ port, browser, focused, onFocused }: KeySetupProps = {}) {
   // Built once. A new port object every render would restart every card's
   // status effect on every keystroke.
   const keyPort = useMemo(() => port ?? createTauriKeyPort(), [port]);
@@ -92,7 +101,14 @@ export function KeySetup({ port, browser }: KeySetupProps = {}) {
 
       <div className="mt-4 space-y-4">
         {KEY_PROVIDERS.map((provider) => (
-          <KeyCard key={provider.id} provider={provider} port={keyPort} browser={browserPort} />
+          <KeyCard
+            key={provider.id}
+            provider={provider}
+            port={keyPort}
+            browser={browserPort}
+            focused={focused === provider.id}
+            onFocused={onFocused}
+          />
         ))}
       </div>
     </section>
@@ -103,9 +119,27 @@ interface KeyCardProps {
   readonly provider: KeyProvider;
   readonly port: KeyPort;
   readonly browser: BrowserPort;
+  readonly focused: boolean;
+  readonly onFocused: ((card: HTMLElement) => void) | undefined;
 }
 
-function KeyCard({ provider, port, browser }: KeyCardProps) {
+function KeyCard({ provider, port, browser, focused, onFocused }: KeyCardProps) {
+  /*
+    Focus lands on the card's own signup button (L-338): the user pressed a
+    button with the same words on Search, and getting the key is the next
+    step. `preventScroll`, never `scrollIntoView` (L-216) — Settings moves its
+    own scroll area, in `onFocused`. Once only; the shell clears the request.
+  */
+  const card = useRef<HTMLElement>(null);
+  const signup = useRef<HTMLButtonElement>(null);
+  const focusDone = useRef(false);
+  useEffect(() => {
+    if (!focused || focusDone.current || card.current === null) return;
+    focusDone.current = true;
+    signup.current?.focus({ preventScroll: true });
+    onFocused?.(card.current);
+  }, [focused, onFocused]);
+
   const [answers, setAnswers] = useState<CredentialAnswers>({});
   const [values, setValues] = useState<Partial<Record<SecretKeyName, string>>>({});
   const [errors, setErrors] = useState<CandidateErrors>({});
@@ -217,7 +251,7 @@ function KeyCard({ provider, port, browser }: KeyCardProps) {
   }, [port, provider.id, provider.label, refresh]);
 
   return (
-    <article data-testid={`key-card-${provider.id}`} className={cardClasses()}>
+    <article ref={card} data-testid={`key-card-${provider.id}`} className={cardClasses()}>
       <header className="flex items-baseline justify-between gap-3">
         <h3 className="font-medium text-ink">{provider.label}</h3>
         {/*
@@ -238,6 +272,7 @@ function KeyCard({ provider, port, browser }: KeyCardProps) {
 
       <div className="mt-2">
         <button
+          ref={signup}
           type="button"
           data-testid={`key-signup-${provider.id}`}
           onClick={() => void browser.open(provider.signupUrl)}

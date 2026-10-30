@@ -106,8 +106,11 @@ export interface SettingsProps {
   readonly browser?: BrowserPort | undefined;
   /** Injected by tests: the real one reads and writes the board-choices file. */
   readonly boardsPort?: BoardPreferencesPort | undefined;
-  /** Open at a section rather than the top (L-310): Search's "Manage job boards". */
-  readonly openAt?: 'job-boards' | undefined;
+  /**
+   * Open at a place rather than the top: Search's "Manage job boards" (L-310),
+   * or its "Get a free Reed key", which unfolds the job-board keys (L-338).
+   */
+  readonly openAt?: 'job-boards' | 'reed-key' | undefined;
   /** Told once the section asked for has been reached, so the shell can forget it. */
   readonly onOpened?: (() => void) | undefined;
   /**
@@ -172,11 +175,15 @@ export function Settings({
   onOpened,
 }: SettingsProps = {}) {
   /*
-    Opened at Job boards (L-310): this screen's own scroll area brings the
-    section to its top. Only this area moves — never the window (L-216).
+    Opened at Job boards (L-310) or the Reed key (L-338): this screen's own
+    scroll area brings the place to its top. Only this area moves — never the
+    window (L-216).
   */
   const scrollArea = useRef<HTMLDivElement>(null);
-  const onBoardsFocused = useCallback(
+  // Unfolded when opened at the Reed key, and only at first draw: once the
+  // shell forgets the request the fold is the user's again (L-338).
+  const [keysUnfolded] = useState(openAt === 'reed-key');
+  const onPlaceFocused = useCallback(
     (section: HTMLElement) => {
       if (scrollArea.current !== null) scrollWithin(scrollArea.current, section);
       onOpened?.();
@@ -462,7 +469,7 @@ export function Settings({
           <BoardSettings
             port={boardsPort}
             focused={openAt === 'job-boards'}
-            onFocused={onBoardsFocused}
+            onFocused={onPlaceFocused}
           />
 
           {/*
@@ -480,12 +487,17 @@ export function Settings({
             its keys with `job_test_credentials`, a command that REFUSES an AI
             credential by design — see the note in `aiKeyModel.ts`.
           */}
-          <details data-testid="settings-advanced" className="group">
+          <details data-testid="settings-advanced" className="group" open={keysUnfolded}>
             <summary className="cursor-pointer font-medium text-ink">
               Job-board keys (optional)
             </summary>
             <div className="mt-4">
-              <KeySetup port={keyPort} browser={browserPort} />
+              <KeySetup
+                port={keyPort}
+                browser={browserPort}
+                focused={openAt === 'reed-key' ? 'reed' : undefined}
+                onFocused={onPlaceFocused}
+              />
             </div>
           </details>
 

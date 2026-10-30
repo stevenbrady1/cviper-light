@@ -8,9 +8,14 @@ export interface SearchSubmitRowProps {
   readonly disabledReason: string | null;
   /**
    * The one-press fix for that reason (L-335), or `null` when there is none:
-   * its label, and what pressing it does.
+   * its label, what pressing it does, and — when it is not a feed tick, like
+   * the UK's "Get a free Reed key" (L-338) — its own test id.
    */
-  readonly fix: { readonly label: string; readonly onFix: () => void } | null;
+  readonly fix: {
+    readonly label: string;
+    readonly onFix: () => void;
+    readonly testId?: string | undefined;
+  } | null;
 }
 
 /**
@@ -70,7 +75,7 @@ export function SearchSubmitRow({ running, disabledReason, fix }: SearchSubmitRo
           {fix === null ? null : (
             <button
               type="button"
-              data-testid="search-tick-feeds"
+              data-testid={fix.testId ?? 'search-tick-feeds'}
               disabled={running}
               onClick={() => {
                 focusWhenEnabled.current = true;
