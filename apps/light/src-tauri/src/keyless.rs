@@ -3,7 +3,7 @@
 //! ============================================================================
 //! THIS MODULE HAS NO ROUTE TO THE CREDENTIAL STORE, AND THAT IS STRUCTURAL
 //! ============================================================================
-//! Neither feed takes a key. There is nothing to send, nothing to forget to
+//! The feed takes no key. There is nothing to send, nothing to forget to
 //! send, and nothing here that could send one by accident: this file cannot so
 //! much as NAME `secrets`, `keyring`, an authorization header or an API-key
 //! header, and `this_command_cannot_reach_the_credential_store` reads its own
@@ -15,10 +15,10 @@
 //! key too" to a request going somewhere Adzuna has nothing to do with.
 //!
 //! ============================================================================
-//! RUST OWNS BOTH ADDRESSES. JAVASCRIPT NAMES A FEED AND A PAGE NUMBER.
+//! RUST OWNS THE ADDRESS. JAVASCRIPT NAMES A FEED AND A PAGE NUMBER.
 //! ============================================================================
 //! Same rule as `jobs.rs` and `providers.rs`: the frontend passes a value from
-//! a two-member enum and a small integer, and the URL is a `&'static str` in
+//! a closed enum and a small integer, and the URL is a `&'static str` in
 //! this file. A command that forwarded an arbitrary address would be
 //! server-side request forgery with a friendly name — see the long note at the
 //! top of `fetch_page.rs`, which takes a URL and is the one place that does.
@@ -30,16 +30,19 @@
 //! ============================================================================
 //! THE BYTES COME BACK RAW. THE PAGE PARSES THEM.
 //! ============================================================================
-//! Guardian Jobs is RSS. Parsing XML here would mean an XML crate in the part
-//! of the app that holds the credentials, to do a job the WebView's own
-//! `DOMParser` already does — so this returns the body and
-//! `packages/job-apis/src/keyless/` reads it. The same split `fetch_page.rs`
-//! uses for HTML.
+//! Parsing the reply here would mean a parser in the part of the app that
+//! holds the credentials, to do a job the WebView already does — so this
+//! returns the body and `packages/job-apis/src/keyless/` reads it. The same
+//! split `fetch_page.rs` uses for HTML.
+//!
+//! Guardian Jobs used to be a second feed here. It closed on 2 Sep 2026 and its
+//! address now redirects to an article about the closure, so it was removed
+//! (L-336): `"guardian"` is no longer a value this command accepts.
 //!
 //! ============================================================================
 //! "PLEASE DO NOT ABUSE" IS IN ARBEITNOW'S OWN TERMS, SO THE GAP IS ENFORCED
 //! ============================================================================
-//! A browse costs three requests: two pages of Arbeitnow and Guardian's one.
+//! A browse costs two requests: two pages of Arbeitnow.
 //! The minimum gap between fetches is enforced here rather than in the UI,
 //! because a disabled button is a suggestion and the transport is the only
 //! place that can actually refuse. The slot is per SOURCE AND PAGE: one browse
@@ -58,7 +61,6 @@ use crate::providers::{self, RequestFailure};
 #[serde(rename_all = "snake_case")]
 pub enum KeylessSource {
     Arbeitnow,
-    Guardian,
 }
 
 /// The most pages of one feed this command will ever fetch.
@@ -71,7 +73,7 @@ const MAX_PAGES: u32 = 2;
 /// The largest reply that will be read, in bytes.
 ///
 /// One live Arbeitnow page is 2.1 MB, so this has real headroom above the
-/// biggest thing either feed legitimately sends, and is a hard stop well short
+/// biggest thing the feed legitimately sends, and is a hard stop well short
 /// of a hostile endpoint streaming until the machine runs out of memory.
 const MAX_FEED_BYTES: usize = 8 * 1024 * 1024;
 
@@ -87,25 +89,17 @@ impl KeylessSource {
     /// Scheme, host AND path. NEVER built from anything JavaScript sent.
     ///
     /// Arbeitnow publishes its whole board here, 250 adverts a page, ordered
-    /// newest first. Guardian's `jobsrss` is the same twenty items whatever is
-    /// asked of it — there is no query form of either address to build.
+    /// newest first. There is no query form of the address to build.
     fn base_url(self) -> &'static str {
         match self {
             KeylessSource::Arbeitnow => "https://www.arbeitnow.com/api/job-board-api",
-            KeylessSource::Guardian => "https://jobs.theguardian.com/jobsrss/",
         }
-    }
-
-    /// Does this feed paginate? Guardian publishes one page and ignores `page`.
-    fn paginates(self) -> bool {
-        matches!(self, KeylessSource::Arbeitnow)
     }
 
     /// What this feed sends, so a maintenance page is not read as data.
     fn accept(self) -> &'static str {
         match self {
             KeylessSource::Arbeitnow => "application/json",
-            KeylessSource::Guardian => "application/rss+xml, application/xml, text/xml",
         }
     }
 
@@ -113,7 +107,6 @@ impl KeylessSource {
     fn label(self) -> &'static str {
         match self {
             KeylessSource::Arbeitnow => "Arbeitnow",
-            KeylessSource::Guardian => "Guardian Jobs",
         }
     }
 
@@ -121,7 +114,6 @@ impl KeylessSource {
     fn last_fetch(self) -> &'static Mutex<[Option<Instant>; MAX_PAGES as usize]> {
         match self {
             KeylessSource::Arbeitnow => &ARBEITNOW_LAST_FETCH,
-            KeylessSource::Guardian => &GUARDIAN_LAST_FETCH,
         }
     }
 }
@@ -147,16 +139,12 @@ fn slot_index(page: u32) -> usize {
 /// ============================================================================
 /// ONE PARAMETER, WHOSE NAME IS A `&'static str` AND WHOSE VALUE IS A NUMBER
 /// ============================================================================
-/// There is nothing else to send. Neither feed accepts a keyword or a location
-/// — that is the entire reason this feature filters on the user's machine — so
+/// There is nothing else to send. The feed accepts no keyword or location —
+/// that is the entire reason this feature filters on the user's machine — so
 /// nothing the user typed reaches this function at all. It cannot: no parameter
 /// of `keyless_fetch` carries text.
-fn query_pairs(source: KeylessSource, page: u32) -> Vec<(&'static str, String)> {
-    if source.paginates() {
-        vec![("page", clamp_page(page).to_string())]
-    } else {
-        Vec::new()
-    }
+fn query_pairs(_source: KeylessSource, page: u32) -> Vec<(&'static str, String)> {
+    vec![("page", clamp_page(page).to_string())]
 }
 
 /// How long to wait before this feed and page may be fetched again, or `None`.
@@ -329,7 +317,7 @@ async fn read_capped(
 /// One page of one public job feed. No credential, and no way to reach one.
 ///
 /// The whole account of why this is safe is at the top of this file. The short
-/// version: two fixed addresses, one clamped page number, no key, nothing the
+/// version: one fixed address, one clamped page number, no key, nothing the
 /// user typed, a minimum gap between requests, and a hard cap on the reply.
 #[tauri::command]
 pub(crate) async fn keyless_fetch(source: KeylessSource, page: u32) -> Result<String, String> {
@@ -342,8 +330,8 @@ pub(crate) async fn keyless_fetch(source: KeylessSource, page: u32) -> Result<St
             "throttled",
             format!(
                 "That was very quick after the last one. Wait about {seconds} second(s) and try \
-                 again — these job feeds are free, and one of them asks in its own terms not to \
-                 be hammered."
+                 again — this job feed is free, and asks in its own terms not to be \
+                 hammered."
             ),
         ));
     }
@@ -374,14 +362,12 @@ pub(crate) async fn keyless_fetch(source: KeylessSource, page: u32) -> Result<St
 
 static ARBEITNOW_LAST_FETCH: Mutex<[Option<Instant>; MAX_PAGES as usize]> =
     Mutex::new([None; MAX_PAGES as usize]);
-static GUARDIAN_LAST_FETCH: Mutex<[Option<Instant>; MAX_PAGES as usize]> =
-    Mutex::new([None; MAX_PAGES as usize]);
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const ALL: [KeylessSource; 2] = [KeylessSource::Arbeitnow, KeylessSource::Guardian];
+    const ALL: [KeylessSource; 1] = [KeylessSource::Arbeitnow];
 
     // ── The addresses ───────────────────────────────────────────────────────
 
@@ -397,17 +383,8 @@ mod tests {
     }
 
     #[test]
-    fn the_two_feeds_are_not_the_same_address() {
-        assert_ne!(
-            KeylessSource::Arbeitnow.base_url(),
-            KeylessSource::Guardian.base_url()
-        );
-    }
-
-    #[test]
     fn each_feed_asks_for_the_kind_of_reply_it_actually_sends() {
         assert!(KeylessSource::Arbeitnow.accept().contains("json"));
-        assert!(KeylessSource::Guardian.accept().contains("xml"));
     }
 
     // ── The one number JavaScript supplies ──────────────────────────────────
@@ -434,13 +411,9 @@ mod tests {
     }
 
     #[test]
-    fn only_the_feed_that_paginates_is_sent_a_page() {
+    fn the_feed_is_sent_the_page_it_asked_for() {
         let arbeitnow = query_pairs(KeylessSource::Arbeitnow, 2);
         assert_eq!(arbeitnow, vec![("page", "2".to_string())]);
-
-        // Guardian ignores every parameter it is given — measured, not assumed
-        // — so sending one would be noise on somebody else's server.
-        assert!(query_pairs(KeylessSource::Guardian, 2).is_empty());
     }
 
     #[test]
@@ -695,11 +668,23 @@ mod tests {
     }
 
     #[test]
+    fn negative_the_closed_guardian_feed_is_refused_on_the_wire() {
+        // Guardian Jobs closed on 2 Sep 2026 and its feed now redirects to an
+        // article (L-336). A frontend that still sends its name must get a
+        // refusal from Tauri's argument decoding, not a request to that host.
+        assert!(serde_json::from_str::<KeylessSource>("\"guardian\"").is_err());
+        assert_eq!(
+            serde_json::from_str::<KeylessSource>("\"arbeitnow\"").unwrap(),
+            KeylessSource::Arbeitnow
+        );
+    }
+
+    #[test]
     fn the_source_names_match_the_typescript_union() {
         const TYPES_TS: &str = include_str!("../../../../packages/job-apis/src/keyless/types.ts");
-        // `#[serde(rename_all = "snake_case")]` turns the enum into these two
+        // `#[serde(rename_all = "snake_case")]` turns the enum into these
         // strings on the wire.
-        for name in ["arbeitnow", "guardian"] {
+        for name in ["arbeitnow"] {
             assert!(
                 TYPES_TS.contains(&format!("'{name}'")),
                 "{name} is not a member of the TypeScript KeylessSourceId union"
@@ -708,10 +693,6 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&KeylessSource::Arbeitnow).unwrap(),
             "\"arbeitnow\""
-        );
-        assert_eq!(
-            serde_json::to_string(&KeylessSource::Guardian).unwrap(),
-            "\"guardian\""
         );
     }
 }

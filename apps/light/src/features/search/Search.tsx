@@ -177,11 +177,12 @@ export function Search({
   });
   const [chosen, setChosen] = useState<ReadonlySet<JobProviderId>>(new Set(JOB_PROVIDER_IDS));
   /*
-    Both free feeds ticked from the start (L-110). They need no key, no account
+    The free feed is ticked from the start (L-110). It needs no key, no account
     and no setup, so a machine with an empty credential store returns real
     adverts the first time the button is pressed — which is the whole point of
-    the feature, and would be undone by making the user find and tick them.
-    Except Arbeitnow for a location in the UK (L-219): it is mostly Europe.
+    the feature, and would be undone by making the user find and tick it.
+    Except for a location in the UK (L-219): Arbeitnow is mostly Europe, and
+    since Guardian Jobs closed (L-336) the UK has no free feed on by default.
     A tick or untick the user makes wins, and is remembered (`feedDefaults`).
   */
   const [feedChoice, setFeedChoice] = useState<FeedChoice>(() => readFeedChoice());
@@ -288,7 +289,16 @@ export function Search({
   const ticked = useMemo(() => new Set(boardsToOpen.map((board) => board.id)), [boardsToOpen]);
   // Search only looks HERE (L-329), so a ticked board is not something for it
   // to do: the boards have their own button, with its own reason.
-  const disabledReason = searchDisabledReason(usableChosen.length + keylessWanted.length);
+  // A UK location with no usable key has no free feed on (L-336), so the
+  // reason names the free Reed key instead of a feed that is mostly Europe.
+  const ukWithoutKey =
+    isUkLocation(form.location) &&
+    !JOB_PROVIDER_IDS.some(
+      (provider) => providerAvailability(provider, keyStates[provider]).usable,
+    );
+  const disabledReason = searchDisabledReason(usableChosen.length + keylessWanted.length, {
+    ukWithoutKey,
+  });
   const openBoardsReason = openBoardsDisabledReason(boardsToOpen.length);
 
   const reedVerdict = quotaVerdict(quota, 'reed', utcDateOf(clock) ?? quota.date);
@@ -589,8 +599,8 @@ export function Search({
               {/*
               Under the keyed boards, not instead of them. The two are different
               things and the screen says which is which: a search of a job board
-              with the user's own free key, and a browse of what two public
-              feeds have just published. Neither is presented as a fallback for
+              with the user's own free key, and a browse of what a public
+              feed has just published. Neither is presented as a fallback for
               the other.
             */}
               <div>

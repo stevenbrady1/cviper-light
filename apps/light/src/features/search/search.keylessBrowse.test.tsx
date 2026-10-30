@@ -7,7 +7,8 @@
  * in a year.
  *
  * 1. A machine with no credential at all presses one button and gets real
- *    adverts on screen, from two feeds that take no key.
+ *    adverts on screen, from a feed that takes no key. (There were two until
+ *    Guardian Jobs closed on 2 Sep 2026 — L-336.)
  *
  * 2. WHEN A FEED BREAKS, THE SCREEN SAYS SO. Free feeds move, change shape and
  *    get switched off, and every one of those failures reaches this screen as
@@ -25,13 +26,13 @@
  * THE REAL CODE RUNS. ONLY THE BYTES ARE SCRIPTED.
  * ============================================================================
  * The fake port is given a `KeylessFetchTransport`, so `browseKeylessJobs`, the
- * Arbeitnow reader, the RSS reader, the local filter and the decision about
+ * Arbeitnow reader, the local filter and the decision about
  * whether a feed FAILED are all the shipped ones. A fake that returned a
  * ready-made outcome would let every assertion below pass while the code that
  * decides there is an error went untested.
  *
- * The bodies are the recorded live responses: Guardian's complete feed, and a
- * 19-advert slice of an Arbeitnow page.
+ * The body is a recorded live response: a 19-advert slice of an Arbeitnow
+ * page.
  */
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -46,7 +47,6 @@ import {
 } from '@cviper/job-apis';
 
 import ARBEITNOW_PAGE from '../../../../../packages/job-apis/src/fixtures/arbeitnow-page1.json';
-import GUARDIAN_FEED from '../../../../../packages/job-apis/src/fixtures/guardian-jobsrss.xml?raw';
 
 import { createFakeBrowserPort } from '../../platform/test/fakeBrowserPort';
 import { type KeyState } from '../../status/environment';
@@ -63,9 +63,9 @@ const ARBEITNOW_BODY = JSON.stringify(ARBEITNOW_PAGE);
 
 type Reply = Result<JobApiHttpResponse, KeylessError>;
 
-/** Both feeds answering with what they really sent on 2026-09-13. */
-function working(source: KeylessSourceId): Reply {
-  return ok({ status: 200, body: source === 'arbeitnow' ? ARBEITNOW_BODY : GUARDIAN_FEED });
+/** The feed answering with what it really sent on 2026-09-13. */
+function working(_source: KeylessSourceId): Reply {
+  return ok({ status: 200, body: ARBEITNOW_BODY });
 }
 
 function transportOf(reply: (source: KeylessSourceId, page: number) => Reply): {
@@ -139,7 +139,7 @@ describe('a machine with no keys at all', () => {
     expect(screen.queryByTestId('search-reason')).toBeNull();
   });
 
-  it('returns real adverts from both feeds', async () => {
+  it('returns real adverts from the feed', async () => {
     const { user } = renderSearch();
     await screen.findByTestId('search-empty');
 
@@ -156,11 +156,11 @@ describe('a machine with no keys at all', () => {
     // would label every advert here "Reed" — a wrong attribution on the one
     // line whose job is to say where the advert came from.
     const { user } = renderSearch();
-    await browse(user, 'social worker');
+    await browse(user, 'engineer');
 
     const chips = await screen.findAllByTestId(/^result-source-/);
     const labels = chips.map((chip) => chip.textContent);
-    expect(labels).toContain('Guardian Jobs');
+    expect(labels).toContain('Arbeitnow');
     expect(labels).not.toContain('Reed');
   });
 
@@ -171,16 +171,16 @@ describe('a machine with no keys at all', () => {
     expect((await screen.findByTestId('arbeitnow-attribution')).textContent).toContain('Arbeitnow');
   });
 
-  it('asks for three pages and sends nothing the user typed', async () => {
+  it('asks for two pages and sends nothing the user typed', async () => {
     // The feeds cannot filter — that is the whole reason the filter is local —
     // so a keyword travelling to them would be both useless and a lie about
     // what this feature does.
     // Berlin, not London: since L-219 a UK location starts with Arbeitnow off
-    // (feedDefaults.test.ts), and this test needs both feeds asked.
+    // (feedDefaults.test.ts), and this test needs the feed asked.
     const { user, asked, argumentsSeen } = renderSearch();
     await browse(user, 'credit risk analyst', 'Berlin');
 
-    expect([...asked()].sort()).toEqual(['arbeitnow:1', 'arbeitnow:2', 'guardian:1']);
+    expect([...asked()].sort()).toEqual(['arbeitnow:1', 'arbeitnow:2']);
     expect(JSON.stringify(argumentsSeen())).not.toContain('credit');
     expect(JSON.stringify(argumentsSeen())).not.toContain('Berlin');
   });
@@ -196,7 +196,11 @@ describe('a machine with no keys at all', () => {
 
   it('filters on this machine — a London browse drops the Berlin adverts', async () => {
     const { user } = renderSearch();
-    await browse(user, '', 'London');
+    // Arbeitnow starts off for a UK location (L-219); tick it, since
+    // L-336 it is the only feed there is to filter.
+    await user.type(screen.getByTestId('search-location'), 'London');
+    await user.click(screen.getByTestId('keyless-source-arbeitnow'));
+    await user.click(screen.getByTestId('search-submit'));
 
     const cards = await screen.findAllByTestId(/^result-/);
     expect(cards.length).toBeGreaterThan(0);
@@ -219,10 +223,7 @@ describe('a feed that has rotted says so, out loud', () => {
     expect(alert.getAttribute('role')).toBe('alert');
     expect(alert.getAttribute('data-kind')).toBe('server');
 
-    // The other feed's adverts are still on the page. One dead source must
-    // never cost the user the results of the one that worked.
-    expect((await screen.findAllByTestId(/^result-/)).length).toBeGreaterThan(0);
-    // And the "nothing matched" line is NOT shown for the dead feed: its words
+    // The "nothing matched" line is NOT shown for the dead feed: its words
     // were never the problem.
     expect(screen.queryByTestId('keyless-nothing-matched-arbeitnow')).toBeNull();
     expect(screen.queryByTestId('search-no-results')).toBeNull();
@@ -232,15 +233,15 @@ describe('a feed that has rotted says so, out loud', () => {
     // The commonest way a free feed dies: still 200, with something else
     // entirely — a maintenance page, a redirect notice, a new envelope.
     const { user } = renderSearch((source) =>
-      source === 'guardian'
+      source === 'arbeitnow'
         ? ok({ status: 200, body: '<html><body>We have moved</body></html>' })
         : working(source),
     );
 
     await browse(user, '');
 
-    const alert = await screen.findByTestId('keyless-error-guardian');
-    expect(alert.textContent).toContain('Guardian Jobs');
+    const alert = await screen.findByTestId('keyless-error-arbeitnow');
+    expect(alert.textContent).toContain('Arbeitnow');
     expect(alert.getAttribute('data-kind')).toBe('bad-response');
   });
 
@@ -258,7 +259,7 @@ describe('a feed that has rotted says so, out loud', () => {
     expect(alert.textContent).toContain('Arbeitnow');
   });
 
-  it('BOTH feeds dead is two messages and no empty-looking list', async () => {
+  it('a dead feed is one message and no empty-looking list', async () => {
     const { user } = renderSearch(() => ok({ status: 503, body: '' }));
 
     await browse(user, 'engineer');
@@ -266,11 +267,10 @@ describe('a feed that has rotted says so, out loud', () => {
     expect((await screen.findByTestId('keyless-error-arbeitnow')).textContent).toContain(
       'Arbeitnow',
     );
-    expect(screen.getByTestId('keyless-error-guardian').textContent).toContain('Guardian Jobs');
     // The one thing that must never happen: a screen that looks like "we
     // looked, and there is nothing out there".
     expect(screen.queryByTestId('search-no-results')).toBeNull();
-    expect(screen.queryAllByRole('alert')).toHaveLength(2);
+    expect(screen.queryAllByRole('alert')).toHaveLength(1);
   });
 
   it('a half-read feed keeps what it did read AND reports the rest', async () => {
@@ -307,8 +307,8 @@ describe('nothing matched is a DIFFERENT sentence from nothing worked', () => {
 
     await browse(user, 'lighthouse keeper');
 
-    expect((await screen.findByTestId('keyless-nothing-matched-guardian')).textContent).toContain(
-      'Guardian Jobs',
+    expect((await screen.findByTestId('keyless-nothing-matched-arbeitnow')).textContent).toContain(
+      'Arbeitnow',
     );
   });
 
@@ -318,15 +318,14 @@ describe('nothing matched is a DIFFERENT sentence from nothing worked', () => {
     await user.click(screen.getByTestId('keyless-source-arbeitnow'));
     await browse(user, '');
 
-    expect(asked()).toEqual(['guardian:1']);
+    expect(asked()).toEqual([]);
     expect(screen.queryByTestId('keyless-nothing-matched-arbeitnow')).toBeNull();
   });
 
-  it('boundary: unticking both feeds with no keys disables the button and says why', async () => {
+  it('boundary: unticking the feed with no keys disables the button and says why', async () => {
     const { user } = renderSearch();
 
     await user.click(screen.getByTestId('keyless-source-arbeitnow'));
-    await user.click(screen.getByTestId('keyless-source-guardian'));
 
     const submit = screen.getByTestId('search-submit') as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
@@ -343,14 +342,15 @@ describe('the screen never calls a keyless browse a search', () => {
     expect(section.textContent?.toLowerCase()).not.toMatch(/\bsearch\b/);
   });
 
-  it('says plainly what the two feeds are before anything is pressed', async () => {
+  it('says plainly what the feed is before anything is pressed', async () => {
     // A reader told "browse jobs, no key needed" who then sees four adverts has
     // been misled by the copy, not by the feeds.
     renderSearch();
 
     const intro = (await screen.findByTestId('keyless-intro')).textContent ?? '';
     expect(intro).toContain('Arbeitnow');
-    expect(intro).toContain('Guardian');
+    // Guardian Jobs closed on 2 Sep 2026 (L-336): the intro must not name it.
+    expect(intro).not.toMatch(/guardian/i);
     expect(intro.toLowerCase()).toContain('europe');
   });
 });

@@ -29,7 +29,6 @@ import {
 } from '@cviper/job-apis';
 
 import ARBEITNOW_PAGE from '../../../../../packages/job-apis/src/fixtures/arbeitnow-page1.json';
-import GUARDIAN_FEED from '../../../../../packages/job-apis/src/fixtures/guardian-jobsrss.xml?raw';
 
 const factories = vi.hoisted(() => ({
   job: vi.fn(() => {
@@ -370,12 +369,12 @@ describe('deal-breakers from the profile', () => {
 describe('with every credential absent', () => {
   type Reply = Result<JobApiHttpResponse, KeylessError>;
 
-  /** Both free feeds answering with their recorded bodies. */
+  /** The free feed answering with its recorded body. */
   const feeds: KeylessFetchTransport = {
-    fetch: async (source): Promise<Reply> =>
+    fetch: async (): Promise<Reply> =>
       ok({
         status: 200,
-        body: source === 'arbeitnow' ? JSON.stringify(ARBEITNOW_PAGE) : GUARDIAN_FEED,
+        body: JSON.stringify(ARBEITNOW_PAGE),
       }),
   };
 

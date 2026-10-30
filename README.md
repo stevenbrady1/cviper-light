@@ -161,14 +161,14 @@ match is a word comparison that runs instantly on your machine with nothing
 installed. A model reads it properly and explains itself — either a free local
 one, or your own API key.
 
-**Browse and search jobs.** _Needs nothing to start._ Two free feeds are read
+**Browse and search jobs.** _Needs nothing to start._ A free feed is read
 straight from the web with no key and no account — Arbeitnow, which is mostly
-Germany and the rest of Europe with a growing London list, and Guardian Jobs,
-which is the twenty most recent UK posts. CViper reads what they have just
-published and narrows it down on your computer, so it is a browse of recent
-jobs rather than a look at the whole market, and each feed says so on screen if
-it stops working. Add your own free Adzuna and Reed keys and the same screen
-searches those two boards properly as well. Either way, what you find saves
+Germany and the rest of Europe with a small London list. CViper reads what it
+has just published and narrows it down on your computer, so it is a browse of
+recent jobs rather than a look at the whole market, and the feed says so on
+screen if it stops working. (Guardian Jobs was a second, UK feed until it
+closed on 2 September 2026.) For UK jobs inside the app, add your own free
+Reed or Adzuna key and the same screen searches those boards properly. Either way, what you find saves
 straight onto the tracker board. The browser links cover ten UK boards and open
 in your own browser; Settings lets you turn any of them off, put them in the
 order you use them, and add your own.
@@ -261,7 +261,7 @@ lines ever reads or writes any state.
 | Basic keyword CV match              | **No.** Runs locally, instantly.                                       |
 | CV analysis with a local model      | **No key** — needs [Ollama](https://ollama.com) installed and running. |
 | CV analysis with your own AI key    | Yes — your own key, billed to you by your provider.                    |
-| Browse recent jobs inside the app   | **No.** Two free feeds, read with no key and no account.               |
+| Browse recent jobs inside the app   | **No.** One free feed (mostly Europe), read with no key or account.    |
 | Full job search inside the app      | Yes — free Adzuna and/or Reed keys.                                    |
 | Job search in your browser          | **No.** One click, no key at all.                                      |
 | Paste a job advert into the tracker | Yes — a local Ollama model, or your own key.                           |

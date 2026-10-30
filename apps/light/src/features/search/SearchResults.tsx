@@ -149,7 +149,7 @@ export function SearchResults({
           </div>
           <p className="font-medium text-ink">Nothing looked at yet.</p>
           <p className="mt-1 text-ink-muted">
-            Type a job title and press Search to see the newest adverts from the free feeds. Or open
+            Type a job title and press Search to see the newest adverts from the free feed. Or open
             the same search on a whole job board with the buttons above.
           </p>
         </div>

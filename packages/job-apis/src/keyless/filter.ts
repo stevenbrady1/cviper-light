@@ -4,9 +4,8 @@
  * ============================================================================
  * THIS EXISTS BECAUSE THE FEEDS CANNOT FILTER. SAY SO, DO NOT HIDE IT.
  * ============================================================================
- * Neither keyless feed accepts a query. Guardian Jobs returns the same twenty
- * items whatever is asked of it; Arbeitnow returns its most recent page. So the
- * app downloads a page of recent adverts and narrows it here, after the fact,
+ * The keyless feed accepts no query: Arbeitnow returns its most recent page
+ * whatever is asked of it. So the app downloads a page of recent adverts and narrows it here, after the fact,
  * in the renderer — which is why this is BROWSING with a filter on top and not
  * a search, and why nothing in this feature is allowed to call it one.
  *

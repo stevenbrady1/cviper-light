@@ -127,8 +127,6 @@ export {
   normaliseArbeitnowFeed,
 } from './keyless/arbeitnow';
 
-export { normaliseGuardianFeed } from './keyless/guardian';
-
 export {
   filterKeylessJobs,
   matchesKeywords,

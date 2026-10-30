@@ -70,7 +70,6 @@ async function searchFor(count: number) {
   harness.port.nextOutcome(outcomeOf(jobs(count), emptyQuota(TODAY)));
   await screen.findByTestId('search-empty');
   await harness.user.click(screen.getByTestId('keyless-source-arbeitnow'));
-  await harness.user.click(screen.getByTestId('keyless-source-guardian'));
   await harness.user.type(screen.getByTestId('search-keywords'), 'software tester');
   await harness.user.type(screen.getByTestId('search-salary'), '60000');
   await harness.user.click(screen.getByTestId('search-submit'));
@@ -215,7 +214,6 @@ describe('Arbeitnow and a UK location (L-219)', () => {
     await user.type(screen.getByTestId('search-location'), 'London');
     expect(arbeitnow().checked).toBe(false);
     expect(screen.getByTestId('keyless-arbeitnow-uk').textContent).toContain('UK location');
-    expect(screen.getByTestId<HTMLInputElement>('keyless-source-guardian').checked).toBe(true);
   });
 
   it('negative: Berlin keeps it on, with no note', async () => {
@@ -314,12 +312,7 @@ describe('phone pass (L-219, part 3)', () => {
   it('every source row is a full-size tap target on a phone, compact on a wide screen', async () => {
     renderSearch(ONE_KEY);
     await screen.findByTestId('provider-toggles');
-    for (const id of [
-      'provider-adzuna',
-      'provider-reed',
-      'keyless-source-arbeitnow',
-      'keyless-source-guardian',
-    ]) {
+    for (const id of ['provider-adzuna', 'provider-reed', 'keyless-source-arbeitnow']) {
       const label = screen.getByTestId(id).closest('label');
       const classes = (label?.className ?? '').split(/\s+/);
       expect(classes, id).toContain('min-h-11');

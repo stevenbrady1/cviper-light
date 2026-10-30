@@ -72,8 +72,10 @@ what counts as financial information includes **API secret keys**.
 CViper Light clears this honestly rather than narrowly — the tracker, the
 keyword match, the deterministic checks and the keyless board links genuinely
 need no key at all. Since L-110 the strongest part of that case is that
-**finding a job inside the app needs no key either**: two free feeds are read
-with no key and no account. Job discovery is about as close to "primary
+**finding a job inside the app needs no key either**: a free feed is read
+with no key and no account. It is mostly Germany and the rest of Europe, so for
+UK jobs inside the app a free Reed or Adzuna key is still the better answer —
+Guardian Jobs, the UK feed beside it, closed on 2 September 2026 (L-336). Job discovery is about as close to "primary
 functionality" as this app has, so say it in the listing rather than leaving a
 reviewer to infer it from a bullet about browser links. But clearing it is a **standing constraint on the listing**,
 not a box already ticked: the description, the screenshots and the first
@@ -491,10 +493,11 @@ WORKS THE MOMENT YOU OPEN IT — NO KEY, NO SIGN-UP
   and see which of its words you already use and which you are missing. It runs
   on your computer, instantly, offline.
 • Read a PDF, a Word file or a JSON Resume, and save one back out again.
-• Browse recent job adverts inside the app. Two free feeds are read straight
-  from the web with no key and no account, and narrowed down on your own
-  computer. It is a browse of what has just been posted rather than a search of
-  the whole market, and each feed tells you on screen if it stops working.
+• Browse recent job adverts inside the app. A free feed, mostly Germany and
+  the rest of Europe, is read straight from the web with no key and no account,
+  and narrowed down on your own computer. It is a browse of what has just been
+  posted rather than a search of the whole market, and it tells you on screen
+  if it stops working.
 • Search ten UK job boards in your browser with one click. Turn any of them
   off, put them in the order you use them, or add your own.
 • Export everything to a single file whenever you like, and import it back.

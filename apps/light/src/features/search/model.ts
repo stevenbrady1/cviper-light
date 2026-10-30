@@ -253,13 +253,31 @@ export function providerAvailability(
  * boards have their own button, and the message points at it.
  *
  * The message still points at what works before it points at Settings.
+ *
+ * ============================================================================
+ * A UK LOCATION WITH NO KEY HAS NO FREE FEED TO TICK (L-336)
+ * ============================================================================
+ * Guardian Jobs closed on 2 Sep 2026, and its feed was the one free source
+ * for the UK. Arbeitnow is off for a UK location (L-219) because it is mostly
+ * Europe, so "tick the free feed" would send that user somewhere unhelpful.
+ * For them the true answer is a free Reed key, and the job sites they tick.
  */
-export function searchDisabledReason(usableSources: number): string | null {
+export function searchDisabledReason(
+  usableSources: number,
+  { ukWithoutKey = false }: { readonly ukWithoutKey?: boolean } = {},
+): string | null {
   if (usableSources > 0) return null;
 
+  if (ukWithoutKey) {
+    return (
+      'A free Reed key, set up in Settings, adds UK jobs here. ' +
+      'Job sites you tick open in your browser with “Also open”.'
+    );
+  }
+
   return (
-    'Nothing is ticked for CViper to look at. Tick one of the free feeds above ' +
-    '— they need no key at all. Job sites you tick open in your browser with the button below.'
+    'Nothing is ticked for CViper to look at. Tick the free feed above ' +
+    '— it needs no key at all. Job sites you tick open in your browser with the button below.'
   );
 }
 

@@ -8,7 +8,7 @@ the shared data model and export/import format, the local SQLite data-access
 layer, CV text extraction, the provider adapters and their Rust transport, the
 keyword-only scorer, JSON Resume import, the app shell, the application tracker, the CV analysis
 view, the job-board clients (Adzuna and Reed request building, response
-normalisation, cross-post detection, the two keyless feeds and the local filter
+normalisation, cross-post detection, the keyless feed and the local filter
 over them, the nine configurable keyless browser links and the daily request
 budget), the job search view, the API-key setup
 wizard, pasted-advert extraction and the review form it fills, fetching one
@@ -45,7 +45,7 @@ product that exists (L-114).
 | Feature                                      | Light                                                                                                                                                                                            | Cloud (future)                     | State                     |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- | ------------------------- |
 | Job search (Adzuna/Reed)                     | Yes — user's own API keys, direct calls                                                                                                                                                          | Yes — server-side, shared keys     | Built                     |
-| Browse recent jobs, no key                   | Yes — Arbeitnow + Guardian feeds, filtered locally                                                                                                                                               | Not applicable                     | Built                     |
+| Browse recent jobs, no key                   | Yes — the Arbeitnow feed, filtered locally (the Guardian Jobs feed was removed when Guardian Jobs closed on 2 Sep 2026, L-336)                                                                   | Not applicable                     | Built                     |
 | Cross-post detection                         | Yes — flags duplicates, never merges                                                                                                                                                             | Yes — merges, with a server undo   | Built                     |
 | Keyless browser search links                 | Yes — ten UK boards, opens in browser                                                                                                                                                            | Not applicable                     | Built                     |
 | Job-board list, user-edited                  | Yes — enable, reorder, add your own                                                                                                                                                              | Not applicable                     | Built                     |

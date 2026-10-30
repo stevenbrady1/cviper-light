@@ -240,18 +240,12 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
   },
   {
     host: 'jobs.theguardian.com',
-    // Two different things at one address, and the entry has to say both
-    // (L-110). It was only ever a link handed to the browser; since the
-    // keyless browse it is also a feed the app itself reads. Describing only
-    // the older half would make this list a summary rather than the complete
-    // statement it claims to be.
-    purpose: 'fetched-on-request',
-    why:
-      'Guardian Jobs’ public list of its twenty most recent UK jobs, read when you press ' +
-      'Browse. It takes no key and no account, and nothing about you is sent — the site sees ' +
-      'your IP address, exactly as it would if you opened the page yourself. Its own search ' +
-      'page is also opened in your browser by the keyless buttons on the search screen, and ' +
-      'the app does not load that one.',
+    // Only a link handed to the browser now. From L-110 the app also read
+    // Guardian Jobs' feed here; Guardian Jobs closed on 2 Sep 2026 and the
+    // feed was removed (L-336). The board link in job-boards.json still names
+    // this host, so the entry stays until that link goes too (L-337).
+    purpose: 'opened-in-your-browser',
+    why: 'A keyless search link for Guardian Jobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.',
   },
   {
     host: 'www.jobserve.com',

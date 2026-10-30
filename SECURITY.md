@@ -37,7 +37,7 @@ runtime also talks to Microsoft on its own schedule; that is the operating
 system's request, not the app's, and the privacy notice says so.
 
 Everything else happens because you pressed something: a job search with your
-own Adzuna or Reed key; a read of the two keyless feeds; a CV analysis or a
+own Adzuna or Reed key; a read of the keyless feed; a CV analysis or a
 pasted advert sent to the cloud provider you chose, under your own key; one
 page fetched from a link you pasted; a manual update check; and links opened
 in your own browser, which the app hands over and does not load.
