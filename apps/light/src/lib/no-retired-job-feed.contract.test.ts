@@ -62,14 +62,27 @@ const SITE_FILES = [
   ...walk(`${REPO_ROOT}packages`, { extensions: ['.ts', '.tsx', '.rs', '.json'] }),
 ];
 
+/**
+ * A case-insensitive pattern that matches `literal` exactly, every regex
+ * metacharacter escaped (so the `.` in a host is a dot, not "any character").
+ * This scans FILE TEXT for a forbidden string; it is not a URL check, and a
+ * pattern keeps that plain without a substring test on a host.
+ */
+function literalPattern(literal: string): RegExp {
+  return new RegExp(literal.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'), 'i');
+}
+
+const DEAD_FEED_PATTERN = literalPattern(DEAD_FEED);
+const CLOSED_SITE_PATTERN = literalPattern(CLOSED_SITE);
+
 /** Does this text name the closed feed? Case-insensitive: hosts are. */
 export function namesDeadFeed(text: string): boolean {
-  return text.toLowerCase().includes(DEAD_FEED);
+  return DEAD_FEED_PATTERN.test(text);
 }
 
 /** Does this text name the closed site at all — feed, board or advert? */
 export function namesClosedSite(text: string): boolean {
-  return text.toLowerCase().includes(CLOSED_SITE);
+  return CLOSED_SITE_PATTERN.test(text);
 }
 
 describe('the keyless feeds are exactly the ones that still publish', () => {
@@ -163,6 +176,9 @@ describe('no shipped file names the closed Guardian Jobs site (L-337)', () => {
     expect(namesClosedSite("host: 'jobs.theguardian.com'")).toBe(true);
     // Not a near miss: the newspaper itself is a different host.
     expect(namesClosedSite('https://www.theguardian.com/help/insideguardian')).toBe(false);
+    // The dots are literal: the pattern is escaped, so `.` is not "any character".
+    expect(namesClosedSite('jobsXtheguardianXcom')).toBe(false);
+    expect(namesDeadFeed('jobs-theguardian-com/jobsrss')).toBe(false);
   });
 
   it('finds none', () => {
