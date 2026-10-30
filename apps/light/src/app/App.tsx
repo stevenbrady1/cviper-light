@@ -192,11 +192,15 @@ export default function App({
 }: AppProps = {}) {
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
   /**
-   * A section for Settings to open at, set by Search's "Manage job boards"
-   * (L-310) and cleared by Settings once it is there, so the next ordinary
-   * visit opens at the top.
+   * A place for Settings to open at, set by Search's "Manage job boards"
+   * (L-310) or "Get a free Reed key" (L-338) and cleared by Settings once it
+   * is there, so the next ordinary visit opens at the top.
    */
-  const [settingsOpenAt, setSettingsOpenAt] = useState<'job-boards' | null>(null);
+  const [settingsOpenAt, setSettingsOpenAt] = useState<'job-boards' | 'reed-key' | null>(null);
+  const openSettingsAt = (place: 'job-boards' | 'reed-key') => {
+    setSettingsOpenAt(place);
+    setActiveView('settings');
+  };
 
   // Focus follows the view (WCAG 2.4.3). Switching view unmounts whatever had
   // focus, which dropped it to <body>: a keyboard or screen-reader user heard
@@ -688,11 +692,9 @@ export default function App({
               // showing, so "no Adzuna key — open Settings" has to come back here
               // to be acted on.
               onOpenSettings: () => setActiveView('settings'),
-              // Settings → Job boards (L-310): the same hand-back, with a section.
-              onOpenJobBoards: () => {
-                setSettingsOpenAt('job-boards');
-                setActiveView('settings');
-              },
+              // Settings → Job boards (L-310) or the Reed key (L-338): same hand-back.
+              onOpenJobBoards: () => openSettingsAt('job-boards'),
+              onOpenReedKey: () => openSettingsAt('reed-key'),
               onAnalyse: onAnalyseJob,
             },
             tracker: {
