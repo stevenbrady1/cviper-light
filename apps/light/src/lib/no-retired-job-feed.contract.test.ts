@@ -45,16 +45,21 @@ import { TABLE_COLUMNS, jobFromRow, jobToValues } from '../db/rows';
 
 import { REPO_ROOT, displayPath, shippedText, walk } from './repo-scan.ts';
 
-/** The closed feed's address, without a scheme, so either spelling is caught. */
-const DEAD_FEED = 'jobs.theguardian.com/jobsrss';
+/**
+ * The closed feed's address, without a scheme, so either spelling is caught.
+ * A regex LITERAL with every `.` escaped: this scans file text for a forbidden
+ * string (it is not a URL check), and a literal says exactly what it matches.
+ * Case-insensitive: hosts are.
+ */
+const DEAD_FEED = /jobs\.theguardian\.com\/jobsrss/i;
 
 const FILES = [
   ...walk(`${REPO_ROOT}apps`, { extensions: ['.ts', '.tsx', '.rs'] }),
   ...walk(`${REPO_ROOT}packages`, { extensions: ['.ts', '.tsx', '.rs'] }),
 ];
 
-/** The closed site's host: the feed AND the board lived on it (L-337). */
-const CLOSED_SITE = 'jobs.theguardian.com';
+/** The closed site's host: the feed AND the board lived on it (L-337). Escaped, as above. */
+const CLOSED_SITE = /jobs\.theguardian\.com/i;
 
 /** The site scan adds `.json`, where the shipped board list lives. */
 const SITE_FILES = [
@@ -62,27 +67,14 @@ const SITE_FILES = [
   ...walk(`${REPO_ROOT}packages`, { extensions: ['.ts', '.tsx', '.rs', '.json'] }),
 ];
 
-/**
- * A case-insensitive pattern that matches `literal` exactly, every regex
- * metacharacter escaped (so the `.` in a host is a dot, not "any character").
- * This scans FILE TEXT for a forbidden string; it is not a URL check, and a
- * pattern keeps that plain without a substring test on a host.
- */
-function literalPattern(literal: string): RegExp {
-  return new RegExp(literal.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'), 'i');
-}
-
-const DEAD_FEED_PATTERN = literalPattern(DEAD_FEED);
-const CLOSED_SITE_PATTERN = literalPattern(CLOSED_SITE);
-
 /** Does this text name the closed feed? Case-insensitive: hosts are. */
 export function namesDeadFeed(text: string): boolean {
-  return DEAD_FEED_PATTERN.test(text);
+  return DEAD_FEED.test(text);
 }
 
 /** Does this text name the closed site at all — feed, board or advert? */
 export function namesClosedSite(text: string): boolean {
-  return CLOSED_SITE_PATTERN.test(text);
+  return CLOSED_SITE.test(text);
 }
 
 describe('the keyless feeds are exactly the ones that still publish', () => {
