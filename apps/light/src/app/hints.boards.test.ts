@@ -24,14 +24,14 @@ describe('boardHint', () => {
 
   it('boundary: only the job title', () => {
     expect(
-      boardHint('Guardian Jobs', {
+      boardHint('Jobserve', {
         location: false,
         radius: false,
         salaryMin: false,
         contract: false,
       }),
     ).toBe(
-      'Opens Guardian Jobs in your browser with your job title. Its link cannot take your location, distance, minimum salary and contract type, so set those on the site.',
+      'Opens Jobserve in your browser with your job title. Its link cannot take your location, distance, minimum salary and contract type, so set those on the site.',
     );
   });
 

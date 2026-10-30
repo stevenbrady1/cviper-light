@@ -128,10 +128,10 @@ describe('job boards, right under the fields (L-219, L-313)', () => {
 
     const more = screen.getByTestId('keyless-more');
     expect(more.getAttribute('aria-expanded')).toBe('false');
-    expect(more.textContent).toContain('5');
+    expect(more.textContent).toContain('4');
     await user.click(more);
     expect(more.getAttribute('aria-expanded')).toBe('true');
-    expect(boardIds(bar)).toHaveLength(10);
+    expect(boardIds(bar)).toHaveLength(9);
     await user.click(more);
     expect(boardIds(bar)).toEqual(DEFAULT_FIVE);
   });

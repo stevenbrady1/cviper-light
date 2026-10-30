@@ -7,7 +7,7 @@
  * confirmed (research, 2026-10-08): Reed, Totaljobs and CV-Library take
  * distance, salary and contract type; Indeed and LinkedIn take distance, and
  * LinkedIn "Contract" (it has no "Permanent"); Google takes the contract type
- * as a word. Adzuna, Guardian Jobs and Jobserve take only what they took
+ * as a word. Adzuna and Jobserve take only what they took
  * before, until their formats are confirmed. A wrong parameter is worse than a
  * missing one.
  */
@@ -35,7 +35,6 @@ const PERMANENT: Readonly<Record<string, string>> = {
   adzuna: 'https://www.adzuna.co.uk/search?q=software+tester&w=London',
   'google-jobs':
     'https://www.google.com/search?q=software+tester+permanent+jobs+London&udm=8&hl=en&gl=uk',
-  guardian: 'https://jobs.theguardian.com/jobs/software-tester/',
   jobserve: 'https://www.jobserve.com/gb/en/JobSearch.aspx?q=software+tester&l=London',
   'gov-uk-find-a-job':
     'https://www.jobs.service.gov.uk/jobs/search?keywords=software+tester&location=London',
@@ -53,7 +52,6 @@ const CONTRACT: Readonly<Record<string, string>> = {
   adzuna: 'https://www.adzuna.co.uk/search?q=software+tester&w=London',
   'google-jobs':
     'https://www.google.com/search?q=software+tester+contract+jobs+London&udm=8&hl=en&gl=uk',
-  guardian: 'https://jobs.theguardian.com/jobs/software-tester/',
   jobserve: 'https://www.jobserve.com/gb/en/JobSearch.aspx?q=software+tester&l=London',
   'gov-uk-find-a-job':
     'https://www.jobs.service.gov.uk/jobs/search?keywords=software+tester&location=London',

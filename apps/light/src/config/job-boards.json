@@ -98,12 +98,6 @@
     }
   },
   {
-    "id": "guardian",
-    "label": "Guardian Jobs",
-    "urlTemplate": "https://jobs.theguardian.com/jobs/{keyword}/",
-    "encoding": "hyphen"
-  },
-  {
     "id": "jobserve",
     "label": "Jobserve",
     "urlTemplate": "https://www.jobserve.com/gb/en/JobSearch.aspx?q={keyword}&l={location}",

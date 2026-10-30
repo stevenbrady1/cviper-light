@@ -169,7 +169,7 @@ recent jobs rather than a look at the whole market, and the feed says so on
 screen if it stops working. (Guardian Jobs was a second, UK feed until it
 closed on 2 September 2026.) For UK jobs inside the app, add your own free
 Reed or Adzuna key and the same screen searches those boards properly. Either way, what you find saves
-straight onto the tracker board. The browser links cover ten UK boards and open
+straight onto the tracker board. The browser links cover nine UK boards and open
 in your own browser; Settings lets you turn any of them off, put them in the
 order you use them, and add your own.
 
