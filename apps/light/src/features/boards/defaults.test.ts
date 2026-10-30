@@ -30,7 +30,6 @@ const EXPECTED_IDS = [
   'reed',
   'adzuna',
   'google-jobs',
-  'guardian',
   'jobserve',
   'gov-uk-find-a-job',
 ];
@@ -46,7 +45,6 @@ const WORKED_URLS: Readonly<Record<string, string>> = {
   adzuna: 'https://www.adzuna.co.uk/search?q=business+analyst&w=Milton+Keynes',
   'google-jobs':
     'https://www.google.com/search?q=business+analyst+jobs+Milton+Keynes&udm=8&hl=en&gl=uk',
-  guardian: 'https://jobs.theguardian.com/jobs/business-analyst/',
   jobserve: 'https://www.jobserve.com/gb/en/JobSearch.aspx?q=business+analyst&l=Milton+Keynes',
   // GOV.UK Work Hub (L-262). `keywords`, not `q`: `q` is accepted and ignored,
   // and the page then shows every job in the country — measured 2026-10-22.
@@ -63,7 +61,6 @@ const NO_LOCATION_URLS: Readonly<Record<string, string>> = {
   reed: 'https://www.reed.co.uk/jobs/business-analyst-jobs',
   adzuna: 'https://www.adzuna.co.uk/search?q=business+analyst',
   'google-jobs': 'https://www.google.com/search?q=business+analyst+jobs&udm=8&hl=en&gl=uk',
-  guardian: 'https://jobs.theguardian.com/jobs/business-analyst/',
   jobserve: 'https://www.jobserve.com/gb/en/JobSearch.aspx?q=business+analyst',
   'gov-uk-find-a-job': 'https://www.jobs.service.gov.uk/jobs/search?keywords=business+analyst',
 };
@@ -85,7 +82,7 @@ describe('the shipped job-board config', () => {
     }
   });
 
-  it('holds exactly these ten ids, in this order', () => {
+  it('holds exactly these nine ids, in this order', () => {
     expect(SHIPPED_BOARDS.map((board) => board.id)).toEqual(EXPECTED_IDS);
   });
 
@@ -101,12 +98,6 @@ describe('the shipped job-board config', () => {
     // Not a stray space to be tidied away: on Google's jobs tab it is the
     // difference between the role and adverts for the role.
     expect(boardById('google-jobs').urlTemplate).toContain('+jobs+');
-  });
-
-  it('has no {location} in the Guardian template, and that is correct', () => {
-    // Guardian Jobs searches by keyword only. A location is simply ignored
-    // there — it is not a missing feature and not a bug.
-    expect(boardById('guardian').urlTemplate).not.toContain('{location}');
   });
 });
 
@@ -137,8 +128,8 @@ describe('every shipped board — with the location box empty', () => {
       expect(() => new URL(url), board.id).not.toThrow();
       expect(new URL(url).protocol, board.id).toBe('https:');
       // No dangling connector, no empty parameter, no `//` in the path.
-      // A trailing `/` is NOT a dangling connector — Guardian's template ends
-      // in one on purpose, and a path may legitimately finish with a slash.
+      // A trailing `/` is NOT a dangling connector — a path may legitimately
+      // finish with a slash.
       expect(url, board.id).not.toMatch(/[-+]$|=($|&)|[-/](in|at|near)$/);
       expect(new URL(url).pathname, board.id).not.toContain('//');
     }

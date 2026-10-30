@@ -24,8 +24,17 @@
  * enumerate. `'guardian'` as a historic `JobSource` is deliberately NOT
  * forbidden: jobs saved from the feed before it closed are still in people's
  * trackers and backups, and they must still load and still say where they
- * came from. The Guardian job BOARD link (`jobs.theguardian.com/jobs/…`) is a
- * different address and is not matched here.
+ * came from.
+ *
+ * ============================================================================
+ * THE SITE ITSELF (L-337)
+ * ============================================================================
+ * The Guardian job BOARD link (`jobs.theguardian.com/jobs/{keyword}/`) in
+ * `job-boards.json` outlived the feed by one release; the whole site answers
+ * 403 now. With the board gone no shipped file has any reason to name the
+ * host at all, so the second scan forbids `jobs.theguardian.com` anywhere in
+ * shipped `.ts`, `.tsx`, `.rs` and `.json` — the board list is a `.json` file,
+ * which is exactly where a copy-paste from an old branch would put it back.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -36,17 +45,36 @@ import { TABLE_COLUMNS, jobFromRow, jobToValues } from '../db/rows';
 
 import { REPO_ROOT, displayPath, shippedText, walk } from './repo-scan.ts';
 
-/** The closed feed's address, without a scheme, so either spelling is caught. */
-const DEAD_FEED = 'jobs.theguardian.com/jobsrss';
+/**
+ * The closed feed's address, without a scheme, so either spelling is caught.
+ * A regex LITERAL with every `.` escaped: this scans file text for a forbidden
+ * string (it is not a URL check), and a literal says exactly what it matches.
+ * Case-insensitive: hosts are.
+ */
+const DEAD_FEED = /jobs\.theguardian\.com\/jobsrss/i;
 
 const FILES = [
   ...walk(`${REPO_ROOT}apps`, { extensions: ['.ts', '.tsx', '.rs'] }),
   ...walk(`${REPO_ROOT}packages`, { extensions: ['.ts', '.tsx', '.rs'] }),
 ];
 
+/** The closed site's host: the feed AND the board lived on it (L-337). Escaped, as above. */
+const CLOSED_SITE = /jobs\.theguardian\.com/i;
+
+/** The site scan adds `.json`, where the shipped board list lives. */
+const SITE_FILES = [
+  ...walk(`${REPO_ROOT}apps`, { extensions: ['.ts', '.tsx', '.rs', '.json'] }),
+  ...walk(`${REPO_ROOT}packages`, { extensions: ['.ts', '.tsx', '.rs', '.json'] }),
+];
+
 /** Does this text name the closed feed? Case-insensitive: hosts are. */
 export function namesDeadFeed(text: string): boolean {
-  return text.toLowerCase().includes(DEAD_FEED);
+  return DEAD_FEED.test(text);
+}
+
+/** Does this text name the closed site at all — feed, board or advert? */
+export function namesClosedSite(text: string): boolean {
+  return CLOSED_SITE.test(text);
 }
 
 describe('the keyless feeds are exactly the ones that still publish', () => {
@@ -109,7 +137,7 @@ describe('no shipped source names the closed Guardian Jobs feed', () => {
   it('would catch the address if it came back', () => {
     expect(namesDeadFeed('"https://jobs.theguardian.com/jobsrss/"')).toBe(true);
     expect(namesDeadFeed('HTTPS://JOBS.THEGUARDIAN.COM/JOBSRSS')).toBe(true);
-    // The board link is a different address, and the board stays until L-337.
+    // The board link is a different address: the site scan below catches it.
     expect(namesDeadFeed('https://jobs.theguardian.com/jobs/{keyword}/')).toBe(false);
   });
 
@@ -119,6 +147,40 @@ describe('no shipped source names the closed Guardian Jobs feed', () => {
       offenders,
       'Guardian Jobs closed on 2 Sep 2026 and its feed redirects to an article. ' +
         'Do not read it again.',
+    ).toEqual([]);
+  });
+});
+
+describe('no shipped file names the closed Guardian Jobs site (L-337)', () => {
+  it('scans the real tree, the board list included', () => {
+    // Anti-inert: the board list is the file the host lived in last.
+    expect(SITE_FILES.length).toBeGreaterThan(FILES.length);
+    expect(
+      SITE_FILES.some((file) => file.replaceAll('\\', '/').endsWith('config/job-boards.json')),
+    ).toBe(true);
+  });
+
+  it('would catch the board link, the feed and an advert address if any came back', () => {
+    expect(namesClosedSite('"urlTemplate": "https://jobs.theguardian.com/jobs/{keyword}/"')).toBe(
+      true,
+    );
+    expect(namesClosedSite('HTTPS://JOBS.THEGUARDIAN.COM/JOBSRSS')).toBe(true);
+    expect(namesClosedSite("host: 'jobs.theguardian.com'")).toBe(true);
+    // Not a near miss: the newspaper itself is a different host.
+    expect(namesClosedSite('https://www.theguardian.com/help/insideguardian')).toBe(false);
+    // The dots are literal: the pattern is escaped, so `.` is not "any character".
+    expect(namesClosedSite('jobsXtheguardianXcom')).toBe(false);
+    expect(namesDeadFeed('jobs-theguardian-com/jobsrss')).toBe(false);
+  });
+
+  it('finds none', () => {
+    const offenders = SITE_FILES.filter((file) => namesClosedSite(shippedText(file))).map(
+      displayPath,
+    );
+    expect(
+      offenders,
+      'Guardian Jobs closed on 2 Sep 2026 and jobs.theguardian.com answers 403. ' +
+        'Do not link to it again.',
     ).toEqual([]);
   });
 });

@@ -71,7 +71,7 @@ Pick one:
 > internet.
 > • Tracks every application: where it is, how long it has sat still, and
 > what to do next.
-> • Searches ten UK job boards in your browser with one tap, no key needed.
+> • Searches nine UK job boards in your browser with one tap, no key needed.
 >
 > IF YOU WANT MORE
 >

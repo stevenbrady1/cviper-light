@@ -239,15 +239,6 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     why: 'A keyless search link for Google Jobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.',
   },
   {
-    host: 'jobs.theguardian.com',
-    // Only a link handed to the browser now. From L-110 the app also read
-    // Guardian Jobs' feed here; Guardian Jobs closed on 2 Sep 2026 and the
-    // feed was removed (L-336). The board link in job-boards.json still names
-    // this host, so the entry stays until that link goes too (L-337).
-    purpose: 'opened-in-your-browser',
-    why: 'A keyless search link for Guardian Jobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.',
-  },
-  {
     host: 'www.jobserve.com',
     purpose: 'opened-in-your-browser',
     why: 'A keyless search link for Jobserve, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page, and it never scrapes Jobserve.',
