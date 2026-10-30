@@ -572,10 +572,17 @@ export default function App({
   // The phone's insets — notch, corners, home indicator — kept off the content
   // once, here, so no view has to know it is on a phone. Zero everywhere else.
   const insets = narrow ? 'pt-safe pb-safe pl-safe pr-safe' : '';
+  /*
+    The frame holds everything positioned inside it (L-334). An `sr-only` status
+    with nothing positioned above it was placed against the WINDOW, below it on
+    a long screen, so the page grew and code could scroll the whole app up.
+    `overflow-clip`, not `-hidden`: it clips without making the frame scrollable.
+  */
+  const frame = 'relative flex h-full min-h-0 overflow-clip bg-canvas text-ink';
 
   if (welcomeOpen) {
     return (
-      <div className={`flex h-full min-h-0 bg-canvas text-ink ${insets}`}>
+      <div className={`${frame} ${insets}`}>
         <Welcome onDismiss={onDismissWelcome} />
       </div>
     );
@@ -586,7 +593,7 @@ export default function App({
       data-testid="shell"
       data-viewport={viewport}
       className={[
-        'flex h-full min-h-0 bg-canvas text-ink',
+        frame,
         // Phone: a column, the view above the bar. The bottom inset is the
         // bar's own (`BottomNav`), so it is navy under the home indicator.
         narrow ? 'flex-col pt-safe pl-safe pr-safe' : '',
