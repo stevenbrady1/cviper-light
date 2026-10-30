@@ -57,9 +57,9 @@ function renderSearch(
   return { user, port, browser, ...utils };
 }
 
-/** Untick both free feeds, so only what the test ticks runs. */
+/** Untick the free feed, so only what the test ticks runs. */
 async function untickFeeds(user: ReturnType<typeof userEvent.setup>) {
-  for (const id of ['keyless-source-arbeitnow', 'keyless-source-guardian']) {
+  for (const id of ['keyless-source-arbeitnow']) {
     const box = screen.getByTestId(id) as HTMLInputElement;
     if (box.checked) await user.click(box);
   }

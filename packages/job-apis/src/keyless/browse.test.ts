@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 /**
  * ============================================================================
  * THE POINT OF THE WHOLE FEATURE: A DEAD FEED MUST NOT LOOK LIKE A QUIET MARKET
@@ -15,9 +14,6 @@
  * nothing must NOT produce an error, because "we found nothing for you" and
  * "we could not look" are different sentences and only one of them is the
  * user's to act on.
- *
- * jsdom, because a browse of both sources parses the Guardian feed with
- * `DOMParser`.
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -25,7 +21,6 @@ import { err, ok, type Result } from '@cviper/core-types';
 
 import { type JobApiHttpResponse } from '../types';
 import arbeitnowFixture from '../fixtures/arbeitnow-page1.json';
-import guardianFixture from '../fixtures/guardian-jobsrss.xml?raw';
 
 import { browseKeylessJobs } from './browse';
 import { keylessError, type KeylessError } from './errors';
@@ -65,9 +60,9 @@ function fakeTransport(reply: (source: KeylessSourceId, page: number) => Reply |
   };
 }
 
-/** Both feeds working, from the recorded pages. */
-function workingReply(source: KeylessSourceId): Reply {
-  return ok({ status: 200, body: source === 'arbeitnow' ? ARBEITNOW_BODY : guardianFixture });
+/** The feed working, from the recorded page. */
+function workingReply(_source: KeylessSourceId): Reply {
+  return ok({ status: 200, body: ARBEITNOW_BODY });
 }
 
 function outcomeFor(
@@ -79,28 +74,26 @@ function outcomeFor(
   return found;
 }
 
-describe('browseKeylessJobs — both feeds working', () => {
-  it('returns the adverts both feeds published', async () => {
+describe('browseKeylessJobs — the feed working', () => {
+  it('returns the adverts the feed published', async () => {
     const { transport } = fakeTransport(workingReply);
     const outcome = await browseKeylessJobs(transport, REQUEST);
 
     // 19 recorded Arbeitnow adverts, asked for twice: the fake answers the
     // same page for page 1 and page 2, which is exactly what a feed that has
-    // not moved on looks like — so 19 distinct adverts, not 38. Plus the
-    // Guardian's 20.
+    // not moved on looks like — so 19 distinct adverts, not 38.
     expect(outcomeFor(outcome, 'arbeitnow').fetched).toBe(19);
-    expect(outcomeFor(outcome, 'guardian').fetched).toBe(20);
-    expect(outcome.jobs).toHaveLength(39);
+    expect(outcome.jobs).toHaveLength(19);
     expect(outcome.outcomes.every((entry) => entry.error === null)).toBe(true);
   });
 
-  it('asks for exactly three pages, and no more', async () => {
-    // The stated cost of one browse: two pages of Arbeitnow and the Guardian's
-    // one. Nothing the user typed can raise it.
+  it('asks for exactly two pages, and no more', async () => {
+    // The stated cost of one browse: two pages of Arbeitnow. Nothing the user
+    // typed can raise it.
     const { transport, asked } = fakeTransport(workingReply);
     await browseKeylessJobs(transport, REQUEST);
 
-    expect([...asked()].sort()).toEqual(['arbeitnow:1', 'arbeitnow:2', 'guardian:1']);
+    expect([...asked()].sort()).toEqual(['arbeitnow:1', 'arbeitnow:2']);
   });
 
   it('asks one feed for its second page only after the first has answered', async () => {
@@ -129,9 +122,9 @@ describe('browseKeylessJobs — both feeds working', () => {
 
   it('contacts nothing the caller did not ask for', async () => {
     const { transport, asked } = fakeTransport(workingReply);
-    const outcome = await browseKeylessJobs(transport, { ...REQUEST, sources: ['guardian'] });
+    const outcome = await browseKeylessJobs(transport, { ...REQUEST, sources: ['arbeitnow'] });
 
-    expect(asked()).toEqual(['guardian:1']);
+    expect(asked()).toEqual(['arbeitnow:1', 'arbeitnow:2']);
     expect(outcome.outcomes).toHaveLength(1);
   });
 
@@ -160,11 +153,6 @@ describe('browseKeylessJobs — a feed that has rotted says so, loudly', () => {
     expect(dead.error?.status).toBe(404);
     expect(dead.error?.message).toContain('Arbeitnow');
     expect(dead.jobs).toEqual([]);
-
-    // And the other feed's adverts are still here. One dead source must never
-    // cost the user the results of the one that worked.
-    expect(outcomeFor(outcome, 'guardian').jobs.length).toBeGreaterThan(0);
-    expect(outcome.jobs.length).toBeGreaterThan(0);
   });
 
   it('a feed that changed shape becomes a message, not an empty list', async () => {
@@ -183,17 +171,6 @@ describe('browseKeylessJobs — a feed that has rotted says so, loudly', () => {
     expect(broken.jobs).toEqual([]);
   });
 
-  it('the same, for the RSS feed', async () => {
-    const { transport } = fakeTransport((source) =>
-      source === 'guardian' ? ok({ status: 200, body: '{"error":"gone"}' }) : workingReply(source),
-    );
-
-    const broken = outcomeFor(await browseKeylessJobs(transport, REQUEST), 'guardian');
-
-    expect(broken.error?.kind).toBe('bad-response');
-    expect(broken.error?.message).toContain('Guardian Jobs');
-  });
-
   it('a feed that answers perfectly with NO adverts is a failure, not a quiet day', async () => {
     // THE SILENT ONE. 200, valid JSON, right shape, zero adverts. Every layer
     // is happy and the user sees an empty list. A feed of "the most recent
@@ -209,25 +186,14 @@ describe('browseKeylessJobs — a feed that has rotted says so, loudly', () => {
     expect(quiet.fetched).toBe(0);
   });
 
-  it('an RSS feed with no items is the same failure', async () => {
-    const { transport } = fakeTransport((source) =>
-      source === 'guardian'
-        ? ok({ status: 200, body: '<?xml version="1.0"?><rss><channel></channel></rss>' })
-        : workingReply(source),
-    );
-
-    const quiet = outcomeFor(await browseKeylessJobs(transport, REQUEST), 'guardian');
-    expect(quiet.error?.kind).toBe('empty-feed');
-  });
-
   it('a request that never completed says so', async () => {
     const { transport } = fakeTransport((source) =>
-      source === 'guardian'
-        ? err(keylessError('guardian', 'network', 'CViper could not reach Guardian Jobs.'))
+      source === 'arbeitnow'
+        ? err(keylessError('arbeitnow', 'network', 'CViper could not reach Arbeitnow.'))
         : workingReply(source),
     );
 
-    const down = outcomeFor(await browseKeylessJobs(transport, REQUEST), 'guardian');
+    const down = outcomeFor(await browseKeylessJobs(transport, REQUEST), 'arbeitnow');
     expect(down.error?.kind).toBe('network');
   });
 
@@ -241,7 +207,6 @@ describe('browseKeylessJobs — a feed that has rotted says so, loudly', () => {
 
     const outcome = await browseKeylessJobs(transport, REQUEST);
     expect(outcomeFor(outcome, 'arbeitnow').error?.kind).toBe('network');
-    expect(outcomeFor(outcome, 'guardian').jobs.length).toBeGreaterThan(0);
   });
 
   it('boundary: page two failing keeps page one’s adverts AND reports the failure', async () => {
@@ -324,9 +289,24 @@ describe('the fake transport is not lying to these tests', () => {
     const fetch = vi.fn(async (source: KeylessSourceId) => workingReply(source));
     await browseKeylessJobs({ fetch }, REQUEST);
 
-    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch).toHaveBeenCalledWith('arbeitnow', 1);
     expect(fetch).toHaveBeenCalledWith('arbeitnow', 2);
-    expect(fetch).toHaveBeenCalledWith('guardian', 1);
+  });
+});
+
+describe('a feed that has closed is never contacted (L-336)', () => {
+  it('negative: a stale caller asking for the Guardian feed contacts nobody', async () => {
+    // Guardian Jobs closed on 2 Sep 2026 and its feed now redirects to an
+    // article. A remembered tick or an old caller must not reach it: the
+    // browse reads only the feeds in the closed set.
+    const { transport, asked } = fakeTransport(workingReply);
+    const outcome = await browseKeylessJobs(transport, {
+      ...REQUEST,
+      sources: ['guardian' as string as KeylessSourceId],
+    });
+
+    expect(asked()).toEqual([]);
+    expect(outcome.outcomes).toEqual([]);
   });
 });

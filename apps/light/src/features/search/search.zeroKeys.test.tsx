@@ -82,7 +82,6 @@ const sql = vi.hoisted(() => {
 vi.mock('../../db/sqlBridge', () => ({ default: { load: sql.load } }));
 
 import ARBEITNOW_PAGE from '../../../../../packages/job-apis/src/fixtures/arbeitnow-page1.json';
-import GUARDIAN_FEED from '../../../../../packages/job-apis/src/fixtures/guardian-jobsrss.xml?raw';
 
 const { default: App } = await import('../../app/App');
 const { markWelcomeSeen } = await import('../onboarding/store');
@@ -106,15 +105,14 @@ const PROVIDER_COMMANDS = [
 const NOW = new Date('2026-08-19T09:00:00.000Z');
 
 /**
- * What the two keyless feeds answer with, for the tests that press the button.
+ * What the keyless feed answers with, for the tests that press the button.
  *
- * The recorded live responses, so the SHIPPED readers run: a 19-advert slice of
- * an Arbeitnow page and the Guardian's complete feed. Reassigned per test to
- * break a feed on purpose.
+ * The recorded live response, so the SHIPPED reader runs: a 19-advert slice of
+ * an Arbeitnow page. Reassigned per test to break the feed on purpose.
  */
-let keylessReply: (source: string) => { status: number; body: string } = (source) => ({
+let keylessReply: (source: string) => { status: number; body: string } = () => ({
   status: 200,
-  body: source === 'arbeitnow' ? JSON.stringify(ARBEITNOW_PAGE) : GUARDIAN_FEED,
+  body: JSON.stringify(ARBEITNOW_PAGE),
 });
 
 function invokedProviderCommands(): string[] {
@@ -130,9 +128,9 @@ beforeEach(() => {
   // Without this the app opens on the welcome screen and the shell is not drawn.
   markWelcomeSeen();
   tauri.invoke.mockReset();
-  keylessReply = (source) => ({
+  keylessReply = () => ({
     status: 200,
-    body: source === 'arbeitnow' ? JSON.stringify(ARBEITNOW_PAGE) : GUARDIAN_FEED,
+    body: JSON.stringify(ARBEITNOW_PAGE),
   });
   tauri.invoke.mockImplementation(async (command, args) => {
     // A machine with nothing set up: no daemon, and not one saved credential.
@@ -239,7 +237,7 @@ describe('the search view on a machine with no keys', () => {
     expect(invokedProviderCommands()).toEqual([]);
   });
 
-  it('lets the button be pressed, and browses two free feeds with no key at all', async () => {
+  it('lets the button be pressed, and browses the free feed with no key at all', async () => {
     // ======================================================================
     // THIS TEST REPLACED ONE THAT ASSERTED THE OPPOSITE (L-110).
     // ======================================================================
@@ -290,7 +288,7 @@ describe('the search view on a machine with no keys', () => {
     // the structural test in keyless.rs.
     expect(invokedProviderCommands()).toEqual([]);
     expect(tauri.invoke.mock.calls.filter(([command]) => command === 'keyless_fetch')).toHaveLength(
-      3,
+      2,
     );
   });
 
@@ -313,7 +311,6 @@ describe('the search view on a machine with no keys', () => {
     expect((await screen.findByTestId('keyless-error-arbeitnow')).textContent).toContain(
       'Arbeitnow',
     );
-    expect(screen.getByTestId('keyless-error-guardian').textContent).toContain('Guardian Jobs');
     expect(screen.queryByTestId('search-no-results')).toBeNull();
     expect(invokedProviderCommands()).toEqual([]);
   });
@@ -333,7 +330,7 @@ describe('the search view on a machine with no keys', () => {
     // since L-329 (pressing the disabled Search here would test nothing). Only
     // the board is ticked — the free feeds are a request of their own, and this
     // test is about the board.
-    for (const feed of ['keyless-source-arbeitnow', 'keyless-source-guardian']) {
+    for (const feed of ['keyless-source-arbeitnow']) {
       const box = screen.getByTestId(feed) as HTMLInputElement;
       if (box.checked) await user.click(box);
     }

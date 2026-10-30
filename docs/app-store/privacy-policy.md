@@ -1,6 +1,6 @@
 # CViper Light privacy policy
 
-_This page is generated from the app's own list of the addresses it may contact — the same list the app shows under Settings → Privacy, and the one a test holds the code to. It changes when that list changes. Last updated: 28 October 2026._
+_This page is generated from the app's own list of the addresses it may contact — the same list the app shows under Settings → Privacy, and the one a test holds the code to. It changes when that list changes. Last updated: 30 October 2026._
 
 ## The short version
 
@@ -42,7 +42,6 @@ These carry a key you pasted into Settings, under an account that is yours. The 
 A plain request with nothing about you in it beyond the request itself.
 
 - `www.arbeitnow.com` — The list of recent jobs this free job board publishes, read when you press Browse. It takes no key and no account, and nothing about you is sent — the site sees your IP address, exactly as it would if you opened its job board in your browser. It cannot search: CViper reads the recent list and narrows it down on your computer.
-- `jobs.theguardian.com` — Guardian Jobs’ public list of its twenty most recent UK jobs, read when you press Browse. It takes no key and no account, and nothing about you is sent — the site sees your IP address, exactly as it would if you opened the page yourself. Its own search page is also opened in your browser by the keyless buttons on the search screen, and the app does not load that one.
 - `github.com` — The update check reads a small signed file from this app’s public GitHub releases. It happens when you press “Check for updates”, and once when the app starts unless you switch that off in Settings. It carries no data about you beyond the request itself. The source code is also opened in your browser from Settings → About.
 - **any job-advert page you ask it to open — only when you press Fetch, or Analyse this job on a search result** — You paste a link and press Fetch, and the app reads that one page so it can fill in the form. Pressing Analyse this job on a search result that carries only a preview of the advert reads that result’s own page, once, so the whole advert is scored. The address is whichever one you pasted or the result links to, so it cannot be listed here in advance. It carries no cookies, no sign-in and no key, it cannot reach your saved keys, it follows no links, and addresses on your own computer or home network are refused. The site sees your IP address, exactly as it would if you had clicked the link yourself.
 
@@ -63,6 +62,7 @@ The app hands the address to your own browser and is not involved from then on. 
 - `www.cv-library.co.uk` — A keyless search link for CV-Library, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.adzuna.co.uk` — A keyless search link for Adzuna’s public search, from job-boards.json, and the word “Adzuna” on each Adzuna advert, which Adzuna’s API terms ask to link to their site. Pressing either hands the address to your own browser; the app never loads the page.
 - `www.google.com` — A keyless search link for Google Jobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `jobs.theguardian.com` — A keyless search link for Guardian Jobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.jobserve.com` — A keyless search link for Jobserve, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page, and it never scrapes Jobserve.
 - `www.jobs.service.gov.uk` — A keyless search link for GOV.UK’s Find a job (the Work Hub service run by the Department for Work and Pensions), from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page, and it never scrapes it.
 - `cviper.ai` — This app’s own website: its download page and the privacy policy, opened in your browser when you tap a line that names it. The app never contacts it, and nothing is added to the link.

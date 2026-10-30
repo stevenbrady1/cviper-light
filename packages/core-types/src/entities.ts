@@ -44,9 +44,11 @@ export type ExtraFields = Readonly<Record<string, unknown>>;
 /**
  * Where an advert came from.
  *
- * `arbeitnow` and `guardian` are the two KEYLESS feeds (L-110): whole recent
- * listings the app reads with no credential and filters on this machine. They
- * are separate members rather than a label reused from a keyed board, because
+ * `arbeitnow` and `guardian` are the KEYLESS feeds (L-110): whole recent
+ * listings the app reads with no credential and filters on this machine.
+ * Guardian Jobs closed on 2 Sep 2026 and its feed is no longer read (L-336),
+ * but `guardian` stays here: adverts saved from it are still in trackers and
+ * backups, and must still load. They are separate members rather than a label reused from a keyed board, because
  * `jobs (source, external_id)` is a unique index — two boards sharing a source
  * name would let one advert's id collide with an unrelated advert's id — and
  * because a card that names the wrong board is a lie on screen.

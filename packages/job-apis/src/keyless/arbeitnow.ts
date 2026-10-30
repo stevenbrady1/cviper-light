@@ -24,7 +24,7 @@
  *     `url`, which points at Arbeitnow's own page for that job, and the search
  *     screen shows an Arbeitnow credit whenever one of its adverts is on
  *     screen. Same treatment Adzuna's terms already get.
- *   * "please do not abuse" — three requests per browse, only ever from a
+ *   * "please do not abuse" — two requests per browse, only ever from a
  *     button press. No polling, no search-as-you-type, no refresh on focus, and
  *     Rust enforces a minimum gap between browses on top of that.
  *

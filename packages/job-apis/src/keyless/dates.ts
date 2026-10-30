@@ -1,14 +1,13 @@
 /**
- * The two date formats the keyless feeds use, neither of which is ISO.
+ * The date format the keyless feed uses, which is not ISO.
  *
- * `toIsoDateOrNull` in `text.ts` reads what Adzuna and Reed send. These feeds
- * send something else entirely — Arbeitnow a unix timestamp in seconds,
- * Guardian Jobs an RFC-822 date out of RSS — and the cost of getting this wrong
- * is already on the record: the web app's parser raised on Reed's format, the
+ * `toIsoDateOrNull` in `text.ts` reads what Adzuna and Reed send. Arbeitnow
+ * sends something else entirely, a unix timestamp in seconds, and the cost of
+ * getting this wrong is already on the record: the web app's parser raised on Reed's format, the
  * surrounding `except` swallowed it, and every Reed advert was stamped with
  * today. "Posted 3 days ago" was never true for Reed.
  *
- * So both readers here refuse rather than guess, and an unreadable date is
+ * So the reader here refuses rather than guesses, and an unreadable date is
  * `null`. `postedLabel` in the search screen renders `null` as nothing at all,
  * which is the honest answer.
  */
@@ -50,55 +49,4 @@ export function unixSecondsToIsoDate(raw: unknown): string | null {
   if (raw < EARLIEST_SECONDS || raw > LATEST_SECONDS) return null;
 
   return isoDayOf(raw * 1000);
-}
-
-/** `Wed, 19 Aug 2026 23:00:00 +0000` — the RSS 2.0 date format. */
-const RFC_822 =
-  /^(?:[A-Za-z]{3},\s*)?(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/;
-
-const MONTHS: Readonly<Record<string, number>> = {
-  jan: 0,
-  feb: 1,
-  mar: 2,
-  apr: 3,
-  may: 4,
-  jun: 5,
-  jul: 6,
-  aug: 7,
-  sep: 8,
-  oct: 9,
-  nov: 10,
-  dec: 11,
-};
-
-/**
- * Guardian Jobs' `pubDate` -> `YYYY-MM-DD`, or `null`.
- *
- * Parsed by hand rather than handed to `new Date(...)`. `Date.parse` of an
- * RFC-822 string is implementation-defined, and the one thing it does
- * reliably on a string it dislikes is return a plausible-looking wrong answer
- * or `NaN` depending on the engine — which is exactly the class of bug this
- * module's header is about.
- *
- * The zone offset is deliberately ignored: the feed publishes `+0000`, the
- * field is a calendar day, and shifting a day by an hour to honour a zone would
- * change the date on a card for no gain a reader could see.
- */
-export function rfc822ToIsoDate(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
-
-  const match = RFC_822.exec(raw.trim());
-  if (match === null) return null;
-
-  const day = Number(match[1]);
-  const month = MONTHS[(match[2] ?? '').toLowerCase()];
-  const year = Number(match[3]);
-  if (month === undefined || !Number.isFinite(day) || !Number.isFinite(year)) return null;
-
-  const stamp = Date.UTC(year, month, day);
-  const iso = isoDayOf(stamp);
-  if (iso === null) return null;
-
-  // Round-tripped, so `31 Feb 2026` is refused rather than rolled into March.
-  return iso.endsWith(String(day).padStart(2, '0')) ? iso : null;
 }

@@ -4,18 +4,21 @@
  * ============================================================================
  * THIS IS BROWSING, NOT SEARCHING. THE DIFFERENCE IS THE WHOLE DESIGN.
  * ============================================================================
- * Neither feed accepts a query. Arbeitnow publishes its most recent 250 adverts
- * per page and Guardian Jobs publishes its most recent 20, and both ignore any
- * parameter asking for something narrower — measured, not assumed. So there is
- * no keyword or location ANYWHERE in this contract: the app reads what the feed
- * published and narrows it on this machine afterwards (`filter.ts`).
+ * The feed accepts no query. Arbeitnow publishes its most recent 250 adverts
+ * per page and ignores any parameter asking for something narrower — measured,
+ * not assumed. So there is no keyword or location ANYWHERE in this contract:
+ * the app reads what the feed published and narrows it on this machine
+ * afterwards (`filter.ts`).
+ *
+ * Guardian Jobs was a second feed until it closed on 2 Sep 2026; its address
+ * now redirects to an article about the closure, so it was removed (L-336).
  *
  * Calling it a search would be a lie in the one place a user cannot check.
  *
  * ============================================================================
  * NO CREDENTIAL EXISTS ON THIS PATH
  * ============================================================================
- * Neither feed takes one. There is no key to omit, no header to forget, and
+ * The feed takes none. There is no key to omit, no header to forget, and
  * nothing in the credential store for this path to read — `keyless.rs` carries
  * a test proving it cannot so much as name the credential module, which is the
  * same structural guard `fetch_page.rs` has.
@@ -30,16 +33,20 @@ import { type Result } from '@cviper/core-types';
 import { type KeylessError } from './errors';
 import { type JobApiHttpResponse } from '../types';
 
-/** The two keyless feeds. A CLOSED SET, for the same reason `JobProviderId` is. */
-export type KeylessSourceId = 'arbeitnow' | 'guardian';
+/**
+ * The keyless feeds. A CLOSED SET, for the same reason `JobProviderId` is.
+ *
+ * One member now. `'guardian'` stays a `JobSource` (saved jobs and backups
+ * still hold it) but is no longer a feed anything reads.
+ */
+export type KeylessSourceId = 'arbeitnow';
 
 /** Every keyless feed, in the order the UI lists them. */
-export const KEYLESS_SOURCE_IDS: readonly KeylessSourceId[] = ['arbeitnow', 'guardian'];
+export const KEYLESS_SOURCE_IDS: readonly KeylessSourceId[] = ['arbeitnow'];
 
 /** How each feed is named in a sentence shown to a person. */
 export const KEYLESS_SOURCE_LABEL: Readonly<Record<KeylessSourceId, string>> = {
   arbeitnow: 'Arbeitnow',
-  guardian: 'Guardian Jobs',
 };
 
 /**
@@ -48,9 +55,9 @@ export const KEYLESS_SOURCE_LABEL: Readonly<Record<KeylessSourceId, string>> = {
  * ============================================================================
  * A FIXED COST, NEVER A FUNCTION OF WHAT THE USER TYPED
  * ============================================================================
- * Three requests per browse: two pages of Arbeitnow (500 adverts) and the one
- * page Guardian Jobs publishes. That is the entire cost, it is the same for
- * every browse, and nothing in the form can raise it.
+ * Two requests per browse: two pages of Arbeitnow (500 adverts). That is the
+ * entire cost, it is the same for every browse, and nothing in the form can
+ * raise it.
  *
  * Two pages rather than one because of what page 1 actually contains: in a live
  * sample of 250 adverts, 59 were plausibly UK and 42 of those were London.
@@ -63,7 +70,6 @@ export const KEYLESS_SOURCE_LABEL: Readonly<Record<KeylessSourceId, string>> = {
  */
 export const KEYLESS_PAGES: Readonly<Record<KeylessSourceId, number>> = {
   arbeitnow: 2,
-  guardian: 1,
 };
 
 /**

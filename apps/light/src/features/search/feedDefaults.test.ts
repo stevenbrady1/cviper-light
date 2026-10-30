@@ -63,19 +63,18 @@ describe('isUkLocation', () => {
 });
 
 describe('chosenFeeds', () => {
-  it('a UK location: Guardian Jobs only', () => {
-    expect([...chosenFeeds({}, 'London')]).toEqual(['guardian']);
+  it('a UK location: no free feed (Guardian Jobs closed, L-336)', () => {
+    expect([...chosenFeeds({}, 'London')]).toEqual([]);
   });
 
-  it('a European or empty location: both feeds', () => {
-    expect([...chosenFeeds({}, 'Berlin')]).toEqual(['arbeitnow', 'guardian']);
-    expect([...chosenFeeds({}, '')]).toEqual(['arbeitnow', 'guardian']);
+  it('a European or empty location: Arbeitnow', () => {
+    expect([...chosenFeeds({}, 'Berlin')]).toEqual(['arbeitnow']);
+    expect([...chosenFeeds({}, '')]).toEqual(['arbeitnow']);
   });
 
   it('the user’s own choice wins over the default, either way', () => {
-    expect([...chosenFeeds({ arbeitnow: true }, 'London')]).toEqual(['arbeitnow', 'guardian']);
-    expect([...chosenFeeds({ arbeitnow: false }, 'Berlin')]).toEqual(['guardian']);
-    expect([...chosenFeeds({ guardian: false }, 'Berlin')]).toEqual(['arbeitnow']);
+    expect([...chosenFeeds({ arbeitnow: true }, 'London')]).toEqual(['arbeitnow']);
+    expect([...chosenFeeds({ arbeitnow: false }, 'Berlin')]).toEqual([]);
   });
 });
 
@@ -93,25 +92,56 @@ describe('remembering the choice', () => {
   });
 });
 
-describe('defaultFeeds and tickFeedsLabel (L-335)', () => {
-  it('negative: a UK location — Guardian Jobs only, never Arbeitnow', () => {
-    expect(defaultFeeds('London')).toEqual(['guardian']);
-    expect(tickFeedsLabel(defaultFeeds('London'))).toBe('Tick Guardian Jobs');
+describe('a stored choice that names a feed which no longer exists (L-336)', () => {
+  it('negative: an unknown key is ignored and the known ones are kept', () => {
+    // Guardian Jobs closed on 2 Sep 2026 and its feed was removed. A machine
+    // that once unticked it still has `guardian` in the store. Throwing the
+    // whole object away would quietly lose the Arbeitnow tick beside it.
+    localStorage.setItem(FEED_CHOICE_KEY, JSON.stringify({ guardian: false, arbeitnow: true }));
+    expect(readFeedChoice()).toEqual({ arbeitnow: true });
   });
 
-  it.each(['Berlin', ''])('boundary: location "%s" — both feeds', (location) => {
-    expect(defaultFeeds(location)).toEqual(['arbeitnow', 'guardian']);
-    expect(tickFeedsLabel(defaultFeeds(location))).toBe('Tick both free feeds');
+  it('negative: an unknown key is ignored whatever its value', () => {
+    localStorage.setItem(FEED_CHOICE_KEY, JSON.stringify({ guardian: 'yes', arbeitnow: false }));
+    expect(readFeedChoice()).toEqual({ arbeitnow: false });
+  });
+
+  it('boundary: a store holding only unknown keys is no choice at all', () => {
+    localStorage.setItem(FEED_CHOICE_KEY, JSON.stringify({ guardian: true }));
+    expect(readFeedChoice()).toEqual({});
+  });
+
+  it('boundary: the next tick does not write the unknown key back', () => {
+    localStorage.setItem(FEED_CHOICE_KEY, JSON.stringify({ guardian: false }));
+    rememberFeedChoice(readFeedChoice(), 'arbeitnow', true);
+    expect(JSON.parse(localStorage.getItem(FEED_CHOICE_KEY) ?? '{}')).toEqual({ arbeitnow: true });
+  });
+});
+
+describe('defaultFeeds and tickFeedsLabel (L-335)', () => {
+  it('negative: a UK location — nothing to tick (Guardian Jobs closed, L-336), never Arbeitnow', () => {
+    expect(defaultFeeds('London')).toEqual([]);
+    // No button may say "Tick 0 free feeds": there is no label at all.
+    expect(tickFeedsLabel(defaultFeeds('London'))).toBeNull();
+  });
+
+  it.each(['Berlin', ''])('boundary: location "%s" — Arbeitnow', (location) => {
+    expect(defaultFeeds(location)).toEqual(['arbeitnow']);
+    expect(tickFeedsLabel(defaultFeeds(location))).toBe('Tick Arbeitnow');
   });
 
   it('the default ignores a stored choice — it is what an empty store would tick', () => {
-    rememberFeedChoice({}, 'guardian', false);
-    expect(defaultFeeds('London')).toEqual(['guardian']);
+    rememberFeedChoice({}, 'arbeitnow', false);
+    expect(defaultFeeds('Berlin')).toEqual(['arbeitnow']);
   });
 
   it('tickFeeds records every one as the user’s own tick, keeping the rest', () => {
-    const next = tickFeeds({ guardian: false, arbeitnow: false }, ['guardian']);
-    expect(next).toEqual({ guardian: true, arbeitnow: false });
-    expect(readFeedChoice()).toEqual({ guardian: true, arbeitnow: false });
+    const next = tickFeeds({ arbeitnow: false }, ['arbeitnow']);
+    expect(next).toEqual({ arbeitnow: true });
+    expect(readFeedChoice()).toEqual({ arbeitnow: true });
+  });
+
+  it('boundary: ticking nothing changes nothing', () => {
+    expect(tickFeeds({ arbeitnow: false }, [])).toEqual({ arbeitnow: false });
   });
 });

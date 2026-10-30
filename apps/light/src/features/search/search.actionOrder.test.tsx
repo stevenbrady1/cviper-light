@@ -72,7 +72,7 @@ describe('the Search button comes after every choice that changes it (L-313)', (
     const all = choices();
     // The board ticks are among them: they are what the button's count is about.
     expect(all).toContain(screen.getByTestId('keyless-reed'));
-    expect(all).toContain(screen.getByTestId('keyless-source-guardian'));
+    expect(all).toContain(screen.getByTestId('keyless-source-arbeitnow'));
     expect(all.length).toBeGreaterThan(10);
     for (const control of all) expect(before(control, submit)).toBe(true);
   });

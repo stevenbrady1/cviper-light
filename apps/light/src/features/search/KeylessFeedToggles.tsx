@@ -5,13 +5,13 @@ import { Hint } from '../../app/Hint';
 import { KEYLESS_FILTER_NOTE, KEYLESS_INTRO, KEYLESS_SUMMARY } from './keylessModel';
 
 /**
- * The two feeds that need no key, and the honest sentence about what they are.
+ * The feed that needs no key, and the honest sentence about what it is.
  *
  * ============================================================================
- * NEITHER CHECKBOX IS EVER DISABLED, AND THAT IS THE WHOLE POINT
+ * THE CHECKBOX IS NEVER DISABLED, AND THAT IS THE WHOLE POINT
  * ============================================================================
  * `ProviderToggles` above it has three different reasons a board cannot be
- * ticked, all of them about a key. These have none: there is no credential, no
+ * ticked, all of them about a key. This has none: there is no credential, no
  * account and nothing to set up, so a machine with an empty credential store
  * gets real job adverts from this section on the day it is installed.
  *
@@ -19,14 +19,15 @@ import { KEYLESS_FILTER_NOTE, KEYLESS_INTRO, KEYLESS_SUMMARY } from './keylessMo
  * THE COPY IS NOT DECORATION
  * ============================================================================
  * "Browse jobs, no key needed" is the claim that sells this and also the claim
- * that would mislead: Arbeitnow is Germany-first with a UK minority, and the
- * Guardian feed is twenty public-sector-weighted items. A reader who is not
- * told that, and who presses the button and sees four adverts, concludes the
- * app is broken. `KEYLESS_INTRO` says it before they press anything, and
- * `keylessModel.test.ts` holds that sentence to naming both feeds and never
- * using the word "search".
+ * that would mislead: Arbeitnow is Germany-first with a UK minority. A reader
+ * who is not told that, and who presses the button and sees four adverts,
+ * concludes the app is broken. `KEYLESS_INTRO` says it before they press
+ * anything, and `keylessModel.test.ts` holds that sentence to naming the feed
+ * and never using the word "search".
  *
- * It is not a search, and nothing in this file calls it one. The feeds accept
+ * Guardian Jobs was a second feed here until it closed on 2 Sep 2026 (L-336).
+ *
+ * It is not a search, and nothing in this file calls it one. The feed accepts
  * no query at all — the narrowing happens on the user's own machine, which is
  * what `KEYLESS_FILTER_NOTE` explains where they type the words.
  */
@@ -47,7 +48,7 @@ export function KeylessFeedToggles({
 }: KeylessFeedTogglesProps) {
   return (
     <fieldset data-testid="keyless-feeds" className="min-w-0">
-      <legend className="text-xs font-medium text-ink-muted">Free feeds, no key needed</legend>
+      <legend className="text-xs font-medium text-ink-muted">Free feed, no key needed</legend>
 
       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
         {KEYLESS_SOURCE_IDS.map((source) => (

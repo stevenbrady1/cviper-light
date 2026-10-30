@@ -239,10 +239,10 @@ describe('keyed boards on a machine with no job-board key (L-276)', () => {
     await vi.waitFor(() => expect(screen.queryByTestId('provider-toggles')).toBeNull());
   });
 
-  it('still offers the free feeds and the board buttons with no key', async () => {
+  it('still offers the free feed and the board buttons with no key', async () => {
     renderSearch({ keys: { adzuna: 'missing', reed: 'missing' } });
     await screen.findByTestId('search-empty');
-    expect(screen.getByTestId('keyless-source-guardian')).toBeTruthy();
+    expect(screen.getByTestId('keyless-source-arbeitnow')).toBeTruthy();
     expect(screen.getByTestId('keyless-bar')).toBeTruthy();
   });
 

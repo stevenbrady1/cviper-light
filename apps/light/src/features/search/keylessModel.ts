@@ -26,7 +26,7 @@ import {
 } from '@cviper/job-apis';
 
 /**
- * What the two free feeds are, in the plainest words that are still true.
+ * What the free feed is, in the plainest words that are still true.
  *
  * ============================================================================
  * THE HONESTY HERE IS LOAD-BEARING, NOT DECORATION
@@ -34,36 +34,36 @@ import {
  * "Browse jobs, no key needed" is the claim that sells this feature and it is
  * also the claim that would mislead. The measured reality: Arbeitnow is a
  * Germany-first board that recently added the UK — in a live page of 250
- * adverts, 59 were plausibly UK — and Guardian Jobs publishes twenty UK items
- * weighted to public sector, education and charity.
+ * adverts, 59 were plausibly UK.
  *
- * So a UK reader who presses Browse gets a modest, lopsided list, and they must
+ * Guardian Jobs, the UK feed that sat beside it, closed on 2 Sep 2026 and was
+ * removed (L-336). The copy names only what is still here.
+ *
+ * So a UK reader who ticks it gets a modest, lopsided list, and they must
  * be told that BEFORE they conclude the app is broken or that this is the
  * market. Saying it costs a sentence; not saying it costs the user's trust in
  * everything else the screen tells them.
  *
- * It also never says "search". The feeds accept no query at all.
+ * It also never says "search". The feed accepts no query at all.
  */
 export const KEYLESS_INTRO =
-  'Two free job feeds, read straight from the web with no key and no account: Arbeitnow, ' +
-  'which is mostly Germany and the rest of Europe with a growing London list, and Guardian ' +
-  'Jobs, which is the twenty most recent UK posts — largely public sector, education and ' +
-  'charity. CViper reads what they have just published and narrows it down on your computer, ' +
-  'so this is a browse of recent jobs rather than a look at the whole market.';
+  'A free job feed, read straight from the web with no key and no account: Arbeitnow, which ' +
+  'is mostly Germany and the rest of Europe with a small London list. CViper reads what it ' +
+  'has just published and narrows it down on your computer, so this is a browse of recent ' +
+  'jobs rather than a look at the whole market.';
 
 /** What the fields the local filter reads, said where the user types them. */
 /**
  * The honest sentence, short enough to read at a glance (L-219). The long
  * version — `KEYLESS_INTRO` and `KEYLESS_FILTER_NOTE` — is one hover or Tab
- * away on it. Never the word "search": the feeds take no query.
+ * away on it. Never the word "search": the feed takes no query.
  */
 export const KEYLESS_SUMMARY =
-  'Arbeitnow is mostly Germany and the rest of Europe; Guardian Jobs is the twenty latest UK ' +
-  'posts. Both are read here and narrowed on your computer, so they show recent jobs, not the ' +
-  'whole market.';
+  'Arbeitnow is mostly Germany and the rest of Europe. It is read here and narrowed on your ' +
+  'computer, so it shows recent jobs, not the whole market.';
 
 export const KEYLESS_FILTER_NOTE =
-  'These feeds cannot be asked for anything, so the narrowing happens here: the job title and ' +
+  'This feed cannot be asked for anything, so the narrowing happens here: the job title and ' +
   'the employer for the words, and whatever the advert wrote in its location box for the ' +
   'place. Many adverts name only a city.';
 

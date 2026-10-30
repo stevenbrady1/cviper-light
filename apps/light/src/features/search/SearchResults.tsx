@@ -51,6 +51,11 @@ export interface SearchResultsProps {
   readonly onAnalyse: ((jobId: string) => void) | undefined;
   /** Search cannot be pressed, so the empty page must not say to press it (L-335). */
   readonly searchBlocked: boolean;
+  /**
+   * A UK location with no usable key: there is no free feed to tick here since
+   * Guardian Jobs closed (L-336), so the empty page names the free Reed key.
+   */
+  readonly noFreeFeedHere: boolean;
 }
 
 export function SearchResults({
@@ -73,6 +78,7 @@ export function SearchResults({
   onOpen,
   onAnalyse,
   searchBlocked,
+  noFreeFeedHere,
 }: SearchResultsProps) {
   const failures = (outcome?.outcomes ?? []).filter((entry) => entry.error !== null);
   /*
@@ -153,8 +159,10 @@ export function SearchResults({
           <p className="font-medium text-ink">Nothing looked at yet.</p>
           <p className="mt-1 text-ink-muted">
             {searchBlocked
-              ? 'Tick a free feed above to see the newest adverts here — they need no key.'
-              : 'Type a job title and press Search to see the newest adverts from the free feeds.'}{' '}
+              ? noFreeFeedHere
+                ? 'A free Reed key, set up in Settings, shows UK adverts here.'
+                : 'Tick a free feed above to see the newest adverts here — it needs no key.'
+              : 'Type a job title and press Search to see the newest adverts from the free feed.'}{' '}
             Or open the same search on a whole job board with the buttons above.
           </p>
         </div>

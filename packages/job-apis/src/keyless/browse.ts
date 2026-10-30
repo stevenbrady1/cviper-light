@@ -23,9 +23,9 @@
  * ============================================================================
  * EVERY SOURCE SUCCEEDS OR FAILS ON ITS OWN
  * ============================================================================
- * Same shape as `searchJobs`, and for the same reason: Guardian being down is
- * not a reason to throw away the Arbeitnow adverts the user was also waiting
- * for. There is no "the browse failed".
+ * Same shape as `searchJobs`, and for the same reason: one feed being down is
+ * not a reason to throw away the adverts another feed sent. There is no "the
+ * browse failed".
  *
  * ============================================================================
  * NO QUOTA, AND NO CREDENTIAL
@@ -48,7 +48,6 @@ import {
   type KeylessError,
 } from './errors';
 import { filterKeylessJobs, type KeylessFilter } from './filter';
-import { normaliseGuardianFeed } from './guardian';
 import {
   KEYLESS_PAGES,
   KEYLESS_SOURCE_IDS,
@@ -97,7 +96,6 @@ export interface KeylessBrowseOutcome {
 /** Which reader reads which feed. */
 const READERS = {
   arbeitnow: normaliseArbeitnowFeed,
-  guardian: normaliseGuardianFeed,
 } as const;
 
 interface Collected {

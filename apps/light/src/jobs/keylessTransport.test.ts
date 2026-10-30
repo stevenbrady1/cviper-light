@@ -45,7 +45,7 @@ describe('createTauriKeylessTransport — the contract with Rust', () => {
   it('never passes a URL — Rust owns both destinations', async () => {
     tauri.invoke.mockResolvedValue(envelope(200, '{"data":[]}'));
 
-    await createTauriKeylessTransport().fetch('guardian', 1);
+    await createTauriKeylessTransport().fetch('arbeitnow', 1);
 
     const args = JSON.stringify(tauri.invoke.mock.calls[0]?.[1] ?? {});
     expect(args).not.toMatch(/https?:/);
@@ -80,7 +80,7 @@ describe('createTauriKeylessTransport — the contract with Rust', () => {
     // that turned it into an Err would throw the status away.
     tauri.invoke.mockResolvedValue(envelope(404, 'Not Found'));
 
-    const reply = await createTauriKeylessTransport().fetch('guardian', 1);
+    const reply = await createTauriKeylessTransport().fetch('arbeitnow', 1);
 
     expect(reply.ok).toBe(true);
     if (!reply.ok) return;
@@ -130,7 +130,7 @@ describe('createTauriKeylessTransport — when Rust says no', () => {
     // unhandled value.
     tauri.invoke.mockRejectedValue(JSON.stringify({ kind: 'quantum', message: 'Odd.' }));
 
-    const reply = await createTauriKeylessTransport().fetch('guardian', 1);
+    const reply = await createTauriKeylessTransport().fetch('arbeitnow', 1);
 
     expect(reply.ok).toBe(false);
     if (reply.ok) return;
@@ -142,7 +142,7 @@ describe('createTauriKeylessTransport — when Rust says no', () => {
     for (const thrown of ['command not found', new Error('ipc gone'), undefined, 42]) {
       tauri.invoke.mockRejectedValue(thrown);
 
-      const reply = await createTauriKeylessTransport().fetch('guardian', 1);
+      const reply = await createTauriKeylessTransport().fetch('arbeitnow', 1);
 
       expect(reply.ok, String(thrown)).toBe(false);
       if (reply.ok) return;

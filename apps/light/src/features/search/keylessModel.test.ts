@@ -15,7 +15,7 @@ import {
 } from '@cviper/job-apis';
 import { type Job } from '@cviper/core-types';
 
-import { KEYLESS_INTRO, combineResults, nothingMatchedNote } from './keylessModel';
+import { KEYLESS_INTRO, KEYLESS_SUMMARY, combineResults, nothingMatchedNote } from './keylessModel';
 import { searchDisabledReason } from './model';
 
 /**
@@ -112,11 +112,6 @@ describe('nothingMatchedNote — the sentence that is NOT an error', () => {
     // feature exists to prevent.
     expect(nothingMatchedNote(sourceOutcome({ fetched: 0, jobs: [] }))).toBeNull();
   });
-
-  it('names the Guardian feed by its own name', () => {
-    const note = nothingMatchedNote(sourceOutcome({ source: 'guardian', fetched: 20 })) ?? '';
-    expect(note).toContain('Guardian Jobs');
-  });
 });
 
 describe('combineResults — two sources, one list', () => {
@@ -130,8 +125,8 @@ describe('combineResults — two sources, one list', () => {
   };
 
   const keyless: KeylessBrowseOutcome = {
-    outcomes: [sourceOutcome({ fetched: 1, jobs: [job('k1', 'guardian', 'Social Worker')] })],
-    jobs: [job('k1', 'guardian', 'Social Worker')],
+    outcomes: [sourceOutcome({ fetched: 1, jobs: [job('k1', 'arbeitnow', 'Social Worker')] })],
+    jobs: [job('k1', 'arbeitnow', 'Social Worker')],
   };
 
   it('puts every advert in one list, keyed first', () => {
@@ -149,11 +144,11 @@ describe('combineResults — two sources, one list', () => {
     // The same advert on Adzuna and on a free feed is exactly the case worth
     // flagging, and it can only be seen by fingerprinting the merged list.
     const onAdzuna = job('a2', 'adzuna', 'Credit Risk Analyst', LONG_TEXT);
-    const onGuardian = job('g2', 'guardian', 'Credit Risk Analyst', LONG_TEXT);
+    const onFeed = job('g2', 'arbeitnow', 'Credit Risk Analyst', LONG_TEXT);
 
     const combined = combineResults(
       { ...keyed, jobs: [onAdzuna] },
-      { outcomes: [], jobs: [onGuardian] },
+      { outcomes: [], jobs: [onFeed] },
     );
 
     expect(combined.clusters.length).toBeGreaterThan(0);
@@ -177,15 +172,48 @@ describe('KEYLESS_INTRO — what the screen promises about these feeds', () => {
   });
 
   it('says where the jobs come from, rather than implying the whole market', () => {
-    // Arbeitnow is Germany-first with a UK minority, and the Guardian feed is
-    // twenty items. A reader who is told "browse jobs, no key needed" and then
-    // sees four adverts has been misled by the copy, not by the feeds.
+    // Arbeitnow is Germany-first with a UK minority. A reader who is told
+    // "browse jobs, no key needed" and then sees four adverts has been misled
+    // by the copy, not by the feed. Guardian Jobs closed on 2 Sep 2026
+    // (L-336), so the intro must not name it any more.
     expect(KEYLESS_INTRO).toContain('Arbeitnow');
-    expect(KEYLESS_INTRO).toContain('Guardian');
+    expect(KEYLESS_INTRO).not.toMatch(/guardian/i);
     expect(KEYLESS_INTRO.toLowerCase()).toContain('recent');
   });
 
   it('says the narrowing happens on this computer', () => {
     expect(KEYLESS_INTRO.toLowerCase()).toMatch(/on your computer|on this computer/);
+  });
+});
+
+describe('the copy after Guardian Jobs closed (L-336)', () => {
+  it('the intro and the summary name Arbeitnow and never the closed feed', () => {
+    for (const text of [KEYLESS_INTRO, KEYLESS_SUMMARY]) {
+      expect(text).toContain('Arbeitnow');
+      expect(text).not.toMatch(/guardian/i);
+      // One feed now: nothing may count two of them.
+      expect(text).not.toMatch(/\btwo\b|\bboth\b/i);
+    }
+  });
+
+  it('a UK location with no key: the reason names the free Reed key and "Also open"', () => {
+    const reason = searchDisabledReason(0, { ukWithoutKey: true }) ?? '';
+    expect(reason).toContain('Reed');
+    expect(reason).toContain('Settings');
+    expect(reason).toContain('Also open');
+    // There is no free feed for the UK to tick any more, so it must not send
+    // the user to tick one.
+    expect(reason).not.toMatch(/free feed/i);
+    expect(reason).not.toMatch(/guardian/i);
+  });
+
+  it('boundary: something to look at means no reason, UK or not', () => {
+    expect(searchDisabledReason(1, { ukWithoutKey: true })).toBeNull();
+  });
+
+  it('negative: outside the UK the reason still points at the one free feed', () => {
+    const reason = searchDisabledReason(0, { ukWithoutKey: false }) ?? '';
+    expect(reason).toMatch(/free feed\b/);
+    expect(reason).not.toMatch(/free feeds/);
   });
 });

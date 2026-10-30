@@ -10,9 +10,9 @@
  * nothing. Now Search only searches here, and "Also open in N boards" opens
  * the ticked boards with the same filters.
  *
- * And the owner's machine showing Guardian Jobs unticked is a remembered
- * untick, not a changed default: Guardian is on for a UK location with no key
- * and an empty store, and an untick the user made is kept (no reset).
+ * Since L-336 (Guardian Jobs closed on 2 Sep 2026) the free feed is Arbeitnow
+ * alone. It is off by default for a UK location (L-219), and an untick the
+ * user made is kept (no reset).
  */
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -60,52 +60,67 @@ function openBoardsButton(): HTMLButtonElement {
   return screen.getByTestId('search-open-boards') as HTMLButtonElement;
 }
 
+function submit(): HTMLButtonElement {
+  return screen.getByTestId('search-submit') as HTMLButtonElement;
+}
+
+/**
+ * The screen's text with the job-board links taken out. The Guardian Jobs
+ * BOARD link is a different thing from the closed feed and leaves in L-337;
+ * everything else on the screen must already be free of the name.
+ */
+function textOutsideTheBoardLinks(): string {
+  const copy = document.body.cloneNode(true) as HTMLElement;
+  copy.querySelector('[data-testid="keyless-bar"]')?.remove();
+  const titles = [...copy.querySelectorAll('[title]')].map((node) => node.getAttribute('title'));
+  return `${copy.textContent ?? ''} ${titles.join(' ')}`;
+}
+
 beforeEach(() => localStorage.clear());
 afterEach(cleanup);
 
-describe('Guardian Jobs on the Search screen — the default is unchanged, a stored untick is kept', () => {
-  it('happy: London, no job-board key, nothing stored — Guardian Jobs is ticked', async () => {
+describe('the free feed on the Search screen — the default is unchanged, a stored untick is kept', () => {
+  it('happy: London, no job-board key, nothing stored — Arbeitnow is off and there is no Guardian feed', async () => {
     const { user } = renderSearch();
     await screen.findByTestId('keyless-bar');
     await user.type(screen.getByTestId('search-location'), 'London');
 
-    expect(box('keyless-source-guardian').checked).toBe(true);
-    // And Arbeitnow is off for the UK (L-219), which is what this does NOT change.
+    // Arbeitnow is off for the UK (L-219), which is what this does NOT change.
     expect(box('keyless-source-arbeitnow').checked).toBe(false);
+    expect(screen.queryByTestId('keyless-source-guardian')).toBeNull();
   });
 
   it('negative: an untick the user made stays off — after a re-render and after a remount', async () => {
     const first = renderSearch();
     await screen.findByTestId('keyless-bar');
-    await first.user.type(screen.getByTestId('search-location'), 'London');
-    await first.user.click(box('keyless-source-guardian'));
-    expect(box('keyless-source-guardian').checked).toBe(false);
+    await first.user.type(screen.getByTestId('search-location'), 'Berlin');
+    await first.user.click(box('keyless-source-arbeitnow'));
+    expect(box('keyless-source-arbeitnow').checked).toBe(false);
 
     // A re-render: the location changes, and the untick does not come back.
-    await first.user.type(screen.getByTestId('search-location'), ' Bridge');
-    expect(box('keyless-source-guardian').checked).toBe(false);
+    await first.user.type(screen.getByTestId('search-location'), ' Mitte');
+    expect(box('keyless-source-arbeitnow').checked).toBe(false);
     expect(JSON.parse(localStorage.getItem(FEED_CHOICE_KEY) ?? '{}')).toEqual({
-      guardian: false,
+      arbeitnow: false,
     });
     first.unmount();
 
     const second = renderSearch();
     await screen.findByTestId('keyless-bar');
-    await second.user.type(screen.getByTestId('search-location'), 'London');
-    expect(box('keyless-source-guardian').checked).toBe(false);
+    await second.user.type(screen.getByTestId('search-location'), 'Berlin');
+    expect(box('keyless-source-arbeitnow').checked).toBe(false);
   });
 
   it.each([
     ['Berlin', true],
     ['', true],
   ] as const)(
-    'boundary: location "%s" — Guardian on, Arbeitnow on (the existing rule)',
+    'boundary: location "%s" — Arbeitnow on (the existing rule)',
     async (location, arbeitnow) => {
       const { user } = renderSearch();
       await screen.findByTestId('keyless-bar');
       if (location !== '') await user.type(screen.getByTestId('search-location'), location);
 
-      expect(box('keyless-source-guardian').checked).toBe(true);
       expect(box('keyless-source-arbeitnow').checked).toBe(arbeitnow);
     },
   );
@@ -115,7 +130,7 @@ describe('the blue Search button searches here and opens no tabs', () => {
   it('with three boards ticked it says just "Search", opens nothing, and browses the ticked feeds', async () => {
     const { user, port, browser } = renderSearch();
     await screen.findByTestId('keyless-bar');
-    await user.type(screen.getByTestId('search-location'), 'London');
+    await user.type(screen.getByTestId('search-location'), 'Berlin');
     await user.click(box('keyless-reed'));
     await user.click(box('keyless-indeed'));
     await user.click(box('keyless-linkedin'));
@@ -125,7 +140,7 @@ describe('the blue Search button searches here and opens no tabs', () => {
     await user.click(submit);
 
     await vi.waitFor(() => expect(port.calls.browseKeyless).toBe(1));
-    expect(port.browses()[0]?.sources).toEqual(['guardian']);
+    expect(port.browses()[0]?.sources).toEqual(['arbeitnow']);
     expect(browser.opened()).toEqual([]);
   });
 
@@ -143,7 +158,6 @@ describe('the blue Search button searches here and opens no tabs', () => {
   it('negative: only boards ticked — no key, no feed — Search is disabled and says why', async () => {
     const { user, browser } = renderSearch();
     await screen.findByTestId('keyless-bar');
-    await user.click(box('keyless-source-guardian'));
     await user.click(box('keyless-source-arbeitnow'));
     await user.click(box('keyless-reed'));
 
@@ -211,5 +225,73 @@ describe('"Also open in N boards" — its own button', () => {
     expect(await screen.findByTestId('search-salary-error')).toBeDefined();
     expect(browser.opened()).toEqual([]);
     expect(port.calls.browseKeyless).toBe(0);
+  });
+});
+
+/*
+  L-336 — Guardian Jobs closed on 2 Sep 2026, and its feed went with it. For
+  a UK location with no job-board key the Guardian feed was the only thing the
+  app itself could read (Arbeitnow is off for the UK, L-219), so Search is now
+  disabled there, and its reason has to be the true one: a free Reed key, set
+  up in Settings, adds results here, and ticked job boards open with "Also
+  open". Outside the UK nothing changes.
+*/
+describe('L-336: a UK location with no job-board key', () => {
+  it('Search is disabled, and the reason is a free Reed key and "Also open"', async () => {
+    const { user } = renderSearch();
+    await screen.findByTestId('keyless-bar');
+    await user.type(screen.getByTestId('search-location'), 'London');
+
+    expect(submit().disabled).toBe(true);
+    const reason = screen.getByTestId('search-reason').textContent ?? '';
+    expect(reason).toContain('Reed');
+    expect(reason).toContain('Settings');
+    expect(reason).toContain('Also open');
+    expect(reason).not.toMatch(/free feeds?/i);
+  });
+
+  it('negative: the closed feed is nowhere on the screen', async () => {
+    const { user } = renderSearch();
+    await screen.findByTestId('keyless-bar');
+    await user.type(screen.getByTestId('search-location'), 'London');
+
+    expect(screen.queryByTestId('keyless-source-guardian')).toBeNull();
+    expect(textOutsideTheBoardLinks()).not.toMatch(/guardian/i);
+  });
+
+  it('negative: pressing the disabled button browses nothing', async () => {
+    const { user, port } = renderSearch();
+    await screen.findByTestId('keyless-bar');
+    await user.type(screen.getByTestId('search-location'), 'Manchester');
+    await user.click(submit());
+
+    expect(port.calls.browseKeyless).toBe(0);
+    expect(port.calls.search).toBe(0);
+  });
+});
+
+describe('L-336: outside the UK nothing changes', () => {
+  it('boundary: Berlin with no key — Arbeitnow is ticked and Search is enabled', async () => {
+    const { user, port } = renderSearch();
+    await screen.findByTestId('keyless-bar');
+    await user.type(screen.getByTestId('search-location'), 'Berlin');
+
+    expect((screen.getByTestId('keyless-source-arbeitnow') as HTMLInputElement).checked).toBe(true);
+    expect(submit().disabled).toBe(false);
+    expect(screen.queryByTestId('search-reason')).toBeNull();
+
+    await user.click(submit());
+    await vi.waitFor(() => expect(port.calls.browseKeyless).toBe(1));
+    expect(port.browses()[0]?.sources).toEqual(['arbeitnow']);
+  });
+
+  it('boundary: a blank location reads the one free feed, Arbeitnow', async () => {
+    renderSearch();
+    await screen.findByTestId('keyless-bar');
+
+    const feeds = screen.getByTestId('keyless-feeds');
+    expect(feeds.querySelectorAll('input[type="checkbox"]')).toHaveLength(1);
+    expect((screen.getByTestId('keyless-source-arbeitnow') as HTMLInputElement).checked).toBe(true);
+    expect(submit().disabled).toBe(false);
   });
 });

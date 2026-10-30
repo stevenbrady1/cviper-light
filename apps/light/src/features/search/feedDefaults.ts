@@ -1,11 +1,15 @@
 /**
- * Which free feeds a search reads by default (L-219).
+ * Which free feed a search reads by default (L-219).
  *
  * Arbeitnow is mostly Germany and the rest of Europe. For a search in the UK
  * it mostly adds noise, so it starts switched OFF when the location is
  * recognisably in the UK — a UK city or town, a county or nation, a postcode,
  * or "UK" itself (owner decision, 2026-10-08). A blank location, or one
- * outside the UK, keeps it on. Guardian Jobs is UK and stays on.
+ * outside the UK, keeps it on.
+ *
+ * Guardian Jobs, the UK feed that sat beside it, closed on 2 Sep 2026 and was
+ * removed (L-336). So a UK location with no job-board key now has no free feed
+ * on by default — the search screen says what to do instead.
  *
  * A tick or untick the user makes is theirs: it wins over the default from
  * then on, and is remembered across restarts in a small store of its own.
@@ -304,19 +308,22 @@ export function chosenFeeds(choice: FeedChoice, location: string): ReadonlySet<K
 
 /**
  * The feeds the default ticks for this location, as if nothing were stored
- * (L-335): what "tick the free feeds" means when the user has unticked them
- * all. For a UK location that is Guardian Jobs alone — never Arbeitnow.
+ * (L-335): what "tick the free feed" means when the user has unticked it.
+ * Outside the UK that is Arbeitnow. For a UK location it is nothing at all
+ * since Guardian Jobs closed (L-336) — never Arbeitnow, which is mostly Europe.
  */
 export function defaultFeeds(location: string): readonly KeylessSourceId[] {
   const feeds = chosenFeeds({}, location);
   return KEYLESS_SOURCE_IDS.filter((source) => feeds.has(source));
 }
 
-/** "Tick Guardian Jobs", or "Tick both free feeds" — named from the feeds' own labels. */
-export function tickFeedsLabel(sources: readonly KeylessSourceId[]): string {
-  const [only] = sources;
-  if (sources.length === 1 && only !== undefined) return `Tick ${KEYLESS_SOURCE_LABEL[only]}`;
-  return sources.length === 2 ? 'Tick both free feeds' : `Tick ${sources.length} free feeds`;
+/**
+ * "Tick Arbeitnow" — named from the feeds' own labels — or `null` when there
+ * is nothing to tick, so no button ever says "Tick 0 free feeds" (L-336).
+ */
+export function tickFeedsLabel(sources: readonly KeylessSourceId[]): string | null {
+  if (sources.length === 0) return null;
+  return `Tick ${sources.map((source) => KEYLESS_SOURCE_LABEL[source]).join(' and ')}`;
 }
 
 /** Tick each of these as the user's own choice, remembered like a tick by hand. */
@@ -333,7 +340,15 @@ function storage(): Storage | null {
   }
 }
 
-/** What the user chose before. Anything unreadable is no choice at all. */
+/**
+ * What the user chose before. Anything unreadable is no choice at all.
+ *
+ * A key that is not a feed any more is IGNORED, not a reason to throw the
+ * rest away (L-336): a machine that once unticked Guardian Jobs still has
+ * `guardian` stored next to its Arbeitnow tick, and dropping the whole object
+ * would quietly lose that tick. A known feed with a value that is not
+ * `true`/`false` still makes the whole store unreadable, as before.
+ */
 export function readFeedChoice(): FeedChoice {
   const store = storage();
   if (store === null) return {};
@@ -345,12 +360,14 @@ export function readFeedChoice(): FeedChoice {
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
   const record = parsed as Record<string, unknown>;
-  const keys = Object.keys(record);
-  const valid = keys.every(
-    (key) =>
-      (KEYLESS_SOURCE_IDS as readonly string[]).includes(key) && typeof record[key] === 'boolean',
-  );
-  return valid ? (record as FeedChoice) : {};
+  const choice: Partial<Record<KeylessSourceId, boolean>> = {};
+  for (const source of KEYLESS_SOURCE_IDS) {
+    if (!Object.hasOwn(record, source)) continue;
+    const value = record[source];
+    if (typeof value !== 'boolean') return {};
+    choice[source] = value;
+  }
+  return choice;
 }
 
 /** Record a tick or untick the user made, and return the new choice. */
