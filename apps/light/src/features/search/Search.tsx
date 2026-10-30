@@ -12,7 +12,7 @@ import {
   type QuotaState,
 } from '@cviper/job-apis';
 
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { SECONDARY_BUTTON } from '../../app/buttons';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { SHIPPED_BOARDS } from '../boards/defaults';
@@ -36,9 +36,12 @@ import {
 import { KeylessBar } from './KeylessBar';
 import {
   chosenFeeds,
+  defaultFeeds,
   isUkLocation,
   readFeedChoice,
   rememberFeedChoice,
+  tickFeeds,
+  tickFeedsLabel,
   type FeedChoice,
 } from './feedDefaults';
 import { KeylessFeedToggles } from './KeylessFeedToggles';
@@ -70,6 +73,7 @@ import { SearchRecent } from './SearchRecent';
 import { SearchResults } from './SearchResults';
 import { SearchResultsHeader } from './SearchResultsHeader';
 import { SearchSaved } from './SearchSaved';
+import { SearchSubmitRow } from './SearchSubmitRow';
 import { useSearchRanking } from './useSearchRanking';
 import { useSearchSaving } from './useSearchSaving';
 
@@ -533,6 +537,17 @@ export function Search({
     setFeedChoice((current) => rememberFeedChoice(current, source, next));
   }, []);
 
+  // Nothing to look at: one press ticks what the default would have (L-335).
+  // Only when no feed is ticked — the one case the reason is about.
+  const fixFeeds = defaultFeeds(form.location);
+  const feedFix =
+    disabledReason === null || keylessWanted.length > 0
+      ? null
+      : {
+          label: tickFeedsLabel(fixFeeds),
+          onFix: () => setFeedChoice((current) => tickFeeds(current, fixFeeds)),
+        };
+
   // ── Rendering ────────────────────────────────────────────────────────────
 
   const view = viewById('search');
@@ -618,40 +633,18 @@ export function Search({
               />
             </section>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              {/*
-                The view's ONE blue button. Disabled, never hidden, and the
-                reason sits beside it — because a grey button that says nothing
-                is where a user's session ends.
-              */}
-              <button
-                type="submit"
-                data-testid="search-submit"
-                data-primary="true"
-                disabled={running || disabledReason !== null}
-                className={PRIMARY_BUTTON}
-              >
-                {/*
-                  "Search" (L-219, owner decision 2026-10-08): one action, one
-                  name — and since L-329 one job: it searches here and opens
-                  no browser tabs, so pressing it always shows results here.
-                */}
-                {running ? 'Working…' : 'Search'}
-              </button>
-
-              {disabledReason === null ? null : (
-                <p data-testid="search-reason" className="text-ink-muted">
-                  {disabledReason}
-                </p>
-              )}
-            </div>
+            {/* The blue button, and why it is grey right beside it (L-335). */}
+            <SearchSubmitRow running={running} disabledReason={disabledReason} fix={feedFix} />
 
             {/*
               The ticked boards, in the browser, with the same filters (L-329).
               A second action, so not blue, and after the blue one. Disabled —
               never hidden — with nothing ticked, and the reason beside it.
             */}
-            <div className="mt-3 flex flex-wrap items-center gap-3">
+            <div
+              data-testid="search-open-boards-row"
+              className="mt-3 flex flex-wrap items-center gap-3"
+            >
               <button
                 type="button"
                 data-testid="search-open-boards"
@@ -743,6 +736,7 @@ export function Search({
             onSave={(jobId) => void onSave(jobId)}
             onOpen={onOpen}
             onAnalyse={onAnalyse === undefined ? undefined : (jobId) => void onAnalyseJob(jobId)}
+            searchBlocked={disabledReason !== null}
           />
         </div>
       </div>

@@ -9,9 +9,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   FEED_CHOICE_KEY,
   chosenFeeds,
+  defaultFeeds,
   isUkLocation,
   readFeedChoice,
   rememberFeedChoice,
+  tickFeeds,
+  tickFeedsLabel,
 } from './feedDefaults';
 
 beforeEach(() => localStorage.clear());
@@ -87,5 +90,28 @@ describe('remembering the choice', () => {
     expect(readFeedChoice()).toEqual({});
     localStorage.setItem(FEED_CHOICE_KEY, JSON.stringify({ arbeitnow: 'yes', unknown: true }));
     expect(readFeedChoice()).toEqual({});
+  });
+});
+
+describe('defaultFeeds and tickFeedsLabel (L-335)', () => {
+  it('negative: a UK location — Guardian Jobs only, never Arbeitnow', () => {
+    expect(defaultFeeds('London')).toEqual(['guardian']);
+    expect(tickFeedsLabel(defaultFeeds('London'))).toBe('Tick Guardian Jobs');
+  });
+
+  it.each(['Berlin', ''])('boundary: location "%s" — both feeds', (location) => {
+    expect(defaultFeeds(location)).toEqual(['arbeitnow', 'guardian']);
+    expect(tickFeedsLabel(defaultFeeds(location))).toBe('Tick both free feeds');
+  });
+
+  it('the default ignores a stored choice — it is what an empty store would tick', () => {
+    rememberFeedChoice({}, 'guardian', false);
+    expect(defaultFeeds('London')).toEqual(['guardian']);
+  });
+
+  it('tickFeeds records every one as the user’s own tick, keeping the rest', () => {
+    const next = tickFeeds({ guardian: false, arbeitnow: false }, ['guardian']);
+    expect(next).toEqual({ guardian: true, arbeitnow: false });
+    expect(readFeedChoice()).toEqual({ guardian: true, arbeitnow: false });
   });
 });
