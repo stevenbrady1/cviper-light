@@ -86,6 +86,8 @@ async function renderWith(cvs: readonly Cv[]) {
       'ollama:llama3.2:3b',
     ),
   );
+  // The preview starts folded since L-340: a user opens it before "Correct the text".
+  await user.click(screen.getByTestId('tailor-cv-preview-toggle'));
   return { user, port, sent };
 }
 
