@@ -94,7 +94,7 @@ export function ImportAiJobSearch({ filePort, onApply }: ImportAiJobSearchProps)
   const cancel = useCallback(() => setPanel({ kind: 'idle' }), []);
 
   return (
-    <section data-testid="profile-import" className={`mt-5 max-w-2xl ${cardClasses()}`}>
+    <section data-testid="profile-import" className={`mt-5 ${cardClasses()}`}>
       <SectionHeading title="Bring a profile in" />
       <p className="mt-1 text-ink-muted">
         If you already keep a candidate profile in an ai-job-search folder, the parts this view has
