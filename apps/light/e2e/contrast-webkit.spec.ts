@@ -301,3 +301,67 @@ describe('the Tracker board lays out (L-311)', () => {
     await page.context().close();
   });
 });
+
+/**
+ * The shared content column (L-341) never makes a screen scroll sideways.
+ *
+ * jsdom does no layout, so `contentColumn.contract.test.tsx` can only read the
+ * classes. Here the real engine measures, at 1000px — a narrow desktop window,
+ * where the column's `max-w-4xl` (896px) plus the rail is wider than the window
+ * and the column must give way, not overflow.
+ */
+const COLUMN_VIEWS = ['profile', 'search', 'settings', 'analysis', 'tailor'] as const;
+
+async function sidewaysOverflow(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const over: string[] = [];
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      over.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    const column = document.querySelector('[data-content-column]');
+    const area = column?.parentElement?.closest('.overflow-y-auto');
+    if (column === null || column === undefined || area === null || area === undefined) {
+      return [...over, 'no content column inside a scroll area'];
+    }
+    if (area.scrollWidth > area.clientWidth) {
+      over.push(`scroll area: ${String(area.scrollWidth - area.clientWidth)}px too wide`);
+    }
+    return over;
+  });
+}
+
+describe('the shared content column fits the window (L-341)', () => {
+  for (const view of COLUMN_VIEWS) {
+    it(`the ${view} screen has no sideways scroll at 1000px`, async () => {
+      const page = await open('?seen=1', { width: 1000, height: 800 });
+      await goTo(page, view);
+      await page.waitForSelector('[data-content-column]');
+      const width = await page.evaluate(
+        () => document.querySelector('[data-content-column]')?.getBoundingClientRect().width ?? 0,
+      );
+      console.log(`${view} at 1000px: column ${String(Math.round(width))}px wide`);
+      assert.ok(width > 0 && width <= 896, `${view}: column ${String(width)}px`);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      await page.context().close();
+    });
+  }
+
+  it('the check can fail: content wider than the window is reported', async () => {
+    const page = await open('?seen=1', { width: 1000, height: 800 });
+    await goTo(page, 'search');
+    await page.waitForSelector('[data-content-column]');
+    await page.evaluate(() => {
+      const wide = document.createElement('div');
+      wide.style.width = '3000px';
+      wide.style.height = '1px';
+      document.querySelector('[data-content-column]')?.append(wide);
+    });
+    const report = await sidewaysOverflow(page);
+    assert.ok(
+      report.some((line) => line.startsWith('scroll area')),
+      `the widened column was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+});
