@@ -71,7 +71,7 @@ export function GapsPanel({ port }: GapsPanelProps) {
   }, [port]);
 
   return (
-    <section data-testid="profile-gaps" className={`mt-5 max-w-2xl ${cardClasses()}`}>
+    <section data-testid="profile-gaps" className={`mt-5 ${cardClasses()}`}>
       <SectionHeading title="Across your applications" />
       <Body state={state} />
     </section>

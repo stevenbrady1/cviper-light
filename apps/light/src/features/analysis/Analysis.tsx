@@ -4,6 +4,7 @@ import { type Analysis as AnalysisRow, type Cv, type Job, type Result } from '@c
 import { runGates } from '@cviper/keyword-scoring';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { CONTENT_COLUMN } from '../../app/layout';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { IconTile } from '../../ui';
@@ -570,149 +571,151 @@ export function Analysis({
       )}
 
       <div className="flex min-h-0 flex-1">
-        <div className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
-          <AnalysisCvPicker
-            cvs={cvs}
-            cvsLoaded={cvsLoaded}
-            selectedCvId={selectedCvId}
-            selectedCv={selectedCv}
-            onPick={(id) => {
-              // A run still in flight was for the CV being left: dropped.
-              session.supersede();
-              session.update({ selectedCvId: id, result: null, runError: null, warnings: [] });
-              clearCvMessages();
-              // Picked once, for the job (L-200).
-              if (stepJob !== null) onJobChoice?.(stepJob, { cvId: id });
-            }}
-            onUpload={() => void onUpload()}
-            onSaveJsonResume={() => void onSaveJsonResume()}
-            exporting={exporting}
-            exportMessage={exportMessage}
-            uploadProblem={uploadProblem}
-            warnings={warnings}
-          />
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+          <div data-content-column className={`${CONTENT_COLUMN} space-y-5`}>
+            <AnalysisCvPicker
+              cvs={cvs}
+              cvsLoaded={cvsLoaded}
+              selectedCvId={selectedCvId}
+              selectedCv={selectedCv}
+              onPick={(id) => {
+                // A run still in flight was for the CV being left: dropped.
+                session.supersede();
+                session.update({ selectedCvId: id, result: null, runError: null, warnings: [] });
+                clearCvMessages();
+                // Picked once, for the job (L-200).
+                if (stepJob !== null) onJobChoice?.(stepJob, { cvId: id });
+              }}
+              onUpload={() => void onUpload()}
+              onSaveJsonResume={() => void onSaveJsonResume()}
+              exporting={exporting}
+              exportMessage={exportMessage}
+              uploadProblem={uploadProblem}
+              warnings={warnings}
+            />
 
-          <AnalysisAdvert
-            jobNote={jobNote}
-            jobText={jobText}
-            onJobTextChange={(value) =>
-              // Still that job while there is an advert in the box — pasting
-              // the full advert over a preview is the edit the note asks for.
-              // An empty box belongs to nothing.
-              session.update(
-                value === '' ? { jobText: '', jobId: null, jobNote: null } : { jobText: value },
-              )
-            }
-            jobs={jobs}
-            onPickJob={(job) =>
-              session.update({ jobText: jobAdvertText(job), jobId: job.id, jobNote: null })
-            }
-          />
+            <AnalysisAdvert
+              jobNote={jobNote}
+              jobText={jobText}
+              onJobTextChange={(value) =>
+                // Still that job while there is an advert in the box — pasting
+                // the full advert over a preview is the edit the note asks for.
+                // An empty box belongs to nothing.
+                session.update(
+                  value === '' ? { jobText: '', jobId: null, jobNote: null } : { jobText: value },
+                )
+              }
+              jobs={jobs}
+              onPickJob={(job) =>
+                session.update({ jobText: jobAdvertText(job), jobId: job.id, jobNote: null })
+              }
+            />
 
-          <AnalysisEngine
-            options={options}
-            optionKey={optionKey}
-            selectedOption={selectedOption}
-            onOptionChange={(picked) => {
-              session.update({ optionKey: picked });
-              // Picked once, for the job (L-200).
-              if (stepJob !== null) onJobChoice?.(stepJob, { optionKey: picked });
-            }}
-            cvCut={cvCut}
-            localModelHint={localModelHint}
-            browser={browserPort}
-            grantedConsents={grantedConsents}
-            onWithdrawConsent={(kind) => void onWithdrawConsent(kind)}
-          />
+            <AnalysisEngine
+              options={options}
+              optionKey={optionKey}
+              selectedOption={selectedOption}
+              onOptionChange={(picked) => {
+                session.update({ optionKey: picked });
+                // Picked once, for the job (L-200).
+                if (stepJob !== null) onJobChoice?.(stepJob, { optionKey: picked });
+              }}
+              cvCut={cvCut}
+              localModelHint={localModelHint}
+              browser={browserPort}
+              grantedConsents={grantedConsents}
+              onWithdrawConsent={(kind) => void onWithdrawConsent(kind)}
+            />
 
-          <AnalysisRunBar
-            running={running}
-            disabledReason={disabledReason}
-            onRun={() => void onRun()}
-            historyCount={history.length}
-            historyDisabled={selectedCv === null || historyOpen}
-            onOpenHistory={() => setHistoryOpen(true)}
-            progressText={progressText}
-            elapsed={elapsed}
-          />
+            <AnalysisRunBar
+              running={running}
+              disabledReason={disabledReason}
+              onRun={() => void onRun()}
+              historyCount={history.length}
+              historyDisabled={selectedCv === null || historyOpen}
+              onOpenHistory={() => setHistoryOpen(true)}
+              progressText={progressText}
+              elapsed={elapsed}
+            />
 
-          {/* ── 5. The result ─────────────────────────────────────────── */}
-          {result === null ? (
-            <div
-              data-testid="analysis-empty"
-              className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
-            >
-              <div className="mb-3 flex justify-center">
-                <IconTile icon="analysis" />
-              </div>
-              <p className="font-medium text-ink">Nothing checked yet.</p>
-              {/* cviper-allow-absolute-privacy-claim: the sentence names its own
-                  subject — "The basic match" — which is the keyword scorer in
-                  packages/keyword-scoring and reaches no network at all. */}
-              <p className="mt-1 text-ink-muted">
-                Pick a CV, paste an advert, and press the button. The basic match needs no account
-                and no set-up, and nothing leaves this machine.
-              </p>
-              {/*
-                L-277: before the user has a CV, one click shows what a check
-                gives back. Secondary, so the view keeps its one blue button.
-                Only while there is no CV: after that the real thing is right
-                there and a sample would be in the way.
-              */}
-              {cvsLoaded && cvs.length === 0 && sample === null ? (
-                <button
-                  type="button"
-                  data-testid="analysis-try-sample"
-                  onClick={() => setSample(runSample())}
-                  className={`${SECONDARY_BUTTON} mt-4`}
-                >
-                  Try it with a sample CV
-                </button>
-              ) : null}
-            </div>
-          ) : (
-            <>
-              {/* Before the score, never in it — see `GateNotice.tsx`. */}
-              {gates === null ? null : <GateNotice results={gates} />}
-              <AnalysisResult
-                analysis={result.analysis}
-                provider={result.provider}
-                model={result.model}
-                retried={result.retried}
-                aiAvailable={aiAvailable}
-                atsKeywordScore={result.atsKeywordScore}
-                // L-290. The result is always the selected CV's: switching CV
-                // clears it (see the CV picker's handler).
-                cvText={selectedCv?.extracted_text ?? undefined}
-                // L-291: the advert this result CHECKED, not the box's current text.
-                advertText={checkedAdvert ?? undefined}
-              />
-              {/*
-                The next step of the flow (L-190), after the result it follows
-                from. Secondary: the view's one blue button is the check.
-              */}
-              {onTailor === undefined ? null : (
-                <div>
+            {/* ── 5. The result ─────────────────────────────────────────── */}
+            {result === null ? (
+              <div
+                data-testid="analysis-empty"
+                className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
+              >
+                <div className="mb-3 flex justify-center">
+                  <IconTile icon="analysis" />
+                </div>
+                <p className="font-medium text-ink">Nothing checked yet.</p>
+                {/* cviper-allow-absolute-privacy-claim: the sentence names its own
+                    subject — "The basic match" — which is the keyword scorer in
+                    packages/keyword-scoring and reaches no network at all. */}
+                <p className="mt-1 text-ink-muted">
+                  Pick a CV, paste an advert, and press the button. The basic match needs no account
+                  and no set-up, and nothing leaves this machine.
+                </p>
+                {/*
+                  L-277: before the user has a CV, one click shows what a check
+                  gives back. Secondary, so the view keeps its one blue button.
+                  Only while there is no CV: after that the real thing is right
+                  there and a sample would be in the way.
+                */}
+                {cvsLoaded && cvs.length === 0 && sample === null ? (
                   <button
                     type="button"
-                    data-testid="analysis-to-tailor"
-                    onClick={() => onTailor(tailorHandoff())}
-                    className={SECONDARY_BUTTON}
+                    data-testid="analysis-try-sample"
+                    onClick={() => setSample(runSample())}
+                    className={`${SECONDARY_BUTTON} mt-4`}
                   >
-                    Tailor my CV for this job
+                    Try it with a sample CV
                   </button>
-                </div>
-              )}
-            </>
-          )}
+                ) : null}
+              </div>
+            ) : (
+              <>
+                {/* Before the score, never in it — see `GateNotice.tsx`. */}
+                {gates === null ? null : <GateNotice results={gates} />}
+                <AnalysisResult
+                  analysis={result.analysis}
+                  provider={result.provider}
+                  model={result.model}
+                  retried={result.retried}
+                  aiAvailable={aiAvailable}
+                  atsKeywordScore={result.atsKeywordScore}
+                  // L-290. The result is always the selected CV's: switching CV
+                  // clears it (see the CV picker's handler).
+                  cvText={selectedCv?.extracted_text ?? undefined}
+                  // L-291: the advert this result CHECKED, not the box's current text.
+                  advertText={checkedAdvert ?? undefined}
+                />
+                {/*
+                  The next step of the flow (L-190), after the result it follows
+                  from. Secondary: the view's one blue button is the check.
+                */}
+                {onTailor === undefined ? null : (
+                  <div>
+                    <button
+                      type="button"
+                      data-testid="analysis-to-tailor"
+                      onClick={() => onTailor(tailorHandoff())}
+                      className={SECONDARY_BUTTON}
+                    >
+                      Tailor my CV for this job
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
 
-          {sample !== null && result === null ? (
-            <AnalysisSample
-              sample={sample}
-              aiAvailable={aiAvailable}
-              onHide={() => setSample(null)}
-            />
-          ) : null}
+            {sample !== null && result === null ? (
+              <AnalysisSample
+                sample={sample}
+                aiAvailable={aiAvailable}
+                onHide={() => setSample(null)}
+              />
+            ) : null}
+          </div>
         </div>
 
         {historyOpen && selectedCv !== null ? (
