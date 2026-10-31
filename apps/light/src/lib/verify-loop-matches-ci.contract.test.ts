@@ -186,6 +186,10 @@ export const WORKFLOW_SCOPE: Readonly<Record<string, string>> = {
     'CLAUDE.md HARD RULE 1 forbids an agent from running, and then the `winapp` CLI and the ' +
     'Windows App Certification Kit, neither of which exists on a developer machine.',
   'monorepo-split.yml': 'out of scope — publishes a filtered history; touches no check.',
+  'feed-canary.yml':
+    'out of scope — asks the live keyless job feeds for jobs once a day (L-339); it needs a ' +
+    'network and a third party that is up, so it can go red with nothing in the change at ' +
+    'fault. Its checker is unit-tested in the loop by `pnpm test`.',
 };
 
 function escapeForRegExp(literal: string): string {
