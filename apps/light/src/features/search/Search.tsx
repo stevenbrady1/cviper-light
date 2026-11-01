@@ -13,6 +13,7 @@ import {
 } from '@cviper/job-apis';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { CONTENT_COLUMN } from '../../app/layout';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { SHIPPED_BOARDS } from '../boards/defaults';
@@ -589,7 +590,7 @@ export function Search({
       <ViewHeader view={view.id} title={view.label} summary={view.summary} />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-        <div className="max-w-3xl space-y-5">
+        <div data-content-column className={`${CONTENT_COLUMN} space-y-5`}>
           <form data-testid="search-form" onSubmit={(event) => void onSubmit(event)}>
             <SearchFields form={form} errors={errors} onField={setField} />
 

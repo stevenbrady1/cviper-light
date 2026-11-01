@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { type ChatTransport, promptKeywordGaps } from '@cviper/ai-providers';
 import { type Application, type Cv, type Job, type Profile } from '@cviper/core-types';
 
+import { CONTENT_COLUMN } from '../../app/layout';
 import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
@@ -633,108 +634,110 @@ export function Tailor({
       <div
         ref={scrollArea}
         data-testid="tailor-scroll"
-        className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 md:px-6 md:py-5"
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5"
       >
-        <span id={STEP_ANCHOR.tailor} aria-hidden="true" />
-        <TailorCvPicker
-          cvs={cvs}
-          cvsLoaded={cvsLoaded}
-          selectedCvId={selectedCvId}
-          selectedCv={selectedCv}
-          onPick={(id) => {
-            // A draft written from another CV is not this CV's draft.
-            patchActive({ cvId: id, result: null, review: null, letter: null, error: null });
-            setSaveMessage(null);
-          }}
-          files={files}
-          saveCv={(cv) => tailorPort.saveCv(cv)}
-          now={now}
-          onUploaded={onCvUploaded}
-          previewOpen={cvPreviewOpen}
-          onTogglePreview={() => setCvPreviewOpen((open) => !open)}
-          running={running}
-          onSaveCv={onSaveCv}
-        />
+        <div data-content-column className={`${CONTENT_COLUMN} space-y-5`}>
+          <span id={STEP_ANCHOR.tailor} aria-hidden="true" />
+          <TailorCvPicker
+            cvs={cvs}
+            cvsLoaded={cvsLoaded}
+            selectedCvId={selectedCvId}
+            selectedCv={selectedCv}
+            onPick={(id) => {
+              // A draft written from another CV is not this CV's draft.
+              patchActive({ cvId: id, result: null, review: null, letter: null, error: null });
+              setSaveMessage(null);
+            }}
+            files={files}
+            saveCv={(cv) => tailorPort.saveCv(cv)}
+            now={now}
+            onUploaded={onCvUploaded}
+            previewOpen={cvPreviewOpen}
+            onTogglePreview={() => setCvPreviewOpen((open) => !open)}
+            running={running}
+            onSaveCv={onSaveCv}
+          />
 
-        <TailorAdvert
-          jobText={jobText}
-          onAdvertChange={(advert) => patchActive({ advert })}
-          advertEdited={advertEdited}
-          selectedJob={selectedJob}
-          onRestoreAdvert={(job) => patchActive({ advert: jobAdvertText(job) })}
-          jobs={jobs}
-          selectedJobId={selectedJobId}
-          onPickJob={(picked) => {
-            // A job seen before comes back as it was left (L-199); a new
-            // one starts from its advert, with the CV and model the user
-            // already chose — those are choices, not this job's work.
-            // Another job starts on its own Tailor step. Set HERE, on
-            // the user's pick, not on any change of job: a hand-off
-            // from another screen's step bar sets the job too, and
-            // must keep the step it asked for (L-200).
-            if (picked.id !== selectedJobId) setStep('tailor');
-            sessions.open(picked.id, () => ({
-              advert: jobAdvertText(picked),
-              cvId: selectedCvId,
-              optionKey: work.optionKey,
-            }));
-            setError(null);
-            setSaveMessage(null);
-          }}
-          keywordGaps={keywordGaps}
-          metricPrompts={metricPrompts}
-          metricState={metricState}
-          onMetricStateChange={(next) => patchActive({ metricState: next })}
-          running={running}
-        />
+          <TailorAdvert
+            jobText={jobText}
+            onAdvertChange={(advert) => patchActive({ advert })}
+            advertEdited={advertEdited}
+            selectedJob={selectedJob}
+            onRestoreAdvert={(job) => patchActive({ advert: jobAdvertText(job) })}
+            jobs={jobs}
+            selectedJobId={selectedJobId}
+            onPickJob={(picked) => {
+              // A job seen before comes back as it was left (L-199); a new
+              // one starts from its advert, with the CV and model the user
+              // already chose — those are choices, not this job's work.
+              // Another job starts on its own Tailor step. Set HERE, on
+              // the user's pick, not on any change of job: a hand-off
+              // from another screen's step bar sets the job too, and
+              // must keep the step it asked for (L-200).
+              if (picked.id !== selectedJobId) setStep('tailor');
+              sessions.open(picked.id, () => ({
+                advert: jobAdvertText(picked),
+                cvId: selectedCvId,
+                optionKey: work.optionKey,
+              }));
+              setError(null);
+              setSaveMessage(null);
+            }}
+            keywordGaps={keywordGaps}
+            metricPrompts={metricPrompts}
+            metricState={metricState}
+            onMetricStateChange={(next) => patchActive({ metricState: next })}
+            running={running}
+          />
 
-        <TailorEngine
-          options={options}
-          optionKey={optionKey}
-          selectedOption={selectedOption}
-          onOptionChange={(key) => patchActive({ optionKey: key })}
-          aiAvailable={aiAvailable}
-          availabilityRead={availabilityRead}
-          cvCut={cvCut}
-          localModelHint={localModelHint}
-          browser={browserPort}
-          grantedConsents={grantedConsents}
-          onWithdrawConsent={(kind) => void onWithdrawConsent(kind)}
-        />
+          <TailorEngine
+            options={options}
+            optionKey={optionKey}
+            selectedOption={selectedOption}
+            onOptionChange={(key) => patchActive({ optionKey: key })}
+            aiAvailable={aiAvailable}
+            availabilityRead={availabilityRead}
+            cvCut={cvCut}
+            localModelHint={localModelHint}
+            browser={browserPort}
+            grantedConsents={grantedConsents}
+            onWithdrawConsent={(kind) => void onWithdrawConsent(kind)}
+          />
 
-        <TailorRunBar
-          phase={phase}
-          disabledReason={disabledReason}
-          onRun={() => void gated('tailor')}
-          onOpenSettings={onOpenSettings}
-          progressSentence={running && selectedOption !== null ? progressSentence : null}
-          elapsed={elapsed}
-          choosingFile={saving === 'file'}
-          saveMessage={saveMessage}
-        />
+          <TailorRunBar
+            phase={phase}
+            disabledReason={disabledReason}
+            onRun={() => void gated('tailor')}
+            onOpenSettings={onOpenSettings}
+            progressSentence={running && selectedOption !== null ? progressSentence : null}
+            elapsed={elapsed}
+            choosingFile={saving === 'file'}
+            saveMessage={saveMessage}
+          />
 
-        <TailorResultView
-          result={result}
-          cvText={cvText}
-          atsComparison={atsComparison}
-          metricsChanged={result !== null && metricsChanged(result.userMetrics, userMetrics)}
-          review={review}
-          letter={letter}
-          phase={phase}
-          busy={running || saving !== null}
-          onRun={(action) => void gated(action)}
-          onSaveText={(kind) => void onSaveText(kind)}
-          onSaveDocument={(kind, format) => void onSaveDocument(kind, format)}
-          saveApplication={{
-            applications,
-            selectedApplicationId,
-            onSelectApplication: setSelectedApplicationId,
-            selectedJobId,
-            applicationsFor,
-            saving: saving === 'application',
-            onSave: () => void onSaveToApplication(),
-          }}
-        />
+          <TailorResultView
+            result={result}
+            cvText={cvText}
+            atsComparison={atsComparison}
+            metricsChanged={result !== null && metricsChanged(result.userMetrics, userMetrics)}
+            review={review}
+            letter={letter}
+            phase={phase}
+            busy={running || saving !== null}
+            onRun={(action) => void gated(action)}
+            onSaveText={(kind) => void onSaveText(kind)}
+            onSaveDocument={(kind, format) => void onSaveDocument(kind, format)}
+            saveApplication={{
+              applications,
+              selectedApplicationId,
+              onSelectApplication: setSelectedApplicationId,
+              selectedJobId,
+              applicationsFor,
+              saving: saving === 'application',
+              onSave: () => void onSaveToApplication(),
+            }}
+          />
+        </div>
       </div>
 
       {pendingConsent === null ? null : (

@@ -10,6 +10,7 @@ import {
 } from '@cviper/core-types';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { CONTENT_COLUMN } from '../../app/layout';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { cardClasses, SectionHeading } from '../../ui';
@@ -313,39 +314,40 @@ export function Profile({ port, now, gapsPort, filePort, cvPort }: ProfileProps)
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
-        {loading ? (
-          <p data-testid="profile-loading" className="text-ink-muted">
-            Loading…
-          </p>
-        ) : null}
+        <div data-content-column className={CONTENT_COLUMN}>
+          {loading ? (
+            <p data-testid="profile-loading" className="text-ink-muted">
+              Loading…
+            </p>
+          ) : null}
+          <YourCv store={cvStore} files={files} now={now} />
 
-        <YourCv store={cvStore} files={files} now={now} />
+          {loaded === null ? null : (
+            <ProfileForm
+              key={formGeneration}
+              loaded={loaded}
+              onEdit={edit}
+              onAddLanguage={onAddLanguage}
+              onLanguageChange={onLanguageChange}
+              onRemoveLanguage={onRemoveLanguage}
+              onAddStar={onAddStar}
+              onStarChange={onStarChange}
+              onRemoveStar={onRemoveStar}
+            />
+          )}
 
-        {loaded === null ? null : (
-          <ProfileForm
-            key={formGeneration}
-            loaded={loaded}
-            onEdit={edit}
-            onAddLanguage={onAddLanguage}
-            onLanguageChange={onLanguageChange}
-            onRemoveLanguage={onRemoveLanguage}
-            onAddStar={onAddStar}
-            onStarChange={onStarChange}
-            onRemoveStar={onRemoveStar}
-          />
-        )}
+          <GapsPanel port={skillsPort} />
 
-        <GapsPanel port={skillsPort} />
-
-        {/*
-          Not on a phone: there is no folder dialog there (`pick_folder` does
-          not exist on iOS or Android), so the button would only ever produce
-          the refusal sentence Rust keeps as a floor. Absent, not disabled —
-          a control with no working state on this device teaches nothing.
-        */}
-        {loaded === null || detectMobileOs() !== null ? null : (
-          <ImportAiJobSearch filePort={files} onApply={onImport} />
-        )}
+          {/*
+            Not on a phone: there is no folder dialog there (`pick_folder` does
+            not exist on iOS or Android), so the button would only ever produce
+            the refusal sentence Rust keeps as a floor. Absent, not disabled —
+            a control with no working state on this device teaches nothing.
+          */}
+          {loaded === null || detectMobileOs() !== null ? null : (
+            <ImportAiJobSearch filePort={files} onApply={onImport} />
+          )}
+        </div>
       </div>
     </section>
   );
@@ -395,48 +397,46 @@ function YourCv({ store, files, now }: YourCvProps) {
   const newest = cvs[0] ?? null;
 
   return (
-    <div className="mb-5 max-w-2xl">
-      <section data-testid="profile-cv" className={cardClasses()}>
-        <SectionHeading title="Your CV" />
-        <p className="mt-1 text-ink-muted">
-          Upload it once — here, on Analysis or on Tailor — and every screen can use it. The file is
-          read on this computer. Its text only goes to an AI you choose, and only when you ask it to
-          read your CV.
-        </p>
+    <section data-testid="profile-cv" className={`mb-5 ${cardClasses()}`}>
+      <SectionHeading title="Your CV" />
+      <p className="mt-1 text-ink-muted">
+        Upload it once — here, on Analysis or on Tailor — and every screen can use it. The file is
+        read on this computer. Its text only goes to an AI you choose, and only when you ask it to
+        read your CV.
+      </p>
 
-        <p data-testid="profile-cv-current" className="mt-3 text-ink">
-          {!cvsLoaded ? (
-            'Reading your CVs…'
-          ) : newest === null ? (
-            'No CV uploaded yet.'
-          ) : (
-            <>
-              Newest: <span className="font-medium">{newest.name}</span>
-            </>
-          )}
-        </p>
-
-        {cvError === null ? null : (
-          <p
-            role="alert"
-            data-testid="profile-cv-error"
-            className="mt-2 rounded-control bg-danger/5 px-3 py-2 text-danger"
-          >
-            {cvError}
-          </p>
+      <p data-testid="profile-cv-current" className="mt-3 text-ink">
+        {!cvsLoaded ? (
+          'Reading your CVs…'
+        ) : newest === null ? (
+          'No CV uploaded yet.'
+        ) : (
+          <>
+            Newest: <span className="font-medium">{newest.name}</span>
+          </>
         )}
+      </p>
 
-        <div className="mt-3">
-          <CvUpload
-            idPrefix="profile"
-            files={files}
-            saveCv={(cv) => store.saveCv(cv)}
-            now={now}
-            onUploaded={onUploaded}
-          />
-        </div>
-      </section>
-    </div>
+      {cvError === null ? null : (
+        <p
+          role="alert"
+          data-testid="profile-cv-error"
+          className="mt-2 rounded-control bg-danger/5 px-3 py-2 text-danger"
+        >
+          {cvError}
+        </p>
+      )}
+
+      <div className="mt-3">
+        <CvUpload
+          idPrefix="profile"
+          files={files}
+          saveCv={(cv) => store.saveCv(cv)}
+          now={now}
+          onUploaded={onUploaded}
+        />
+      </div>
+    </section>
   );
 }
 
@@ -511,7 +511,7 @@ function ProfileForm({
   );
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="space-y-5">
       <section data-testid="profile-about" className={cardClasses()}>
         <SectionHeading title="About you" />
         <p className="mt-1 text-ink-muted">
