@@ -365,3 +365,507 @@ describe('the shared content column fits the window (L-341)', () => {
     await page.context().close();
   });
 });
+
+/**
+ * The Search button stays on screen on short windows (L-342).
+ *
+ * The form runs fields, then a tall "Where to look" box, then the submit row,
+ * and the app's smallest window is 1000×700: the row used to fall below the
+ * bottom edge, so a person saw neither the button nor why it was grey. It is
+ * now sticky to the bottom of the scroll area from `md:` up, and in the form's
+ * flow, so it sits in its natural place when there is room and scrolls away
+ * with the form when the user scrolls on to the results.
+ *
+ * jsdom does no layout, so whether any of that is true is only knowable here.
+ */
+const SEARCH_AREA = '[data-testid="view-search"] .overflow-y-auto';
+const SUBMIT_ROW = '[data-testid="search-submit-row"]';
+const SMALLEST_WINDOW = { width: 1000, height: 700 };
+const NARROWEST_STICKY = { width: 768, height: 700 };
+
+/** Search with the owner's typing: a grey button, its reason, and the Reed fix. */
+async function openTypedSearch(
+  viewport: { width: number; height: number },
+  query = '?seen=1',
+): Promise<Page> {
+  const page = await open(query, viewport);
+  await goTo(page, 'search');
+  await page.fill('[data-testid="search-keywords"]', 'Project Coordinator');
+  await page.fill('[data-testid="search-location"]', 'London');
+  if (query === '?seen=1') await page.waitForSelector('[data-testid="search-get-reed-key"]');
+  return page;
+}
+
+/** What is wrong with what the user can see of the row. Empty means all is well. */
+async function submitRowProblems(
+  page: Page,
+  parts: readonly string[] = ['search-submit', 'search-reason', 'search-get-reed-key'],
+): Promise<string[]> {
+  return page.evaluate(
+    ({ areaSelector, ids }) => {
+      const area = document.querySelector(areaSelector);
+      if (area === null) return ['no scroll area'];
+      const seen = area.getBoundingClientRect();
+      return ids.flatMap((id) => {
+        const part = document.querySelector(`[data-testid="${id}"]`);
+        if (part === null) return [`${id}: not drawn`];
+        const box = part.getBoundingClientRect();
+        if (box.top < seen.top || box.bottom > seen.bottom) {
+          return [
+            `${id}: ${String(box.top)}–${String(box.bottom)} is outside the scroll area's ` +
+              `${String(seen.top)}–${String(seen.bottom)}`,
+          ];
+        }
+        const onTop = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        return onTop !== null && part.contains(onTop) ? [] : [`${id}: something is on top of it`];
+      });
+    },
+    { areaSelector: SEARCH_AREA, ids: parts },
+  );
+}
+
+/** Open "More boards", then back to the top: pressing it scrolls it clear of the row. */
+async function pressMoreBoards(page: Page): Promise<void> {
+  await page.click('[data-testid="keyless-more"]');
+  await page.waitForSelector('[data-testid="keyless-more"][aria-expanded="true"]');
+  await scrollAreaTo(page, 0);
+}
+
+/**
+ * The tallest form a real user reaches at the smallest window: a job-board key
+ * saved, so the keyed boards show, and "More boards" open. The Search button
+ * itself runs past the bottom of the window here if nothing holds it up.
+ */
+async function openTallestSearch(viewport: { width: number; height: number }): Promise<Page> {
+  const page = await openTypedSearch(viewport, '?seen=1&results=1');
+  await pressMoreBoards(page);
+  return page;
+}
+
+/**
+ * The same form with nothing ticked, so the reason shows too. At the narrowest
+ * sticky width the ticks wrap, and the row really does cover the last of them.
+ */
+async function openTicksUnderTheRow(): Promise<Page> {
+  const page = await openTallestSearch(NARROWEST_STICKY);
+  const ticked = page.locator('[data-testid="search-where"] input:checked');
+  while ((await ticked.count()) > 0) await ticked.first().uncheck();
+  await page.waitForSelector('[data-testid="search-reason"]');
+  await scrollAreaTo(page, 0);
+  return page;
+}
+
+/** The row's top where it is, and where it would be if it were not sticky. */
+async function rowAgainstFlow(page: Page): Promise<{ top: number; inFlow: number }> {
+  return page.evaluate((selector) => {
+    const row = document.querySelector<HTMLElement>(selector);
+    if (row === null) throw new Error('no submit row');
+    const top = row.getBoundingClientRect().top;
+    row.style.position = 'static';
+    const inFlow = row.getBoundingClientRect().top;
+    row.style.position = '';
+    return { top, inFlow };
+  }, SUBMIT_ROW);
+}
+
+async function scrollAreaTo(page: Page, top: number): Promise<void> {
+  await page.evaluate(
+    ({ selector, to }) => {
+      const area = document.querySelector(selector);
+      if (area === null) throw new Error('no scroll area');
+      area.scrollTop = to;
+    },
+    { selector: SEARCH_AREA, to: top },
+  );
+}
+
+/** Focus each control in "Where to look" in turn; report any the row then hides. */
+async function focusedControlsUnderTheRow(page: Page): Promise<string[]> {
+  return page.evaluate(
+    async ({ areaSelector, rowSelector }) => {
+      const area = document.querySelector(areaSelector);
+      const row = document.querySelector(rowSelector);
+      const controls = [
+        ...document.querySelectorAll<HTMLElement>(
+          '[data-testid="search-where"] :is(input, button, [tabindex="0"])',
+        ),
+      ];
+      if (area === null || row === null || controls.length === 0) return ['nothing to measure'];
+      const problems: string[] = [];
+      for (const control of controls) {
+        // From the top each time: the hardest start, and what a click on the field does.
+        (document.activeElement as HTMLElement | null)?.blur();
+        area.scrollTop = 0;
+        control.focus();
+        // WebKit brings a focused box into view in a later frame, not during `focus()`.
+        await new Promise((done) => requestAnimationFrame(done));
+        await new Promise((done) => requestAnimationFrame(done));
+        const name = control.dataset.testid ?? '?';
+        const over = control.getBoundingClientRect().bottom - row.getBoundingClientRect().top;
+        if (document.activeElement !== control) problems.push(`${name}: did not take focus`);
+        else if (over > 0) problems.push(`${name}: ${String(over)}px under the row`);
+      }
+      return problems;
+    },
+    { areaSelector: SEARCH_AREA, rowSelector: SUBMIT_ROW },
+  );
+}
+
+/** Focus the last tick in "Where to look", from wherever the area is now. */
+async function lastTickFocused(page: Page): Promise<{
+  tick: string | undefined;
+  focused: boolean;
+  overBeforeFocus: number;
+  tickBottom: number;
+  rowTop: number;
+}> {
+  return page.evaluate(async (selector) => {
+    const ticks = document.querySelectorAll<HTMLElement>('[data-testid="search-where"] input');
+    const tick = ticks[ticks.length - 1];
+    const row = document.querySelector(selector);
+    if (tick === undefined || row === null) throw new Error('no tick or row');
+    const overBeforeFocus = tick.getBoundingClientRect().bottom - row.getBoundingClientRect().top;
+    tick.focus();
+    // WebKit brings a focused box into view in a later frame, not during `focus()`.
+    await new Promise((done) => requestAnimationFrame(done));
+    await new Promise((done) => requestAnimationFrame(done));
+    return {
+      tick: tick.dataset.testid,
+      focused: document.activeElement === tick,
+      overBeforeFocus,
+      tickBottom: tick.getBoundingClientRect().bottom,
+      rowTop: row.getBoundingClientRect().top,
+    };
+  }, SUBMIT_ROW);
+}
+
+describe('the Search button stays on screen on short windows (L-342)', () => {
+  // HAPPY — the owner's report, at the smallest window and the default one.
+  for (const viewport of [SMALLEST_WINDOW, { width: 1280, height: 800 }]) {
+    const size = `${String(viewport.width)}×${String(viewport.height)}`;
+
+    it(`the button, its reason and the fix are on screen at ${size}, unscrolled`, async () => {
+      const page = await openTypedSearch(viewport);
+      const scrollTop = await page.evaluate(
+        (selector) => document.querySelector(selector)?.scrollTop ?? -1,
+        SEARCH_AREA,
+      );
+      assert.equal(scrollTop, 0, 'the area was scrolled before measuring');
+      assert.deepEqual(await submitRowProblems(page), []);
+      await page.context().close();
+    });
+  }
+
+  // The typed form above fits 1000×700 by 2px with nothing holding the row up. So
+  // the two forms that do NOT fit, both a click away at the smallest window.
+  it('with "More boards" open the reason and the fix are on screen at 1000×700', async () => {
+    const page = await openTypedSearch(SMALLEST_WINDOW);
+    await pressMoreBoards(page);
+    assert.deepEqual(await submitRowProblems(page), []);
+    await page.context().close();
+  });
+
+  it('with a key saved and "More boards" open the button is on screen at 1000×700', async () => {
+    const page = await openTallestSearch(SMALLEST_WINDOW);
+    assert.deepEqual(await submitRowProblems(page, ['search-submit']), []);
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: without the sticky position the row is reported', async () => {
+    const page = await openTallestSearch(SMALLEST_WINDOW);
+    await page.evaluate((selector) => {
+      const row = document.querySelector<HTMLElement>(selector);
+      if (row !== null) row.style.position = 'static';
+    }, SUBMIT_ROW);
+    const report = await submitRowProblems(page, ['search-submit']);
+    assert.ok(
+      report.some((line) => line.startsWith('search-submit')),
+      `the button below the window was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+
+  // TRAP — a sticky `bottom-0` stops at the scroll area's PADDING edge, which
+  // would leave a 20px strip of the form showing below the row.
+  it('nothing shows through below the row, and its background is the page behind it', async () => {
+    const page = await openTallestSearch(SMALLEST_WINDOW);
+    const seen = await page.evaluate(
+      ({ areaSelector, rowSelector }) => {
+        const area = document.querySelector(areaSelector);
+        const row = document.querySelector(rowSelector);
+        if (area === null || row === null) throw new Error('no area or row');
+        const areaBox = area.getBoundingClientRect();
+        const rowBox = row.getBoundingClientRect();
+        const atBottomEdge = document.elementFromPoint(rowBox.left + 4, areaBox.bottom - 1);
+        let behind: Element | null = area;
+        let painted = 'none';
+        while (behind !== null && painted === 'none') {
+          const colour = getComputedStyle(behind).backgroundColor;
+          if (colour !== 'rgba(0, 0, 0, 0)' && colour !== 'transparent') painted = colour;
+          behind = behind.parentElement;
+        }
+        return {
+          gap: areaBox.bottom - rowBox.bottom,
+          rowHeight: rowBox.height,
+          edgeIsRow: atBottomEdge !== null && row.contains(atBottomEdge),
+          rowColour: getComputedStyle(row).backgroundColor,
+          painted,
+        };
+      },
+      { areaSelector: SEARCH_AREA, rowSelector: SUBMIT_ROW },
+    );
+    console.log(`stuck row at 1000×700: ${JSON.stringify(seen)}`);
+    assert.ok(Math.abs(seen.gap) < 0.5, `${String(seen.gap)}px between the row and the edge`);
+    assert.ok(seen.edgeIsRow, 'the last pixel of the scroll area is not the row');
+    assert.equal(seen.rowColour, seen.painted);
+    await page.context().close();
+  });
+
+  // TRAP — the row's background spans the column, and adds no sideways scroll.
+  it('the row is as wide as the column and adds no sideways scroll at 1000×700', async () => {
+    const page = await openTypedSearch(SMALLEST_WINDOW);
+    const edges = await page.evaluate((selector) => {
+      const row = document.querySelector(selector)?.getBoundingClientRect();
+      const column = document.querySelector('[data-content-column]')?.getBoundingClientRect();
+      return { row: [row?.left, row?.right], column: [column?.left, column?.right] };
+    }, SUBMIT_ROW);
+    assert.deepEqual(edges.row, edges.column);
+    assert.deepEqual(await sidewaysOverflow(page), []);
+    await page.context().close();
+  });
+
+  // BOUNDARY — a tall window: its natural place, with the spacing it always had.
+  it('on a tall window the row sits in its natural place, with the same gaps', async () => {
+    const page = await openTypedSearch({ width: 1280, height: 1400 });
+    const { top, inFlow } = await rowAgainstFlow(page);
+    console.log(`row on a tall window: at ${String(top)}, in flow ${String(inFlow)}`);
+    assert.equal(top, inFlow);
+    const gaps = await page.evaluate(() => {
+      const box = (id: string): DOMRect => {
+        const part = document.querySelector(`[data-testid="${id}"]`);
+        if (part === null) throw new Error(`no ${id}`);
+        return part.getBoundingClientRect();
+      };
+      return {
+        above: box('search-reason-area').top - box('search-where').bottom,
+        below: box('search-open-boards-row').top - box('search-reason-area').bottom,
+      };
+    });
+    // `mt-4` and `mt-3`, as they were before the row had a background to paint.
+    assert.deepEqual(gaps, { above: 16, below: 12 });
+    await page.context().close();
+  });
+
+  // BOUNDARY — no jump: scrolled to the end, the row is exactly where it belongs.
+  it('scrolled on at 1000×700, the row is back in its natural place', async () => {
+    const page = await openTypedSearch(SMALLEST_WINDOW);
+    await scrollAreaTo(page, 100_000);
+    const { top, inFlow } = await rowAgainstFlow(page);
+    assert.equal(top, inFlow);
+    await page.context().close();
+  });
+
+  // BOUNDARY — phones: an on-screen keyboard plus a tall wrapped row would cover
+  // the fields, so below `md:` nothing changes at all.
+  for (const width of [375, 767]) {
+    it(`at ${String(width)}px the row is not sticky and its spacing is unchanged`, async () => {
+      const page = await openTypedSearch({ width, height: 700 });
+      const seen = await page.evaluate((selector) => {
+        const row = document.querySelector(selector);
+        if (row === null) throw new Error('no submit row');
+        const style = getComputedStyle(row);
+        return {
+          position: style.position,
+          marginTop: style.marginTop,
+          marginBottom: style.marginBottom,
+          paddingTop: style.paddingTop,
+          paddingBottom: style.paddingBottom,
+          background: style.backgroundColor,
+        };
+      }, SUBMIT_ROW);
+      assert.deepEqual(seen, {
+        position: 'static',
+        marginTop: '16px',
+        marginBottom: '0px',
+        paddingTop: '0px',
+        paddingBottom: '0px',
+        background: 'rgba(0, 0, 0, 0)',
+      });
+      await page.context().close();
+    });
+  }
+
+  it('from exactly the md: width up, the row is sticky', async () => {
+    const page = await openTypedSearch(NARROWEST_STICKY);
+    const position = await page.evaluate((selector) => {
+      const row = document.querySelector(selector);
+      return row === null ? 'no row' : getComputedStyle(row).position;
+    }, SUBMIT_ROW);
+    assert.equal(position, 'sticky');
+    await page.context().close();
+  });
+
+  // TRAP — WCAG 2.4.11, Focus Not Obscured. Every control in "Where to look" is
+  // above the pinned row when it has focus. The row is at its tallest with the
+  // grey reason and the fix button, and tallest of all where it wraps the most.
+  for (const viewport of [SMALLEST_WINDOW, NARROWEST_STICKY]) {
+    const size = `${String(viewport.width)}×${String(viewport.height)}`;
+
+    it(`a focused control in "Where to look" is clear of the tallest row at ${size}`, async () => {
+      const page = await openTypedSearch(viewport);
+      await pressMoreBoards(page);
+      assert.deepEqual(await focusedControlsUnderTheRow(page), []);
+      await page.context().close();
+    });
+  }
+
+  it('the last tick, focused at 1000×700, is clear of the row', async () => {
+    const page = await openTypedSearch(SMALLEST_WINDOW);
+    await pressMoreBoards(page);
+    const seen = await lastTickFocused(page);
+    console.log(`last tick focused at 1000×700: ${JSON.stringify(seen)}`);
+    assert.ok(seen.focused, 'the last tick did not take focus');
+    assert.ok(seen.tickBottom <= seen.rowTop, JSON.stringify(seen));
+    await page.context().close();
+  });
+
+  // At 1000×700 the last tick happens to clear the row by itself. Here it does
+  // not, so this is the case that shows the scroll padding doing the work.
+  it('a tick really under the row is moved clear of it when focused', async () => {
+    const page = await openTicksUnderTheRow();
+    const seen = await lastTickFocused(page);
+    console.log(`last tick focused under the row: ${JSON.stringify(seen)}`);
+    assert.ok(seen.focused, 'the last tick did not take focus');
+    assert.ok(seen.overBeforeFocus > 0, `it was not under the row: ${JSON.stringify(seen)}`);
+    assert.ok(seen.tickBottom <= seen.rowTop, JSON.stringify(seen));
+    await page.context().close();
+  });
+
+  it('the check can fail: with no scroll padding a focused tick is reported', async () => {
+    const page = await openTicksUnderTheRow();
+    await page.evaluate((selector) => {
+      const area = document.querySelector<HTMLElement>(selector);
+      if (area !== null) area.style.scrollPaddingBottom = '0px';
+    }, SEARCH_AREA);
+    const report = await focusedControlsUnderTheRow(page);
+    assert.ok(
+      report.some((line) => line.includes('under the row')),
+      `a tick under the row was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+
+  // The scroll padding puts the pinned row inside the zone the browser scrolls
+  // things out of, so moving focus to Search from code threw the form 300px up.
+  it('pressing the fix in the pinned row does not scroll the form', async () => {
+    const page = await openTypedSearch(SMALLEST_WINDOW);
+    await page.fill('[data-testid="search-location"]', 'Berlin');
+    await page.uncheck('[data-testid="keyless-source-arbeitnow"]');
+    const fix = page.locator('[data-testid="search-tick-feeds"]');
+    await fix.waitFor();
+    await scrollAreaTo(page, 0);
+    const box = await fix.boundingBox();
+    assert.ok(box !== null, 'no fix button');
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.locator('[data-testid="search-submit"]:focus').waitFor();
+    const scrollTop = await page.evaluate(async (selector) => {
+      await new Promise((done) => requestAnimationFrame(done));
+      await new Promise((done) => requestAnimationFrame(done));
+      return document.querySelector(selector)?.scrollTop ?? -1;
+    }, SEARCH_AREA);
+    assert.equal(scrollTop, 0);
+    assert.deepEqual(await submitRowProblems(page, ['search-submit']), []);
+    await page.context().close();
+  });
+
+  // TRAP — z-order, both ways: above the ticks, below the hints.
+  it('the row paints above the ticks it covers', async () => {
+    const page = await openTicksUnderTheRow();
+    const report = await page.evaluate(
+      ({ areaSelector, rowSelector }) => {
+        const area = document.querySelector(areaSelector);
+        const row = document.querySelector(rowSelector);
+        const ticks = document.querySelectorAll('[data-testid="search-where"] input');
+        const tick = ticks[ticks.length - 1];
+        if (area === null || row === null || tick === undefined)
+          throw new Error('nothing to measure');
+        // Scroll the last tick into the middle of the row, which stays pinned.
+        const middleOf = (box: DOMRect): number => box.top + box.height / 2;
+        area.scrollTop +=
+          middleOf(tick.getBoundingClientRect()) - middleOf(row.getBoundingClientRect());
+        const tickBox = tick.getBoundingClientRect();
+        const rowBox = row.getBoundingClientRect();
+        const hit = document.elementFromPoint(tickBox.left + tickBox.width / 2, middleOf(tickBox));
+        return {
+          tickInsideRow: middleOf(tickBox) > rowBox.top && middleOf(tickBox) < rowBox.bottom,
+          topmostIsRow: hit !== null && row.contains(hit),
+        };
+      },
+      { areaSelector: SEARCH_AREA, rowSelector: SUBMIT_ROW },
+    );
+    console.log(`a tick under the row: ${JSON.stringify(report)}`);
+    assert.deepEqual(report, { tickInsideRow: true, topmostIsRow: true });
+    await page.context().close();
+  });
+
+  it('a hint paints above the row', async () => {
+    const page = await openTypedSearch(SMALLEST_WINDOW);
+    await page.locator('[data-testid="search-where"] input').last().focus();
+    await page.waitForSelector('[data-testid="hint"]:visible');
+    const onTop = await page.evaluate((selector) => {
+      const row = document.querySelector(selector);
+      const tip = document.querySelector<HTMLElement>('[data-testid="hint"]:not([hidden])');
+      if (row === null || tip === null) throw new Error('no row or hint');
+      // A tip takes no pointer events, so `elementFromPoint` would look through
+      // it. Give it some, and put it over the row, to ask the stacking order.
+      const box = row.getBoundingClientRect();
+      tip.style.pointerEvents = 'auto';
+      tip.style.top = `${String(box.top)}px`;
+      tip.style.left = `${String(box.left)}px`;
+      const tipBox = tip.getBoundingClientRect();
+      return document.elementFromPoint(tipBox.left + 2, tipBox.top + 2) === tip;
+    }, SUBMIT_ROW);
+    assert.ok(onTop, 'the hint paints below the row');
+    await page.context().close();
+  });
+
+  // TRAP — results: the row must never float over them.
+  it('after a search, the row never covers a result and scrolls away with the form', async () => {
+    const page = await openTypedSearch(SMALLEST_WINDOW, '?seen=1&results=1');
+    await page.locator('[data-testid="search-submit"]:not([disabled])').click();
+    await page.getByText('Project Coordinator 11').first().waitFor();
+    const report = await page.evaluate(
+      async ({ areaSelector, rowSelector }) => {
+        const area = document.querySelector(areaSelector);
+        const row = document.querySelector(rowSelector);
+        if (area === null || row === null) throw new Error('no area or row');
+        const first = document.querySelector('[data-testid="search-results"]');
+        if (first === null) throw new Error('no results drawn');
+        const overlaps: number[] = [];
+        const range = area.scrollHeight - area.clientHeight;
+        for (let top = 0; top <= range; top += 40) {
+          area.scrollTop = top;
+          await new Promise((done) => requestAnimationFrame(done));
+          const rowBox = row.getBoundingClientRect();
+          const resultsBox = first.getBoundingClientRect();
+          if (resultsBox.top < rowBox.bottom && resultsBox.bottom > rowBox.top) overlaps.push(top);
+        }
+        area.scrollTop = range;
+        await new Promise((done) => requestAnimationFrame(done));
+        return {
+          overlaps,
+          range,
+          rowBottom: row.getBoundingClientRect().bottom,
+          areaTop: area.getBoundingClientRect().top,
+        };
+      },
+      { areaSelector: SEARCH_AREA, rowSelector: SUBMIT_ROW },
+    );
+    console.log(`results: ${JSON.stringify(report)}`);
+    assert.ok(report.range > 0, 'the results did not make the area scroll');
+    assert.deepEqual(report.overlaps, [], 'the row covered a result at these scroll positions');
+    assert.ok(report.rowBottom < report.areaTop, 'the row did not scroll away');
+    await page.context().close();
+  });
+});

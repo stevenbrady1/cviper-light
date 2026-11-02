@@ -37,6 +37,29 @@ export interface SearchSubmitRowProps {
  * secondary and `type="button"`, so it never submits the form (L-313), and
  * pressing it moves focus to Search — the fix button itself is gone by then,
  * and focus left on nothing is focus thrown back to the top of the page.
+ *
+ * ============================================================================
+ * STICKY FROM `md:` UP, SO A SHORT WINDOW CANNOT HIDE IT (L-342)
+ * ============================================================================
+ * The form is tall and the smallest window is 1000×700, so the row could fall
+ * below the bottom edge, taking the button and its reason with it. It now holds
+ * at the bottom of the scroll area until the page reaches its natural place. It
+ * stays in the form's flow and after every choice in the DOM (L-313), and a
+ * sticky box never moves below where it belongs, so it scrolls away with the
+ * form and never floats over the results.
+ *
+ *   - `-bottom-5` cancels the scroll area's `py-5`: sticky stops at the PADDING
+ *     edge, and `bottom-0` left a 20px strip of form showing under the row.
+ *   - `mt-0 pt-4` is the same 16px gap as `mt-4`, with the background behind
+ *     it; `pb-3 -mb-3` paints under the next row's `mt-3` without moving it.
+ *   - No z-index: a sticky box already paints above the unpositioned form
+ *     before it, and hints (`z-50`) still paint above it.
+ *   - The scroll area's `scroll-pb` keeps a focused tick clear of the row. The
+ *     row itself sits in that zone, so focus moved to Search from code does not
+ *     scroll: the fix was pressed right beside it, so it is already on screen.
+ *
+ * Phones keep all of it off: an on-screen keyboard plus a tall wrapped row
+ * would cover the very fields being typed in.
  */
 export function SearchSubmitRow({ running, disabledReason, fix }: SearchSubmitRowProps) {
   const submit = useRef<HTMLButtonElement>(null);
@@ -45,11 +68,14 @@ export function SearchSubmitRow({ running, disabledReason, fix }: SearchSubmitRo
   useEffect(() => {
     if (!focusWhenEnabled.current || disabledReason !== null) return;
     focusWhenEnabled.current = false;
-    submit.current?.focus();
+    submit.current?.focus({ preventScroll: true });
   }, [disabledReason]);
 
   return (
-    <div data-testid="search-submit-row" className="mt-4 flex flex-wrap items-center gap-3">
+    <div
+      data-testid="search-submit-row"
+      className="mt-4 flex flex-wrap items-center gap-3 md:sticky md:-bottom-5 md:mt-0 md:-mb-3 md:bg-canvas md:pt-4 md:pb-3"
+    >
       <button
         ref={submit}
         type="submit"

@@ -15,9 +15,11 @@
  * Neither changes a single class name or colour. What the spec measures —
  * which text colour lands on which painted background — is the app's own.
  *
- * The page reads two switches from the address:
+ * The page reads three switches from the address:
  *   - `?seen=1` skips the first-run welcome, as a returning user sees the app;
- *   - `?entries=1` puts three applications on the board.
+ *   - `?entries=1` puts three applications on the board;
+ *   - `?results=1` says a job-board key is saved, and answers Search with a long
+ *     list of adverts from the fake port (L-342: what results do to the layout).
  *
  * This file is never part of the app's own build: `vite.config.ts` builds
  * `index.html` at the app root, and this page has its own config.
@@ -33,7 +35,7 @@ const params = new URLSearchParams(window.location.search);
 (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
   invoke: (command: string): Promise<unknown> => {
     if (command === 'ollama_probe') return Promise.resolve(null);
-    if (command === 'secret_status') return Promise.resolve(false);
+    if (command === 'secret_status') return Promise.resolve(params.get('results') === '1');
     return Promise.reject(new Error(`not available in the contrast harness: ${command}`));
   },
   transformCallback: (): number => 0,
@@ -88,6 +90,10 @@ const { markWelcomeSeen } = await import('../../src/features/onboarding/store');
 const { createFakeTrackerPort } = await import('../../src/features/tracker/test/fakePort');
 const { createFakeProfilePort } = await import('../../src/features/profile/test/fakePort');
 const { createFakeTailorPort } = await import('../../src/features/tailor/test/fakePort');
+const { createFakeSearchPort, outcomeOf } =
+  await import('../../src/features/search/test/fakeSearchPort');
+const { entry } = await import('../../src/features/search/test/fixtures');
+const { emptyQuota } = await import('@cviper/job-apis');
 
 if (params.get('seen') === '1') markWelcomeSeen();
 
@@ -95,6 +101,22 @@ const entries =
   params.get('entries') === '1'
     ? [application('a', 'saved'), application('b', 'applied'), application('c', 'interviewing')]
     : [];
+
+const searchPort = params.get('results') === '1' ? createFakeSearchPort() : undefined;
+searchPort?.nextOutcome(
+  outcomeOf(
+    Array.from({ length: 12 }, (_, index) =>
+      entry({
+        id: `job-${String(index)}`,
+        external_id: `reed-${String(index)}`,
+        title: `Project Coordinator ${String(index)}`,
+        company: `Company ${String(index)}`,
+        description: null,
+      }),
+    ),
+    emptyQuota('2026-08-19'),
+  ),
+);
 
 const root = document.getElementById('root');
 if (root === null) throw new Error('#root missing from the contrast harness');
@@ -105,6 +127,7 @@ ReactDOM.createRoot(root).render(
       trackerPort={createFakeTrackerPort(entries)}
       profilePort={createFakeProfilePort()}
       tailorPort={createFakeTailorPort()}
+      {...(searchPort === undefined ? {} : { searchPort })}
       now={NOW}
     />
   </React.StrictMode>,
