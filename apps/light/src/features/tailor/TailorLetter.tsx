@@ -38,7 +38,8 @@ export function TailorLetter({ letter, busy, onSaveText, onSaveDocument }: Tailo
         {letter.text}
       </pre>
       <p data-testid="tailor-letter-words" className="text-xs text-ink-faint">
-        <span className="font-mono tabular-nums">{letter.words}</span> words
+        <span className="font-mono tabular-nums">{letter.words}</span>{' '}
+        {letter.words === 1 ? 'word' : 'words'}
       </p>
       {letter.words > LETTER_WORD_LIMIT ? (
         <p

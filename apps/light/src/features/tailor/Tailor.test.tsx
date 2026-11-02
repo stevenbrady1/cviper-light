@@ -31,6 +31,7 @@ const { Tailor } = await import('./Tailor');
 const { createFakeTailorPort } = await import('./test/fakePort');
 const { createFakeConsentPort } = await import('../analysis/test/fakeConsentPort');
 const { createFakeFilePort } = await import('../../platform/test/fakeFilePort');
+const { TailorLetter } = await import('./TailorLetter');
 
 const NOW = new Date('2026-08-19T09:00:00.000Z');
 
@@ -451,6 +452,25 @@ describe('the cover letter (L-161)', () => {
     const note = screen.getByTestId('tailor-letter-long');
     expect(note.textContent).toContain('Over 400 words');
     expect(note.className).toContain('text-gold');
+  });
+
+  // L-343. Exact matches on purpose: "1 words" contains "1 word".
+  it.each([
+    ['happy: many', 185, '185 words'],
+    ['boundary: two', 2, '2 words'],
+    ['boundary: one', 1, '1 word'],
+    ['boundary: none stays plural', 0, '0 words'],
+  ])('%s: the count reads right', (_label, words, phrase) => {
+    render(
+      <TailorLetter
+        letter={{ letter: LETTER, text: 'A letter.', words, claims: [] }}
+        busy={false}
+        onSaveText={vi.fn()}
+        onSaveDocument={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('tailor-letter-words').textContent).toBe(phrase);
   });
 });
 

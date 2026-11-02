@@ -216,6 +216,38 @@ describe('when there is nothing to show', () => {
   });
 });
 
+describe('the word count’s wording (L-343)', () => {
+  // Exact matches on purpose: "1 words" contains "1 word", so `toContain` could not fail.
+  it.each([
+    ['happy: many', 185, '185 words'],
+    ['boundary: two', 2, '2 words'],
+    ['boundary: one', 1, '1 word'],
+  ])('%s reads the same folded and open', async (_label, count, phrase) => {
+    await renderWith([
+      cv('cv-1', 'Count.txt', Array.from({ length: count }, () => 'word').join(' ')),
+    ]);
+    await vi.waitFor(() => expect(previewText()).toBeTruthy());
+
+    expect(screen.getByTestId('tailor-cv-preview-summary').textContent).toBe(
+      `: Count.txt · ${phrase}`,
+    );
+    expect(screen.getByTestId('tailor-cv-preview-meta').textContent).toBe(`Count.txt · ${phrase}`);
+  });
+
+  it.each([
+    ['no stored text', null],
+    ['an empty string', ''],
+    ['only whitespace', '  \n\t \n'],
+  ])('negative: %s shows no count at all, not "0 words"', async (_label, text) => {
+    await renderWith([cv('cv-1', 'Blank.docx', text)]);
+    await screen.findByTestId('tailor-cv-preview-empty');
+
+    expect(screen.queryByTestId('tailor-cv-preview-summary')).toBeNull();
+    expect(screen.queryByTestId('tailor-cv-preview-meta')).toBeNull();
+    expect(screen.getByTestId('view-tailor').textContent).not.toMatch(/\b0 words?\b/);
+  });
+});
+
 describe('a very long CV', () => {
   it('boundary: renders whole, inside a height-capped, scrollable, wrapping block', async () => {
     const long = Array.from(
