@@ -148,7 +148,8 @@ export function CvTextPanel({ cv, disabled, onSave }: CvTextPanelProps) {
             {text}
           </pre>
           <p data-testid="tailor-cv-preview-meta" className="mt-1 text-xs text-ink-faint">
-            {cv.name} · <span className="font-mono tabular-nums">{wordCount(text)}</span> words
+            {cv.name} · <span className="font-mono tabular-nums">{wordCount(text)}</span>{' '}
+            {wordCount(text) === 1 ? 'word' : 'words'}
             {corrected ? ' · corrected' : ''}
           </p>
         </>

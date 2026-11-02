@@ -139,7 +139,8 @@ function CvPreview({ cv, open, onToggle, running, onSaveCv }: CvPreviewProps) {
           {shown ? null : (
             // Open, the panel's own line says this: no repeat.
             <span data-testid="tailor-cv-preview-summary" className="text-xs text-ink-faint">
-              : {cv.name} · <span className="font-mono tabular-nums">{wordCount(text)}</span> words
+              : {cv.name} · <span className="font-mono tabular-nums">{wordCount(text)}</span>{' '}
+              {wordCount(text) === 1 ? 'word' : 'words'}
             </span>
           )}
         </p>

@@ -131,8 +131,8 @@ describe('folded on a fresh mount', () => {
 
     // The same `wordCount` the open panel's meta line uses, and its wording.
     const meta = screen.getByTestId('tailor-cv-preview-meta').textContent ?? '';
-    expect(meta).toContain('1 words');
-    expect(summary()?.textContent).toBe(': One.txt · 1 words');
+    expect(meta).toContain('1 word');
+    expect(summary()?.textContent).toBe(': One.txt · 1 word');
   });
 });
 
