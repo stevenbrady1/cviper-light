@@ -19,6 +19,10 @@
  * `destructive` is red, and red appears in exactly two places in the whole app:
  * here, and an overdue next action on a tracker card (the `rejected` status
  * pill that used to be the other one left the card in L-175).
+ *
+ * A disabled button LOOKS disabled, and in one way: the `line` grey fill, in all
+ * four styles (L-315). Greying the text alone left a secondary button looking
+ * pressable. `sunken` is too close to the page to see, and it is the hover colour.
  */
 
 // `min-h-11` below `md`: 44px is the smallest thing a thumb reliably hits,
@@ -30,9 +34,9 @@ const BASE =
 
 export const PRIMARY_BUTTON = `${BASE} bg-blue text-ink-inverse hover:bg-navy disabled:bg-line disabled:text-ink-faint`;
 
-export const SECONDARY_BUTTON = `${BASE} border border-line bg-card text-ink hover:bg-sunken disabled:text-ink-faint`;
+export const SECONDARY_BUTTON = `${BASE} border border-line bg-card text-ink hover:bg-sunken disabled:border-transparent disabled:bg-line disabled:text-ink-faint aria-disabled:border-transparent aria-disabled:bg-line`;
 
 export const DESTRUCTIVE_BUTTON = `${BASE} bg-danger text-ink-inverse hover:bg-danger/90 disabled:bg-line disabled:text-ink-faint`;
 
 /** A quiet, text-only button for the third-rank actions. */
-export const QUIET_BUTTON = `${BASE} text-ink-muted hover:bg-sunken hover:text-ink disabled:text-ink-faint`;
+export const QUIET_BUTTON = `${BASE} text-ink-muted hover:bg-sunken hover:text-ink disabled:bg-line disabled:text-ink-faint aria-disabled:bg-line`;
