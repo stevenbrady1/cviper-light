@@ -8,6 +8,37 @@ All notable changes to CViper Light are recorded here. The format follows
 
 Changes waiting for the next release are in [`changes/unreleased/`](changes/unreleased/), one file per change, so two pull requests never edit the same lines here (L-303). `pnpm changelog:preview` shows them as they will appear; `pnpm changelog:release <version> <date>` writes them in below. See [CONTRIBUTING.md](CONTRIBUTING.md#the-changelog).
 
+## [0.12.0] — 2026-11-03
+
+Most of this release is about Search. The Search button now searches inside the app and opens no browser tabs; opening the job boards you ticked is its own button, "Also open in N boards". When Search is greyed out, the reason sits right beside the button, and a UK search with no job-board key gets a "Get a free Reed key" button that goes straight to the key in Settings. On a short desktop window the button stays in view. Guardian Jobs closed on 2 September 2026, so its feed and its board link are gone; jobs you saved from it are kept. Elsewhere, Tailor starts with your CV folded so the job advert box is in view without scrolling, a started job's card on the tracker says which step it is on in words, a CV check starts on a general chat model rather than a coding model, and Profile, Search, Settings, Analysis and Tailor share one reading width so their cards line up.
+
+### Added
+
+- A daily check that the free Arbeitnow job feed still answers (L-339). Once a day CI asks every free feed the app reads for its jobs, through the app's own reader, and fails if a feed redirects, answers with a web page instead of its list, sends a list it cannot read or an empty one, or has no job with a title and a link; it then opens an issue, or adds to the one already open. Guardian Jobs' feed closed on 2 September and turned into a web page, and nothing noticed for two months. Nothing in the app changes.
+- For a UK search with no job-board key, a "Get a free Reed key" button now sits beside the greyed-out Search and takes you straight to the Reed key in Settings, with the job-board keys unfolded (L-338).
+
+### Changed
+
+- Profile, Search, Settings, Analysis and Tailor now share one reading width, so their cards line up as you move between them (L-341). Profile, Settings and Search are a little wider than before, and on a very wide window Analysis and Tailor no longer stretch their text across the whole screen.
+- On Tailor, your CV now starts folded to one line, with its file name, its word count and "Show CV", so the job advert box is in view without scrolling (L-340). A CV with no text still shows "Type or paste your CV text" straight away.
+- A CV check now starts on a general chat model on your PC rather than a coding model, and coding models say they may read CVs less well (L-333).
+- A started job's card on the tracker now says which step it is on in words, such as "Step 3 of 5 · Tailor", above its progress dots, and a screen reader hears the same words (L-331).
+- Example text in the empty Profile and Search boxes now starts with "e.g.", so it no longer looks like an answer already filled in (L-330).
+- Search now always searches inside the app and opens no browser tabs; opening the ticked job boards is its own button, "Also open in N boards", with the same filters. A saved search still opens its boards as well as searching (L-329).
+
+### Fixed
+
+- On Tailor, a one-word CV or cover letter now says "1 word" instead of "1 words" (L-343).
+- On a short window the Search button, and the reason it is grey, could fall below the bottom of the screen (L-342). On desktop widths they now stay in view at the bottom of the Search screen until the page reaches them, then scroll away with the form, so they never sit over your results. Phones are unchanged.
+- The Guardian Jobs board link is gone from Search and Settings: Guardian Jobs closed on 2 Sep 2026 and the link opened a page that refused it. Nine UK boards remain, and a board you had ticked or saved with a search simply drops out while your other boards stay ticked (L-337).
+- Guardian Jobs closed on 2 September 2026, so its free feed has gone from Search and no longer shows "Guardian Jobs sent something CViper could not read" (L-336). Jobs you saved from it are kept and still say where they came from.
+- For a UK search with no job-board key, Search now says what will work: a free Reed key, set up in Settings, adds UK jobs here, and the job sites you tick open with "Also open" (L-336).
+- When Search is greyed out, the reason now sits right beside the button instead of below the bottom of the window, with a one-press "Tick Arbeitnow" to fix it where there is a free feed to tick, and the empty results no longer say to press a button that cannot be pressed (L-335).
+- Going from Search to Settings no longer shifts the whole app up, cutting off the top and leaving a blank strip at the bottom (L-334).
+- The Interviewing column's header now reads its name then its count, like every other column, and "Edit stages" sits just under it instead of pushing the count onto a second line (L-332).
+- The work-item number check now reads every issue, page by page, and fails if it read fewer than the repository holds; it had stopped at the first 200 (L-328).
+- Settings now lists all six things AI adds, not just the full CV reading: tailoring your CV, the cover letter, interview prep, follow-up drafts and Paste a job (L-327).
+
 ## [0.11.0] — 2026-10-29
 
 The launch release. The free CV check reads skills it used to miss, now including UK qualifications, licences and checks such as NVQ, DBS and C+E; it shows the line of your CV behind each match and how much the advert gave it to go on, and it no longer counts a skill your CV says you lack. A new user sees a full result in one click, is no longer asked for job-board keys, and is told in plain words how to add AI. There is a tenth UK job board, and three security fixes: AI requests no longer follow redirects, a local Ollama run never goes through a proxy, and a memory issue in backup validation is patched.
@@ -552,7 +583,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.11.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.12.0...main
+[0.12.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.11.0...light-v0.12.0
 [0.11.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.6...light-v0.11.0
 [0.10.6]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.5...light-v0.10.6
 [0.10.5]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.4...light-v0.10.5
