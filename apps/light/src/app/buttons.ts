@@ -2,12 +2,13 @@
  * The three kinds of button this app has. There is no fourth.
  *
  * ============================================================================
- * ONE BLUE BUTTON PER VIEW
+ * AT MOST ONE BLUE BUTTON PER VIEW
  * ============================================================================
  * Blue means "this is the thing this screen is for". The moment a screen has
  * two blue buttons, neither of them is primary and the user has to read both to
  * find out which one the screen is about — so the colour has stopped carrying
- * any information at all.
+ * any information at all. A view with no one main action has none: Settings at
+ * rest is the example (L-321).
  *
  * `data-primary` is on every primary button so this is CHECKABLE rather than
  * merely intended: the tracker's tests count the enabled primary buttons on

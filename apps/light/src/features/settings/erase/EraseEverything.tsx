@@ -34,8 +34,7 @@ import { LiveStatus } from '../../../app/LiveStatus';
  * The first button opens the confirmation; the second, differently worded,
  * does the deleting. Both are always rendered — disabled while busy, never
  * removed — so nothing on this screen moves about, and neither carries
- * `data-primary`: the view's one blue button stays "Export my data", which is
- * the thing a person should do first.
+ * `data-primary`: erasing is never the thing this screen is for.
  */
 
 type Stage =

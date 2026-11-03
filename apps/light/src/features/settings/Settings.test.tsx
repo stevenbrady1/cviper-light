@@ -25,6 +25,8 @@ import {
   type Profile,
 } from '@cviper/core-types';
 
+import { SECONDARY_BUTTON } from '../../app/buttons';
+
 import { Settings } from './Settings';
 import { createFakeBackupPort } from './test/fakePort';
 import { createFakeFilePort } from '../../platform/test/fakeFilePort';
@@ -145,14 +147,43 @@ describe('the screen itself', () => {
     expect(copy).toContain('Nothing is deleted');
   });
 
-  it('has exactly one enabled primary button', () => {
+  it('has no enabled primary button at rest (L-321)', () => {
     renderSettings();
 
     const primaries = [...document.querySelectorAll('[data-primary="true"]')].filter(
       (button) => !(button as HTMLButtonElement).disabled,
     );
-    expect(primaries).toHaveLength(1);
-    expect(primaries[0]?.getAttribute('data-testid')).toBe('settings-export');
+    expect(primaries.map((button) => button.getAttribute('data-testid'))).toEqual([]);
+  });
+
+  it('negative: Export is secondary, yet still enabled and pressable (L-321)', async () => {
+    const { user, filePort } = renderSettings(createFakeBackupPort(FULL));
+
+    const exportButton = screen.getByTestId('settings-export') as HTMLButtonElement;
+    expect(exportButton.className).toBe(SECONDARY_BUTTON);
+    expect(exportButton.hasAttribute('data-primary')).toBe(false);
+    expect(exportButton.disabled).toBe(false);
+
+    await user.click(exportButton);
+
+    await screen.findByTestId('settings-message');
+    expect(filePort.written()).toHaveLength(1);
+  });
+
+  it('boundary: with an import confirmation open, Export is secondary and switched off (L-321)', async () => {
+    const { user, filePort } = renderSettings();
+    filePort.nextBackup({ name: 'b.json', path: 'C:\b.json', text: emptyBackup() });
+
+    await user.click(screen.getByTestId('settings-import'));
+    await screen.findByTestId('settings-confirm');
+
+    const exportButton = screen.getByTestId('settings-export') as HTMLButtonElement;
+    expect(exportButton.className).toBe(SECONDARY_BUTTON);
+    expect(exportButton.hasAttribute('data-primary')).toBe(false);
+    expect(exportButton.disabled).toBe(true);
+
+    await user.click(exportButton);
+    expect(filePort.written()).toHaveLength(0);
   });
 });
 

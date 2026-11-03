@@ -42,9 +42,9 @@ import { LiveStatus } from '../../../app/LiveStatus';
  * ============================================================================
  * NEITHER BUTTON HERE IS BLUE.
  * ============================================================================
- * Settings already has its one primary action — Export my data. Checking for
- * updates is housekeeping, and a second blue button on the screen would stop
- * blue meaning anything at all (see `app/buttons.ts`).
+ * Checking for updates is housekeeping, and Settings has no blue button at rest
+ * (L-321). Blue here would say this is the thing the screen is for, which it is
+ * not (see `app/buttons.ts`).
  */
 
 export interface UpdateCheckProps {

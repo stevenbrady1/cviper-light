@@ -44,7 +44,7 @@ import { LiveStatus } from '../../../app/LiveStatus';
  * The saved line comes from `custom_provider_status`: the address, the tick
  * and a bool. The key box is a password field and is cleared once saved.
  *
- * Secondary and quiet buttons only: Settings spends its one primary on Export.
+ * Secondary and quiet buttons only: Settings has no blue button at rest (L-321).
  */
 
 /** Rust's limit on the address, in bytes after parsing. The box stops typing there. */
