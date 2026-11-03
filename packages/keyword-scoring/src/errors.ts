@@ -48,7 +48,7 @@ export function cvTooShortError(characters: number, minimum: number): ScoringErr
   return {
     code: 'CV_TOO_SHORT',
     message:
-      `That CV is only ${characters} characters long, and at least ${minimum} are ` +
+      `That CV is only ${characters} ${characters === 1 ? 'character' : 'characters'} long, and at least ${minimum} are ` +
       'needed before a keyword comparison says anything useful. If your CV is ' +
       'a scan or a photo, the text could not be read out of it — try the ' +
       'original Word or PDF file you exported.',
@@ -68,7 +68,7 @@ export function jobDescriptionTooShortError(characters: number, minimum: number)
   return {
     code: 'JOB_DESCRIPTION_TOO_SHORT',
     message:
-      `That job advert is only ${characters} characters long, and at least ` +
+      `That job advert is only ${characters} ${characters === 1 ? 'character' : 'characters'} long, and at least ` +
       `${minimum} are needed for a keyword comparison to mean anything. Paste ` +
       'the full advert, including the requirements, rather than just the job title.',
   };

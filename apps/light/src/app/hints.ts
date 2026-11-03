@@ -55,9 +55,10 @@ export const ATS_BAND_HINT: Readonly<Record<AtsBand, string>> = {
 
 /** ▲ / ▼ beside a score. */
 export function changeHint(value: number): string {
+  const points = Math.abs(value) === 1 ? 'point' : 'points';
   return value > 0
-    ? `Up ${value} points on your original CV: better.`
-    : `Down ${Math.abs(value)} points on your original CV: worse.`;
+    ? `Up ${value} ${points} on your original CV: better.`
+    : `Down ${Math.abs(value)} ${points} on your original CV: worse.`;
 }
 
 export const STEP_HINT: Readonly<Record<StepState, string>> = {
