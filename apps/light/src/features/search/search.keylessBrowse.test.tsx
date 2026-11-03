@@ -48,6 +48,7 @@ import {
 
 import ARBEITNOW_PAGE from '../../../../../packages/job-apis/src/fixtures/arbeitnow-page1.json';
 
+import { QUOTA_STORAGE_KEY } from '../../jobs/quotaStore';
 import { createFakeBrowserPort } from '../../platform/test/fakeBrowserPort';
 import { type KeyState } from '../../status/environment';
 
@@ -188,10 +189,14 @@ describe('a machine with no keys at all', () => {
   it('spends none of the daily job-board allowance', async () => {
     // These feeds have no account and no allowance. Counting a browse against
     // Reed's hundred would take real searches away from the user for nothing.
-    const { user } = renderSearch();
+    const { user, asked } = renderSearch();
     await browse(user, 'engineer');
 
-    expect(screen.getByTestId('search-quota').textContent ?? '').toContain('0');
+    // Wait for the adverts first: checked any sooner, this would pass before
+    // the code that could spend the allowance had run.
+    await screen.findAllByTestId(/^result-/);
+    expect(asked()).not.toEqual([]);
+    expect(localStorage.getItem(QUOTA_STORAGE_KEY)).toBeNull();
   });
 
   it('filters on this machine — a London browse drops the Berlin adverts', async () => {

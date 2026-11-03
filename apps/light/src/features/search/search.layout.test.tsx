@@ -111,7 +111,7 @@ describe('job boards, right under the fields (L-219, L-313)', () => {
     const form = await screen.findByTestId('search-form');
     const boards = screen.getByTestId('keyless-bar');
     const submit = screen.getByTestId('search-submit');
-    const quota = screen.getByTestId('search-quota');
+    const quota = await screen.findByTestId('search-quota');
     // Inside the form since L-313: the button that opens them comes after them.
     expect(form.contains(boards)).toBe(true);
     expect(boards.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
