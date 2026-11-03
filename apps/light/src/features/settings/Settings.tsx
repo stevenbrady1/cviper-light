@@ -340,19 +340,18 @@ export function Settings({
         title={view.label}
         summary={view.summary}
         /*
-         * The view's ONE blue button — except while the import confirmation is
-         * up, when it is disabled and the confirm button takes over. Disabled
-         * rather than hidden, so the control does not move about, and so there
-         * is never more than one enabled primary on screen.
+         * Secondary, not blue (L-321): a backup is housekeeping, and this screen
+         * has no one main action at rest. Disabled rather than hidden while the
+         * import confirmation is up, when the confirm button is the one blue
+         * button, so the control does not move about.
          */
         action={
           <button
             type="button"
             data-testid="settings-export"
-            data-primary="true"
             disabled={busy || confirming}
             onClick={() => void onExport()}
-            className={PRIMARY_BUTTON}
+            className={SECONDARY_BUTTON}
           >
             {stage.kind === 'busy' && stage.what === 'export' ? 'Exporting…' : 'Export my data'}
           </button>
