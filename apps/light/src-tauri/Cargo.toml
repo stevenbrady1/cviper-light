@@ -86,7 +86,7 @@ tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 # only approved statements. Already in the tree through tauri-plugin-sql; named
 # here at the same major versions because we call them directly. `time` decodes
 # DATE/TIME/DATETIME exactly as the plugin does.
-sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "time", "json"] }
+sqlx = { version = "0.9", default-features = false, features = ["sqlite", "runtime-tokio", "time", "json"] }
 indexmap = { version = "2", features = ["serde"] }
 time = "0.3"
 tauri-plugin-store = "2"
