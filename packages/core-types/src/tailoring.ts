@@ -323,7 +323,22 @@ export function renderTailoredCv(
 
   // One trailing newline, never two: the last GAP becomes the file's final
   // line break.
-  return lines.join('\n').replace(/\n+$/, '\n');
+  return oneFinalNewline(lines.join('\n'));
+}
+
+/**
+ * Trailing newlines collapsed to exactly one; text with none gets none.
+ *
+ * What `.replace(/\n+$/, '\n')` did, byte for byte, without the regex: that
+ * pattern retried from every newline in a run and scanned to the end each
+ * time, so text a user typed (L-346's contact line) with a long run of
+ * newlines before other text took quadratic time (CodeQL js/polynomial-redos).
+ * This walks back over the trailing newlines once.
+ */
+export function oneFinalNewline(text: string): string {
+  let end = text.length;
+  while (end > 0 && text.charCodeAt(end - 1) === 0x0a) end -= 1;
+  return end === text.length ? text : `${text.slice(0, end)}\n`;
 }
 
 /** The cover letter as plain text: greeting, paragraphs, sign-off, one blank line apart. */

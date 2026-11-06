@@ -38,6 +38,14 @@ export const NO_CONTACT: CvContact = { name: '', email: '', phone: '' };
 export const HEADER_LINES = 15;
 
 /**
+ * The longest line searched for an email or a phone. A contact line is short;
+ * a longer one is a paragraph (or a whole CV a PDF gave back as one line), and
+ * the email pattern below backtracks in time that grows with the square of
+ * its input (CodeQL js/polynomial-redos), so it is never given more than this.
+ */
+export const SCANNED_LINE_MAX = 300;
+
+/**
  * COPIED FROM `packages/ats-checks/src/checks.ts` (`EMAIL_RE`), with the
  * global flag added to find every candidate. Copied, not imported: that
  * package is pinned to the web app's Python by `parity.test.ts`, and this is
@@ -51,7 +59,55 @@ const PHONE_RUN = /[+(]?\d[\d \t\u00a0().-]*\d/gu;
 const PHONE_MIN_DIGITS = 9;
 const PHONE_MAX_DIGITS = 15;
 /** "Tel", "Mobile", "M:" and friends, right before the number. */
-const PHONE_LABEL = /(?:^|[^\p{L}])(?:tel|telephone|phone|mobile|mob|cell|ph|t|m)\.?\s*:?\s*$/iu;
+const PHONE_LABELS: ReadonlySet<string> = new Set([
+  'tel',
+  'telephone',
+  'phone',
+  'mobile',
+  'mob',
+  'cell',
+  'ph',
+  't',
+  'm',
+]);
+
+const SPACE = /^\s$/u;
+const LETTER = /^\p{L}$/u;
+
+/**
+ * Where `chars[0..end)` would end with every trailing character that passes
+ * `test` taken off. One pass backwards: the `[…]+$` and `\s*:?\s*$` patterns
+ * this replaces retried from every position in a run (CodeQL
+ * js/polynomial-redos), which a long run in a user's CV made quadratic.
+ */
+function endWithout(chars: readonly string[], end: number, test: (char: string) => boolean) {
+  let at = end;
+  while (at > 0 && test(chars[at - 1] ?? '')) at -= 1;
+  return at;
+}
+
+/** `text` with every trailing character that passes `test` removed. */
+function trimEndWhere(text: string, test: (char: string) => boolean): string {
+  const chars = Array.from(text);
+  return chars.slice(0, endWithout(chars, chars.length, test)).join('');
+}
+
+/**
+ * Whether `prefix` ends in a phone label: a whole word from `PHONE_LABELS`,
+ * any case, then an optional `.`, spaces, an optional `:` and spaces. What
+ * `/(?:^|[^\p{L}])(?:tel|…|m)\.?\s*:?\s*$/iu` matched, in one pass.
+ */
+function endsWithPhoneLabel(prefix: string): boolean {
+  const chars = Array.from(prefix);
+  const isSpace = (char: string) => SPACE.test(char);
+  let end = endWithout(chars, chars.length, isSpace);
+  if (chars[end - 1] === ':') end = endWithout(chars, end - 1, isSpace);
+  if (chars[end - 1] === '.') end -= 1;
+  // The label is the whole run of letters before that: never the tail of a
+  // longer word ("Hotel", "Item").
+  const start = endWithout(chars, end, (char) => LETTER.test(char));
+  return PHONE_LABELS.has(chars.slice(start, end).join('').toLowerCase());
+}
 
 /** Whole-line section headings. "Contact details" is not one: it sits in the header. */
 const SECTION_HEADINGS: ReadonlySet<string> = new Set([
@@ -212,10 +268,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function headingKey(line: string): string {
-  return line
-    .toLowerCase()
-    .replace(/&/gu, 'and')
-    .replace(/[\s:]+$/u, '')
+  const lower = line.toLowerCase().replace(/&/gu, 'and');
+  return trimEndWhere(lower, (char) => char === ':' || SPACE.test(char))
     .replace(/\s+/gu, ' ')
     .trim();
 }
@@ -237,20 +291,25 @@ function onlyOne(candidates: readonly string[], key: (value: string) => string):
   return distinct.size === 1 ? (candidates[0] ?? '') : '';
 }
 
+/** The header lines short enough to search (`SCANNED_LINE_MAX`). */
+function scanned(lines: readonly string[]): string[] {
+  return lines.filter((line) => line.length <= SCANNED_LINE_MAX);
+}
+
 function emailIn(lines: readonly string[]): string {
-  const found = lines.flatMap((line) => line.match(EMAIL) ?? []);
+  const found = scanned(lines).flatMap((line) => line.match(EMAIL) ?? []);
   return onlyOne(found, (email) => email.toLowerCase());
 }
 
 function phoneIn(lines: readonly string[]): string {
   const found: string[] = [];
-  for (const line of lines) {
+  for (const line of scanned(lines)) {
     for (const match of line.matchAll(PHONE_RUN)) {
       const value = match[0];
       const digits = value.replace(/\D/gu, '').length;
       if (digits < PHONE_MIN_DIGITS || digits > PHONE_MAX_DIGITS) continue;
       const starts = value.startsWith('+') || value.startsWith('0') || value.startsWith('(');
-      if (!starts && !PHONE_LABEL.test(line.slice(0, match.index))) continue;
+      if (!starts && !endsWithPhoneLabel(line.slice(0, match.index))) continue;
       found.push(value);
     }
   }
@@ -269,7 +328,8 @@ function looksLikeName(candidate: string): boolean {
 
 function nameIn(lines: readonly string[]): string {
   const first = lines[0] ?? '';
-  const line = CV_TITLE.test(first.replace(/[\s.:]+$/u, '')) ? (lines[1] ?? '') : first;
+  const title = trimEndWhere(first, (char) => char === '.' || char === ':' || SPACE.test(char));
+  const line = CV_TITLE.test(title) ? (lines[1] ?? '') : first;
   const candidate = (line.split(/[|•]/u)[0] ?? '').trim();
   return looksLikeName(candidate) ? candidate : '';
 }

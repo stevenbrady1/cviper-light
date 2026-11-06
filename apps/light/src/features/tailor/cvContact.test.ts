@@ -273,3 +273,87 @@ describe('savedCvText', () => {
     expect(saved.split('\n').slice(0, 3)).toEqual(['Jane Smith', 'jane@x.com | 07700 900123', '']);
   });
 });
+
+/**
+ * CodeQL js/polynomial-redos on #509 found `/\n+$/` in the renderer; these
+ * are the same shapes in this file, run on the user's own CV text. Each input
+ * is a long run the old pattern retried from every position, then failed.
+ */
+describe('linear time on hostile CV text (L-346, CodeQL)', () => {
+  const RUN = 50_000;
+
+  function timedDetect(text: string) {
+    const started = performance.now();
+    const found = detectCvContact(cv(text));
+    return { found, ms: performance.now() - started };
+  }
+
+  it('a heading check on a long run of spaces and colons (`[\\s:]+$`)', () => {
+    const { found, ms } = timedDetect(`Jane Smith\n${': '.repeat(RUN)}x\n${BODY}`);
+    expect(ms).toBeLessThan(1_000);
+    expect(found.name).toBe('Jane Smith');
+  });
+
+  it('the "CV" title check on a long run of dots and spaces (`[\\s.:]+$`)', () => {
+    const { found, ms } = timedDetect(`${'. '.repeat(RUN)}x\n${BODY}`);
+    expect(ms).toBeLessThan(1_000);
+    expect(found.name).toBe('');
+  });
+
+  it('a phone label check on a long run of spaces (`\\s*:?\\s*$`)', () => {
+    const { found, ms } = timedDetect(`Jane Smith\nt${' '.repeat(RUN)}x 7700 900 123\n${BODY}`);
+    expect(ms).toBeLessThan(1_000);
+    expect(found.phone).toBe('');
+  });
+
+  it('an email search on a long run of letters with no @', () => {
+    const { found, ms } = timedDetect(`Jane Smith\n${'a'.repeat(RUN)}\n${BODY}`);
+    expect(ms).toBeLessThan(1_000);
+    expect(found.email).toBe('');
+  });
+
+  it('an email search on a long run of letters before an @ that leads nowhere', () => {
+    const { found, ms } = timedDetect(`Jane Smith\n${'a'.repeat(RUN)}@\n${BODY}`);
+    expect(ms).toBeLessThan(1_000);
+    expect(found.email).toBe('');
+  });
+
+  it('the phone run on a digit then a long run of spaces (already linear, held here)', () => {
+    const { found, ms } = timedDetect(`Jane Smith\n1${' '.repeat(RUN)}x\n${BODY}`);
+    expect(ms).toBeLessThan(1_000);
+    expect(found.phone).toBe('');
+  });
+});
+
+describe('parity for the rewritten checks', () => {
+  it('headings with trailing colons and spaces still end the header', () => {
+    expect(detectCvContact(cv(`Jane Smith\nExperience :  \njane@x.com`)).email).toBe('');
+    expect(detectCvContact(cv(`Jane Smith\nEDUCATION:\njane@x.com`)).email).toBe('');
+    expect(detectCvContact(cv(`Jane Smith\nEducation & Training:\njane@x.com`)).email).toBe('');
+  });
+
+  it('a title line with trailing punctuation still moves the name to line 2', () => {
+    expect(detectCvContact(cv(`Curriculum Vitae.\nJamie Lewis\n${BODY}`)).name).toBe('Jamie Lewis');
+    expect(detectCvContact(cv(`CV :\nJamie Lewis\n${BODY}`)).name).toBe('Jamie Lewis');
+  });
+
+  it('labels: with a dot, a spaced colon, upper case; never the tail of a longer word', () => {
+    const phone = (line: string) => detectCvContact(cv(`Jane Smith\n${line}\n${BODY}`)).phone;
+    expect(phone('Tel. : 7700 900 123')).toBe('7700 900 123');
+    expect(phone('MOBILE 7700900123')).toBe('7700900123');
+    expect(phone('Home | M: 7700 900 123')).toBe('7700 900 123');
+    expect(phone('Hotel 7700 900 123')).toBe('');
+    expect(phone('Item: 7700 900 123')).toBe('');
+  });
+
+  it('boundary: an email on a line of exactly 300 characters is read, 301 is not', () => {
+    const at = (length: number) => {
+      const email = 'jane@x.com';
+      const line = `${'x '.repeat(length).slice(0, length - email.length - 1)} ${email}`;
+      expect(line).toHaveLength(length);
+      return detectCvContact(cv(`Jane Smith\n${line}\n${BODY}`)).email;
+    };
+    expect(at(300)).toBe('jane@x.com');
+    expect(at(301)).toBe('');
+  });
+});
