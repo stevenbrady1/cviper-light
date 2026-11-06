@@ -10,7 +10,8 @@
  * the advert box is one write when the user pauses, not one per keystroke.
  *
  * What is written: the advert, the CV and model chosen, and the unsaved draft
- * (tailored CV, review, letter, keyword gaps). What is NOT: whether a model was
+ * (tailored CV, review, letter, keyword gaps, and the name and contact details
+ * confirmed for a saved CV — L-346). What is NOT: whether a model was
  * running — that run died with the app — and the half-typed metric boxes.
  *
  * A pasted advert has no job, so it has no row: it lasts as long as the app.
@@ -47,6 +48,7 @@ import {
   type TailorResult,
 } from './jobSessions';
 import { type HandedGaps } from '../flow/handoff';
+import { contactFrom, type CvContact } from './cvContact';
 
 /** How long after the last change a job's work is written. */
 export const WRITE_DELAY_MS = 500;
@@ -75,6 +77,8 @@ interface Draft {
   readonly review?: unknown;
   readonly letter?: unknown;
   readonly handedGaps?: unknown;
+  /** The details confirmed for a saved CV, by CV id (L-346). */
+  readonly contact?: unknown;
 }
 
 /** One job's session, as its `job_workflow` row. */
@@ -83,12 +87,14 @@ export function toRow(jobId: string, session: TailorJobState, now: string): JobW
     session.result !== null ||
     session.review !== null ||
     session.letter !== null ||
-    session.handedGaps !== null;
+    session.handedGaps !== null ||
+    Object.keys(session.contact).length > 0;
   const draft: Draft = {
     result: session.result,
     review: session.review,
     letter: session.letter,
     handedGaps: session.handedGaps,
+    contact: session.contact,
   };
   return {
     id: jobId,
@@ -113,7 +119,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function resultFrom(value: unknown): TailorResult | null {
   if (!isRecord(value) || !TailoredCvSchema.safeParse(value['cv']).success) return null;
   if (typeof value['text'] !== 'string' || !isRecord(value['report'])) return null;
-  return value as unknown as TailorResult;
+  const result = value as unknown as TailorResult;
+  // The CV it was written from (L-346): text, or unknown — never a guess. A
+  // draft kept from before has none, and comes back exactly as it was.
+  if (!('cvId' in value)) return result;
+  return { ...result, cvId: typeof value['cvId'] === 'string' ? value['cvId'] : null };
+}
+
+/** The confirmed details, CV by CV. One that cannot be read is dropped on its own. */
+function contactsFrom(value: unknown): Record<string, CvContact> {
+  if (!isRecord(value)) return {};
+  const contacts: Record<string, CvContact> = {};
+  for (const [cvId, stored] of Object.entries(value)) {
+    const contact = contactFrom(stored);
+    if (contact !== null) contacts[cvId] = contact;
+  }
+  return contacts;
 }
 
 function letterFrom(value: unknown): LetterResult | null {
@@ -154,6 +175,7 @@ export function fromRow(row: JobWorkflowRow): TailorJobState {
     review: review.success ? review.data : null,
     letter: letterFrom(draft.letter),
     handedGaps: gapsFrom(draft.handedGaps),
+    contact: contactsFrom(draft.contact),
   };
 }
 

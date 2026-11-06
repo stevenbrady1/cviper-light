@@ -278,13 +278,20 @@ function roleLine(role: TailoredCvRole): string {
  * `name` is `null` when the app does not know it. Nothing here guesses one:
  * the model is never asked for the candidate's name, because a name is the
  * easiest thing in a CV to get subtly wrong and the hardest to check.
+ *
+ * `contactLine` (L-346) is the email and phone the USER confirmed, printed as
+ * an ordinary line under the name. Left out, the text is exactly what it was.
  */
-export function renderTailoredCv(cv: TailoredCv, name: string | null): string {
+export function renderTailoredCv(
+  cv: TailoredCv,
+  name: string | null,
+  contactLine: string | null = null,
+): string {
   const lines: string[] = [];
 
-  const trimmedName = name?.trim() ?? '';
-  if (trimmedName !== '') {
-    lines.push(trimmedName, GAP);
+  const top = [name?.trim() ?? '', contactLine?.trim() ?? ''].filter((line) => line !== '');
+  if (top.length > 0) {
+    lines.push(...top, GAP);
   }
 
   lines.push('PROFESSIONAL SUMMARY', cv.summary.trim(), GAP);
