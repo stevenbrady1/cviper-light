@@ -5,6 +5,7 @@ import { type Application, type Cv, type Job } from '@cviper/core-types';
 import { type FilePort } from '../../platform/files';
 import { type SavedProgress } from '../flow/progress';
 
+import { contactLine, savedCvText, type CvContact } from './cvContact';
 import { type LetterResult, type TailorResult } from './jobSessions';
 import {
   documentTitle,
@@ -16,6 +17,7 @@ import {
 } from './model';
 import { buildCoverLetterPdf, buildCvPdf } from './pdf';
 import { type TailorPort } from './port';
+import { type ContactFormat } from './useCvContact';
 
 export interface TailorSavingInput {
   readonly tailorPort: TailorPort;
@@ -34,6 +36,11 @@ export interface TailorSavingInput {
   readonly setSaved: Dispatch<SetStateAction<SavedProgress>>;
   readonly setError: (message: string | null) => void;
   readonly setSaveMessage: (message: string | null) => void;
+  /**
+   * Run a CV file save with the details the user confirmed, asking first
+   * (L-346). `useCvContact`'s `withContact`.
+   */
+  readonly withContact: (format: ContactFormat, save: (contact: CvContact) => void) => void;
 }
 
 /**
@@ -62,6 +69,7 @@ export function useTailorSaving({
   setSaved,
   setError,
   setSaveMessage,
+  withContact,
 }: TailorSavingInput) {
   const [saving, setSaving] = useState<'application' | 'file' | null>(null);
 
@@ -184,9 +192,12 @@ export function useTailorSaving({
     [setCvs, tailorPort],
   );
 
-  const onSaveText = useCallback(
-    async (kind: 'cv' | 'cover_letter') => {
-      const text = kind === 'cv' ? result?.text : letter?.text;
+  const saveText = useCallback(
+    async (kind: 'cv' | 'cover_letter', contact: CvContact | null) => {
+      // The CV is rendered NOW, with the confirmed details on top (L-346).
+      // `result.text` stays without them: it is what the AI paths send.
+      const text =
+        kind === 'cv' ? (result === null ? undefined : savedCvText(result, contact)) : letter?.text;
       if (text === undefined) return;
       setError(null);
       setSaveMessage(null);
@@ -206,21 +217,31 @@ export function useTailorSaving({
     [files, jobTitle, letter, result, setError, setSaveMessage],
   );
 
+  const onSaveText = useCallback(
+    (kind: 'cv' | 'cover_letter') => {
+      if (kind === 'cover_letter') void saveText(kind, null);
+      else withContact('txt', (contact) => void saveText(kind, contact));
+    },
+    [saveText, withContact],
+  );
+
   // The Word (L-165) and PDF (L-201) exports: the same structured result the
   // text render reads, built into a file on this machine and handed to the
   // same dialog-in-Rust save. Success and cancel are worded exactly as the
   // text path's, so the buttons side by side behave as one feature.
-  const onSaveDocument = useCallback(
-    async (kind: 'cv' | 'cover_letter', format: 'docx' | 'pdf') => {
-      // `null` for the name: the app never asks the model for one, and this
-      // screen has nothing else to offer (see `renderTailoredCv`).
+  const saveDocument = useCallback(
+    async (kind: 'cv' | 'cover_letter', format: 'docx' | 'pdf', contact: CvContact | null) => {
+      // The name and contact line are the ones the USER confirmed (L-346);
+      // the app never asks the model for them (see `renderTailoredCv`).
+      const name = contact === null || contact.name.trim() === '' ? null : contact.name.trim();
+      const line = contact === null ? null : contactLine(contact);
       const build = async (): Promise<{ bytes: Uint8Array; missing: readonly string[] }> => {
         // The Word builder (`docx` + `jszip`, ~400 kB) is loaded on the first
         // Word export, not at launch: `word-code-loads-on-demand.contract.test.ts`.
         if (kind === 'cv' && result !== null) {
-          if (format === 'pdf') return buildCvPdf(result.cv, null);
+          if (format === 'pdf') return buildCvPdf(result.cv, name, line);
           const { buildCvDocx } = await import('./docx');
-          return { bytes: await buildCvDocx(result.cv, null), missing: [] };
+          return { bytes: await buildCvDocx(result.cv, name, line), missing: [] };
         }
         if (kind === 'cover_letter' && letter !== null) {
           if (format === 'pdf') return buildCoverLetterPdf(letter.letter);
@@ -266,6 +287,14 @@ export function useTailorSaving({
       );
     },
     [files, jobTitle, letter, result, setError, setSaveMessage],
+  );
+
+  const onSaveDocument = useCallback(
+    (kind: 'cv' | 'cover_letter', format: 'docx' | 'pdf') => {
+      if (kind === 'cover_letter') void saveDocument(kind, format, null);
+      else withContact(format, (contact) => void saveDocument(kind, format, contact));
+    },
+    [saveDocument, withContact],
   );
 
   return { saving, onSaveToApplication, onSaveCv, onSaveText, onSaveDocument };

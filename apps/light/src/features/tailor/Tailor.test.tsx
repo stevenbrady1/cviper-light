@@ -551,6 +551,7 @@ describe('saving', () => {
 
     filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Tailored CV.txt');
     await user.click(screen.getByTestId('tailor-save-text'));
+    await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
     const message = await screen.findByTestId('tailor-save-message');
     expect(message.textContent).toContain('Tailored CV.txt');
@@ -567,6 +568,7 @@ describe('saving', () => {
 
     filePort.nextSavePath(null);
     await user.click(screen.getByTestId('tailor-save-text'));
+    await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
     expect(filePort.calls.saveText).toBe(1);
     expect(screen.queryByTestId('tailor-save-message')).toBeNull();
@@ -585,6 +587,7 @@ describe('saving as a PDF (L-201)', () => {
 
     filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Tailored CV.pdf');
     await user.click(screen.getByTestId('tailor-save-pdf-cv'));
+    await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
     const message = await screen.findByTestId('tailor-save-message');
     expect(message.textContent).toBe('Saved to C:\\Users\\jamie\\Documents\\Tailored CV.pdf.');
@@ -658,6 +661,7 @@ describe('saving as a PDF (L-201)', () => {
 
     filePort.failSave('Windows would not let CViper write there.');
     await user.click(screen.getByTestId('tailor-save-pdf-cv'));
+    await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
     const error = await screen.findByTestId('tailor-error');
     expect(error.textContent).toContain('Windows would not let CViper write there.');
@@ -678,6 +682,7 @@ describe('saving as a Word document (L-165)', () => {
 
     filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Tailored CV.docx');
     await user.click(screen.getByTestId('tailor-save-docx-cv'));
+    await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
     const message = await screen.findByTestId('tailor-save-message');
     expect(message.textContent).toContain('Tailored CV.docx');
@@ -715,6 +720,7 @@ describe('saving as a Word document (L-165)', () => {
 
     filePort.nextSavePath(null);
     await user.click(screen.getByTestId('tailor-save-docx-cv'));
+    await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
     await vi.waitFor(() => expect(filePort.calls.saveBytes).toBe(1));
     expect(screen.queryByTestId('tailor-save-message')).toBeNull();
@@ -729,6 +735,7 @@ describe('saving as a Word document (L-165)', () => {
 
     filePort.failSave('Windows would not let CViper write there.');
     await user.click(screen.getByTestId('tailor-save-docx-cv'));
+    await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
     const error = await screen.findByTestId('tailor-error');
     expect(error.textContent).toContain('Windows would not let CViper write there.');
@@ -763,6 +770,7 @@ describe('while a save window is open (L-217)', () => {
     const held = holdSaves(filePort);
 
     await user.click(screen.getByTestId('tailor-save-pdf-cv'));
+    await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
     const waiting = await screen.findByTestId('tailor-save-choosing');
     expectSpoken(waiting, 'save window');
@@ -785,6 +793,7 @@ describe('while a save window is open (L-217)', () => {
     const held = holdSaves(filePort);
 
     await user.click(screen.getByTestId('tailor-save-text'));
+    await user.click(await screen.findByTestId('tailor-contact-confirm'));
     await screen.findByTestId('tailor-save-choosing');
 
     held.answer(null);

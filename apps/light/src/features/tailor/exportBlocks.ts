@@ -34,12 +34,21 @@ export function roleLine(role: TailoredCvRole): string {
     .join(' | ');
 }
 
-/** The tailored CV, in `MANDATORY_STRUCTURE`'s order. */
-export function cvBlocks(cv: TailoredCv, name: string | null): ExportBlock[] {
+/**
+ * The tailored CV, in `MANDATORY_STRUCTURE`'s order. `contactLine` (L-346) is
+ * the email and phone the user confirmed: an ordinary line under the name.
+ */
+export function cvBlocks(
+  cv: TailoredCv,
+  name: string | null,
+  contactLine: string | null = null,
+): ExportBlock[] {
   const blocks: ExportBlock[] = [];
 
   const trimmedName = name?.trim() ?? '';
   if (trimmedName !== '') blocks.push({ kind: 'name', text: trimmedName });
+  const trimmedLine = contactLine?.trim() ?? '';
+  if (trimmedLine !== '') blocks.push({ kind: 'line', text: trimmedLine });
 
   blocks.push(
     { kind: 'heading', text: 'PROFESSIONAL SUMMARY' },

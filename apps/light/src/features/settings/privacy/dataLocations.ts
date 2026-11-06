@@ -41,6 +41,12 @@ export const DATA_LOCATIONS: readonly DataLocation[] = [
     erasedBy: 'database',
   },
   {
+    // L-346: kept with the job's draft, keyed by CV, so a saved CV does not ask twice.
+    what: 'The name, email and phone you confirmed for the top of a saved CV, for each job and CV',
+    where: `the same database file, on this computer only — an export always leaves it out`,
+    erasedBy: 'database',
+  },
+  {
     // L-227: made on the first launch after an update that changes how the
     // data is stored, before the change runs. One copy, replaced each time.
     what: 'A safety copy of that database, made just before an update changes how it is stored, so an update that goes wrong cannot lose your data',

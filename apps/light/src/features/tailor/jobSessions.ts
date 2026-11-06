@@ -6,6 +6,7 @@ import {
 import { type CoverLetter, type DraftReview, type TailoredCv } from '@cviper/core-types';
 
 import { type HandedGaps } from '../flow/handoff';
+import { type CvContact } from './cvContact';
 import { EMPTY_METRIC_STATE, type MetricState } from './metricPrompts';
 
 /**
@@ -47,7 +48,17 @@ export type Phase = 'idle' | 'tailoring' | 'reviewing' | 'writing';
 
 export interface TailorResult {
   readonly cv: TailoredCv;
-  /** `renderTailoredCv` of `cv`, computed once. */
+  /**
+   * The CV this draft was written from, recorded at run time (L-346): the
+   * details on a saved CV are that CV's, never the one now picked. Absent or
+   * `null` on a draft kept from before, which means "unknown".
+   */
+  readonly cvId?: string | null | undefined;
+  /**
+   * `renderTailoredCv` of `cv`, computed once, with NO name or contact line.
+   * It is what the review and the letter send to the AI, so the details the
+   * user confirms for a saved file never go with it (L-346).
+   */
   readonly text: string;
   readonly report: FabricationReport;
   readonly provider: string;
@@ -86,6 +97,11 @@ export interface TailorJobState {
   readonly phase: Phase;
   /** Why the last run for THIS job failed, or `null`. */
   readonly error: string | null;
+  /**
+   * The name and contact details the user confirmed for a saved CV (L-346),
+   * keyed by the id of the CV they were confirmed for (`contactKey`).
+   */
+  readonly contact: Readonly<Record<string, CvContact>>;
 }
 
 export const EMPTY_TAILOR_JOB: TailorJobState = {
@@ -99,7 +115,13 @@ export const EMPTY_TAILOR_JOB: TailorJobState = {
   letter: null,
   phase: 'idle',
   error: null,
+  contact: {},
 };
+
+/** Where a draft's confirmed details are kept: its CV's id, or `''` when that is unknown. */
+export function contactKey(result: Pick<TailorResult, 'cvId'>): string {
+  return result.cvId ?? '';
+}
 
 export interface JobSessionsState {
   /** The tracked job Tailor is showing, or `null` for a pasted advert. */

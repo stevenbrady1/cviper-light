@@ -44,14 +44,17 @@ import {
 } from './metricPrompts';
 import { createJobSessions, sessionIn, type JobSessions, type TailorJobState } from './jobSessions';
 import { compareAts } from './atsComparison';
+import { savedCvText } from './cvContact';
 import { profileNotes, runDisabledReason, tailorOptions } from './model';
 import { createDbTailorPort, type TailorPort } from './port';
 import { TailorAdvert } from './TailorAdvert';
+import { TailorContactDialog } from './TailorContactDialog';
 import { TailorCvPicker } from './TailorCvPicker';
 import { TailorEngine } from './TailorEngine';
 import { TailorResultView } from './TailorResultView';
 import { TailorRunBar } from './TailorRunBar';
 import { STEP_ANCHOR, isTailorStep, type TailorStep } from './tailorSteps';
+import { useCvContact } from './useCvContact';
 import { useTailorRuns } from './useTailorRuns';
 import { useTailorSaving } from './useTailorSaving';
 
@@ -451,17 +454,26 @@ export function Tailor({
   const selectedCv = cvs.find((cv) => cv.id === selectedCvId) ?? null;
   const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? null;
   const cvText = selectedCv?.extracted_text ?? '';
+  /** The name and contact details for a saved CV (L-346). */
+  const cvContact = useCvContact({ sessions, result, cvs, contacts: work.contact });
+  const confirmedContact = cvContact.confirmed;
 
   /**
-   * The ATS Score step's numbers (L-198): the draft against the advert on
-   * screen, beside the original CV against the same advert. Recomputed only
-   * when one of the three changes — the scorers are synchronous, but a
-   * keystroke in the advert box should not re-score twice per render.
+   * The ATS Score step's numbers (L-198): the draft AS IT WILL BE SAVED —
+   * with the confirmed details on top (L-346) — against the advert on screen,
+   * beside the original CV against the same advert. Recomputed only when one
+   * of them changes: a keystroke in the advert box should not re-score twice.
    */
   const atsComparison = useMemo(
     () =>
-      result === null ? null : compareAts({ originalCv: cvText, tailoredCv: result.text, jobText }),
-    [cvText, jobText, result],
+      result === null
+        ? null
+        : compareAts({
+            originalCv: cvText,
+            tailoredCv: savedCvText(result, confirmedContact),
+            jobText,
+          }),
+    [confirmedContact, cvText, jobText, result],
   );
   const notes = profileNotes(profile);
   /**
@@ -530,6 +542,7 @@ export function Tailor({
       setConsent,
       createTransport,
       selectedOption,
+      cvId: selectedCvId,
       cvText,
       jobText,
       notes,
@@ -557,6 +570,7 @@ export function Tailor({
     setSaved,
     setError,
     setSaveMessage,
+    withContact: cvContact.withContact,
   });
 
   // ── Rendering ────────────────────────────────────────────────────────────
@@ -736,6 +750,8 @@ export function Tailor({
               saving: saving === 'application',
               onSave: () => void onSaveToApplication(),
             }}
+            contact={confirmedContact}
+            onChangeContact={cvContact.onChangeContact}
           />
         </div>
       </div>
@@ -745,6 +761,14 @@ export function Tailor({
           kind={pendingConsent.kind}
           onAccept={() => void onConsentAccept()}
           onDecline={onConsentDecline}
+        />
+      )}
+
+      {cvContact.asking === null ? null : (
+        <TailorContactDialog
+          question={cvContact.asking}
+          onConfirm={cvContact.onConfirmContact}
+          onCancel={cvContact.onCancelContact}
         />
       )}
     </section>
