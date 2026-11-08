@@ -16,7 +16,7 @@
     "@cviper/core-types": "workspace:*",
     "@cviper/resume-schema": "workspace:*",
     "mammoth": "^1.13.0",
-    "pdfjs-dist": "^6.4.299"
+    "pdfjs-dist": "^6.5.438"
   },
   "devDependencies": {
     "fflate": "^0.8.3"
