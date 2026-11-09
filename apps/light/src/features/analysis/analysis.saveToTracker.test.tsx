@@ -284,6 +284,43 @@ describe('saving a pasted advert to the tracker (L-325)', () => {
     expect(message).toContain('The database is locked by another copy of CViper.');
   });
 
+  it('negative: if the check itself was never saved, the job is saved and a note says the check is not on it', async () => {
+    const { fake, addToTracker, session, user } = await renderAnalysis();
+    // The check's own history write fails, so there is no row to re-save.
+    fake.failNext('saveAnalysis');
+    await check(user);
+    await vi.waitFor(() => expect(fake.calls.saveAnalysis).toBe(1));
+    expect(fake.storedAnalyses()).toHaveLength(0);
+
+    await fillAndSave(user, { title: 'Credit Risk Analyst', company: 'Lloyds' });
+
+    await screen.findByTestId('job-steps');
+    expect(addToTracker).toHaveBeenCalledTimes(1);
+    expect(session.get().jobId).not.toBeNull();
+    const note =
+      'Saved to your tracker, under Saved. ' +
+      'This check could not be added to the job: the check itself was not saved.';
+    expect(screen.getByTestId('analysis-tracker-message').textContent).toBe(note);
+    expect(screen.getByTestId('analysis-tracker-status').textContent).toBe(note);
+    // Nothing is written back in its place: still the one failed attempt.
+    expect(fake.calls.saveAnalysis).toBe(1);
+  });
+
+  it('boundary: a check whose row was saved links with no note', async () => {
+    const { fake, user } = await renderAnalysis();
+    await check(user);
+    await vi.waitFor(() => expect(fake.storedAnalyses()).toHaveLength(1));
+
+    await fillAndSave(user, { title: 'Credit Risk Analyst', company: 'Lloyds' });
+
+    await screen.findByTestId('job-steps');
+    await vi.waitFor(() => expect(fake.storedAnalyses()[0]?.job_id).not.toBeNull());
+    expect(screen.getByTestId('analysis-tracker-message').textContent).toBe(
+      'Saved to your tracker, under Saved.',
+    );
+    expect(screen.getByTestId('analysis-tracker-message').className).not.toContain('text-danger');
+  });
+
   it('boundary: an empty or whitespace advert is not offered', async () => {
     const { session, user } = await renderAnalysis();
     await check(user);

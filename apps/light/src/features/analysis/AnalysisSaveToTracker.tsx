@@ -26,6 +26,7 @@ export interface AnalysisSaveToTrackerProps {
 
 const FIELD = 'mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink';
 const SAVED = 'Saved to your tracker, under Saved.';
+const NOT_LINKED = 'This check could not be added to the job: ';
 
 /**
  * "Save this job to the tracker" (L-325), under the result of a check on a
@@ -64,11 +65,14 @@ export function AnalysisSaveToTracker({
   async function link(job: Job, saved: string | null) {
     let linked = record;
     let relinkProblem: string | null = null;
-    if (record !== null && record.job_id !== job.id) {
+    // No row: the check's own history write failed, or has not finished.
+    // Said, not skipped — the job is saved, the check is not on it.
+    if (record === null) relinkProblem = `${NOT_LINKED}the check itself was not saved.`;
+    else if (record.job_id !== job.id) {
       const relinked = { ...record, job_id: job.id };
       const written = await saveAnalysis(relinked);
       if (written.ok) linked = relinked;
-      else relinkProblem = `This check could not be added to the job: ${written.error.message}`;
+      else relinkProblem = `${NOT_LINKED}${written.error.message}`;
     }
     // The job is linked either way: a history row that would not re-save is a
     // note, not a reason to take the job back off the board.
