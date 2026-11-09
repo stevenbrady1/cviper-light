@@ -1,4 +1,4 @@
-import { type CvAnalysis } from '@cviper/core-types';
+import { type Analysis, type CvAnalysis } from '@cviper/core-types';
 
 /**
  * The last analysis the user was working on, kept above the view switch.
@@ -84,6 +84,11 @@ export interface AnalysisSessionState {
    */
   readonly checkedAdvert: string | null;
   /**
+   * The history row the last run saved, or `null` — so saving a pasted advert
+   * to the tracker (L-325) can re-save that same row against the new job.
+   */
+  readonly checkedRecord: Analysis | null;
+  /**
    * Why the last run failed, or `null`. Kept here rather than in the view's
    * error banner state because a run can fail while the user is on another
    * view, and coming back to a silent "Nothing checked yet" is a dead end.
@@ -102,6 +107,7 @@ export const EMPTY_ANALYSIS_SESSION: AnalysisSessionState = {
   optionKey: null,
   result: null,
   checkedAdvert: null,
+  checkedRecord: null,
   runError: null,
   warnings: [],
   running: false,
