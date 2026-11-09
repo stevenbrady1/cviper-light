@@ -120,5 +120,5 @@ export function useAnalysisLibrary({
     };
   }, []);
 
-  return { cvs, setCvs, cvsLoaded, jobs, options, localModelHint, profile };
+  return { cvs, setCvs, cvsLoaded, jobs, setJobs, options, localModelHint, profile };
 }

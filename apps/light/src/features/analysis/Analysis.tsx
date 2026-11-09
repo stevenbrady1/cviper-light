@@ -27,6 +27,7 @@ import { AnalysisHistory } from './AnalysisHistory';
 import { AnalysisResult } from './AnalysisResult';
 import { AnalysisRunBar } from './AnalysisRunBar';
 import { AnalysisSample } from './AnalysisSample';
+import { AnalysisSaveToTracker } from './AnalysisSaveToTracker';
 import { ConsentGate } from './ConsentGate';
 import { cvCutNote } from './cvCutNote';
 import { GateNotice } from './GateNotice';
@@ -241,6 +242,7 @@ export function Analysis({
     optionKey: pickedOptionKey,
     result,
     checkedAdvert,
+    checkedRecord,
     runError,
     warnings,
     running,
@@ -264,12 +266,13 @@ export function Analysis({
     readonly kind: ConsentProviderKind;
   } | null>(null);
 
-  const { cvs, setCvs, cvsLoaded, jobs, options, localModelHint, profile } = useAnalysisLibrary({
-    analysisPort,
-    profiles,
-    session,
-    setError,
-  });
+  const { cvs, setCvs, cvsLoaded, jobs, setJobs, options, localModelHint, profile } =
+    useAnalysisLibrary({
+      analysisPort,
+      profiles,
+      session,
+      setError,
+    });
 
   // ── Loading ──────────────────────────────────────────────────────────────
 
@@ -394,7 +397,12 @@ export function Analysis({
         return;
       }
 
-      session.update({ running: false, result: run.value, checkedAdvert: jobText });
+      session.update({
+        running: false,
+        result: run.value,
+        checkedAdvert: jobText,
+        checkedRecord: null,
+      });
 
       const record = newAnalysisRecord({
         id: crypto.randomUUID(),
@@ -419,6 +427,8 @@ export function Analysis({
         return;
       }
 
+      // Kept, so "Save this job to the tracker" re-saves THIS row (L-325).
+      if (session.isCurrent(ticket)) session.update({ checkedRecord: record });
       setHistory((current) => [record, ...current]);
     },
     [analysisPort, consentStore, createTransport, jobText, now, session],
@@ -704,6 +714,25 @@ export function Analysis({
                       Tailor my CV for this job
                     </button>
                   </div>
+                )}
+                {analysisPort.addToTracker === undefined ? null : (
+                  <AnalysisSaveToTracker
+                    checkedAdvert={checkedAdvert}
+                    jobId={jobId}
+                    jobs={jobs}
+                    record={checkedRecord}
+                    addToTracker={analysisPort.addToTracker}
+                    saveAnalysis={analysisPort.saveAnalysis}
+                    now={now}
+                    onLinked={(job, record) => {
+                      setJobs((current) =>
+                        current.some((j) => j.id === job.id) ? current : [job, ...current],
+                      );
+                      // Before the job id, so the step bar finds this CV and engine already chosen.
+                      onJobChoice?.(job, { cvId: selectedCvId, optionKey });
+                      session.update({ jobId: job.id, jobNote: null, checkedRecord: record });
+                    }}
+                  />
                 )}
               </>
             )}
