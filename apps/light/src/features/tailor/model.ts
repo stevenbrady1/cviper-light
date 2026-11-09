@@ -17,6 +17,7 @@ import {
 } from '@cviper/core-types';
 
 import { type ProviderOption } from '../analysis/providers';
+import { URL_ONLY_RUN_REASON, urlOnlyPaste } from '../tracker/pastedUrl';
 
 /** The shortest advert, and the shortest CV, worth rewriting for. Same bar as the analysis. */
 export const MIN_TEXT_CHARS = MIN_SCORABLE_CHARS;
@@ -104,6 +105,11 @@ export function runDisabledReason(state: TailorRunState): string | null {
   const advert = state.jobText.trim();
   if (advert.length === 0) {
     return 'Paste the job advert, or choose a tracked job.';
+  }
+  // L-348: before the length check, so a short link is told it is a link and
+  // not to "paste more". The same rule as Analysis and the tracker.
+  if (urlOnlyPaste(advert) !== null) {
+    return URL_ONLY_RUN_REASON;
   }
   if (advert.length < MIN_TEXT_CHARS) {
     return (

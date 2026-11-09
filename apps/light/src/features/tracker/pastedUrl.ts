@@ -122,6 +122,18 @@ export const URL_ONLY_BLOCKED_NOTE =
   'browser — fetching it would come back empty. Open the page in your browser, copy the advert ' +
   'text, and paste it here. The link is in the box above and is saved with the job.';
 
+/**
+ * Why Analysis and Tailor will not run on a link (L-348).
+ *
+ * Those screens have no link box and no Fetch button, so neither note above
+ * fits: both point at a button that is not there. This one gives the only route
+ * those screens have — the page, copied by hand. Same rule (`urlOnlyPaste`),
+ * same promise: no request is made, to a model or anywhere else.
+ */
+export const URL_ONLY_RUN_REASON =
+  "That's a link, not the advert. CViper can't open links here, so open the page, " +
+  'copy the advert text and paste it in.';
+
 /** The one sentence for this paste, whichever kind of site it points at. */
 export function urlOnlyNote(paste: UrlOnlyPaste): string {
   return paste.blocked ? URL_ONLY_BLOCKED_NOTE : URL_ONLY_NOTE;
