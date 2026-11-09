@@ -313,7 +313,11 @@ interface AiKeyProviderCopy {
   readonly secret: AiKeySecret;
   readonly defaultModel: string;
   readonly signupUrl: string;
-  /** The billing sentence: who pays, and at whose rates. Never an amount (L-249). */
+  /**
+   * What is different about billing with this provider: who sends the bill. Never
+   * an amount (L-249), and never what every card would say, which `AI_COST_LINE`
+   * says once (L-321).
+   */
   readonly billing: string;
 }
 
@@ -361,17 +365,15 @@ export const OPENAI_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   secret: OPENAI_SECRET_KEY,
   defaultModel: OPENAI_DEFAULT_MODEL,
   signupUrl: 'https://platform.openai.com/api-keys',
-  billing:
-    'An OpenAI key is not free. OpenAI bills your own account for what you use, at their ' +
-    'published rates. CViper adds nothing to that, takes no cut, and never sees your bill.',
+  billing: 'An OpenAI key is not free. OpenAI bills your own account for what you use.',
 });
 
 /**
  * No figure (L-249). This card used to say "a typical CV check costs a few
  * pence", worked out from Anthropic's published rates for one default model
  * and one size of CV. Rates change, models differ and CVs vary, so the card now
- * says what every other card says: who bills, at whose rates, and that CViper
- * takes nothing.
+ * says what every other card says: who bills. The rates, and that CViper takes
+ * nothing, are said once at the top of the section (`AI_COST_LINE`, L-321).
  */
 export const ANTHROPIC_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   id: 'anthropic',
@@ -380,9 +382,7 @@ export const ANTHROPIC_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   secret: ANTHROPIC_SECRET_KEY,
   defaultModel: ANTHROPIC_DEFAULT_MODEL,
   signupUrl: 'https://console.anthropic.com/settings/keys',
-  billing:
-    'Anthropic bills your own account for what you use, at their published rates. CViper adds ' +
-    'nothing to that, takes no cut, and never sees your bill.',
+  billing: 'Anthropic bills your own account for what you use.',
 });
 
 /**
@@ -416,7 +416,7 @@ export const GOOGLE_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   billing:
     'Google offers a free tier with daily limits and bills your own account beyond it. Google’s ' +
     'terms let it use what is sent on the free tier to improve its products; billed use is not ' +
-    'used that way. CViper adds nothing to that, takes no cut, and never sees your bill.',
+    'used that way.',
 });
 
 export const MISTRAL_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
@@ -426,9 +426,7 @@ export const MISTRAL_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   secret: MISTRAL_SECRET_KEY,
   defaultModel: MISTRAL_DEFAULT_MODEL,
   signupUrl: 'https://console.mistral.ai/api-keys',
-  billing:
-    'Mistral bills your own account for what you use, at their published rates. CViper adds ' +
-    'nothing to that, takes no cut, and never sees your bill.',
+  billing: 'Mistral bills your own account for what you use.',
 });
 
 export const GROK_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
@@ -438,9 +436,7 @@ export const GROK_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   secret: GROK_SECRET_KEY,
   defaultModel: GROK_DEFAULT_MODEL,
   signupUrl: 'https://console.x.ai',
-  billing:
-    'xAI bills your own account for what you use, at their published rates. CViper adds ' +
-    'nothing to that, takes no cut, and never sees your bill.',
+  billing: 'xAI bills your own account for what you use.',
 });
 
 export const OPENROUTER_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
@@ -452,8 +448,7 @@ export const OPENROUTER_KEY_PROVIDER: AiKeyProvider = buildAiKeyProvider({
   signupUrl: 'https://openrouter.ai/keys',
   billing:
     'OpenRouter bills your own prepaid credit and passes each request on to the company that ' +
-    'runs the model — for the default model here, that is OpenAI. CViper adds nothing to that, ' +
-    'takes no cut, and never sees your bill.',
+    'runs the model — for the default model here, that is OpenAI.',
 });
 
 /**

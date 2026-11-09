@@ -22,8 +22,8 @@ import { createTauriReportPort, type ReportPort } from './port';
  * ============================================================================
  * NO PRIMARY BUTTON HERE
  * ============================================================================
- * Settings spends its one blue button on Export (`app/buttons.ts`), and
- * `Settings.test.tsx` counts the enabled primaries and expects exactly one.
+ * Settings has no blue button at rest (L-321, `app/buttons.ts`), and
+ * `Settings.test.tsx` counts the enabled primaries and expects none.
  */
 
 export interface ReportProblemProps {
