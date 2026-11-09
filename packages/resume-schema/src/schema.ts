@@ -2,7 +2,7 @@
  * The JSON Resume schema, version 1.0.0, as Zod.
  *
  * JSON Resume (jsonresume.org) is the one CV interchange format that more than
- * one tool speaks: CVAurum, Reactive Resume, the `resume-cli` themes and a long
+ * one tool speaks: the `resume-cli` themes and a long
  * tail of converters all read and write it. Supporting it means a CV built
  * anywhere else can be brought into CViper Light without retyping it — and,
  * later, taken out again.

@@ -54,8 +54,8 @@ export function notAJsonResumeError(): ResumeError {
     message:
       'That is a JSON file, but not a JSON Resume: none of the sections a résumé ' +
       'has (basics, work, education, skills and so on) is in it. CViper reads the ' +
-      'JSON Resume format, which CVAurum, Reactive Resume and jsonresume.org tools ' +
-      'all export. Check you picked the right file.',
+      'JSON Resume format. Some CV builders save their own kind of JSON instead, ' +
+      'so look for an export called JSON Resume. Check you picked the right file.',
     detail: null,
   };
 }
