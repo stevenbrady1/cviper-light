@@ -80,7 +80,7 @@ export function runDisabledReason(state: RunState): string | null {
   if (cvText.length < MIN_ADVERT_CHARS) {
     return (
       'There is almost no text in that CV — only ' +
-      `${cvText.length} characters could be read out of it. Upload the original ` +
+      `${cvText.length} ${cvText.length === 1 ? 'character' : 'characters'} could be read out of it. Upload the original ` +
       '.docx, or a PDF you exported from Word.'
     );
   }

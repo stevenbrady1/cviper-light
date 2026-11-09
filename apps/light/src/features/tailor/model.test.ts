@@ -195,3 +195,48 @@ describe('the letter limit', () => {
     expect(LETTER_WORD_LIMIT).toBe(400);
   });
 });
+
+describe('runDisabledReason — the count of what could be read (L-344)', () => {
+  const reasonFor = (text: string) =>
+    runDisabledReason({
+      cv: { ...CV, extracted_text: text },
+      jobText: ADVERT,
+      option: OLLAMA,
+      aiAvailable: true,
+      running: false,
+    });
+  const almostNoText = (count: string) =>
+    `There is almost no text in that CV — only ${count} could be read out of it. ` +
+    'Upload the original .docx, or a PDF you exported from Word.';
+
+  // Exact matches on purpose: "1 characters" contains "1 character", so
+  // `toContain` could not fail.
+  it('boundary: one character says "1 character"', () => {
+    expect(reasonFor('x')).toBe(almostNoText('1 character'));
+  });
+
+  it('negative: one character never says "1 characters"', () => {
+    expect(reasonFor('x')).not.toMatch(/\b1 characters\b/);
+  });
+
+  it('edge: spaces around the one character do not count', () => {
+    expect(reasonFor('  x \n')).toBe(almostNoText('1 character'));
+  });
+
+  it('two characters stay plural', () => {
+    expect(reasonFor('xy')).toBe(almostNoText('2 characters'));
+  });
+
+  it('the largest count that is still refused stays plural', () => {
+    expect(reasonFor('x'.repeat(MIN_TEXT_CHARS - 1))).toBe(
+      almostNoText(`${MIN_TEXT_CHARS - 1} characters`),
+    );
+  });
+
+  it('zero characters is a different message, with no count in it', () => {
+    expect(reasonFor('')).toBe(
+      'That CV has no readable text, so there is nothing to rewrite from. It is almost certainly ' +
+        'a scan or a photo — upload the original .docx, or a PDF you exported from Word.',
+    );
+  });
+});
