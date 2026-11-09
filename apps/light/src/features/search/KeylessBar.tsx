@@ -221,8 +221,8 @@ export function KeylessBar({
       </div>
       <p className="mt-0.5 text-xs text-ink-muted">
         Tick the boards you want, then press “Also open” under Search. Each one opens in your
-        browser, where you are already signed in, with the words and filters above. Point at a board
-        to see which filters it takes.
+        browser, where you are already signed in, with the words and filters above. Point at, or tab
+        to, a board to see which filters it takes.
       </p>
 
       {shown.length === 0 ? (

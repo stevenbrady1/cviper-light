@@ -337,7 +337,7 @@ describe('the search view on a machine with no keys', () => {
     await user.click(screen.getByTestId('keyless-linkedin'));
     await user.click(screen.getByTestId('search-open-boards'));
 
-    expect(screen.getByTestId('search-quota').textContent ?? '').toContain('0');
+    expect(screen.queryByTestId('search-quota')).toBeNull();
     expect(localStorage.getItem('cviper.light.requests')).toBeNull();
     expect(localStorage.getItem('cviper.light.jobQuota')).toBeNull();
     expect(invokedProviderCommands()).toEqual([]);

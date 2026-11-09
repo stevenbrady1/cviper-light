@@ -1,4 +1,13 @@
-import { PROVIDER_LABEL, REED_DAILY_LIMIT, type QuotaState } from '@cviper/job-apis';
+import {
+  PROVIDER_LABEL,
+  REED_DAILY_LIMIT,
+  type JobProviderId,
+  type QuotaState,
+} from '@cviper/job-apis';
+
+import { type KeyState } from '../../status/environment';
+
+import { hasAnyJobBoardKey } from './model';
 
 /**
  * The results' own bookkeeping, beside them rather than above the search
@@ -12,6 +21,8 @@ export interface SearchResultsHeaderProps {
   readonly bestFirst: boolean;
   readonly onBestFirst: (next: boolean) => void;
   readonly quota: QuotaState;
+  /** A board's count shows only once it has a key (L-323), same test as the row of boards. */
+  readonly keyStates: Readonly<Record<JobProviderId, KeyState>>;
 }
 
 export function SearchResultsHeader({
@@ -20,7 +31,10 @@ export function SearchResultsHeader({
   bestFirst,
   onBestFirst,
   quota,
+  keyStates,
 }: SearchResultsHeaderProps) {
+  const showReed = hasAnyJobBoardKey({ reed: keyStates.reed, adzuna: 'missing' });
+  const showAdzuna = hasAnyJobBoardKey({ reed: 'missing', adzuna: keyStates.adzuna });
   return (
     /*
       The toggle when there is a CV to rank against; one quiet line when
@@ -47,19 +61,32 @@ export function SearchResultsHeader({
           Upload a CV on the Analysis screen and results will be ranked against it.
         </p>
       )}
-      <div data-testid="search-quota" className="text-xs text-ink-faint sm:text-right">
-        Requests today — {PROVIDER_LABEL.reed}{' '}
-        <span className="font-mono tabular-nums">{quota.counts.reed}</span> of{' '}
-        <span className="font-mono tabular-nums">{REED_DAILY_LIMIT}</span> · {PROVIDER_LABEL.adzuna}{' '}
-        <span className="font-mono tabular-nums">{quota.counts.adzuna}</span>{' '}
-        {/*
-          A bare count for Adzuna, with no denominator. Their allowance
-          depends on the plan the user bought and cannot be queried, so any
-          figure here would be a confident wrong number on screen for ever.
-          Counted, shown, never enforced.
-        */}
-        (allowance depends on your plan)
-      </div>
+      {showReed || showAdzuna ? (
+        <div data-testid="search-quota" className="text-xs text-ink-faint sm:text-right">
+          Requests today —{' '}
+          {showReed ? (
+            <>
+              {PROVIDER_LABEL.reed}{' '}
+              <span className="font-mono tabular-nums">{quota.counts.reed}</span> of{' '}
+              <span className="font-mono tabular-nums">{REED_DAILY_LIMIT}</span>
+            </>
+          ) : null}
+          {showReed && showAdzuna ? ' · ' : null}
+          {showAdzuna ? (
+            <>
+              {PROVIDER_LABEL.adzuna}{' '}
+              <span className="font-mono tabular-nums">{quota.counts.adzuna}</span>{' '}
+              {/*
+                A bare count for Adzuna, with no denominator. Their allowance
+                depends on the plan the user bought and cannot be queried, so any
+                figure here would be a confident wrong number on screen for ever.
+                Counted, shown, never enforced.
+              */}
+              (allowance depends on your plan)
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

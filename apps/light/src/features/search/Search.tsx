@@ -748,6 +748,7 @@ export function Search({
             bestFirst={ranking.bestFirst}
             onBestFirst={ranking.setBestFirst}
             quota={quota}
+            keyStates={keyStates}
           />
 
           <SearchResults

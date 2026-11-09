@@ -69,7 +69,7 @@ export function KeylessFeedToggles({
         ))}
         {arbeitnowOffForUk ? (
           <span data-testid="keyless-arbeitnow-uk" className="text-xs text-ink-faint">
-            Arbeitnow is off for a UK location, as it is mostly Europe. Tick it to include it.
+            Off for a UK location. Tick it to include it.
           </span>
         ) : null}
       </div>
