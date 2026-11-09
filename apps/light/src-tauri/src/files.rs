@@ -93,8 +93,8 @@ const MAX_BACKUP_BYTES: u64 = 128 * 1024 * 1024;
 /// useful thing anyone can tell that user. Refusing to read the bytes here
 /// would replace that advice with "unsupported format".
 ///
-/// `json` is a JSON Resume file — the interchange format CVAurum, Reactive
-/// Resume and the jsonresume.org tools export. Whether a given `.json` really
+/// `json` is a JSON Resume file — the interchange format the jsonresume.org
+/// tools read and write. Whether a given `.json` really
 /// is one is `@cviper/resume-schema`'s decision, made on the bytes.
 const CV_EXTENSIONS: [&str; 4] = ["pdf", "docx", "doc", "json"];
 
