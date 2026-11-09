@@ -25,6 +25,7 @@ import { advertForModel } from '../../lib/advertForModel';
 
 import { isCloudKind, readStoredConsent, type ConsentProviderKind } from '../analysis/consent';
 import { type ProviderOption } from '../analysis/providers';
+import { URL_ONLY_RUN_REASON, urlOnlyPaste } from '../tracker/pastedUrl';
 
 import { KEYWORD_CANNOT_WRITE, OPTION_UNAVAILABLE, consentRefusal, providerFor } from './adapter';
 
@@ -64,6 +65,12 @@ export async function runTailor(
   createTransport: () => ChatTransport = createTauriTransport,
   hasConsent: (kind: ConsentProviderKind) => Promise<boolean> = readStoredConsent,
 ): Promise<Result<TailorRunSuccess, TailorRunFailure>> {
+  // L-348: the run button already refuses a bare link; this is the backstop
+  // for any other caller, before consent is asked or a transport is built.
+  if (urlOnlyPaste(request.jobText) !== null) {
+    return err({ message: URL_ONLY_RUN_REASON });
+  }
+
   const model = request.option.model;
 
   // Refused BEFORE the factory is touched, so "this path cannot reach the

@@ -18,6 +18,8 @@ import {
   type Result,
 } from '@cviper/core-types';
 
+import { URL_ONLY_RUN_REASON, urlOnlyPaste } from '../tracker/pastedUrl';
+
 import { type ProviderOption } from './providers';
 
 /**
@@ -88,6 +90,12 @@ export function runDisabledReason(state: RunState): string | null {
   const advert = state.jobText.trim();
   if (advert.length === 0) {
     return 'Paste the job advert.';
+  }
+  // L-348: before the length check, so a short link is told it is a link and
+  // not to "paste more". Every option, the basic match included — scoring the
+  // words in an address is as meaningless as a model reading it.
+  if (urlOnlyPaste(advert) !== null) {
+    return URL_ONLY_RUN_REASON;
   }
   if (advert.length < MIN_ADVERT_CHARS) {
     return (

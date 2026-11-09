@@ -50,6 +50,8 @@ import { KEYWORD_SCORING_VERSION, atsKeywordScore, scoreByKeywords } from '@cvip
 import { createTauriTransport } from '../../ai/transport';
 import { advertForModel } from '../../lib/advertForModel';
 
+import { URL_ONLY_RUN_REASON, urlOnlyPaste } from '../tracker/pastedUrl';
+
 import { isCloudKind, readStoredConsent, type ConsentProviderKind } from './consent';
 import { providerLabel } from './model';
 import { type ProviderOption } from './providers';
@@ -132,6 +134,14 @@ export async function runAnalysis(
   createTransport: () => ChatTransport = createTauriTransport,
   hasConsent: (kind: ConsentProviderKind) => Promise<boolean> = readStoredConsent,
 ): Promise<Result<RunSuccess, RunFailure>> {
+  // ── A bare link (L-348) ──────────────────────────────────────────────────
+  // The run button already refuses this (`runDisabledReason`); this is the
+  // backstop for any other caller. First of all, before the keyword scorer
+  // would score the words in the address and before any transport is built.
+  if (urlOnlyPaste(request.jobText) !== null) {
+    return err({ message: URL_ONLY_RUN_REASON });
+  }
+
   // ── The keyword path, and everything's input guard ───────────────────────
   // `scoreByKeywords` is pure, synchronous and free, and it refuses input there
   // is nothing to measure with better wording than anything this file could
