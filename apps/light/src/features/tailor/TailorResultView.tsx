@@ -1,10 +1,11 @@
 import { type DraftReview } from '@cviper/core-types';
 
-import { SECONDARY_BUTTON } from '../../app/buttons';
+import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { IconTile } from '../../ui';
 
 import { AtsStep } from './AtsStep';
 import { type AtsComparison } from './atsComparison';
+import { contactSummary, type CvContact } from './cvContact';
 import { type LetterResult, type Phase, type TailorResult } from './jobSessions';
 import { TailorDraft } from './TailorDraft';
 import { TailorLetter } from './TailorLetter';
@@ -28,6 +29,9 @@ export interface TailorResultViewProps {
   readonly onSaveText: (kind: 'cv' | 'cover_letter') => void;
   readonly onSaveDocument: (kind: 'cv' | 'cover_letter', format: 'docx' | 'pdf') => void;
   readonly saveApplication: Omit<TailorSaveApplicationProps, 'busy'>;
+  /** The details confirmed for this draft's CV (L-346), or `null` before the first save. */
+  readonly contact: CvContact | null;
+  readonly onChangeContact: () => void;
 }
 
 /** Tailor, step 5: nothing yet, or the draft and everything done with it. */
@@ -44,6 +48,8 @@ export function TailorResultView({
   onSaveText,
   onSaveDocument,
   saveApplication,
+  contact,
+  onChangeContact,
 }: TailorResultViewProps) {
   if (result === null) {
     return (
@@ -85,6 +91,27 @@ export function TailorResultView({
           Your added results changed since this draft. Re-run tailoring to use them.
         </p>
       ) : null}
+
+      {/* What a saved CV will carry at the top (L-346), once the user has said. */}
+      {contact === null ? null : (
+        <div
+          data-testid="tailor-contact-line"
+          className="flex flex-wrap items-center gap-2 text-xs text-ink-muted"
+        >
+          <span>
+            {`At the top of this CV: ${contactSummary(contact) || 'no name or contact details.'}`}
+          </span>
+          <button
+            type="button"
+            data-testid="tailor-contact-change"
+            disabled={busy}
+            onClick={onChangeContact}
+            className={QUIET_BUTTON}
+          >
+            Change
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <button

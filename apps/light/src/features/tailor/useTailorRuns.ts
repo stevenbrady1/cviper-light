@@ -29,6 +29,8 @@ export interface TailorRunsInput {
   readonly setConsent: (next: ConsentState) => void;
   readonly createTransport: (() => ChatTransport) | undefined;
   readonly selectedOption: ProviderOption | null;
+  /** The CV being tailored, recorded on the draft (L-346). */
+  readonly cvId: string | null;
   readonly cvText: string;
   readonly jobText: string;
   readonly notes: string | null;
@@ -54,6 +56,7 @@ export function useTailorRuns({
   setConsent,
   createTransport,
   selectedOption,
+  cvId,
   cvText,
   jobText,
   notes,
@@ -98,6 +101,8 @@ export function useTailorRuns({
       const text = renderTailoredCv(run.value.cv, null);
       const tailored = {
         cv: run.value.cv,
+        // The CV this draft is from: its details, and no other's, go on top (L-346).
+        cvId,
         text,
         // Deterministic, on the original text, before anything is shown.
         // The figures the user typed and approved are theirs (L-205); the
@@ -116,6 +121,7 @@ export function useTailorRuns({
     },
     [
       createTransport,
+      cvId,
       cvText,
       hasConsent,
       jobText,

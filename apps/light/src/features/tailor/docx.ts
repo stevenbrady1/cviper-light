@@ -141,8 +141,12 @@ async function pack(title: string, children: readonly Paragraph[]): Promise<Uint
  * The tailored CV as `.docx` bytes. `name` is `null` when the app does not
  * know the candidate's name, and nothing here guesses one.
  */
-export function buildCvDocx(cv: TailoredCv, name: string | null): Promise<Uint8Array> {
-  return pack('Tailored CV', cvBlocks(cv, name).map(paragraph));
+export function buildCvDocx(
+  cv: TailoredCv,
+  name: string | null,
+  contactLine: string | null = null,
+): Promise<Uint8Array> {
+  return pack('Tailored CV', cvBlocks(cv, name, contactLine).map(paragraph));
 }
 
 /** The cover letter as `.docx` bytes. */

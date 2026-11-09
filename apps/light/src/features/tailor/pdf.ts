@@ -471,8 +471,12 @@ export function buildPdf(blocks: readonly ExportBlock[], title: string): BuiltPd
  * The tailored CV as a PDF. `name` is `null` when the app does not know the
  * candidate's name, and nothing here guesses one.
  */
-export function buildCvPdf(cv: TailoredCv, name: string | null): BuiltPdf {
-  return buildPdf(cvBlocks(cv, name), 'Tailored CV');
+export function buildCvPdf(
+  cv: TailoredCv,
+  name: string | null,
+  contactLine: string | null = null,
+): BuiltPdf {
+  return buildPdf(cvBlocks(cv, name, contactLine), 'Tailored CV');
 }
 
 /** The cover letter as a PDF. */

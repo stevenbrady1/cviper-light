@@ -278,13 +278,20 @@ function roleLine(role: TailoredCvRole): string {
  * `name` is `null` when the app does not know it. Nothing here guesses one:
  * the model is never asked for the candidate's name, because a name is the
  * easiest thing in a CV to get subtly wrong and the hardest to check.
+ *
+ * `contactLine` (L-346) is the email and phone the USER confirmed, printed as
+ * an ordinary line under the name. Left out, the text is exactly what it was.
  */
-export function renderTailoredCv(cv: TailoredCv, name: string | null): string {
+export function renderTailoredCv(
+  cv: TailoredCv,
+  name: string | null,
+  contactLine: string | null = null,
+): string {
   const lines: string[] = [];
 
-  const trimmedName = name?.trim() ?? '';
-  if (trimmedName !== '') {
-    lines.push(trimmedName, GAP);
+  const top = [name?.trim() ?? '', contactLine?.trim() ?? ''].filter((line) => line !== '');
+  if (top.length > 0) {
+    lines.push(...top, GAP);
   }
 
   lines.push('PROFESSIONAL SUMMARY', cv.summary.trim(), GAP);
@@ -316,7 +323,22 @@ export function renderTailoredCv(cv: TailoredCv, name: string | null): string {
 
   // One trailing newline, never two: the last GAP becomes the file's final
   // line break.
-  return lines.join('\n').replace(/\n+$/, '\n');
+  return oneFinalNewline(lines.join('\n'));
+}
+
+/**
+ * Trailing newlines collapsed to exactly one; text with none gets none.
+ *
+ * What `.replace(/\n+$/, '\n')` did, byte for byte, without the regex: that
+ * pattern retried from every newline in a run and scanned to the end each
+ * time, so text a user typed (L-346's contact line) with a long run of
+ * newlines before other text took quadratic time (CodeQL js/polynomial-redos).
+ * This walks back over the trailing newlines once.
+ */
+export function oneFinalNewline(text: string): string {
+  let end = text.length;
+  while (end > 0 && text.charCodeAt(end - 1) === 0x0a) end -= 1;
+  return end === text.length ? text : `${text.slice(0, end)}\n`;
 }
 
 /** The cover letter as plain text: greeting, paragraphs, sign-off, one blank line apart. */
