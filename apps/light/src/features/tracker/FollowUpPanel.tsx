@@ -8,6 +8,7 @@ import {
 import { type Application, type Document, type IsoDate } from '@cviper/core-types';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD } from '../../app/fields';
 
 import { readAvailability as readRealAvailability } from '../analysis/availability';
 import { ConsentGate } from '../analysis/ConsentGate';
@@ -417,7 +418,7 @@ export function FollowUpPanel({
               const key = event.currentTarget.value;
               setOptionKey(key);
             }}
-            className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+            className={`${FIELD} mt-1 w-full`}
           >
             {options.map((option) => (
               <option key={option.key} value={option.key}>
@@ -501,7 +502,7 @@ export function FollowUpPanel({
                 const subject = event.currentTarget.value;
                 setDraft((current) => (current === null ? null : { ...current, subject }));
               }}
-              className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+              className={`${FIELD} mt-1 w-full`}
             />
           </div>
           <div>
@@ -520,7 +521,7 @@ export function FollowUpPanel({
                 const body = event.currentTarget.value;
                 setDraft((current) => (current === null ? null : { ...current, body }));
               }}
-              className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+              className={`${FIELD} mt-1 w-full`}
             />
             <p className="mt-1 text-xs text-ink-faint">
               Written from your archived documents only. Read it before it goes anywhere.

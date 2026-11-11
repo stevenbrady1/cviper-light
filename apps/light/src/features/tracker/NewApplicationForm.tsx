@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { type ApplicationStatus, type SalaryPeriod } from '@cviper/core-types';
 
 import { PRIMARY_BUTTON, QUIET_BUTTON } from '../../app/buttons';
+import { FIELD, FIELD_INVALID } from '../../app/fields';
 
 import {
   EMPTY_DRAFT,
@@ -82,9 +83,9 @@ function Field({
         aria-invalid={error === undefined ? undefined : true}
         aria-describedby={error === undefined ? undefined : `${id}-error`}
         onChange={(event) => onChange(event.currentTarget.value)}
-        className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
+        className={`${error === undefined ? FIELD : FIELD_INVALID} mt-1 w-full ${
           numeric ? 'font-mono tabular-nums' : ''
-        } ${error === undefined ? 'border-field-line' : 'border-danger'}`}
+        }`}
       />
       {error === undefined ? null : (
         <p id={`${id}-error`} className="mt-1 text-xs text-danger">
@@ -119,9 +120,7 @@ function DescriptionField({
         aria-invalid={error === undefined ? undefined : true}
         aria-describedby={error === undefined ? undefined : 'new-description-error'}
         onChange={(event) => onChange(event.currentTarget.value)}
-        className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
-          error === undefined ? 'border-field-line' : 'border-danger'
-        }`}
+        className={`${error === undefined ? FIELD : FIELD_INVALID} mt-1 w-full`}
       />
       {error === undefined ? null : (
         <p id="new-description-error" className="mt-1 text-xs text-danger">
@@ -218,7 +217,7 @@ export function NewApplicationForm({ onCreate, onCancel, initial }: NewApplicati
             const status = event.currentTarget.value as ApplicationStatus;
             setDraft((current) => ({ ...current, status }));
           }}
-          className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+          className={`${FIELD} mt-1 w-full`}
         >
           {TRACKER_COLUMNS.map((status) => (
             <option key={status} value={status}>
@@ -292,9 +291,7 @@ export function NewApplicationForm({ onCreate, onCancel, initial }: NewApplicati
               const salaryPeriod = event.currentTarget.value as SalaryPeriod | '';
               setDraft((current) => ({ ...current, salaryPeriod }));
             }}
-            className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
-              visible.salaryPeriod === undefined ? 'border-field-line' : 'border-danger'
-            }`}
+            className={`${visible.salaryPeriod === undefined ? FIELD : FIELD_INVALID} mt-1 w-full`}
           >
             <option value="">Not stated</option>
             <option value="year">Year</option>

@@ -9,6 +9,7 @@ import {
 } from '@cviper/core-types';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD } from '../../app/fields';
 import { todayIsoDate } from '../../lib/dates';
 
 import { ConsentGate } from '../analysis/ConsentGate';
@@ -351,7 +352,7 @@ export function InterviewPanel({
               const key = event.currentTarget.value;
               setOptionKey(key);
             }}
-            className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+            className={`${FIELD} mt-1 w-full`}
           >
             {options.map((option) => (
               <option key={option.key} value={option.key}>

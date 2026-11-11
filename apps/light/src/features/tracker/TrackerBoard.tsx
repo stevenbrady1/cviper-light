@@ -64,6 +64,7 @@ export function TrackerBoard({
         <label className="sr-only" htmlFor="tracker-search">
           Search applications
         </label>
+        {/* Hand-written, not FIELD (L-365): a bigger box with its own padding, phone height and blue focus edge. */}
         <input
           id="tracker-search"
           type="search"
