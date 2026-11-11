@@ -226,8 +226,12 @@ function sourceFiles(dir: string): string[] {
   return found.sort();
 }
 
-/** Bare brand colours as text: `text-teal`, `hover:text-gold`; not `text-teal-ink`. */
-const BARE_BRAND_TEXT = /(?<![w-])(?:[a-z0-9-]+:)*text-(?:teal|gold)(?![w-])/g;
+/**
+ * Bare brand colours as text: `text-teal`, `hover:text-gold`; not `text-teal-ink`.
+ * A whole class token only: the same edges as `colourRegex`, no word character or
+ * "-" on either side (L-361: these once read `[w-]`, the letter w, not `\w`).
+ */
+const BARE_BRAND_TEXT = /(?<![\w-])(?:[a-z0-9-]+:)*text-(?:teal|gold)(?![\w-])/g;
 
 const css = readFileSync(THEME, 'utf8');
 const tokens = parseTokens(css);
@@ -319,6 +323,48 @@ describe('text contrast contract (WCAG 2.1 AA, 4.5:1)', () => {
     it('the bare-brand guard catches text-teal and variants, not the -ink tokens', () => {
       const hits = "'text-teal hover:text-gold text-teal-ink text-gold-ink'".match(BARE_BRAND_TEXT);
       expect(hits).toEqual(['text-teal', 'hover:text-gold']);
+    });
+
+    // L-361: the guard matches a WHOLE class token, the same edges `colourRegex`
+    // uses: no word character or "-" on either side. Each row is a source snippet
+    // and exactly what the guard must report from it.
+    it.each([
+      // must match: the bare class, wherever a class can start
+      ['the bare class', 'text-teal', ['text-teal']],
+      ['the bare gold class', 'text-gold', ['text-gold']],
+      ['a hover: variant', 'hover:text-teal', ['hover:text-teal']],
+      ['a group-hover: variant', 'group-hover:text-gold', ['group-hover:text-gold']],
+      ['an md: breakpoint', 'md:text-teal', ['md:text-teal']],
+      ['stacked variants', 'md:hover:text-gold', ['md:hover:text-gold']],
+      ['an alpha suffix (still bare teal)', 'text-teal/60', ['text-teal']],
+      ['after whitespace', 'px-2 text-teal', ['text-teal']],
+      ['after a single quote', "'text-teal'", ['text-teal']],
+      ['after a double quote', '"text-gold"', ['text-gold']],
+      ['after a backtick', '`text-teal ${x}`', ['text-teal']],
+      ['after a newline', 'px-2\ntext-gold', ['text-gold']],
+      // must NOT match: the -ink tokens, and longer classes that merely contain the text
+      ['the -ink token', 'text-teal-ink', []],
+      ['a variant of the -ink token', 'hover:text-gold-ink', []],
+      ['a longer class ending in the text, after "-"', 'my-text-teal', []],
+      ['a longer class ending in the text, after a letter', 'subtext-teal', []],
+      ['preceded by a letter other than "w"', 'xtext-gold', []],
+      ['preceded by "w"', 'wtext-teal', []],
+      ['preceded by a capital letter', 'Atext-teal', []],
+      ['preceded by a digit', '2text-teal', []],
+      ['preceded by an underscore', '_text-gold', []],
+      ['followed by a letter other than "w"', 'text-tealish', []],
+      ['a longer colour name', 'text-goldenrod', []],
+      ['followed by "w"', 'text-tealw', []],
+      ['followed by a digit', 'text-teal2', []],
+      ['followed by an underscore', 'text-gold_x', []],
+    ])('bare-brand guard, %s: %j', (_name, source, expected) => {
+      expect(source.match(BARE_BRAND_TEXT) ?? []).toEqual(expected);
+    });
+
+    it('known limit: the bare-brand guard is a text search, so a comment mention is flagged too', () => {
+      // Over-strict, never blind: a comment naming the class fails the build. The
+      // fix is to name it differently in prose, never to allow-list the file.
+      expect('// never use text-teal here'.match(BARE_BRAND_TEXT)).toEqual(['text-teal']);
     });
 
     it('pairs and judges a group-hover: variant', () => {
