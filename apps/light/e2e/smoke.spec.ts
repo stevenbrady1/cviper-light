@@ -178,6 +178,7 @@ import {
   startedJobWorkflowValues,
 } from './demoStartedJob.ts';
 import { createSessionWhenWindowReady } from './smoke-session.ts';
+import { diagnose } from './smokeDiag.ts';
 import {
   CHECK_ATS_TABLE,
   CHECK_CARD_PROGRESS,
@@ -1184,6 +1185,7 @@ describe('the built CViper Light binary', () => {
     const png = await session().takeScreenshot();
     writeFileSync(join(SCREENSHOT_DIR, `${name}.png`), Buffer.from(png, 'base64'));
     console.log(`smoke: screenshot = ${name}.png`);
+    await diagnose(session(), SCREENSHOT_DIR, name);
   }
 
   /** Import whatever `SMOKE_BACKUP_FILE` holds, through Settings, and say what it said. */
@@ -1381,6 +1383,7 @@ return 'installed';
     const png = await session().takeScreenshot();
     writeFileSync(join(SCREENSHOT_DIR, `${name}.png`), Buffer.from(png, 'base64'));
     console.log(`smoke: screenshot = ${name}.png`);
+    await diagnose(session(), SCREENSHOT_DIR, name);
   }
 
   it(
