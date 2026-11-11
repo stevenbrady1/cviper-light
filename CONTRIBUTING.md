@@ -174,7 +174,7 @@ is not newer than the last one, and a date that is not a real day.
   new one. The one still over it (Profile) is capped at its size and may only shrink. A big
   screen is split into one file per panel, plus hooks for its actions, as `Tailor.tsx` (L-305),
   `Analysis.tsx` (L-306) and `Search.tsx` (L-308) were. `Tracker.tsx` (L-355) has had its
-  panels split out; its hooks are a later item.
+  panels split out, and its loading and saving moved into hooks (L-358).
 
 ## Layout, and the conventions that bite
 
