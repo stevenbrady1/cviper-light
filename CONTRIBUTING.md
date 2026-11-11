@@ -171,7 +171,7 @@ is not newer than the last one, and a date that is not a real day.
   before any `as`. `export-lists-sorted.contract.test.ts` fails the build otherwise (L-307). The
   order of the `export … from` lines themselves is left topical, under their comments.
 - **No screen file over 800 lines.** `component-size.contract.test.ts` fails the build on a
-  new one. The one still over it (Profile) is capped at its size and may only shrink. A big
+  new one. None is over it now: `Profile.tsx` (L-359) was the last, split into panels. A big
   screen is split into one file per panel, plus hooks for its actions, as `Tailor.tsx` (L-305),
   `Analysis.tsx` (L-306) and `Search.tsx` (L-308) were. `Tracker.tsx` (L-355) has had its
   panels split out; its hooks are a later item.
