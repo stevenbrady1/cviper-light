@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { LiveStatus } from '../../app/LiveStatus';
+import { Icon } from '../../ui';
 
 import { type SavedSearch } from './savedSearches';
 
@@ -109,7 +110,9 @@ export function SearchSaved({
               disabled={disabled}
               className={`${QUIET_BUTTON} rounded-pill px-1.5 py-0.5 text-xs`}
             >
-              <span aria-hidden="true">×</span>
+              <span className="flex h-lh items-center">
+                <Icon name="close" size={12} />
+              </span>
             </button>
           </span>
         ))}

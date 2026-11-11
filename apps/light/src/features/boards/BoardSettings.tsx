@@ -4,7 +4,7 @@ import { buildBoardUrl } from '@cviper/job-apis';
 import { BOARD_ENCODINGS, type BoardEncoding } from '@cviper/core-types';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
-import { cardClasses, SectionHeading, StatusPill } from '../../ui';
+import { cardClasses, Icon, SectionHeading, StatusPill } from '../../ui';
 
 import { SHIPPED_BOARDS } from './defaults';
 import {
@@ -222,7 +222,8 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
 
             {/*
               Disabled at the ends, never hidden. A button that comes and goes
-              as a row moves is a button the user cannot learn.
+              as a row moves is a button the user cannot learn. The arrows are
+              drawn (L-369), one text line tall, so the row keeps its height.
             */}
             <button
               type="button"
@@ -232,7 +233,9 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
               onClick={() => void apply(moveBoard(preferences, boards, board.id, 'up'))}
               className={QUIET_BUTTON}
             >
-              ↑
+              <span className="flex h-lh items-center">
+                <Icon name="arrowUp" size={16} />
+              </span>
             </button>
             <button
               type="button"
@@ -242,7 +245,9 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
               onClick={() => void apply(moveBoard(preferences, boards, board.id, 'down'))}
               className={QUIET_BUTTON}
             >
-              ↓
+              <span className="flex h-lh items-center">
+                <Icon name="arrowDown" size={16} />
+              </span>
             </button>
 
             {board.userAdded ? (

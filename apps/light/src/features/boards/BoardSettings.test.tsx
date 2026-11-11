@@ -11,9 +11,12 @@
  * Board ids are read from the shipped config rather than typed out, so adding a
  * ninth board does not silently make these tests assert about the wrong row.
  */
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+
+import { QUIET_BUTTON } from '../../app/buttons';
+import { drawingsAreDecoration, shownAs } from '../../ui/test/shownAs';
 
 import { BoardSettings } from './BoardSettings';
 import { SHIPPED_BOARDS } from './defaults';
@@ -289,5 +292,64 @@ describe('adding a board of your own', () => {
 
     expect((screen.getByTestId('boards-new-label') as HTMLInputElement).value).toBe('');
     expect(port.saved().custom).toEqual([]);
+  });
+});
+
+describe('the reorder arrows are drawn, not typed (L-369)', () => {
+  const LABEL_OF = (id: string): string =>
+    SHIPPED_BOARDS.find((board) => board.id === id)?.label ?? '';
+
+  it('happy: every row draws an up arrow and a down arrow, and nothing else, named by their labels', async () => {
+    await open(createFakeBoardPort());
+
+    for (const board of SHIPPED_BOARDS) {
+      const row = screen.getByTestId(`board-row-${board.id}`);
+      const up = within(row).getByRole('button', { name: `Move ${board.label} up` });
+      const down = within(row).getByRole('button', { name: `Move ${board.label} down` });
+      expect(shownAs(up), board.id).toBe('[arrowUp]');
+      expect(shownAs(down), board.id).toBe('[arrowDown]');
+      expect(up, board.id).toBe(screen.getByTestId(`board-up-${board.id}`));
+      expect(down, board.id).toBe(screen.getByTestId(`board-down-${board.id}`));
+    }
+  });
+
+  it('the arrows are decoration: hidden from screen readers, never a Tab stop; the label is the name', async () => {
+    await open(createFakeBoardPort());
+
+    const up = screen.getByTestId(`board-up-${SECOND}`);
+    expect(drawingsAreDecoration(up)).toBe(true);
+    expect(up.getAttribute('aria-label')).toBe(`Move ${LABEL_OF(SECOND)} up`);
+    // The words a screen reader would otherwise read out are gone, not hidden.
+    expect(up.textContent).toBe('');
+  });
+
+  it('keeps the shared quiet button style, so the 44px phone height and the disabled look come with it', async () => {
+    await open(createFakeBoardPort());
+
+    for (const id of [`board-up-${FIRST}`, `board-down-${FIRST}`]) {
+      expect(screen.getByTestId(id).className, id).toBe(QUIET_BUTTON);
+    }
+  });
+
+  it('pressing the down arrow moves the row down, and it stays there after a restart', async () => {
+    const port = createFakeBoardPort();
+    const { user } = await open(port);
+
+    await user.click(screen.getByRole('button', { name: `Move ${LABEL_OF(FIRST)} down` }));
+    expect(rowOrder().slice(0, 2)).toEqual([SECOND, FIRST]);
+
+    await restart(port);
+    expect(rowOrder().slice(0, 2)).toEqual([SECOND, FIRST]);
+  });
+
+  it('negative: the arrows at the ends are disabled AND still drawn, never hidden', async () => {
+    await open(createFakeBoardPort());
+
+    const firstUp = screen.getByTestId(`board-up-${FIRST}`) as HTMLButtonElement;
+    const lastDown = screen.getByTestId(`board-down-${LAST}`) as HTMLButtonElement;
+    expect(firstUp.disabled).toBe(true);
+    expect(lastDown.disabled).toBe(true);
+    expect(shownAs(firstUp)).toBe('[arrowUp]');
+    expect(shownAs(lastDown)).toBe('[arrowDown]');
   });
 });

@@ -13,8 +13,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { emptyQuota, type JobProviderId } from '@cviper/job-apis';
 
+import { QUIET_BUTTON } from '../../app/buttons';
 import { createFakeBrowserPort } from '../../platform/test/fakeBrowserPort';
 import { type KeyState } from '../../status/environment';
+import { drawingsAreDecoration, shownAs } from '../../ui/test/shownAs';
 import { NO_PREFERENCES, type BoardPreferences } from '../boards/model';
 import { createFakeBoardPort } from '../boards/test/fakeBoardPort';
 
@@ -27,6 +29,7 @@ import {
   type SavedSearch,
 } from './savedSearches';
 import { Search } from './Search';
+import { SearchSaved } from './SearchSaved';
 import { createFakeSearchPort, outcomeOf } from './test/fakeSearchPort';
 
 const NOW = new Date('2026-08-19T09:00:00.000Z');
@@ -278,5 +281,87 @@ describe('deleting a saved search', () => {
     expect(readSavedSearches().map((entry) => entry.id)).toEqual(['saved-2']);
     expect(screen.getByTestId('saved-search-note').textContent).toBe('Deleted “London testing”.');
     expect(port.calls.search).toBe(0);
+  });
+});
+
+describe('the remove button on a saved search is drawn, not typed (L-369)', () => {
+  const LEEDS: SavedSearch = { ...LONDON, id: 'saved-2', name: 'Leeds' };
+
+  function renderPanel(saved: readonly SavedSearch[], disabled: boolean) {
+    const onDelete = vi.fn();
+    render(
+      <SearchSaved
+        saved={saved}
+        suggestedName=""
+        disabled={disabled}
+        note={null}
+        onSave={() => null}
+        onRun={vi.fn()}
+        onDelete={onDelete}
+      />,
+    );
+    return { onDelete };
+  }
+
+  it('happy: each saved search has a remove button that draws a cross, and nothing else, named by the search', async () => {
+    seed([LONDON, LEEDS]);
+    renderSearch();
+
+    for (const { id, name } of [LONDON, LEEDS]) {
+      const remove = await screen.findByRole('button', { name: `Delete saved search: ${name}` });
+      expect(remove, id).toBe(screen.getByTestId(`saved-search-delete-${id}`));
+      expect(shownAs(remove), id).toBe('[close]');
+    }
+  });
+
+  it('the cross is decoration: hidden from screen readers, never a Tab stop; the label is the name', () => {
+    renderPanel([LONDON], false);
+
+    const remove = screen.getByTestId('saved-search-delete-saved-1');
+    expect(drawingsAreDecoration(remove)).toBe(true);
+    expect(remove.getAttribute('aria-label')).toBe('Delete saved search: London testing');
+    expect(remove.textContent).toBe('');
+  });
+
+  it('keeps the shared quiet button style, so the 44px phone height and the disabled look come with it', () => {
+    renderPanel([LONDON], false);
+
+    const classes = screen.getByTestId('saved-search-delete-saved-1').className;
+    expect(classes.startsWith(`${QUIET_BUTTON} `)).toBe(true);
+  });
+
+  it('pressing it removes exactly that saved search', async () => {
+    const user = userEvent.setup();
+    const { onDelete } = renderPanel([LONDON, LEEDS], false);
+
+    await user.click(screen.getByRole('button', { name: 'Delete saved search: Leeds' }));
+
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onDelete).toHaveBeenCalledWith(LEEDS);
+  });
+
+  it('negative: while a search runs it is disabled AND still drawn, never hidden, and pressing it does nothing', async () => {
+    const user = userEvent.setup();
+    const { onDelete } = renderPanel([LONDON], true);
+
+    const remove = screen.getByRole('button', { name: 'Delete saved search: London testing' });
+    expect((remove as HTMLButtonElement).disabled).toBe(true);
+    expect(shownAs(remove)).toBe('[close]');
+    await user.click(remove);
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  it('boundary: removing the only saved search leaves none, and Save this search is still there', async () => {
+    seed([LONDON]);
+    const { user } = renderSearch();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Delete saved search: London testing' }),
+    );
+
+    const list = screen.getByTestId('search-saved');
+    expect(within(list).queryAllByRole('button', { name: /^Delete saved search:/ })).toEqual([]);
+    expect(readSavedSearches()).toEqual([]);
+    expect(within(list).getByTestId('saved-search-open')).toBeTruthy();
   });
 });
