@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  ok,
   type ApplicationStatus,
   type InterviewSubstage,
   type Job,
@@ -10,13 +9,10 @@ import {
 
 import { type ChatTransport } from '@cviper/ai-providers';
 
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
-import { DetailPane } from '../../app/DetailPane';
 import { ViewHeader } from '../../app/ViewHeader';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { todayIsoDate } from '../../lib/dates';
 import { viewById } from '../../app/views';
-import { IconTile } from '../../ui';
 
 import { readAvailability as readRealAvailability } from '../analysis/availability';
 import { type ConsentPort } from '../analysis/consent';
@@ -29,16 +25,14 @@ import {
 } from '../flow/progress';
 import { type JobProgress, type StepId } from '../flow/steps';
 
-import { ApplicationDetail } from './ApplicationDetail';
 import { FunnelStrip } from './FunnelStrip';
-import { addSubstage, moveSubstage, removeSubstage, renameSubstage } from './interviewSubstages';
-import { NewApplicationForm } from './NewApplicationForm';
 import { type PageFetchTransport } from './pageFetch';
-import { PasteJobForm } from './PasteJobForm';
-import { SubstageEditor } from './SubstageEditor';
-import { TrackerColumn } from './TrackerColumn';
+import { TrackerAlerts } from './TrackerAlerts';
+import { TrackerBoard } from './TrackerBoard';
+import { AddApplicationButton, PasteJobButton } from './TrackerButtons';
+import { EmptyBoard } from './TrackerEmptyBoard';
+import { TrackerSidePane, type Pane } from './TrackerSidePane';
 import {
-  TRACKER_COLUMNS,
   createEntry,
   groupByStatus,
   withEdit,
@@ -48,7 +42,6 @@ import {
   type TrackerEntry,
 } from './model';
 import { createDbTrackerPort, type TrackerPort } from './port';
-import { LiveStatus } from '../../app/LiveStatus';
 
 /**
  * The application tracker: five columns, one card per application.
@@ -146,22 +139,6 @@ export interface TrackerProps {
   /** "Continue" under a started job's card: the shell takes the user to that step. */
   readonly onContinue?: ((job: Job, step: StepId) => void) | undefined;
 }
-
-/**
- * What the side pane is showing.
- *
- * `new` carries an optional starting draft and an optional notice, which is how
- * the paste flow hands its result over: on success the draft is the extraction,
- * on failure it is a blank form still holding everything the user pasted, and
- * the notice explains which happened. ONE destination for both outcomes, so
- * there is no failure path that leads somewhere nobody thought about.
- */
-type Pane =
-  | { kind: 'closed' }
-  | { kind: 'new'; initial?: ApplicationDraft; notice?: string; fromPaste?: true }
-  | { kind: 'paste' }
-  | { kind: 'substages' }
-  | { kind: 'entry'; applicationId: string };
 
 export function Tracker({
   port,
@@ -622,40 +599,14 @@ export function Tracker({
       */}
       {loading || boardIsEmpty ? null : <FunnelStrip entries={entries} />}
 
-      {error === null ? null : (
-        <div
-          role="alert"
-          data-testid="tracker-error"
-          className="flex items-center justify-between gap-3 border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
-        >
-          <span>{error}</span>
-          {!loadFailed ? null : (
-            <button
-              type="button"
-              className={SECONDARY_BUTTON}
-              disabled={loading}
-              onClick={() => void loadEntries()}
-            >
-              {loading ? 'Retrying…' : 'Retry'}
-            </button>
-          )}
-        </div>
-      )}
-
-      {substagesFailed === null ? null : (
-        <div
-          role="alert"
-          data-testid="tracker-substages-error"
-          className="flex items-center justify-between gap-3 border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
-        >
-          <span>
-            {`Your interview stages could not be read: ${substagesFailed} The board is shown without them.`}
-          </span>
-          <button type="button" className={SECONDARY_BUTTON} onClick={() => void loadSubstages()}>
-            Retry
-          </button>
-        </div>
-      )}
+      <TrackerAlerts
+        error={error}
+        loadFailed={loadFailed}
+        loading={loading}
+        loadEntries={loadEntries}
+        substagesFailed={substagesFailed}
+        loadSubstages={loadSubstages}
+      />
 
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden p-2 md:p-4">
@@ -670,331 +621,59 @@ export function Tracker({
               disabled={paneIsOpenForNewWork}
             />
           ) : (
-            /*
-             * Phone: the columns are wider than the screen and scroll sideways,
-             * one column snapping into view at a time — the same board, read a
-             * column at a time. Desktop: all of them, side by side, each at
-             * least 11rem wide (L-175). With the 380px detail pane open the
-             * five used to share ~630px and every title shrank to "Senior
-             * Pr…"; now the board scrolls sideways instead of crushing.
-             */
-            <div className="flex h-full min-h-0 flex-col gap-2">
-              <div className="flex shrink-0 items-center gap-2">
-                <label className="sr-only" htmlFor="tracker-search">
-                  Search applications
-                </label>
-                <input
-                  id="tracker-search"
-                  type="search"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search applications"
-                  className="min-h-11 min-w-0 flex-1 rounded-control border border-field-line bg-card px-3 py-2 text-ink placeholder:text-ink-faint focus:border-blue focus:outline-none md:min-h-0"
-                />
-                {searchQuery.trim() === '' ? null : (
-                  <button
-                    type="button"
-                    aria-label="Clear search"
-                    onClick={() => setSearchQuery('')}
-                    className={SECONDARY_BUTTON}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <LiveStatus
-                text={
-                  normalizedQuery !== '' && visibleEntries.length === 0
-                    ? 'No applications match your search.'
-                    : null
-                }
-              />
-              {normalizedQuery !== '' && visibleEntries.length === 0 ? (
-                <p
-                  data-testid="tracker-search-no-results"
-                  className="shrink-0 text-sm text-ink-muted"
-                >
-                  No applications match “{searchQuery.trim()}”.
-                </p>
-              ) : null}
-              <div
-                data-testid="tracker-board"
-                className="flex min-h-0 flex-1 snap-x snap-mandatory gap-2 overflow-x-auto md:snap-none"
-              >
-                {TRACKER_COLUMNS.map((status) => (
-                  <TrackerColumn
-                    key={status}
-                    status={status}
-                    entries={grouped[status]}
-                    today={today}
-                    now={clock}
-                    selectedId={selected?.application.id ?? null}
-                    settlingId={settlingId}
-                    substages={substages}
-                    onEditSubstages={substagesLoaded ? openSubstageEditor : undefined}
-                    onSelect={(applicationId) => setPane({ kind: 'entry', applicationId })}
-                    onDropCard={onStatusChange}
-                    progressFor={progressFor}
-                    onContinue={
-                      onContinue === undefined
-                        ? undefined
-                        : (entry, step) => onContinue(entry.job, step)
-                    }
-                  />
-                ))}
-              </div>
-            </div>
+            <TrackerBoard
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              normalizedQuery={normalizedQuery}
+              visibleEntries={visibleEntries}
+              grouped={grouped}
+              today={today}
+              clock={clock}
+              selected={selected}
+              settlingId={settlingId}
+              substages={substages}
+              substagesLoaded={substagesLoaded}
+              openSubstageEditor={openSubstageEditor}
+              setPane={setPane}
+              onStatusChange={onStatusChange}
+              progressFor={progressFor}
+              onContinue={onContinue}
+            />
           )}
         </div>
 
-        {pane.kind === 'paste' ? (
-          <DetailPane
-            title="Paste a job"
-            subtitle="An AI reads the advert. You check every field before it is saved."
-            onClose={() => setPane({ kind: 'closed' })}
-          >
-            <PasteJobForm
-              onExtracted={(initial, notice) =>
-                setPane({
-                  kind: 'new',
-                  initial,
-                  fromPaste: true,
-                  // `exactOptionalPropertyTypes` is on: an absent notice and a
-                  // notice that is `undefined` are different types.
-                  ...(notice === null ? {} : { notice }),
-                })
-              }
-              onCancel={() => setPane({ kind: 'closed' })}
-              onOpenSettings={onOpenSettings}
-              createTransport={createTransport}
-              createPageTransport={createPageTransport}
-              readAvailability={readAvailability}
-              consentPort={consentPort}
-            />
-          </DetailPane>
-        ) : pane.kind === 'substages' ? (
-          <DetailPane
-            title="Interview stages"
-            subtitle="Your own stages inside Interviewing, such as HR Screen or Final."
-            onClose={() => setPane({ kind: 'closed' })}
-          >
-            {!substagesLoaded ? (
-              <div data-testid="substage-blocked" className="space-y-3 text-ink-muted">
-                <p>
-                  Your interview stages need to load again before you can edit them, so nothing you
-                  change here can overwrite what is saved.
-                </p>
-                <button
-                  type="button"
-                  className={SECONDARY_BUTTON}
-                  onClick={() => void loadSubstages()}
-                >
-                  Retry
-                </button>
-              </div>
-            ) : (
-              <SubstageEditor
-                substages={substages}
-                busy={savingSubstages}
-                usage={(id) =>
-                  entries.filter((entry) => entry.application.interview_substage_id === id).length
-                }
-                onAdd={(name) =>
-                  applySubstages(addSubstage(substagesRef.current, name, crypto.randomUUID()))
-                }
-                onRename={(id, name) =>
-                  applySubstages(renameSubstage(substagesRef.current, id, name))
-                }
-                onMove={(id, direction) =>
-                  applySubstages(ok(moveSubstage(substagesRef.current, id, direction)))
-                }
-                onRemove={(id) => applySubstages(ok(removeSubstage(substagesRef.current, id)), id)}
-              />
-            )}
-          </DetailPane>
-        ) : pane.kind === 'new' ? (
-          <DetailPane
-            title={pane.fromPaste === true ? 'Check the details' : 'New application'}
-            subtitle={
-              pane.fromPaste === true
-                ? 'Nothing has been saved yet. Correct anything that is wrong, then save.'
-                : 'Anything you have applied to, typed in by hand.'
-            }
-            onClose={() => setPane({ kind: 'closed' })}
-          >
-            <LiveStatus
-              text={
-                pane.notice === undefined
-                  ? null
-                  : `${pane.notice} Your paste is in the description below.`
-              }
-            />
-            {pane.notice === undefined ? null : (
-              <p
-                data-testid="tracker-extract-notice"
-                className="mb-3 rounded-control bg-sunken px-3 py-2 text-ink-muted"
-              >
-                {pane.notice} Your paste is in the description below.
-              </p>
-            )}
-            {/*
-              Keyed so a second paste replaces the boxes instead of leaving the
-              first extraction's values sitting in a form the user thinks is new.
-              `initial` is read once, as initial state, by design.
-            */}
-            <NewApplicationForm
-              key={pane.initial === undefined ? 'blank' : pane.initial.description}
-              initial={pane.initial}
-              onCreate={(draft) => void onCreate(draft)}
-              onCancel={() => setPane({ kind: 'closed' })}
-            />
-          </DetailPane>
-        ) : selected === null ? null : (
-          <DetailPane
-            title={selected.job.title}
-            subtitle={[selected.job.company, selected.job.location]
-              .filter((part) => part !== null && part !== '')
-              .join(' · ')}
-            onClose={() => setPane({ kind: 'closed' })}
-          >
-            {/*
-              Keyed by the application id so every field resets when the
-              selection changes. Without it, a debounced note from the last card
-              could land on this one.
-            */}
-            <ApplicationDetail
-              key={selected.application.id}
-              entry={selected}
-              today={today}
-              now={clock}
-              browser={browserPort}
-              onEdit={(changes) => onEdit(selected.application.id, changes)}
-              onStatusChange={(status) => onStatusChange(selected.application.id, status)}
-              substages={substages}
-              onSubstageChange={
-                substagesLoaded
-                  ? (substageId) => onSubstageChange(selected.application.id, substageId)
-                  : undefined
-              }
-              onEditSubstages={substagesLoaded ? openSubstageEditor : undefined}
-              substagesFailed={substagesFailed !== null}
-              onRetrySubstages={() => void loadSubstages()}
-              onDelete={() => void onDelete(selected)}
-              port={trackerPort}
-              availability={availability ?? undefined}
-              readAvailability={readAvailability}
-              createTransport={createTransport}
-              consentPort={consentPort}
-              onAnalyse={onAnalyse === undefined ? undefined : () => onAnalyse(selected)}
-              onTailor={onTailor === undefined ? undefined : () => onTailor(selected)}
-            />
-          </DetailPane>
-        )}
+        <TrackerSidePane
+          pane={pane}
+          setPane={setPane}
+          onOpenSettings={onOpenSettings}
+          createTransport={createTransport}
+          createPageTransport={createPageTransport}
+          readAvailability={readAvailability}
+          consentPort={consentPort}
+          substagesLoaded={substagesLoaded}
+          loadSubstages={loadSubstages}
+          substages={substages}
+          savingSubstages={savingSubstages}
+          entries={entries}
+          applySubstages={applySubstages}
+          substagesRef={substagesRef}
+          onCreate={onCreate}
+          selected={selected}
+          today={today}
+          clock={clock}
+          browserPort={browserPort}
+          onEdit={onEdit}
+          onStatusChange={onStatusChange}
+          onSubstageChange={onSubstageChange}
+          openSubstageEditor={openSubstageEditor}
+          substagesFailed={substagesFailed}
+          onDelete={onDelete}
+          trackerPort={trackerPort}
+          availability={availability}
+          onAnalyse={onAnalyse}
+          onTailor={onTailor}
+        />
       </div>
     </section>
-  );
-}
-
-/**
- * The single "Add application" button, wherever it happens to be.
- *
- * One component so the two placements cannot drift into two different buttons,
- * and so `data-primary` — which the tests count — is attached in exactly one
- * place.
- */
-function AddApplicationButton({
-  testId,
-  disabled,
-  onClick,
-  className = '',
-}: {
-  testId: string;
-  disabled: boolean;
-  onClick: () => void;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      data-primary="true"
-      disabled={disabled}
-      onClick={onClick}
-      className={`${PRIMARY_BUTTON} ${className}`}
-    >
-      Add application
-      {disabled ? <span className="sr-only"> — the form is already open</span> : null}
-    </button>
-  );
-}
-
-/**
- * The second way in — and NOT a blue button.
- *
- * "Add application" stays the view's one primary. Pasting an advert is a
- * shortcut to the same form, not a different destination, and a second blue
- * button beside the first would leave neither of them meaning anything.
- */
-function PasteJobButton({
-  testId,
-  disabled,
-  onClick,
-  className = '',
-}: {
-  testId: string;
-  disabled: boolean;
-  onClick: () => void;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      disabled={disabled}
-      onClick={onClick}
-      className={`${SECONDARY_BUTTON} ${className}`}
-    >
-      Paste a job
-      {disabled ? <span className="sr-only"> — a form is already open</span> : null}
-    </button>
-  );
-}
-
-/**
- * The empty board.
- *
- * An invitation, not an apology. It does not say "no applications found" — it
- * says what this screen is for and offers the actions that make it useful, with
- * the reassurance that matters most here: this works with nothing set up.
- */
-function EmptyBoard({
-  onAdd,
-  onPaste,
-  disabled,
-}: {
-  onAdd: () => void;
-  onPaste: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <div
-      data-testid="tracker-empty"
-      className="flex h-full items-center justify-center rounded-card border border-line border-dashed bg-card"
-    >
-      <div className="max-w-sm px-6 text-center">
-        <div className="mb-3 flex justify-center">
-          <IconTile icon="tracker" />
-        </div>
-        <p className="font-medium text-ink">Start with the last job you applied to.</p>
-        <p className="mt-1 text-ink-muted">
-          The board keeps every application in one place and shows you which ones have gone quiet.
-          It needs no account and no set-up.
-        </p>
-        <div className="mt-4 flex items-center justify-center gap-2">
-          <AddApplicationButton testId="tracker-empty-add" disabled={disabled} onClick={onAdd} />
-          <PasteJobButton testId="tracker-empty-paste" disabled={disabled} onClick={onPaste} />
-        </div>
-      </div>
-    </div>
   );
 }
