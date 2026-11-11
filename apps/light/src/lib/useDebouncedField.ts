@@ -80,18 +80,39 @@ export function useDebouncedField(
     };
   }, []);
 
+  // The armed autosave timer, so `flush` can cancel it (L-372).
+  const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (draft === lastCommitted.current) return;
 
     const timer = setTimeout(() => {
+      pendingTimer.current = null;
+      // The same check `flush` and the unmount make. Without it the timer saved
+      // a value that was already saved — by a blur that did not cancel it, or a
+      // `reset` to the very text that was pending — so one edit was written
+      // twice, and a second write that succeeded wiped the error a failed
+      // first one had put on screen (L-372).
+      if (draft === lastCommitted.current) return;
       lastCommitted.current = draft;
       commitRef.current(draft);
     }, delayMs);
+    pendingTimer.current = timer;
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (pendingTimer.current === timer) pendingTimer.current = null;
+    };
   }, [draft, delayMs]);
 
   const flush = useCallback(() => {
+    // Saving now makes the pending autosave redundant: cancel it, so one edit
+    // is saved once. A failed save stays failed and on screen until the user
+    // edits again — nothing quietly retries behind the message.
+    if (pendingTimer.current !== null) {
+      clearTimeout(pendingTimer.current);
+      pendingTimer.current = null;
+    }
     if (draft === lastCommitted.current) return;
     lastCommitted.current = draft;
     commitRef.current(draft);
