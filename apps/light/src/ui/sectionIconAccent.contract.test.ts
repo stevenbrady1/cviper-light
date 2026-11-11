@@ -9,17 +9,20 @@
  * first choice, #17a2b8, measured 2.35-2.62:1; on 2026-10-16 the owner chose
  * #148da0, the same hue darkened to clear 3:1 on all four.
  */
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
 import { describe, expect, it } from 'vitest';
 
-const THEME = readFileSync(fileURLToPath(new URL('../styles/theme.css', import.meta.url)), 'utf8');
+import { lightColours } from '../styles/themeTokens';
+
+/**
+ * The light colour set, from the one shared reader (L-366). It throws, by name,
+ * on a colour it cannot read, one declared twice, or one outside the light set,
+ * so a name here has exactly one declaration or none.
+ */
+const LIGHT = lightColours();
 
 function tokens(name: string): string[] {
-  return [
-    ...THEME.matchAll(new RegExp(String.raw`--color-${name}:\s*(#[0-9a-fA-F]{6});`, 'g')),
-  ].map((match) => (match[1] ?? '').toLowerCase());
+  const found = LIGHT.get(name);
+  return found === undefined ? [] : [found.hex];
 }
 
 function token(name: string): string {

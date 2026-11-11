@@ -3,7 +3,8 @@
  *
  * `text-teal` (#0e9f6e) on `bg-teal/10` or `bg-sunken` measures about 3:1, below
  * the WCAG 2.1 AA floor of 4.5:1 for normal text, and nothing noticed because
- * every token was chosen by eye. This reads theme.css, finds every text colour
+ * every token was chosen by eye. This reads theme.css (through the one shared
+ * reader, `themeTokens.ts`, since L-366), finds every text colour
  * used in the same class string as a background colour, composites any alpha
  * background over the surface it could sit on, and fails below 4.5:1.
  *
@@ -52,17 +53,27 @@
  * `currentColor`, so the text check above already covers them; the app uses
  * no `fill-*`, `stroke-*` or `ring-*` classes, and `no fill-, stroke- or
  * ring- colour classes` below fails the day one appears unchecked. The theme has no dark mode today; `the theme has no dark variant` fails
- * the day one appears, so this audit cannot silently go stale.
+ * the day one appears, so this audit cannot silently go stale. Since L-366 the
+ * same check also covers every other style file and `dark:` class names, and
+ * the shared reader fails by name on any colour declared outside the light set.
  *
  * Large or bold text may be 3:1. Nothing is exempt automatically; if a pair is
  * genuinely large text or an icon, it goes in ALLOWLIST below with a reason.
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, posix, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+
+import {
+  darkClassVariants,
+  lightColours,
+  stripCssComments,
+  styleSheetsOnDisk,
+  type Rgb,
+} from './themeTokens';
 
 const THEME = fileURLToPath(new URL('./theme.css', import.meta.url));
 const REPO = fileURLToPath(new URL('../../../..', import.meta.url));
@@ -72,21 +83,6 @@ const AA_TEXT = 4.5;
 
 /** Explicit, justified exceptions. Empty is the goal. */
 const ALLOWLIST: readonly { file: string; text: string; bg: string; reason: string }[] = [];
-
-type Rgb = readonly [number, number, number];
-
-function parseTokens(css: string): Map<string, Rgb> {
-  const tokens = new Map<string, Rgb>();
-  for (const m of css.matchAll(/--color-([a-z-]+):\s*#([0-9a-fA-F]{6})\s*;/g)) {
-    const hex = m[2] as string;
-    tokens.set(m[1] as string, [
-      parseInt(hex.slice(0, 2), 16),
-      parseInt(hex.slice(2, 4), 16),
-      parseInt(hex.slice(4, 6), 16),
-    ]);
-  }
-  return tokens;
-}
 
 function luminance([r, g, b]: Rgb): number {
   const lin = (v: number): number => {
@@ -234,7 +230,11 @@ function sourceFiles(dir: string): string[] {
 const BARE_BRAND_TEXT = /(?<![\w-])(?:[a-z0-9-]+:)*text-(?:teal|gold)(?![\w-])/g;
 
 const css = readFileSync(THEME, 'utf8');
-const tokens = parseTokens(css);
+// L-366: the light colour set, from the one shared reader. It throws, by name,
+// on a colour it cannot read, one declared twice, or one outside the light set.
+// That stops this whole file at load, by name: its checks never run on a
+// partial palette, where an unread colour would simply be paired with nothing.
+const tokens = new Map<string, Rgb>([...lightColours()].map(([name, token]) => [name, token.rgb]));
 const names = [...tokens.keys()];
 
 function label(bg: Use | null): string {
@@ -290,6 +290,41 @@ describe('text contrast contract (WCAG 2.1 AA, 4.5:1)', () => {
 
   it('the theme has no dark variant, so the light-only audit is complete', () => {
     expect(css).not.toMatch(/prefers-color-scheme:\s*dark|\.dark\b|\[data-theme/);
+  });
+
+  // L-366: the check above, widened, unchanged itself. (i) The same pattern,
+  // character for character, over every OTHER style file, with comments
+  // removed: a comment styles nothing. (ii) A `dark:` variant in a class name,
+  // read from the strings of the source only, so a comment or JSX text that
+  // mentions one is not flagged. The shared reader adds the structural half:
+  // any colour token declared outside the light set fails it by name.
+  it('no other style file has a dark variant either', () => {
+    const themePath = relative(REPO, THEME).replaceAll('\\', '/');
+    const others = styleSheetsOnDisk().filter((sheet) => sheet.path !== themePath);
+    expect(others.map((sheet) => sheet.path)).toContain('apps/light/src/styles/fonts.css');
+    const offences = others
+      .filter((sheet) =>
+        /prefers-color-scheme:\s*dark|\.dark\b|\[data-theme/.test(stripCssComments(sheet.text)),
+      )
+      .map((sheet) => sheet.path);
+    expect(offences).toEqual([]);
+  });
+
+  it('no source class uses a dark: variant', () => {
+    const roots = [
+      join(REPO, 'apps/light/src'),
+      ...readdirSync(join(REPO, 'packages'))
+        .map((name) => join(REPO, 'packages', name, 'src'))
+        .filter((dir) => existsSync(dir)),
+    ];
+    const files = roots.flatMap(sourceFiles);
+    expect(files.length).toBeGreaterThan(20);
+    const offences = files.flatMap((file) =>
+      darkClassVariants(relative(REPO, file).replaceAll('\\', '/'), readFileSync(file, 'utf8')).map(
+        (hit) => `${hit.at}: ${hit.found}`,
+      ),
+    );
+    expect(offences).toEqual([]);
   });
 
   describe('the checker can actually fail', () => {
