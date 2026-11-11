@@ -27,13 +27,23 @@ import { type ReactNode } from 'react';
  * interrupt (the update check's "could not check") is not an ErrorBox.
  *
  * The classes are exactly what the hand-built ones carried, class for class,
- * so moving a screen onto this part changes nothing it draws.
+ * so moving a screen onto this part changes nothing it draws — plus one.
+ *
+ * ============================================================================
+ * A WORD TOO LONG FOR ITS LINE BREAKS (L-374)
+ * ============================================================================
+ * An error often carries a file path or a web address: a "word" with no spaces.
+ * Without a rule it ran past the edge of the strip in a narrow window, cut off
+ * where nobody could read it, and pushed Tracker's Retry off screen. Every
+ * shape carries `break-words` (`overflow-wrap: break-word`). It only acts on a
+ * word that cannot fit on a line of its own, so a sentence wraps at exactly the
+ * same words as before. Not `break-all`, which would split ordinary words.
  */
 
 /** Under a screen's header (Analysis, Tailor, Tracker, Profile). */
-const STRIP = 'border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6';
+const STRIP = 'border-b border-danger/30 bg-danger/5 px-4 py-2 break-words text-danger md:px-6';
 /** Inside a panel (settings, CV upload, search, …). */
-const BOX = 'rounded-control bg-danger/5 px-3 py-2 text-danger';
+const BOX = 'rounded-control bg-danger/5 px-3 py-2 break-words text-danger';
 
 interface Common {
   readonly testId: string;
@@ -45,7 +55,10 @@ export interface ErrorStripProps extends Common {
   readonly variant: 'strip';
   /**
    * `row`: the message and a control side by side (Tracker). The children are
-   * drawn as given, so the caller wraps the message in its own `<span>`.
+   * drawn as given, so the caller wraps the message in its own `<span>`, and
+   * gives it `className="min-w-0"`. A flex item is never narrower than its
+   * longest word unless told, so without it a long path pushes the control
+   * off screen however the words are allowed to break (L-374).
    */
   readonly layout?: 'text' | 'row';
 }

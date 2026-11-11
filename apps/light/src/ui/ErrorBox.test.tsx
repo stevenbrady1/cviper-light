@@ -23,12 +23,15 @@ afterEach(() => {
   cleanup();
 });
 
-/** What the hand-built strips on Analysis, Tailor and Tracker carried on 11 Nov 2026. */
-const STRIP = 'border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6';
+/**
+ * What the hand-built strips on Analysis, Tailor and Tracker carried on 11 Nov
+ * 2026, plus `break-words` (L-374): a word too long for a line breaks.
+ */
+const STRIP = 'border-b border-danger/30 bg-danger/5 px-4 py-2 break-words text-danger md:px-6';
 /** Tracker's two strips: the same strip, laid out as a row so Retry sits at the end. */
 const STRIP_ROW = `flex items-center justify-between gap-3 ${STRIP}`;
-/** What the hand-built boxes inside panels carry. */
-const BOX = 'rounded-control bg-danger/5 px-3 py-2 text-danger';
+/** What the hand-built boxes inside panels carry, plus `break-words` (L-374). */
+const BOX = 'rounded-control bg-danger/5 px-3 py-2 break-words text-danger';
 
 /** Anything that forces a sentence onto one line, or the box to a fixed width. */
 const CLIPPING = /\b(truncate|text-ellipsis|whitespace-nowrap|line-clamp-1|(min-)?w-\S+)\b/;
@@ -233,9 +236,36 @@ describe('ErrorBox — what goes inside', () => {
     }
   });
 
-  // An UNBROKEN token (a long file path with no spaces) is NOT guaranteed to
-  // wrap today: none of the hand-built strips or boxes carries `break-words`.
-  // Adding it would change what every strip draws, and the owner approved only
-  // the Profile bottom line for L-368. It needs its own decision.
-  it.todo('a very long UNBROKEN message wraps inside 375px (needs `break-words`: owner decision)');
+  // An UNBROKEN token — a file path or web address with no spaces — used to run
+  // off the edge: none of the strips or boxes carried `break-words` (L-374).
+  // jsdom cannot measure it, so this pins the class; the WebKit job measures
+  // the real layout at 375px and 1000px (`e2e/contrast-webkit.spec.ts`).
+  it('a very long UNBROKEN message breaks: every shape carries `break-words` (L-374)', () => {
+    const path = `C:\\Users\\someone\\AppData\\Roaming\\com.cviper.light\\${'NestedFolder\\'.repeat(12)}cviper.json`;
+    render(
+      <>
+        <ErrorBox variant="strip" testId="s">
+          {path}
+        </ErrorBox>
+        <ErrorBox variant="strip" layout="row" testId="r">
+          <span className="min-w-0">{path}</span>
+        </ErrorBox>
+        <ErrorBox variant="box" testId="b">
+          {path}
+        </ErrorBox>
+        <ErrorBox variant="box" gapAbove="mt-3" testId="g">
+          {path}
+        </ErrorBox>
+      </>,
+    );
+    for (const id of ['s', 'r', 'b', 'g']) {
+      const classes = screen.getByTestId(id).className.split(' ');
+      expect(classes, id).toContain('break-words');
+      // Only a word too long for its line breaks: never mid-word in a sentence
+      // (`break-all`), and the text is never clipped instead.
+      expect(classes, id).not.toContain('break-all');
+      expect(screen.getByTestId(id).className, id).not.toMatch(CLIPPING);
+      expect(screen.getByTestId(id).textContent, id).toBe(path);
+    }
+  });
 });
