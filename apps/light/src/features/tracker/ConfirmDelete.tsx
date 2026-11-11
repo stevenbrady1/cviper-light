@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
-import { useFocusTrap } from '../../lib/useFocusTrap';
+import { Dialog } from '../../ui';
 
 /**
  * The app's only modal.
@@ -31,6 +31,9 @@ import { useFocusTrap } from '../../lib/useFocusTrap';
  *   * Tab stays inside it, and focus goes back to the Delete button when it
  *     closes (L-236). `aria-modal` alone tells a screen reader the page behind
  *     is inert; it does not stop Tab from reaching it.
+ *
+ * The backdrop, markers, trap, first focus and Escape are `ui/Dialog.tsx`'s
+ * (L-356); this file keeps the words, the buttons, and which one gets focus.
  */
 
 interface ConfirmDeleteProps {
@@ -49,63 +52,40 @@ export function ConfirmDelete({
   confirmClassName,
 }: ConfirmDeleteProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  // Before the focus effect below: the trap reads the opener first.
-  useFocusTrap(dialogRef);
-
-  useEffect(() => {
-    cancelRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent): void {
-      if (event.key !== 'Escape') return;
-      // Claimed, so the detail pane's own Escape handler stands down.
-      event.preventDefault();
-      onCancel();
-    }
-
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onCancel]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 p-6">
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-delete-title"
-        data-testid="confirm-delete"
-        className="w-full max-w-sm rounded-card bg-card p-5 shadow-overlay"
-      >
-        <h2 id="confirm-delete-title" className="font-semibold text-ink">
-          Delete this application?
-        </h2>
-        <p className="mt-1 text-ink-muted">
-          {`${title} at ${company} will be removed, along with its notes. This cannot be undone.`}
-        </p>
+    <Dialog
+      initialFocus={cancelRef}
+      onEscape={onCancel}
+      labelledBy="confirm-delete-title"
+      testId="confirm-delete"
+    >
+      <h2 id="confirm-delete-title" className="font-semibold text-ink">
+        Delete this application?
+      </h2>
+      <p className="mt-1 text-ink-muted">
+        {`${title} at ${company} will be removed, along with its notes. This cannot be undone.`}
+      </p>
 
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <button
-            ref={cancelRef}
-            type="button"
-            onClick={onCancel}
-            data-testid="confirm-delete-cancel"
-            className={SECONDARY_BUTTON}
-          >
-            Keep it
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            data-testid="confirm-delete-confirm"
-            className={confirmClassName}
-          >
-            Delete application
-          </button>
-        </div>
+      <div className="mt-4 flex items-center justify-end gap-2">
+        <button
+          ref={cancelRef}
+          type="button"
+          onClick={onCancel}
+          data-testid="confirm-delete-cancel"
+          className={SECONDARY_BUTTON}
+        >
+          Keep it
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          data-testid="confirm-delete-confirm"
+          className={confirmClassName}
+        >
+          Delete application
+        </button>
       </div>
-    </div>
+    </Dialog>
   );
 }
