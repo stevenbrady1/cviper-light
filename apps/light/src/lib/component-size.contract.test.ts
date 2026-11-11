@@ -27,9 +27,7 @@ import { REPO_ROOT, displayPath, walk } from './repo-scan.ts';
 export const LINE_LIMIT = 800;
 
 /** Over the limit on the day the guard arrived (28 Oct 2026). May only shrink. */
-export const CEILINGS: Readonly<Record<string, number>> = {
-  'apps/light/src/features/profile/Profile.tsx': 890,
-};
+export const CEILINGS: Readonly<Record<string, number>> = {};
 
 export interface SizedFile {
   readonly path: string;
