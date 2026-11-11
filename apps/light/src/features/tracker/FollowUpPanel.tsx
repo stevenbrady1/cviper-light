@@ -7,7 +7,7 @@ import {
 } from '@cviper/ai-providers';
 import { type Application, type Document, type IsoDate } from '@cviper/core-types';
 
-import { SECONDARY_BUTTON } from '../../app/buttons';
+import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 
 import { readAvailability as readRealAvailability } from '../analysis/availability';
 import { ConsentGate } from '../analysis/ConsentGate';
@@ -550,7 +550,7 @@ export function FollowUpPanel({
                 setDraft(null);
                 setNote(null);
               }}
-              className="rounded-control px-3 py-1.5 text-ink-muted hover:bg-sunken hover:text-ink"
+              className={QUIET_BUTTON}
             >
               Discard
             </button>

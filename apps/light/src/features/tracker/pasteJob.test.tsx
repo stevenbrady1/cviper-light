@@ -22,7 +22,7 @@
  * port, the credential probe and the HTTP transport, none of which exist in a
  * Vitest process.
  */
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -655,5 +655,33 @@ describe('one blue button, still', () => {
     );
     expect(enabled).toHaveLength(1);
     expect((enabled[0] as HTMLElement).dataset['testid']).toBe('paste-job-extract');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('a switched-off button looks switched off (L-349)', () => {
+  it('Cancel looks switched off while the advert is being read', async () => {
+    // The model never answers, so the form stays busy for the whole test.
+    // Cancel was `disabled` here but wore a hand-written class with no
+    // `disabled:` styles, so it looked exactly as pressable as before.
+    const neverAnswers: ChatTransport = {
+      chat: () => new Promise<Result<ProviderHttpResponse, ProviderError>>(() => undefined),
+      listModels(): Promise<Result<ProviderHttpResponse, ProviderError>> {
+        throw new Error('the paste flow must never list models');
+      },
+    };
+    const user = userEvent.setup();
+    renderBoard({ transport: neverAnswers });
+
+    await openPaste(user);
+    await user.click(screen.getByTestId('paste-job-text'));
+    await user.paste(ADVERT);
+    await user.click(screen.getByTestId('paste-job-extract'));
+
+    const form = screen.getByTestId('paste-job-form');
+    const cancel = within(form).getByRole('button', { name: 'Cancel' }) as HTMLButtonElement;
+    await waitFor(() => expect(cancel.disabled).toBe(true));
+    expect(cancel.className.split(/\s+/)).toContain('disabled:bg-line');
   });
 });

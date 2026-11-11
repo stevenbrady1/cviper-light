@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 
 import { type ApplicationStatus, type SalaryPeriod } from '@cviper/core-types';
 
-import { PRIMARY_BUTTON } from '../../app/buttons';
+import { PRIMARY_BUTTON, QUIET_BUTTON } from '../../app/buttons';
 
 import {
   EMPTY_DRAFT,
@@ -347,11 +347,7 @@ export function NewApplicationForm({ onCreate, onCancel, initial }: NewApplicati
         <button type="submit" data-primary="true" className={PRIMARY_BUTTON}>
           Save application
         </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-control px-3 py-1.5 text-ink-muted hover:bg-sunken hover:text-ink"
-        >
+        <button type="button" onClick={onCancel} className={QUIET_BUTTON}>
           Cancel
         </button>
       </div>

@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 
 import { useFocusTrap } from '../lib/useFocusTrap';
 
+import { QUIET_BUTTON } from './buttons';
 import { useViewportClass } from './viewport';
 
 /**
@@ -144,7 +145,7 @@ export function DetailPane({ title, subtitle = null, onClose, children }: Detail
           type="button"
           onClick={onClose}
           data-testid="detail-pane-close"
-          className="shrink-0 rounded-control px-2 py-1 text-xs text-ink-muted hover:bg-sunken hover:text-ink"
+          className={`${QUIET_BUTTON} shrink-0 text-xs`}
         >
           Close
           <span className="sr-only"> the details panel (Escape)</span>

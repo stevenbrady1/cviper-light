@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 
+import { SECONDARY_BUTTON } from '../../app/buttons';
 import { useFocusTrap } from '../../lib/useFocusTrap';
 
 /**
@@ -91,7 +92,7 @@ export function ConfirmDelete({
             type="button"
             onClick={onCancel}
             data-testid="confirm-delete-cancel"
-            className="rounded-control border border-line px-3 py-1.5 font-medium text-ink hover:bg-sunken"
+            className={SECONDARY_BUTTON}
           >
             Keep it
           </button>

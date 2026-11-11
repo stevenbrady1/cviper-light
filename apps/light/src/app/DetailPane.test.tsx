@@ -259,3 +259,17 @@ describe('DetailPane on a phone keeps focus while it covers the screen (L-236)',
     expect(screen.getByTestId('detail-pane').contains(document.activeElement)).toBe(false);
   });
 });
+
+describe('DetailPane Close is the shared quiet button (L-349)', () => {
+  it('Close is a thumb-sized target on a phone', () => {
+    // 44px below `md` is the smallest thing a thumb reliably hits (L-81). The
+    // hand-written class this button used to wear had no minimum height.
+    render(
+      <DetailPane title="Quant Developer" onClose={() => {}}>
+        <p>Body</p>
+      </DetailPane>,
+    );
+
+    expect(screen.getByTestId('detail-pane-close').className.split(/\s+/)).toContain('min-h-11');
+  });
+});
