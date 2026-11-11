@@ -30,7 +30,21 @@ import {
  *
  * Every icon is decorative (`aria-hidden`). The words beside it carry the
  * meaning, so a screen reader hears the label once rather than twice.
+ *
+ * Marks that carry a meaning of their own — a tick, a warning, a step's dot —
+ * are not icons: they are `StateMark`s, which the L-215 check finds and holds
+ * to "every mark is explained". The warning mark draws this file's `alert`
+ * triangle, from `WARNING_TRIANGLE` below, so the two can never drift apart.
  */
+
+/** The `alert` icon's triangle, shared with the `warning` state mark. */
+export const WARNING_TRIANGLE = (
+  <>
+    <path d="M12 3 2 20h20z" />
+    <path d="M12 10v4" />
+    <path d="M12 17h.01" />
+  </>
+);
 
 const PATHS = {
   tracker: (
@@ -107,11 +121,25 @@ const PATHS = {
       <path d="m17 6 3 3" />
     </>
   ),
-  alert: (
+  alert: WARNING_TRIANGLE,
+  // Controls (L-354): drawn so they no longer depend on whatever fallback font
+  // the machine has. Decorative like the rest — the button carries the name.
+  arrowUp: (
     <>
-      <path d="M12 3 2 20h20z" />
-      <path d="M12 10v4" />
-      <path d="M12 17h.01" />
+      <path d="M12 19V5" />
+      <path d="m5 12 7-7 7 7" />
+    </>
+  ),
+  arrowDown: (
+    <>
+      <path d="M12 5v14" />
+      <path d="m19 12-7 7-7-7" />
+    </>
+  ),
+  close: (
+    <>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
     </>
   ),
 } satisfies Record<string, ReactNode>;

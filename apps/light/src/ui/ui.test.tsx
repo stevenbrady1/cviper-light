@@ -15,6 +15,7 @@ import { Card } from './Card';
 import { Icon, ICON_NAMES } from './Icon';
 import { IconTile } from './IconTile';
 import { PageHeader } from './PageHeader';
+import { STATE_MARK_NAMES, StateMark } from './StateMark';
 import { PILL_TONES, StatusPill, type PillTone } from './StatusPill';
 
 afterEach(() => {
@@ -100,6 +101,12 @@ describe('IconTile', () => {
     }
   });
 
+  it('has the control icons for move up, move down and close (L-354)', () => {
+    // Drawn, so they no longer depend on a fallback font for ↑ ↓ ×. The two
+    // tests either side of this one cover them like every other name.
+    expect(ICON_NAMES).toEqual(expect.arrayContaining(['arrowUp', 'arrowDown', 'close']));
+  });
+
   it('every icon is hidden from assistive tech and never takes focus', () => {
     for (const name of ICON_NAMES) {
       cleanup();
@@ -108,6 +115,66 @@ describe('IconTile', () => {
       expect(svg?.getAttribute('aria-hidden'), name).toBe('true');
       expect(svg?.getAttribute('focusable'), name).toBe('false');
     }
+  });
+});
+
+describe('StateMark — the drawn marks that carry a meaning (L-354)', () => {
+  it('draws exactly the nine marks the typed symbols stood for', () => {
+    expect([...STATE_MARK_NAMES].sort()).toEqual(
+      ['back', 'cross', 'dot', 'down', 'ring', 'skipped', 'tick', 'up', 'warning'].sort(),
+    );
+  });
+
+  it('every state mark draws a different shape', () => {
+    // Skipped, to-do (ring), done (tick) and current (dot) must differ by
+    // SHAPE: colour alone is not a difference everybody can see.
+    const drawings = new Map<string, string>();
+    for (const name of STATE_MARK_NAMES) {
+      cleanup();
+      const { container } = render(<StateMark name={name} />);
+      const svg = container.querySelector('svg');
+      expect(svg?.childElementCount, name).toBeGreaterThan(0);
+      const inner = svg?.innerHTML ?? '';
+      const twin = [...drawings].find(([, drawing]) => drawing === inner)?.[0];
+      expect(twin, `${name} draws the same shape as ${twin ?? ''}`).toBeUndefined();
+      drawings.set(name, inner);
+    }
+    expect(drawings.size).toBe(STATE_MARK_NAMES.length);
+  });
+
+  it('every state mark is hidden from assistive tech, carries data-mark and never takes focus', () => {
+    for (const name of STATE_MARK_NAMES) {
+      cleanup();
+      const { container } = render(<StateMark name={name} />);
+      const mark = container.firstElementChild as HTMLElement;
+      expect(mark.dataset['mark'], name).toBe(name);
+      expect(mark.getAttribute('aria-hidden'), name).toBe('true');
+      expect(mark.hasAttribute('tabindex'), name).toBe(false);
+      const svg = mark.querySelector('svg');
+      expect(svg?.getAttribute('focusable'), name).toBe('false');
+      expect(container.querySelector('[tabindex]'), name).toBeNull();
+    }
+  });
+
+  it('is sized to the text and drawn in the text colour', () => {
+    for (const name of STATE_MARK_NAMES) {
+      cleanup();
+      const { container } = render(<StateMark name={name} />);
+      const svg = container.querySelector('svg');
+      expect(svg?.getAttribute('width'), name).toBe('1em');
+      expect(svg?.getAttribute('height'), name).toBe('1em');
+      expect(svg?.getAttribute('stroke'), name).toBe('currentColor');
+      // Any fill is the text colour too, never a colour of its own.
+      for (const shape of svg?.querySelectorAll('[fill]') ?? []) {
+        expect(['none', 'currentColor'], name).toContain(shape.getAttribute('fill'));
+      }
+    }
+  });
+
+  it('the warning mark is the same triangle as the alert icon, not a second drawing of it', () => {
+    const { container: mark } = render(<StateMark name="warning" />);
+    const { container: icon } = render(<Icon name="alert" />);
+    expect(mark.querySelector('svg')?.innerHTML).toBe(icon.querySelector('svg')?.innerHTML);
   });
 });
 
