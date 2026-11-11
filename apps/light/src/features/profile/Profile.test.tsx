@@ -5,7 +5,7 @@
  * FAKE PORT was handed — a render-only test would pass just as happily on a
  * form that saved nothing.
  */
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -200,6 +200,32 @@ describe('editing a field', () => {
     expect(alert.textContent).toContain('could not be saved');
     expect(alert.textContent).toContain('The database is locked');
     expect(input('profile-headline').value).toBe('Quant developer');
+    expect(port.saved()).toBeNull();
+  });
+
+  it('regression (L-372): a save that fails on blur keeps the error on screen after the autosave delay', async () => {
+    // The blur saved at once and failed; the autosave timer the keystroke had
+    // armed then saved the same value again, succeeded, and wiped the error
+    // ~600 ms later. Whether the test above saw the error depended on how fast
+    // the machine was. Fake timers make the delay pass for certain.
+    const { port } = await renderProfile();
+    vi.useFakeTimers();
+    port.failNext('save');
+
+    typeAndBlur('profile-headline', 'Quant developer');
+    // Inside `act`, so the error a settled save sets is on screen when looked for.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByRole('alert').textContent).toContain('could not be saved');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS + 10);
+    });
+
+    expect(screen.getByRole('alert').textContent).toContain('could not be saved');
+    expect(input('profile-headline').value).toBe('Quant developer');
+    expect(port.calls.save).toBe(1);
     expect(port.saved()).toBeNull();
   });
 });
