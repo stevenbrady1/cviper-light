@@ -1,7 +1,7 @@
 /**
  * Fifteen questions asked of the REAL built binary (L-88, extended by L-103,
  * L-104, L-301 and L-242), and the screenshots of it the landing page uses
- * (L-244).
+ * (L-244) — the last three of a job that has been started (L-363).
  *
  * ============================================================================
  * WHY THIS EXISTS
@@ -166,7 +166,24 @@ import { Builder, By, Capabilities, until, type WebDriver } from 'selenium-webdr
 // header of that file for why.
 import { makeMinimalPdf, makeScannedPdf } from '../../../packages/cv-parsing/src/test/fixtures.ts';
 import { DEMO_ID_PREFIX, demoApplicationIds, demoBackup } from './demoBackup.ts';
+import {
+  CV_DELETE,
+  JOB_WORKFLOW_UPSERT,
+  NETWORK_COMMANDS,
+  REQUEST_COUNT_KEY,
+  STARTED_APPLICATION_ID,
+  STARTED_CV_ID,
+  STARTED_JOB_TITLE,
+  startedJobBackup,
+  startedJobWorkflowValues,
+} from './demoStartedJob.ts';
 import { createSessionWhenWindowReady } from './smoke-session.ts';
+import {
+  CHECK_ATS_TABLE,
+  CHECK_CARD_PROGRESS,
+  CHECK_STEP_BAR,
+  SMOKE_PICTURES,
+} from './smokePictures.ts';
 
 /**
  * The port the app's own WebDriver server listens on.
@@ -1128,97 +1145,333 @@ describe('the built CViper Light binary', () => {
     listings — the owner has no Windows PC to take them on. Made-up
     applications (`demoBackup.ts`) go in through the same test-only import
     switch as above, each main screen is saved as a PNG, and the demo cards
-    are deleted again. The pictures are an artefact for a person, not a gate;
-    what this step asserts is that the import and the screens worked.
+    are deleted again at the end. The pictures are an artefact for a person,
+    not a gate; what this step asserts is that the import and the screens
+    worked.
+
+    L-363 adds three pictures of a STARTED job after these five, and checks
+    each of those screens before it is saved — see `smokePictures.ts`.
   */
+
+  /**
+   * Ask for the window the app opens at. The CI runner's screen is about
+   * 1024x768 and Windows may hold the window to it; whatever it gets is
+   * logged, so the pictures' size is never a surprise.
+   */
+  async function sizeWindow(): Promise<void> {
+    try {
+      await session().manage().window().setRect({ x: 0, y: 0, width: 1280, height: 800 });
+    } catch (error) {
+      console.log(`smoke: window   = resize refused (${String(error)})`);
+    }
+    try {
+      const rect = await session().manage().window().getRect();
+      console.log(`smoke: window   = ${String(rect.width)}x${String(rect.height)}`);
+    } catch (error) {
+      console.log(`smoke: window   = size unknown (${String(error)})`);
+    }
+  }
+
+  async function shot(name: string): Promise<void> {
+    // A beat for fonts and layout to settle after a view change.
+    await session().sleep(600);
+    // No focus ring in a picture: the app moves focus to each screen's
+    // heading (WCAG 2.4.3), and WebDriver's clicks do not count as a
+    // mouse, so the ring a pointer user never sees is drawn here.
+    await session().executeScript(
+      'if (document.activeElement instanceof HTMLElement) document.activeElement.blur();',
+    );
+    const png = await session().takeScreenshot();
+    writeFileSync(join(SCREENSHOT_DIR, `${name}.png`), Buffer.from(png, 'base64'));
+    console.log(`smoke: screenshot = ${name}.png`);
+  }
+
+  /** Import whatever `SMOKE_BACKUP_FILE` holds, through Settings, and say what it said. */
+  async function importSmokeBackup(): Promise<string> {
+    await click('[data-testid="nav-settings"]');
+    await click('[data-testid="settings-import"]');
+    await visible('[data-testid="settings-confirm"]');
+    await click('[data-testid="settings-confirm-import"]');
+    return settingsMessage('Imported');
+  }
+
+  it('photographs the main screens with made-up applications', { timeout: 240_000 }, async () => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    mkdirSync(join(SMOKE_BACKUP_FILE, '..'), { recursive: true });
+    writeFileSync(SMOKE_BACKUP_FILE, demoBackup(new Date()));
+
+    await sizeWindow();
+
+    console.log(`smoke: demo     = ${await importSmokeBackup()}`);
+
+    const ids = demoApplicationIds();
+    await click('[data-testid="nav-tracker"]');
+    for (const id of ids) await visible(`[data-testid="tracker-card-${id}"]`);
+    await shot('1-tracker');
+
+    await click(`[data-testid="tracker-card-${DEMO_ID_PREFIX}app-insight-analyst"]`);
+    await visible('[data-testid="detail-pane"]');
+    await shot('2-tracker-application');
+
+    await click('[data-testid="nav-analysis"]');
+    // The sample is offered only once the screen has loaded the CV list and
+    // found it empty, a moment after the view opens. The first run looked
+    // straight away, found nothing, and photographed the empty form.
+    const sample = await session()
+      .wait(until.elementLocated(By.css('[data-testid="analysis-try-sample"]')), ELEMENT_TIMEOUT)
+      .then(
+        (element) => [element],
+        () => [],
+      );
+    console.log(
+      `smoke: sample   = ${sample.length > 0 ? 'offered' : 'not offered (a CV is saved)'}`,
+    );
+    if (sample.length > 0) {
+      await sample[0]!.click();
+      await visible('[data-testid="analysis-sample"]');
+      // The result is below the form. Scroll the screen's OWN area to it —
+      // never scrollIntoView, which moves the shell too (L-216).
+      await session().executeScript(`
+        const result = document.querySelector('[data-testid="analysis-sample"]');
+        let area = result && result.parentElement;
+        while (area && getComputedStyle(area).overflowY !== 'auto') area = area.parentElement;
+        if (result && area) {
+          area.scrollTop += result.getBoundingClientRect().top - area.getBoundingClientRect().top - 16;
+        }
+      `);
+    }
+    await shot('3-analysis');
+
+    await click('[data-testid="nav-search"]');
+    await shot('4-search');
+
+    await click('[data-testid="nav-settings"]');
+    await shot('5-settings');
+  });
+
+  // ── L-363: a STARTED job — its card's progress, its step bar, its ATS table ─
+  //
+  // The five pictures above show no job that has been started, so two changes
+  // to exactly these marks (L-360, L-362) left every picture byte-identical.
+  // The started job (`demoStartedJob.ts`) is added only now, AFTER the five,
+  // so those stay exactly as they were.
+
+  /**
+   * Run one of the app's own commands from the page, through the same bridge
+   * the app's code uses (`invoke` in `@tauri-apps/api/core` is this call), and
+   * park the answer on `window` to be polled — the same fire-and-poll shape
+   * as `RUN_PDF_PARSE`, so nothing depends on the plugin's `execute/async`.
+   */
+  const RUN_COMMAND = String.raw`
+const w = window;
+const key = arguments[2];
+w[key] = { state: 'running' };
+w.__TAURI_INTERNALS__.invoke(arguments[0], arguments[1]).then(
+  function (value) { w[key] = { state: 'done', value: value }; },
+  function (error) { w[key] = { state: 'failed', error: String(error) }; }
+);
+return 'started';
+`;
+
+  interface CommandRun {
+    readonly state: 'running' | 'done' | 'failed';
+    readonly value?: unknown;
+    readonly error?: string;
+  }
+
+  async function runCommand(command: string, args: Record<string, unknown>): Promise<unknown> {
+    const key = '__l363command';
+    const started = await session().executeScript<string>(RUN_COMMAND, command, args, key);
+    assert.equal(started, 'started');
+    const read = (): Promise<CommandRun> =>
+      session().executeScript<CommandRun>(`return window.${key};`);
+    await session().wait(async () => (await read()).state !== 'running', ELEMENT_TIMEOUT);
+    const run = await read();
+    if (run.state !== 'done') {
+      throw new Error(`${command} failed in the app: ${run.error ?? '(no detail reported)'}`);
+    }
+    return run.value;
+  }
+
+  /** `db_execute`'s answer is `[rowsAffected, lastInsertId]`. */
+  function rowsAffected(answer: unknown): number {
+    return Array.isArray(answer) && typeof answer[0] === 'number' ? answer[0] : -1;
+  }
+
+  /**
+   * Every request the page starts from here on. The app's commands go out as
+   * `fetch` to `ipc.localhost/<command>` (Tauri's own IPC script looks `fetch`
+   * up when it calls it), so this sees which commands ran as well as any
+   * request for a page or a file.
+   */
+  const RECORD_REQUESTS = String.raw`
+const w = window;
+if (w.__l363requests !== undefined) return 'already-installed';
+const seen = [];
+w.__l363requests = seen;
+const nativeFetch = w.fetch;
+w.fetch = function (input, init) {
+  try {
+    seen.push(typeof input === 'string' ? input : input instanceof URL ? input.href : String(input && input.url));
+  } catch (e) {
+    seen.push('<a request that could not be read>');
+  }
+  return nativeFetch.apply(w, arguments);
+};
+const nativeOpen = XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open = function (method, url) {
+  seen.push(String(url));
+  return nativeOpen.apply(this, arguments);
+};
+return 'installed';
+`;
+
+  /** What the app has counted as sent to an AI or a job site today (`requestLog.ts`). */
+  async function requestCount(): Promise<string | null> {
+    return session().executeScript<string | null>(
+      'return localStorage.getItem(arguments[0]);',
+      REQUEST_COUNT_KEY,
+    );
+  }
+
+  /**
+   * Press a button that is already on screen, as the app's WebDriver click does
+   * (`el.click()`) but without its `scrollIntoView`, which can move the shell
+   * as well (L-216), and its `focus()`, which opens the button's hint over the
+   * picture.
+   */
+  async function press(selector: string): Promise<void> {
+    await visible(selector);
+    const pressed = await session().executeScript<boolean>(
+      `const element = document.querySelector(arguments[0]);
+       if (!(element instanceof HTMLElement)) return false;
+       element.click();
+       return true;`,
+      selector,
+    );
+    assert.ok(pressed, `there was nothing to press at ${selector}`);
+  }
+
+  /** Wait until `check` says the screen shows what the picture is for. */
+  async function untilShown(name: string, check: string, args: readonly unknown[]): Promise<void> {
+    let problem = '(the check never ran)';
+    try {
+      await session().wait(async () => {
+        problem = await session().executeScript<string>(check, ...args);
+        return problem === '';
+      }, ELEMENT_TIMEOUT);
+    } catch (error) {
+      throw new Error(`${name}.png was NOT saved, because ${problem}.`, { cause: error });
+    }
+  }
+
+  /**
+   * `shot`, with the screen checked twice: once before the settle, and again
+   * just before the picture, so a scroll still moving (Tailor's is smooth)
+   * cannot slip a cropped picture through.
+   */
+  async function checkedShot(name: string, check: string, args: readonly unknown[]): Promise<void> {
+    await untilShown(name, check, args);
+    await session().sleep(600);
+    await session().executeScript(
+      'if (document.activeElement instanceof HTMLElement) document.activeElement.blur();',
+    );
+    const problem = await session().executeScript<string>(check, ...args);
+    assert.equal(problem, '', `${name}.png was NOT saved, because ${problem}.`);
+    const png = await session().takeScreenshot();
+    writeFileSync(join(SCREENSHOT_DIR, `${name}.png`), Buffer.from(png, 'base64'));
+    console.log(`smoke: screenshot = ${name}.png`);
+  }
+
   it(
-    'photographs the main screens with made-up applications, then removes them',
+    'photographs a started job — its card’s progress, its step bar and its ATS table — sending nothing',
     { timeout: 240_000 },
     async () => {
-      mkdirSync(SCREENSHOT_DIR, { recursive: true });
+      const countBefore = await requestCount();
+
+      // The job, its application, the CV and the Basic-match analysis: the
+      // backup import, exactly as for the five pictures above.
       mkdirSync(join(SMOKE_BACKUP_FILE, '..'), { recursive: true });
-      writeFileSync(SMOKE_BACKUP_FILE, demoBackup(new Date()));
+      writeFileSync(SMOKE_BACKUP_FILE, startedJobBackup(new Date()));
+      console.log(`smoke: started  = ${await importSmokeBackup()}`);
 
-      // Ask for the window the app opens at. The CI runner's screen is about
-      // 1024x768 and Windows may hold the window to it; whatever it gets is
-      // logged, so the pictures' size is never a surprise.
-      try {
-        await session().manage().window().setRect({ x: 0, y: 0, width: 1280, height: 800 });
-      } catch (error) {
-        console.log(`smoke: window   = resize refused (${String(error)})`);
-      }
-      try {
-        const rect = await session().manage().window().getRect();
-        console.log(`smoke: window   = ${String(rect.width)}x${String(rect.height)}`);
-      } catch (error) {
-        console.log(`smoke: window   = size unknown (${String(error)})`);
-      }
-
-      const shot = async (name: string): Promise<void> => {
-        // A beat for fonts and layout to settle after a view change.
-        await session().sleep(600);
-        // No focus ring in a picture: the app moves focus to each screen's
-        // heading (WCAG 2.4.3), and WebDriver's clicks do not count as a
-        // mouse, so the ring a pointer user never sees is drawn here.
-        await session().executeScript(
-          'if (document.activeElement instanceof HTMLElement) document.activeElement.blur();',
-        );
-        const png = await session().takeScreenshot();
-        writeFileSync(join(SCREENSHOT_DIR, `${name}.png`), Buffer.from(png, 'base64'));
-        console.log(`smoke: screenshot = ${name}.png`);
-      };
-
-      await click('[data-testid="nav-settings"]');
-      await click('[data-testid="settings-import"]');
-      await visible('[data-testid="settings-confirm"]');
-      await click('[data-testid="settings-confirm-import"]');
-      console.log(`smoke: demo     = ${await settingsMessage('Imported')}`);
-
-      const ids = demoApplicationIds();
-      await click('[data-testid="nav-tracker"]');
-      for (const id of ids) await visible(`[data-testid="tracker-card-${id}"]`);
-      await shot('1-tracker');
-
-      await click(`[data-testid="tracker-card-${DEMO_ID_PREFIX}app-insight-analyst"]`);
-      await visible('[data-testid="detail-pane"]');
-      await shot('2-tracker-application');
-
-      await click('[data-testid="nav-analysis"]');
-      // The sample is offered only once the screen has loaded the CV list and
-      // found it empty, a moment after the view opens. The first run looked
-      // straight away, found nothing, and photographed the empty form.
-      const sample = await session()
-        .wait(until.elementLocated(By.css('[data-testid="analysis-try-sample"]')), ELEMENT_TIMEOUT)
-        .then(
-          (element) => [element],
-          () => [],
-        );
-      console.log(
-        `smoke: sample   = ${sample.length > 0 ? 'offered' : 'not offered (a CV is saved)'}`,
+      // The tailored draft: a `job_workflow` row, never in a backup, written
+      // with the statement the app's own write-through uses.
+      const written = await runCommand('db_execute', {
+        sql: JOB_WORKFLOW_UPSERT,
+        values: startedJobWorkflowValues(new Date()),
+      });
+      assert.equal(
+        rowsAffected(written),
+        1,
+        `the draft was not written: ${JSON.stringify(written)}`,
       );
-      if (sample.length > 0) {
-        await sample[0]!.click();
-        await visible('[data-testid="analysis-sample"]');
-        // The result is below the form. Scroll the screen's OWN area to it —
-        // never scrollIntoView, which moves the shell too (L-216).
-        await session().executeScript(`
-          const result = document.querySelector('[data-testid="analysis-sample"]');
-          let area = result && result.parentElement;
-          while (area && getComputedStyle(area).overflowY !== 'auto') area = area.parentElement;
-          if (result && area) {
-            area.scrollTop += result.getBoundingClientRect().top - area.getBoundingClientRect().top - 16;
-          }
-        `);
+
+      // Tailor reads every job's draft once, at launch.
+      await restart();
+      const welcome = await session().findElements(By.css('[data-testid="welcome-skip"]'));
+      if (welcome.length > 0) await click('[data-testid="welcome-skip"]');
+      await sizeWindow();
+      assert.equal(await session().executeScript<string>(RECORD_REQUESTS), 'installed');
+
+      await click('[data-testid="nav-tracker"]');
+      await checkedShot('6-tracker-card-progress', CHECK_CARD_PROGRESS, [
+        STARTED_APPLICATION_ID,
+        ['dot', 'dot', 'dot', 'ring', 'ring'],
+      ]);
+
+      // Continue goes to the first thing still to do: the ATS Score.
+      await press(`[data-testid="tracker-card-continue-${STARTED_APPLICATION_ID}"]`);
+      await visible('[data-testid="view-tailor"]');
+      await visible('[data-testid="job-step-ats"][data-state="current"]');
+
+      await press('[data-testid="job-step-tailor"]');
+      await checkedShot('7-step-bar', CHECK_STEP_BAR, [STARTED_JOB_TITLE, 'tailor']);
+
+      await press('[data-testid="job-steps-next"]');
+      await checkedShot('8-ats-table', CHECK_ATS_TABLE, [STARTED_JOB_TITLE]);
+
+      // ── Negative: the started job sent nothing anywhere ───────────────────
+      const requests = await session().executeScript<string[]>(
+        'return window.__l363requests || [];',
+      );
+      const origin = await session().executeScript<string>('return location.origin;');
+      const commands: string[] = [];
+      const elsewhere: string[] = [];
+      for (const request of requests) {
+        const url = new URL(request, origin);
+        if (url.hostname === 'ipc.localhost') {
+          commands.push(decodeURIComponent(url.pathname.slice(1)));
+        } else if (url.origin !== origin) {
+          elsewhere.push(request);
+        }
       }
-      await shot('3-analysis');
+      console.log(`smoke: started commands = ${JSON.stringify([...new Set(commands)])}`);
 
-      await click('[data-testid="nav-search"]');
-      await shot('4-search');
+      assert.ok(
+        commands.includes('db_select'),
+        'The request recorder saw no database read, so it is not seeing the app’s commands and ' +
+          `the two checks below would prove nothing. It saw: ${JSON.stringify(requests)}`,
+      );
+      assert.deepEqual(
+        commands.filter((command) => NETWORK_COMMANDS.includes(command)),
+        [],
+        'A command that reaches the network ran while the started job was photographed.',
+      );
+      assert.deepEqual(elsewhere, [], 'The page asked another host for something.');
+      assert.equal(
+        await requestCount(),
+        countBefore,
+        'The app counted a request to an AI or a job site while the started job was photographed.',
+      );
+    },
+  );
 
-      await click('[data-testid="nav-settings"]');
-      await shot('5-settings');
-
-      for (const id of ids) {
+  it(
+    'removes every made-up application and the CV, having saved every picture',
+    { timeout: 180_000 },
+    async () => {
+      for (const id of [...demoApplicationIds(), STARTED_APPLICATION_ID]) {
         await click('[data-testid="nav-tracker"]');
         await click(`[data-testid="tracker-card-${id}"]`);
         await click('[data-testid="detail-delete"]');
@@ -1228,10 +1481,23 @@ describe('the built CViper Light binary', () => {
           return left.length === 0;
         }, ELEMENT_TIMEOUT);
       }
+      // No button deletes a CV; its analysis goes with it (ON DELETE CASCADE).
+      const removed = await runCommand('db_execute', { sql: CV_DELETE, values: [STARTED_CV_ID] });
+      assert.equal(
+        rowsAffected(removed),
+        1,
+        `the made-up CV was not removed: ${JSON.stringify(removed)}`,
+      );
       rmSync(join(SMOKE_BACKUP_FILE, '..'), { recursive: true, force: true });
 
-      const saved = readdirSync(SCREENSHOT_DIR).filter((file) => file.endsWith('.png'));
-      assert.equal(saved.length, 5, `expected 5 screenshots, found ${saved.join(', ')}`);
+      const saved = readdirSync(SCREENSHOT_DIR)
+        .filter((file) => file.endsWith('.png'))
+        .sort();
+      assert.deepEqual(
+        saved,
+        SMOKE_PICTURES.map((name) => `${name}.png`).sort(),
+        `expected exactly ${SMOKE_PICTURES.join(', ')}; found ${saved.join(', ')}`,
+      );
     },
   );
 });
