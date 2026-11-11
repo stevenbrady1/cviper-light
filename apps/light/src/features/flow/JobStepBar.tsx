@@ -1,6 +1,7 @@
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { Hint } from '../../app/Hint';
 import { FLOW_HINT, STEP_HINT } from '../../app/hints';
+import { StateMark, type StateMarkName } from '../../ui';
 
 import {
   nextStep,
@@ -27,6 +28,11 @@ import {
  *
  * No blue here. Each view keeps its one primary action; this bar is
  * navigation, so it uses the quiet and secondary buttons only.
+ *
+ * The marks are drawn (`StateMark`, L-360), not typed, so they look the same
+ * on every machine, and each state is its own shape: done a tick, current a
+ * filled dot, skipped a struck-through ring, to do an empty ring. A mark is
+ * hidden from a screen reader; the words after the step's name say its state.
  */
 export interface JobStepBarProps {
   readonly title: string;
@@ -44,11 +50,11 @@ export interface JobStepBarProps {
   readonly onTracker?: (() => void) | undefined;
 }
 
-const SYMBOL: Readonly<Record<StepState, string>> = {
-  done: '✓',
-  current: '●',
-  skipped: '⊘',
-  todo: '○',
+const MARK: Readonly<Record<StepState, StateMarkName>> = {
+  done: 'tick',
+  current: 'dot',
+  skipped: 'skipped',
+  todo: 'ring',
 };
 
 /** What a screen reader says after the step's name. */
@@ -98,7 +104,7 @@ export function JobStepBar({
                 className={QUIET_BUTTON}
                 {...trigger}
               >
-                <span aria-hidden="true">◀</span> Tracker
+                <StateMark name="back" /> Tracker
               </button>
             )}
           </Hint>
@@ -141,7 +147,7 @@ export function JobStepBar({
                     className={QUIET_BUTTON}
                     {...trigger}
                   >
-                    <span aria-hidden="true">{SYMBOL[step.state]}</span>
+                    <StateMark name={MARK[step.state]} />
                     <span className={step.state === 'current' ? 'font-semibold text-ink' : ''}>
                       {step.label}
                     </span>

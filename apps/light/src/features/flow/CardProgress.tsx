@@ -3,6 +3,7 @@ import { useId } from 'react';
 import { QUIET_BUTTON } from '../../app/buttons';
 import { Hint } from '../../app/Hint';
 import { FLOW_HINT } from '../../app/hints';
+import { StateMark } from '../../ui';
 
 import { STEPS, continueStep, stepStates, type JobProgress, type StepId } from './steps';
 
@@ -22,6 +23,10 @@ import { STEPS, continueStep, stepStates, type JobProgress, type StepId } from '
  * The step is the one Continue goes to; a job with everything done is on
  * "Step 5 of 5 · Export", where Continue opens it. That line is also the
  * row's accessible name, so the words heard and the words read are one.
+ *
+ * The dots are drawn (`StateMark`, L-360), not typed, so they look the same on
+ * every machine: a filled dot for a step done, an empty ring for one not —
+ * two shapes, not two colours.
  */
 export interface CardProgressProps {
   readonly applicationId: string;
@@ -63,7 +68,9 @@ export function CardProgress({ applicationId, progress, onContinue }: CardProgre
             aria-hidden="true"
             className="font-mono text-[11px] tracking-[0.2em] text-ink-muted"
           >
-            {filled.map((on) => (on ? '●' : '○')).join('')}
+            {states.map((step, index) => (
+              <StateMark key={step.id} name={filled[index] === true ? 'dot' : 'ring'} />
+            ))}
           </span>
         </Hint>
         <span className="sr-only">

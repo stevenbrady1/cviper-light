@@ -266,7 +266,9 @@ describe('Continue on a tracker card (L-200)', () => {
     await user.click(screen.getByTestId('nav-tracker'));
 
     const row = await screen.findByTestId('tracker-card-progress-app-tracked');
-    expect(row.textContent).toContain('●●○○○');
+    expect(
+      [...row.querySelectorAll('[data-mark]')].map((dot) => dot.getAttribute('data-mark')),
+    ).toEqual(['dot', 'dot', 'ring', 'ring', 'ring']);
     await user.click(screen.getByTestId('tracker-card-continue-app-tracked'));
 
     await screen.findByTestId('view-tailor');

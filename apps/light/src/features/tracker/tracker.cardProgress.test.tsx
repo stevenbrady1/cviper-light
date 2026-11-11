@@ -19,6 +19,11 @@ import { createFakeTrackerPort } from './test/fakePort';
 
 const NOW = new Date(2026, 9, 7, 9, 0, 0);
 
+/** The drawn dots inside `element`, in order (L-360). */
+function marksIn(element: Element): (string | null)[] {
+  return [...element.querySelectorAll('[data-mark]')].map((mark) => mark.getAttribute('data-mark'));
+}
+
 function entry(id: string): TrackerEntry {
   return {
     job: {
@@ -95,7 +100,7 @@ describe('tracker cards for started jobs (L-200)', () => {
     });
 
     const row = await screen.findByTestId('tracker-card-progress-a');
-    expect(row.textContent).toContain('●●●○○');
+    expect(marksIn(row)).toEqual(['dot', 'dot', 'dot', 'ring', 'ring']);
     await user.click(screen.getByTestId('tracker-card-continue-a'));
 
     expect(onContinue).toHaveBeenCalledTimes(1);
@@ -109,7 +114,13 @@ describe('tracker cards for started jobs (L-200)', () => {
     expect((await screen.findByTestId('tracker-card-continue-b')).getAttribute('aria-label')).toBe(
       'Continue: Tailor',
     );
-    expect(screen.getByTestId('tracker-card-progress-c').textContent).toContain('●○○○●');
+    expect(marksIn(screen.getByTestId('tracker-card-progress-c'))).toEqual([
+      'dot',
+      'ring',
+      'ring',
+      'ring',
+      'dot',
+    ]);
   });
 
   it('negative: a job nothing has happened to shows no row at all', async () => {
