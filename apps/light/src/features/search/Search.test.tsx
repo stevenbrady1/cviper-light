@@ -390,7 +390,7 @@ describe('the results', () => {
 
     await search(user);
 
-    expect(await screen.findByTestId('search-no-results')).toBeDefined();
+    expect((await screen.findByTestId('search-few-results')).textContent).toContain('No matches');
     expect(screen.queryAllByRole('alert')).toEqual([]);
   });
 });

@@ -271,6 +271,33 @@ interface FewResultsProps {
   readonly form: SearchForm;
   readonly browser: BrowserPort;
   readonly boards: readonly Board[];
+  /** A line above already says why nothing came back (L-352) — see `fewResultsWords`. */
+  readonly explained: boolean;
+}
+
+/**
+ * The panel's sentence, without its last mark: the panel ends it with a colon
+ * before its buttons, the screen reader with a full stop.
+ *
+ * ============================================================================
+ * AT ZERO, "NO MATCHES" IS SAID ONCE ON THE PAGE (L-352)
+ * ============================================================================
+ * It is said here only when nothing above has said why the list is empty. A
+ * free feed that answered has its own counted line ("Arbeitnow published 38
+ * recent jobs and none of them matched…"), and a board that failed has its
+ * own error — and "no matches" beside a failure tells the user their words
+ * were the problem when the board never answered (L-110). Either way the
+ * panel drops its first sentence and just offers the boards. The hint to
+ * broaden the search lives here too, since "No adverts matched that" now
+ * shows only when there is no panel at all.
+ */
+function fewResultsWords(count: number, explained: boolean): string {
+  if (count > 0) {
+    return `Only ${count} ${count === 1 ? 'match' : 'matches'} in CViper’s sources. Try the same search on a job board`;
+  }
+  return explained
+    ? 'Try the same search on a job board'
+    : 'No matches in CViper’s sources. Try broader words or a wider distance, or run the same search on a job board';
 }
 
 /**
@@ -279,14 +306,14 @@ interface FewResultsProps {
  * this through a `LiveStatus` that is always on the page, because a message
  * that arrives with its words already in it is not reliably announced.
  */
-export function fewResultsText(count: number, boards: readonly Board[]): string | null {
+export function fewResultsText(
+  count: number,
+  boards: readonly Board[],
+  explained: boolean,
+): string | null {
   const { main } = mainBoards(boards.filter((board) => board.enabled));
   if (count >= FEW_RESULTS || main.length === 0) return null;
-  const found =
-    count === 0
-      ? 'No matches in CViper’s sources.'
-      : `Only ${count} ${count === 1 ? 'match' : 'matches'} in CViper’s sources.`;
-  return `${found} Try the same search on a job board.`;
+  return `${fewResultsWords(count, explained)}.`;
 }
 
 /**
@@ -295,21 +322,16 @@ export function fewResultsText(count: number, boards: readonly Board[]): string 
  * 2026-10-08). Nothing is opened on its own: a search that suddenly opened
  * five browser tabs would be the most jarring thing on the screen.
  */
-export function FewResults({ count, form, browser, boards }: FewResultsProps) {
+export function FewResults({ count, form, browser, boards, explained }: FewResultsProps) {
   const { main } = mainBoards(boards.filter((board) => board.enabled));
-  if (fewResultsText(count, boards) === null) return null;
+  if (fewResultsText(count, boards, explained) === null) return null;
 
   return (
     <div
       data-testid="search-few-results"
       className="rounded-card border border-line bg-sunken px-4 py-3"
     >
-      <p className="text-ink">
-        {count === 0
-          ? 'No matches in CViper’s sources.'
-          : `Only ${count} ${count === 1 ? 'match' : 'matches'} in CViper’s sources.`}{' '}
-        Try the same search on a job board:
-      </p>
+      <p className="text-ink">{`${fewResultsWords(count, explained)}:`}</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <BoardButtons boards={main} form={form} browser={browser} prefix="few" />
       </div>

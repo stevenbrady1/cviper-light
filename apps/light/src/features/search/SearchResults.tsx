@@ -99,6 +99,9 @@ export function SearchResults({
   const nothingMatched = (keylessOutcome?.outcomes ?? [])
     .map((entry) => ({ source: entry.source, note: nothingMatchedNote(entry) }))
     .filter((entry): entry is { source: KeylessSourceId; note: string } => entry.note !== null);
+  // A line above already says why the list is empty, so the panel does not (L-352).
+  const explained = failures.length > 0 || keylessFailures.length > 0 || nothingMatched.length > 0;
+  const fewText = fewResultsText(results.jobs.length, jobBoards, explained);
 
   const showsAdzuna = results.jobs.some((entry) => entry.job.source === 'adzuna');
   // Arbeitnow's own terms ask for a link back to the site, so their credit is
@@ -145,9 +148,7 @@ export function SearchResults({
       <NothingMatchedNotes entries={nothingMatched} />
 
       {/* The few-results message, spoken from here (L-238) — see `fewResultsText`. */}
-      <LiveStatus
-        text={results.ran && !running ? fewResultsText(results.jobs.length, jobBoards) : null}
-      />
+      <LiveStatus text={results.ran && !running ? fewText : null} />
       {!results.ran ? (
         <div
           data-testid="search-empty"
@@ -174,6 +175,7 @@ export function SearchResults({
               form={form}
               browser={browser}
               boards={jobBoards}
+              explained={explained}
             />
           )}
 
@@ -206,10 +208,11 @@ export function SearchResults({
             </p>
           )}
 
-          {results.jobs.length === 0 &&
-          failures.length === 0 &&
-          keylessFailures.length === 0 &&
-          nothingMatched.length === 0 ? (
+          {/*
+            Only when there is no panel — every board switched off. With a
+            panel, the panel already says "No matches" (L-352).
+          */}
+          {results.jobs.length === 0 && !explained && fewText === null ? (
             <p data-testid="search-no-results" className="text-ink-muted">
               No adverts matched that. Try broader keywords, a wider radius, or send the same words
               to your browser with the buttons above.
