@@ -59,6 +59,36 @@ function hintOn(text: string, within_: HTMLElement = document.body): string | nu
   return describedBy(within(within_).getByText(text));
 }
 
+/**
+ * What `element` shows, in order: each drawn mark as `[name]`, and the text
+ * around it exactly (L-362) — the drawn-mark version of `textContent`.
+ */
+function asShown(element: Node): string {
+  if (element instanceof Element && element.hasAttribute('data-mark')) {
+    return `[${element.getAttribute('data-mark') ?? ''}]`;
+  }
+  if (element.nodeType === Node.TEXT_NODE) return element.textContent ?? '';
+  return [...element.childNodes].map(asShown).join('');
+}
+
+/**
+ * The one element showing `words` with the drawn `mark` before it — as
+ * `getByText('✓ OK')` found the one element showing a typed "✓ OK" (L-362).
+ */
+function marked(mark: string, words: string, within_: HTMLElement = document.body): HTMLElement {
+  const element = within(within_).getByText(words);
+  expect(asShown(element)).toBe(`[${mark}] ${words}`);
+  return element;
+}
+
+function markedHintOn(
+  mark: string,
+  words: string,
+  within_: HTMLElement = document.body,
+): string | null {
+  return describedBy(marked(mark, words, within_));
+}
+
 describe('ATS Score hints (L-215)', () => {
   it('the heading explains what ATS stands for', () => {
     render(<AtsStep comparison={BASE} fabrication={{ clean: true, flagged: 0 }} />);
@@ -78,20 +108,20 @@ describe('ATS Score hints (L-215)', () => {
 
   it('happy: ✓, ⚠ and ✗ each say what they mean', () => {
     render(<AtsStep comparison={BASE} fabrication={{ clean: true, flagged: 0 }} />);
-    expect(hintOn('✓ OK', screen.getByTestId('tailor-ats-check-section_headers'))).toBe(
+    expect(markedHintOn('tick', 'OK', screen.getByTestId('tailor-ats-check-section_headers'))).toBe(
       ATS_STATUS_HINT.pass,
     );
-    expect(hintOn('⚠ Check', screen.getByTestId('tailor-ats-check-section_headers'))).toBe(
-      ATS_STATUS_HINT.warn,
-    );
-    expect(hintOn('✗ Missing', screen.getByTestId('tailor-ats-check-contact_info'))).toBe(
-      ATS_STATUS_HINT.fail,
-    );
+    expect(
+      markedHintOn('warning', 'Check', screen.getByTestId('tailor-ats-check-section_headers')),
+    ).toBe(ATS_STATUS_HINT.warn);
+    expect(
+      markedHintOn('cross', 'Missing', screen.getByTestId('tailor-ats-check-contact_info')),
+    ).toBe(ATS_STATUS_HINT.fail);
   });
 
   it('▼ and ▲ say which way and by how much, and the band word gives its range', () => {
     render(<AtsStep comparison={BASE} fabrication={{ clean: true, flagged: 0 }} />);
-    expect(hintOn('▼ -3')).toBe(changeHint(-3));
+    expect(markedHintOn('down', '-3')).toBe(changeHint(-3));
     expect(hintOn('Needs work')).toBe(ATS_BAND_HINT.low);
   });
 
@@ -111,7 +141,7 @@ describe('ATS Score hints (L-215)', () => {
 
   it('hovering a mark shows its explanation on screen', () => {
     render(<AtsStep comparison={BASE} fabrication={{ clean: true, flagged: 0 }} />);
-    const mark = within(screen.getByTestId('tailor-ats-check-contact_info')).getByText('✗ Missing');
+    const mark = marked('cross', 'Missing', screen.getByTestId('tailor-ats-check-contact_info'));
     fireEvent.mouseEnter(mark);
     const visible = screen.getAllByRole('tooltip').filter((tip) => !tip.hidden);
     expect(visible.map((tip) => tip.textContent)).toEqual([ATS_STATUS_HINT.fail]);
