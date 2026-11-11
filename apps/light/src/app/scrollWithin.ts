@@ -14,10 +14,18 @@
  *
  * Here the caller names the one area that may move. If the anchor is not
  * inside it, nothing moves.
+ *
+ * Measured from where the area's content STARTS, below its own top padding
+ * (L-353). From the outer edge, an anchor at the very start of a padded area
+ * read as 20px away, so Tailor opened 20px down; and an anchor further down
+ * landed flush against the edge. Now the first anchor leaves the area at the
+ * top, and every other one lands with the same padding gap above it.
  */
 export function scrollWithin(container: HTMLElement, anchor: HTMLElement): void {
   if (!container.contains(anchor)) return;
-  const offset = anchor.getBoundingClientRect().top - container.getBoundingClientRect().top;
+  const padding = parseFloat(getComputedStyle(container).paddingTop) || 0;
+  const offset =
+    anchor.getBoundingClientRect().top - container.getBoundingClientRect().top - padding;
   const top = Math.max(0, container.scrollTop + offset);
   if (typeof container.scrollTo === 'function') {
     container.scrollTo({ top, behavior: 'smooth' });

@@ -869,3 +869,208 @@ describe('the Search button stays on screen on short windows (L-342)', () => {
     await page.context().close();
   });
 });
+
+/**
+ * Every screen opens at the top of its scroll areas (L-353).
+ *
+ * Tailor scrolls to its current step when it opens, and `scrollWithin`
+ * measured from the scroll area's outer edge, not from where its content
+ * starts — so it counted the area's own top padding (20px, 16px on a phone) as
+ * distance to scroll. Tailor opened 20px down, "Your CV" tight under the step
+ * bar. Settings, opened at Job boards or the Reed key, uses the same function:
+ * its section now lands with that same gap above it rather than flush.
+ *
+ * jsdom does no layout and has no padding, so only a real engine can see this.
+ */
+
+/** Wait until no scroll area has moved for a while: the step scroll is smooth. */
+async function scrollingSettled(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const areas = [...document.querySelectorAll('*')].filter((element) =>
+      ['auto', 'scroll'].includes(getComputedStyle(element).overflowY),
+    );
+    let last = '';
+    let still = 0;
+    for (let frame = 0; frame < 600 && still < 20; frame += 1) {
+      await new Promise((done) => requestAnimationFrame(done));
+      const now = areas.map((area) => String(area.scrollTop)).join(',');
+      still = now === last ? still + 1 : 0;
+      last = now;
+    }
+  });
+}
+
+/** Every scroll area on the page that is not at its top. Empty means all are. */
+async function scrolledAreas(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('*')]
+      .filter((element) => ['auto', 'scroll'].includes(getComputedStyle(element).overflowY))
+      .filter((area) => area.scrollTop !== 0)
+      .map((area) => {
+        const name =
+          area.getAttribute('data-testid') ??
+          area.closest('[data-testid^="view-"]')?.getAttribute('data-testid') ??
+          area.tagName.toLowerCase();
+        return `${name}: scrolled ${String(area.scrollTop)}px`;
+      }),
+  );
+}
+
+/** Where a target sits in its scroll area, against the area's own top padding. */
+async function landing(
+  page: Page,
+  target: string,
+): Promise<{ gap: number; padding: number; scrollTop: number; atEnd: boolean }> {
+  return page.evaluate((selector) => {
+    const element = document.querySelector(selector);
+    const area = element?.parentElement?.closest('.overflow-y-auto');
+    if (element === null || area === null || area === undefined) throw new Error(`no ${selector}`);
+    return {
+      gap: element.getBoundingClientRect().top - area.getBoundingClientRect().top,
+      padding: parseFloat(getComputedStyle(area).paddingTop),
+      scrollTop: area.scrollTop,
+      atEnd: area.scrollTop >= area.scrollHeight - area.clientHeight - 1,
+    };
+  }, target);
+}
+
+/** One call to a scroll area's `scrollTo`, and the layout at that same moment. */
+interface ScrollRequest {
+  /** The position asked for. */
+  readonly top: number;
+  /** Where the target's top was, in the area's scrolled content, when asked. */
+  readonly sectionAt: number;
+  /** The area's own top padding, when asked. */
+  readonly padding: number;
+}
+
+/**
+ * From now on, write down every `scrollTo` on a scroll area holding `target`,
+ * with where the target was at that instant — the same layout `scrollWithin`
+ * measured, before anything drawn later can move it.
+ */
+async function recordScrollRequests(page: Page, target: string): Promise<void> {
+  await page.evaluate((selector) => {
+    const record: unknown[] = [];
+    (window as unknown as { __scrollRequests: unknown[] }).__scrollRequests = record;
+    const original = Element.prototype.scrollTo;
+    Element.prototype.scrollTo = function scrollTo(this: Element, ...args: unknown[]) {
+      const section = document.querySelector(selector);
+      const options = args[0] as ScrollToOptions | undefined;
+      if (section !== null && this.contains(section) && typeof options?.top === 'number') {
+        record.push({
+          top: options.top,
+          sectionAt:
+            this.scrollTop + section.getBoundingClientRect().top - this.getBoundingClientRect().top,
+          padding: parseFloat(getComputedStyle(this).paddingTop),
+        });
+      }
+      return (original as (...a: unknown[]) => void).apply(this, args);
+    } as Element['scrollTo'];
+  }, target);
+}
+
+async function scrollRequests(page: Page): Promise<ScrollRequest[]> {
+  return page.evaluate(
+    () => (window as unknown as { __scrollRequests: ScrollRequest[] }).__scrollRequests,
+  );
+}
+
+describe('every screen opens at the top of its scroll areas (L-353)', () => {
+  for (const [width, viewport] of Object.entries(VIEWPORTS)) {
+    const padding = width === 'phone' ? 16 : 20;
+
+    it(`Tailor opens at the top of its own scroll area, ${width}`, async () => {
+      const page = await open('?seen=1', viewport);
+      await goTo(page, 'tailor');
+      await page.waitForSelector('[data-testid="tailor-scroll"] [data-content-column]');
+      await scrollingSettled(page);
+      const seen = await landing(page, '[data-testid="tailor-scroll"] [data-content-column]');
+      const room = await page.evaluate(() => {
+        const area = document.querySelector('[data-testid="tailor-scroll"]');
+        return area === null ? 0 : area.scrollHeight - area.clientHeight;
+      });
+      console.log(`Tailor opened (${width}): ${JSON.stringify({ ...seen, room })}`);
+      // Room to scroll, or the bug could not show: an area that cannot move
+      // stays at the top whatever it is asked.
+      assert.ok(room > padding, `Tailor's area has only ${String(room)}px to scroll`);
+      assert.equal(seen.scrollTop, 0, 'Tailor opened scrolled down');
+      assert.equal(seen.padding, padding);
+      assert.equal(seen.gap, padding, '"Your CV" is not the padding below the step bar');
+      await page.context().close();
+    });
+
+    it(`no screen opens with a scroll area already scrolled, ${width}`, async () => {
+      const page = await open('?seen=1', viewport);
+      const report: string[] = [];
+      for (const view of VIEWS) {
+        await goTo(page, view);
+        await scrollingSettled(page);
+        report.push(...(await scrolledAreas(page)).map((line) => `${view} — ${line}`));
+      }
+      assert.deepEqual(report, []);
+      await page.context().close();
+    });
+
+    /*
+      Judged at the moment the scroll is asked for, not after it lands.
+
+      A KNOWN, SEPARATE late shift: Settings' backup section, above Job boards,
+      shows `.json` in IBM Plex Mono. The browser fetches that face only when
+      Settings first draws it, which is after Settings has already worked out
+      the scroll. Until it arrives the line uses a fallback mono font, whose
+      line box is a different height: 0.5px taller on Windows, about 2px on
+      CI's Linux. So once the font lands, Job boards sits that much higher
+      than it was when the scroll was aimed, and the gap read after landing
+      was 14px on CI, not 16. That is not `scrollWithin`'s arithmetic, so it
+      is not measured here; it is reported as its own item.
+    */
+    it(`Settings opened at Job boards aims the section the padding below the top, ${width}`, async () => {
+      const page = await open('?seen=1', viewport);
+      await goTo(page, 'search');
+      await recordScrollRequests(page, '[data-testid="boards-settings"]');
+      await page.click('[data-testid="keyless-manage"]');
+      await page.locator('[data-testid="nav-settings"][aria-current="page"]:visible').waitFor();
+      await page.locator('[data-testid="boards-settings"]:focus').waitFor();
+      await scrollingSettled(page);
+      const requests = await scrollRequests(page);
+      const seen = await landing(page, '[data-testid="boards-settings"]');
+      console.log(
+        `Settings at Job boards (${width}): ${JSON.stringify({ requests, landed: seen })}`,
+      );
+      assert.equal(requests.length, 1, 'Settings did not ask its scroll area to move once');
+      const [asked] = requests as [ScrollRequest];
+      assert.equal(asked.padding, padding);
+      // Before L-353 the area was asked for `sectionAt` itself: flush.
+      assert.equal(
+        asked.top,
+        asked.sectionAt - asked.padding,
+        'the scroll was not aimed the padding above the section',
+      );
+      assert.ok(!seen.atEnd, 'the area ran out of room, so the aim proves nothing');
+      // It got there: an engine scrolls in whole pixels, and a section can sit
+      // on a half pixel, so the area stops within the pixel it was asked for.
+      assert.ok(
+        Math.abs(seen.scrollTop - asked.top) < 1,
+        `asked for ${String(asked.top)}, stopped at ${String(seen.scrollTop)}`,
+      );
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a scroll area moved by hand is reported', async () => {
+    const page = await open('?seen=1', VIEWPORTS.desktop);
+    await goTo(page, 'settings');
+    await page.evaluate(() => {
+      const area = document.querySelector('[data-testid="view-settings"] .overflow-y-auto');
+      if (area !== null) area.scrollTop = 40;
+    });
+    const report = await scrolledAreas(page);
+    assert.ok(
+      report.some((line) => line.includes('scrolled 40px')),
+      `the moved area was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+});

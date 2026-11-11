@@ -91,3 +91,44 @@ describe('scrollWithin', () => {
     expect(container.scrollTop).toBe(310);
   });
 });
+
+/**
+ * L-353: a scroll area with top padding. Its content starts BELOW its top
+ * edge — 20px on a wide window, 16px on a narrow one (`py-4 md:py-5`) — so an
+ * anchor at the very start of the content is that far below the edge while the
+ * area sits at the top. Measured from the edge alone, Tailor opened 20px down.
+ */
+describe('scrollWithin, in a scroll area with top padding (L-353)', () => {
+  for (const padding of [20, 16]) {
+    it(`boundary: an anchor at the very start of a ${String(padding)}px-padded area leaves it at the top`, () => {
+      const { container, anchor, scrollTo } = setUp(100, 100 + padding, 0);
+      container.style.paddingTop = `${String(padding)}px`;
+      scrollWithin(container, anchor);
+      expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  it('boundary: from further down, back to that anchor is all the way back to the top', () => {
+    const { container, anchor, scrollTo } = setUp(100, 120 - 300, 300);
+    container.style.paddingTop = '20px';
+    scrollWithin(container, anchor);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+  });
+
+  it('a section further down lands with the padding gap above it, not flush (Settings)', () => {
+    // Settings opened at Job boards or the Reed key: the section is 600px
+    // below the area's edge. It lands 20px down — the same gap the first
+    // section has when the screen is unscrolled — not flush at 0px.
+    const { container, anchor, scrollTo } = setUp(100, 700, 0);
+    container.style.paddingTop = '20px';
+    scrollWithin(container, anchor);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 580, behavior: 'smooth' });
+  });
+
+  it('negative: with no padding, the result is what it always was', () => {
+    const { container, anchor, scrollTo } = setUp(100, 700, 50);
+    container.style.paddingTop = '0px';
+    scrollWithin(container, anchor);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 650, behavior: 'smooth' });
+  });
+});
