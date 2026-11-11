@@ -2,11 +2,12 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { DESTRUCTIVE_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
 import { SectionHeading } from '../../../ui';
-import { countBackup, describeCounts, type BackupCounts, type BackupPort } from '../backup';
+import { countBackup, type BackupCounts, type BackupPort } from '../backup';
 import { DATA_LOCATIONS } from '../privacy/dataLocations';
 
 import {
   ERASE_STEPS,
+  eraseConfirmationText,
   locationsErasedBy,
   runErase,
   summariseErase,
@@ -115,9 +116,7 @@ export function EraseEverything({ port, backupPort, onErased }: EraseEverythingP
           <h3 className="font-medium text-ink">Delete everything on this computer?</h3>
 
           <p data-testid="settings-erase-counts" className="mt-1 text-ink">
-            {stage.counts === null
-              ? 'The database could not be read to count what is in it. Deleting will still empty it.'
-              : `This will delete ${describeCounts(stage.counts)}, every saved API key and every preference.`}
+            {eraseConfirmationText(stage.counts)}
           </p>
 
           <ul className="mt-2 list-disc space-y-1 pl-5 text-ink-muted">

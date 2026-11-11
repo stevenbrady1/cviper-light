@@ -7,7 +7,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type Application, type Cv, type Job } from '@cviper/core-types';
+import { PROFILE_ID, type Application, type Cv, type Job, type Profile } from '@cviper/core-types';
 
 import { createFakeBackupPort } from '../test/fakePort';
 import { DATA_LOCATIONS } from '../privacy/dataLocations';
@@ -60,6 +60,31 @@ const FULL = {
   interview_substages: [],
   documents: [],
   cvs: [CV],
+  analyses: [],
+};
+
+const PROFILE: Profile = {
+  id: PROFILE_ID,
+  headline: 'Credit risk analyst',
+  languages: [],
+  work_rights: null,
+  deal_breakers: [],
+  target_sectors: [],
+  career_goals: [],
+  energising: [],
+  draining: [],
+  writing_style: null,
+  star_examples: [],
+  updated_at: '2026-08-03T09:00:00.000Z',
+};
+
+const EMPTY_SNAPSHOT = {
+  profile: null,
+  jobs: [],
+  applications: [],
+  interview_substages: [],
+  documents: [],
+  cvs: [],
   analyses: [],
 };
 
@@ -116,6 +141,42 @@ describe('the confirmation', () => {
     const counts = await screen.findByTestId('settings-erase-counts');
     expect(counts.textContent).toContain('could not be read to count');
     expect(screen.getByTestId<HTMLButtonElement>('settings-erase-confirm').disabled).toBe(false);
+  });
+
+  // L-351. With nothing saved, the confirmation used to read "This will delete
+  // nothing at all, every saved API key and every preference." — a sentence
+  // that says nothing will be deleted, then lists two things that will be.
+  it('boundary: an empty database does not say it will delete nothing', async () => {
+    const { user } = renderErase();
+
+    await user.click(screen.getByTestId('settings-erase'));
+
+    const counts = await screen.findByTestId('settings-erase-counts');
+    expect(counts.textContent).not.toMatch(/delete nothing/i);
+    expect(counts.textContent).toContain('API key');
+    expect(counts.textContent).toContain('preference');
+  });
+
+  it('boundary: a profile and nothing else is named on its own', async () => {
+    const backupPort = createFakeBackupPort({ ...EMPTY_SNAPSHOT, profile: PROFILE });
+    const user = userEvent.setup();
+    render(<EraseEverything port={createFakeErasePort()} backupPort={backupPort} />);
+
+    await user.click(screen.getByTestId('settings-erase'));
+
+    expect((await screen.findByTestId('settings-erase-counts')).textContent).toBe(
+      'This will delete your profile, every saved API key and every preference.',
+    );
+  });
+
+  it('negative: a failed count keeps its own sentence, word for word', async () => {
+    const { user } = renderErase({ failBackupRead: true });
+
+    await user.click(screen.getByTestId('settings-erase'));
+
+    expect((await screen.findByTestId('settings-erase-counts')).textContent).toBe(
+      'The database could not be read to count what is in it. Deleting will still empty it.',
+    );
   });
 
   it('keeps everything when the user changes their mind', async () => {

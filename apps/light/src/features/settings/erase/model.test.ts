@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
+import { type BackupCounts } from '../backup';
 import { DATA_LOCATIONS } from '../privacy/dataLocations';
 
-import { ERASE_STEPS, locationsErasedBy, runErase, summariseErase } from './model';
+import {
+  ERASE_STEPS,
+  eraseConfirmationText,
+  locationsErasedBy,
+  runErase,
+  summariseErase,
+} from './model';
 import { createFakeErasePort } from './test/fakeErasePort';
 
 describe('runErase', () => {
@@ -71,6 +78,75 @@ describe('summariseErase', () => {
     expect(summary.allDone).toBe(false);
     expect(summary.headline).toMatch(/^Nothing was deleted/);
     expect(summary.failures).toHaveLength(3);
+  });
+});
+
+/**
+ * L-351. The confirmation once read "This will delete nothing at all, every
+ * saved API key and every preference." `describeCounts` says "nothing at all"
+ * for an empty database, which is right as the whole object of a sentence and
+ * wrong as the first item of a list. These two shapes are forbidden in every
+ * sentence the confirmation can show, so a new case cannot bring them back.
+ */
+describe('eraseConfirmationText', () => {
+  const NONE: BackupCounts = {
+    jobs: 0,
+    applications: 0,
+    cvs: 0,
+    analyses: 0,
+    documents: 0,
+    profile: false,
+  };
+
+  const CASES: readonly (readonly [string, BackupCounts | null, string])[] = [
+    [
+      'empty',
+      NONE,
+      'Nothing is saved here yet, so there is no work to lose. Your saved API keys and your preferences will still be deleted.',
+    ],
+    [
+      'one item',
+      { ...NONE, cvs: 1 },
+      'This will delete 1 CV, every saved API key and every preference.',
+    ],
+    [
+      'many',
+      { jobs: 43, applications: 12, cvs: 2, analyses: 7, documents: 3, profile: true },
+      'This will delete 43 jobs, 12 applications, 2 CVs, 7 past checks, 3 archived documents and your profile, every saved API key and every preference.',
+    ],
+    [
+      'profile only',
+      { ...NONE, profile: true },
+      'This will delete your profile, every saved API key and every preference.',
+    ],
+    [
+      'count failed',
+      null,
+      'The database could not be read to count what is in it. Deleting will still empty it.',
+    ],
+  ];
+
+  it.each(CASES)('%s: says exactly what it will do', (_name, counts, expected) => {
+    expect(eraseConfirmationText(counts)).toBe(expected);
+  });
+
+  // "nothing" followed, in the same sentence, by a comma: "nothing" used as
+  // the first item of a list. Case-sensitive on purpose: the approved empty
+  // sentence OPENS with "Nothing is saved here yet, so …", where "Nothing" is
+  // the subject and the comma joins two clauses. A list item is never the
+  // first word of the sentence, so it is always lower case.
+  const NOTHING_AS_A_LIST_ITEM = /\bnothing\b[^.]*,/;
+
+  it('the forbidden shapes catch the sentence that shipped', () => {
+    const shipped = 'This will delete nothing at all, every saved API key and every preference.';
+    expect(shipped).toMatch(/delete nothing/i);
+    expect(shipped).toMatch(NOTHING_AS_A_LIST_ITEM);
+  });
+
+  it.each(CASES)('%s: never says it will delete nothing', (_name, counts) => {
+    const text = eraseConfirmationText(counts);
+    expect(text).not.toMatch(/delete nothing/i);
+    expect(text).not.toMatch(NOTHING_AS_A_LIST_ITEM);
   });
 });
 
