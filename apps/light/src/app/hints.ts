@@ -62,10 +62,10 @@ export function changeHint(value: number): string {
 }
 
 export const STEP_HINT: Readonly<Record<StepState, string>> = {
-  done: '✓ Done.',
-  current: '● You are on this step now.',
-  skipped: '⊘ Skipped: you moved past this step without doing it. You can still go back to it.',
-  todo: '○ Not done yet.',
+  done: 'Done.',
+  current: 'You are on this step now.',
+  skipped: 'Skipped: you moved past this step without doing it. You can still go back to it.',
+  todo: 'Not done yet.',
 };
 
 export const FLOW_HINT = {
@@ -74,7 +74,7 @@ export const FLOW_HINT = {
     'The CV and AI engine used for this job. Choose them once: Analysis and Tailor share the choice.',
   cardDots:
     'How far this job has got: one dot for each step — Find, Analyse, Tailor, ATS Score, ' +
-    'Export. A filled dot ● is done; an empty one ○ is not.',
+    'Export. A filled dot is done; an empty one is not.',
   diff: 'Green lines are new in the draft. Struck-through lines were in your original CV and are not in the draft.',
 } as const;
 

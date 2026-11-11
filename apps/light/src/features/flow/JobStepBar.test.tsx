@@ -8,12 +8,18 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { FLOW_HINT, STEP_HINT } from '../../app/hints';
 import { JobStepBar } from './JobStepBar';
 import { type JobProgress, type StepId } from './steps';
 
 afterEach(() => {
   cleanup();
 });
+
+/** The drawn marks inside `element`, in order (L-360). */
+function marksIn(element: Element): (string | null)[] {
+  return [...element.querySelectorAll('[data-mark]')].map((mark) => mark.getAttribute('data-mark'));
+}
 
 function renderBar(
   current: StepId = 'tailor',
@@ -65,7 +71,10 @@ describe('JobStepBar', () => {
     renderBar('tailor', { analysed: false, tailored: false, exported: false });
     const analyse = screen.getByTestId('job-step-analyse');
     expect(analyse.getAttribute('data-state')).toBe('skipped');
-    expect(analyse.textContent).toBe('⊘Analyse, skipped');
+    // L-360: the mark is drawn, not typed — first in the button, then the words.
+    expect(marksIn(analyse)).toEqual(['skipped']);
+    expect(analyse.firstElementChild?.getAttribute('data-mark')).toBe('skipped');
+    expect(analyse.textContent).toBe('Analyse, skipped');
   });
 
   it('a step is a link to that step, never locked — even one not reached yet', async () => {
@@ -156,5 +165,96 @@ describe('JobStepBar', () => {
     );
     expect(screen.getByTestId('job-steps-choice').textContent).toContain('CV: none chosen');
     expect(screen.getByTestId('job-steps-choice').textContent).toContain('Engine: none set up');
+  });
+});
+
+/**
+ * L-360: the step bar's marks are drawn (`StateMark`), not typed, so they look
+ * the same on every machine. Each state keeps its own SHAPE — done, current,
+ * skipped and to-do differ without colour — and the words a screen reader
+ * hears are unchanged, because a drawn mark is hidden from it.
+ */
+describe('JobStepBar draws its marks (L-360)', () => {
+  const STEP_IDS = ['find', 'analyse', 'tailor', 'ats', 'export'] as const;
+
+  function stepMarks(): (string | null)[][] {
+    return STEP_IDS.map((id) => marksIn(screen.getByTestId(`job-step-${id}`)));
+  }
+
+  it('happy: one mark per step, in order — done, done, current, to do, to do', () => {
+    renderBar();
+    expect(stepMarks()).toEqual([['tick'], ['tick'], ['dot'], ['ring'], ['ring']]);
+  });
+
+  it('done, current, skipped and to-do are four different shapes, not four colours', () => {
+    renderBar('ats', { analysed: false, tailored: true, exported: false });
+    const byState = new Map<string, string>();
+    for (const id of STEP_IDS) {
+      const step = screen.getByTestId(`job-step-${id}`);
+      const mark = step.querySelector('[data-mark]')!;
+      byState.set(step.getAttribute('data-state')!, mark.innerHTML);
+    }
+    expect([...byState.keys()].sort()).toEqual(['current', 'done', 'skipped', 'todo']);
+    expect(new Set(byState.values()).size).toBe(4);
+    // And no state puts a colour on its mark: shape is what tells them apart.
+    for (const mark of document.querySelectorAll('[data-testid^="job-step-"] [data-mark]')) {
+      expect(mark.getAttribute('class') ?? '').not.toMatch(/\btext-/);
+    }
+  });
+
+  it('the step hints no longer quote a typed symbol the bar does not show', () => {
+    expect(Object.values(STEP_HINT).join(' ')).not.toMatch(/[✓●○⊘◀]/);
+    expect(FLOW_HINT.tracker).not.toMatch(/[✓●○⊘◀]/);
+  });
+
+  it('no step types a symbol any more', () => {
+    renderBar('ats', { analysed: false, tailored: true, exported: false });
+    const bar = screen.getByTestId('job-steps');
+    expect(bar.textContent).not.toMatch(/[✓●○⊘◀]/);
+  });
+
+  it('negative: a job with every step it can skip skipped', () => {
+    // Find is done whenever there is a job, and the step you are on is
+    // current, so on Export with nothing done the three between are skipped.
+    renderBar('export', { analysed: false, tailored: false, exported: false });
+    expect(stepMarks()).toEqual([['tick'], ['skipped'], ['skipped'], ['skipped'], ['dot']]);
+    for (const [id, name] of [
+      ['analyse', 'Analyse, skipped'],
+      ['tailor', 'Tailor, skipped'],
+      ['ats', 'ATS Score, skipped'],
+    ] as const) {
+      expect(screen.getByRole('button', { name })).toBe(screen.getByTestId(`job-step-${id}`));
+    }
+  });
+
+  it('boundary: all five steps done — four ticks and the step you are on', () => {
+    renderBar('export', { analysed: true, tailored: true, exported: true });
+    expect(stepMarks()).toEqual([['tick'], ['tick'], ['tick'], ['tick'], ['dot']]);
+  });
+
+  it('screen readers hear the same names as before: the mark is hidden, the words stay', () => {
+    renderBar('ats', { analysed: false, tailored: true, exported: false });
+    const names = STEP_IDS.map(
+      (id) => screen.getByTestId(`job-step-${id}`).textContent, // the mark adds no text
+    );
+    expect(names).toEqual([
+      'Find, done',
+      'Analyse, skipped',
+      'Tailor, done',
+      'ATS Score, you are here',
+      'Export, not started',
+    ]);
+    for (const name of names) expect(screen.getByRole('button', { name: name! })).toBeTruthy();
+    for (const mark of document.querySelectorAll('[data-testid="job-steps"] [data-mark]')) {
+      expect(mark.closest('[aria-hidden="true"]')).not.toBeNull();
+    }
+  });
+
+  it('the Tracker link draws its back mark first and is still named "Tracker"', () => {
+    renderBar();
+    const tracker = screen.getByTestId('job-steps-tracker');
+    expect(marksIn(tracker)).toEqual(['back']);
+    expect(tracker.firstElementChild?.getAttribute('data-mark')).toBe('back');
+    expect(screen.getByRole('button', { name: 'Tracker' })).toBe(tracker);
   });
 });
