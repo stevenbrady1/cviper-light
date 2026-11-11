@@ -31,6 +31,16 @@ export const CEILINGS: Readonly<Record<string, number>> = {
   'apps/light/src/features/profile/Profile.tsx': 890,
 };
 
+/**
+ * Screens split well below the limit, held at their size after the split
+ * (L-358). A ceiling here is lower than `LINE_LIMIT`, so the logic that left
+ * the file does not drift back into it. Lower a number when its file shrinks;
+ * never raise one.
+ */
+export const SPLIT_CEILINGS: Readonly<Record<string, number>> = {
+  'apps/light/src/features/tracker/Tracker.tsx': 365,
+};
+
 export interface SizedFile {
   readonly path: string;
   readonly lines: number;
@@ -78,6 +88,15 @@ describe('screen files stay small enough to edit in parallel (L-305)', () => {
     }));
     expect(files.length).toBeGreaterThan(50);
     expect(sizeProblems(files, LINE_LIMIT, CEILINGS)).toEqual([]);
+  });
+
+  it('a screen already split stays at or under its own lower ceiling (L-358)', () => {
+    for (const [path, ceiling] of Object.entries(SPLIT_CEILINGS)) {
+      expect(ceiling).toBeLessThan(LINE_LIMIT);
+      // A missing file throws here, so a stale entry fails rather than passing.
+      const lines = lineCount(readFileSync(join(REPO_ROOT, path), 'utf8'));
+      expect(sizeProblems([{ path, lines }], ceiling, {})).toEqual([]);
+    }
   });
 });
 

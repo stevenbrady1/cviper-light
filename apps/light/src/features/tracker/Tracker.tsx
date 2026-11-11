@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import {
-  type ApplicationStatus,
-  type InterviewSubstage,
-  type Job,
-  type Result,
-} from '@cviper/core-types';
+import { type Job } from '@cviper/core-types';
 
 import { type ChatTransport } from '@cviper/ai-providers';
 
@@ -17,13 +12,8 @@ import { viewById } from '../../app/views';
 import { readAvailability as readRealAvailability } from '../analysis/availability';
 import { type ConsentPort } from '../analysis/consent';
 import { type Availability } from '../analysis/providers';
-import {
-  NO_SAVED_PROGRESS,
-  createDbBoardProgressPort,
-  type BoardProgressPort,
-  type SavedProgress,
-} from '../flow/progress';
-import { type JobProgress, type StepId } from '../flow/steps';
+import { type BoardProgressPort } from '../flow/progress';
+import { type StepId } from '../flow/steps';
 
 import { FunnelStrip } from './FunnelStrip';
 import { type PageFetchTransport } from './pageFetch';
@@ -32,16 +22,11 @@ import { TrackerBoard } from './TrackerBoard';
 import { AddApplicationButton, PasteJobButton } from './TrackerButtons';
 import { EmptyBoard } from './TrackerEmptyBoard';
 import { TrackerSidePane, type Pane } from './TrackerSidePane';
-import {
-  createEntry,
-  groupByStatus,
-  withEdit,
-  withStatus,
-  withSubstage,
-  type ApplicationDraft,
-  type TrackerEntry,
-} from './model';
+import { groupByStatus, type TrackerEntry } from './model';
 import { createDbTrackerPort, type TrackerPort } from './port';
+import { useBoardProgress } from './useBoardProgress';
+import { useTrackerEntries } from './useTrackerEntries';
+import { useTrackerSubstages } from './useTrackerSubstages';
 
 /**
  * The application tracker: five columns, one card per application.
@@ -70,9 +55,6 @@ import { createDbTrackerPort, type TrackerPort } from './port';
  * in its new column, and nothing else in the app moves at all. See theme.css,
  * where `prefers-reduced-motion` removes even that.
  */
-
-/** How long the settle animation runs. Matches the keyframe in theme.css. */
-const SETTLE_MS = 200;
 
 export interface TrackerProps {
   /**
@@ -162,63 +144,15 @@ export function Tracker({
   const clock = useMemo(() => now ?? new Date(), [now]);
   const today = todayIsoDate(clock);
 
+  // The board is held here because all three hooks below need it. Their order,
+  // and the availability effect's place between them, is the order the effects
+  // ran in when they all lived in this file (L-358): steps, availability, cards,
+  // interview stages.
   const [entries, setEntries] = useState<readonly TrackerEntry[]>([]);
 
-  // ── Each job's steps (L-200) ─────────────────────────────────────────────
-  const boardProgress = useMemo<BoardProgressPort>(
-    () =>
-      boardProgressPort ??
-      (port === undefined ? createDbBoardProgressPort() : { loadAll: async () => new Map() }),
-    [boardProgressPort, port],
-  );
-  const [savedProgress, setSavedProgress] = useState<ReadonlyMap<string, SavedProgress>>(
-    () => new Map(),
-  );
-  // Re-read whenever the board changes: a card added, moved or removed may
-  // have brought or taken a saved CV with it.
-  useEffect(() => {
-    let cancelled = false;
-    void boardProgress.loadAll().then((loaded) => {
-      if (!cancelled) setSavedProgress(loaded);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [boardProgress, entries]);
-  const progressFor = useCallback(
-    (entry: TrackerEntry): JobProgress => {
-      const saved = savedProgress.get(entry.job.id) ?? NO_SAVED_PROGRESS;
-      return {
-        analysed: saved.analysed,
-        tailored: tailoredJob?.(entry.job.id) ?? false,
-        exported: saved.exported,
-      };
-    },
-    [savedProgress, tailoredJob],
-  );
+  const progressFor = useBoardProgress({ boardProgressPort, port, entries, tailoredJob });
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const loadInProgress = useRef(false);
-  const loadRequest = useRef(0);
   const [pane, setPane] = useState<Pane>({ kind: 'closed' });
-  const [settlingId, setSettlingId] = useState<string | null>(null);
-  /**
-   * The user's interview sub-stages (L-205), and whether they were READ.
-   *
-   * The second matters more than it looks. Saving replaces the stored list with
-   * this one, so editing after a failed read would write an empty list over the
-   * real one. Until `substagesLoaded`, nothing that edits them is offered.
-   */
-  const [substages, setSubstages] = useState<readonly InterviewSubstage[]>([]);
-  const [substagesLoaded, setSubstagesLoaded] = useState(false);
-  /** Why the list could not be read, or null. */
-  const [substagesFailed, setSubstagesFailed] = useState<string | null>(null);
-  const substagesRef = useRef<readonly InterviewSubstage[]>([]);
-  /** One sub-stage save at a time. A ref as well as state: the check must be synchronous. */
-  const savingSubstagesRef = useRef(false);
-  const [savingSubstages, setSavingSubstages] = useState(false);
   /**
    * What this machine can offer the detail pane's AI panels. `null` until the
    * first card is opened: the probe (Ollama's port, the credential store) is
@@ -238,68 +172,28 @@ export function Tracker({
     };
   }, [availability, pane.kind, probe]);
 
-  const loadEntries = useCallback(async () => {
-    if (loadInProgress.current) return;
-    loadInProgress.current = true;
-    const request = ++loadRequest.current;
-    setLoading(true);
-
-    try {
-      const loaded = await trackerPort.load();
-      if (request !== loadRequest.current) return;
-
-      if (loaded.ok) {
-        setEntries(loaded.value);
-        setLoadFailed(false);
-        setError(null);
-      } else {
-        setLoadFailed(true);
-        setError(`${loaded.error.message} Your data is still on this machine.`);
-      }
-    } catch (loadError) {
-      if (request !== loadRequest.current) return;
-      const message = loadError instanceof Error ? loadError.message : String(loadError);
-      setLoadFailed(true);
-      setError(`${message} Your data is still on this machine.`);
-    } finally {
-      if (request === loadRequest.current) {
-        loadInProgress.current = false;
-        setLoading(false);
-      }
-    }
-  }, [trackerPort]);
-
-  useEffect(() => {
-    void loadEntries();
-    return () => {
-      loadInProgress.current = false;
-      loadRequest.current += 1;
-    };
-  }, [loadEntries]);
-
-  const loadSubstages = useCallback(async () => {
-    setSubstagesFailed(null);
-    let message: string;
-    try {
-      const read = await trackerPort.substages();
-      if (read.ok) {
-        substagesRef.current = read.value;
-        setSubstages(read.value);
-        setSubstagesLoaded(true);
-        return;
-      }
-      message = read.error.message;
-    } catch (cause) {
-      // A port that cannot answer is the same as one that said no.
-      message = cause instanceof Error ? cause.message : String(cause);
-    }
-    // The board still works without them; only the editing is withheld.
-    setSubstagesFailed(message);
-  }, [trackerPort]);
-
-  useEffect(() => {
-    void loadSubstages();
-  }, [loadSubstages]);
+  const {
+    loading,
+    loadFailed,
+    error,
+    loadEntries,
+    settlingId,
+    save,
+    onStatusChange,
+    onEdit,
+    onCreate,
+    onDelete,
+  } = useTrackerEntries({ trackerPort, entries, setEntries, setPane });
+  const {
+    substages,
+    substagesLoaded,
+    substagesFailed,
+    substagesRef,
+    savingSubstages,
+    loadSubstages,
+    onSubstageChange,
+    applySubstages,
+  } = useTrackerSubstages({ trackerPort, entries, setEntries, save });
 
   /** Where focus goes back to when the stage editor closes. */
   const editorOpener = useRef<HTMLElement | null>(null);
@@ -324,214 +218,6 @@ export function Tracker({
         : document.querySelector<HTMLElement>('[data-testid="tracker-edit-substages"]');
     target?.focus();
   }, [pane.kind]);
-
-  const replace = useCallback((next: TrackerEntry) => {
-    setEntries((current) =>
-      current.map((entry) => (entry.application.id === next.application.id ? next : entry)),
-    );
-  }, []);
-
-  /**
-   * Write one changed entry.
-   *
-   * OPTIMISTIC, and it says so when it is wrong: the board updates immediately,
-   * and a failed write puts the old entry back AND raises the message. Waiting
-   * for SQLite before moving a dragged card makes the board feel broken; moving
-   * it and never telling the user it did not stick would be worse.
-   */
-  const save = useCallback(
-    async (previous: TrackerEntry, next: TrackerEntry) => {
-      setError(null);
-      replace(next);
-
-      const written = await trackerPort.saveApplication(next.application);
-      if (written.ok) return;
-
-      replace(previous);
-      setError(`That change could not be saved: ${written.error.message} Try again.`);
-    },
-    [replace, trackerPort],
-  );
-
-  const onStatusChange = useCallback(
-    (applicationId: string, status: ApplicationStatus) => {
-      const previous = entries.find((entry) => entry.application.id === applicationId);
-      if (previous === undefined) return;
-      if (previous.application.status === status) return;
-
-      const next: TrackerEntry = {
-        ...previous,
-        application: withStatus(previous.application, status, new Date().toISOString()),
-      };
-
-      setSettlingId(applicationId);
-      window.setTimeout(() => setSettlingId(null), SETTLE_MS);
-
-      void save(previous, next);
-    },
-    [entries, save],
-  );
-
-  const onEdit = useCallback(
-    (applicationId: string, changes: Parameters<typeof withEdit>[1]) => {
-      const previous = entries.find((entry) => entry.application.id === applicationId);
-      if (previous === undefined) return;
-
-      const next: TrackerEntry = {
-        ...previous,
-        application: withEdit(previous.application, changes, new Date().toISOString()),
-      };
-
-      void save(previous, next);
-    },
-    [entries, save],
-  );
-
-  const onSubstageChange = useCallback(
-    (applicationId: string, substageId: string | null) => {
-      const previous = entries.find((entry) => entry.application.id === applicationId);
-      if (previous === undefined) return;
-      if ((previous.application.interview_substage_id ?? null) === substageId) return;
-
-      const next: TrackerEntry = {
-        ...previous,
-        application: withSubstage(
-          previous.application,
-          substageId,
-          substagesRef.current,
-          new Date().toISOString(),
-        ),
-      };
-
-      void save(previous, next);
-    },
-    [entries, save],
-  );
-
-  /**
-   * Save a changed sub-stage list, optimistically, and answer with the reason
-   * if it did not stick (`null` when it did).
-   *
-   * `removedId` is the one sub-stage being taken away, if any. The database
-   * unsets it on every card that used it (`ON DELETE SET NULL`); the board does
-   * the same in memory so it does not have to reload to agree. On a failed
-   * save both go back, so the screen never shows a state the database refused.
-   */
-  const applySubstages = useCallback(
-    async (
-      change: Result<InterviewSubstage[], string>,
-      removedId: string | null = null,
-    ): Promise<string | null> => {
-      if (!change.ok) return change.error;
-      // Serial, because the save REPLACES the stored list: a second one built
-      // on a list the first has not confirmed can delete real stages.
-      if (savingSubstagesRef.current) return 'Wait for the current save to finish.';
-      savingSubstagesRef.current = true;
-      setSavingSubstages(true);
-
-      try {
-        const affected = new Set(
-          entries
-            .filter(
-              (entry) =>
-                removedId !== null && entry.application.interview_substage_id === removedId,
-            )
-            .map((entry) => entry.application.id),
-        );
-
-        substagesRef.current = change.value;
-        setSubstages(change.value);
-        if (removedId !== null) {
-          setEntries((current) =>
-            current.map((entry) =>
-              affected.has(entry.application.id)
-                ? { ...entry, application: { ...entry.application, interview_substage_id: null } }
-                : entry,
-            ),
-          );
-        }
-
-        const written = await trackerPort.saveSubstages(change.value);
-        if (written.ok) return null;
-
-        // FAILED. Do not restore a snapshot: ask the database what it holds. The
-        // write may have half landed, and a stale snapshot is what the next
-        // edit would build its delete on.
-        const [reread, reloaded] = await Promise.all([trackerPort.substages(), trackerPort.load()]);
-        if (reread.ok) {
-          substagesRef.current = reread.value;
-          setSubstages(reread.value);
-        } else {
-          // Could not ask the database what it holds. Do NOT fall back to the
-          // list from before the edit: that is exactly the stale picture the
-          // next save would delete against. Block editing until Retry works.
-          setSubstagesLoaded(false);
-          setSubstagesFailed(reread.error.message);
-        }
-        if (reloaded.ok) {
-          setEntries(reloaded.value);
-        } else if (removedId !== null) {
-          setEntries((current) =>
-            current.map((entry) =>
-              affected.has(entry.application.id)
-                ? {
-                    ...entry,
-                    application: { ...entry.application, interview_substage_id: removedId },
-                  }
-                : entry,
-            ),
-          );
-        }
-        return `That change could not be saved: ${written.error.message} Try again.`;
-      } finally {
-        savingSubstagesRef.current = false;
-        setSavingSubstages(false);
-      }
-    },
-    [entries, trackerPort],
-  );
-
-  const onCreate = useCallback(
-    async (draft: ApplicationDraft) => {
-      setError(null);
-
-      const entry = createEntry(
-        draft,
-        { jobId: crypto.randomUUID(), applicationId: crypto.randomUUID() },
-        new Date().toISOString(),
-      );
-
-      const created = await trackerPort.create(entry);
-      if (!created.ok) {
-        setError(`That application could not be saved: ${created.error.message} Try again.`);
-        return;
-      }
-
-      setEntries((current) => [...current, entry]);
-      // Straight into the detail pane for the new card. The user almost always
-      // wants to add a next action while it is still in their head.
-      setPane({ kind: 'entry', applicationId: entry.application.id });
-    },
-    [trackerPort],
-  );
-
-  const onDelete = useCallback(
-    async (entry: TrackerEntry) => {
-      setError(null);
-
-      const removed = await trackerPort.remove(entry);
-      if (!removed.ok) {
-        setError(`That application could not be deleted: ${removed.error.message} Try again.`);
-        return;
-      }
-
-      setEntries((current) =>
-        current.filter((candidate) => candidate.application.id !== entry.application.id),
-      );
-      setPane({ kind: 'closed' });
-    },
-    [trackerPort],
-  );
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const visibleEntries = useMemo(() => {
