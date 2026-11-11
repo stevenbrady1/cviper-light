@@ -379,14 +379,22 @@ export function Settings({
 
           <section>
             <SectionHeading icon="data" title="Your data" />
+            {/*
+              `leading-none` on the `.json` (L-364): this line sits above Job
+              boards, where "Manage job boards" scrolls to. At the line's own
+              height the mono face's metrics made it taller or shorter
+              depending on which face had loaded, so the section moved when
+              Plex Mono landed. At `leading-none` the line is the paragraph's
+              own height whatever the face. Measured: no pixel changes.
+            */}
             <p className="mt-1 text-ink-muted">
               Everything CViper Light knows lives in one file on this computer: the jobs you have
               saved, the applications you are chasing, the text of your CVs, every check you have
               run, the profile you filled in, and every document the app wrote for an application —
               tailored CVs, cover letters, follow-ups and interview packs. Exporting writes all of
-              it into a single <code>.json</code> file that you choose the location of. Nothing is
-              uploaded, and nothing is sent anywhere — the file goes exactly where you put it and
-              nowhere else.
+              it into a single <code className="leading-none">.json</code> file that you choose the
+              location of. Nothing is uploaded, and nothing is sent anywhere — the file goes exactly
+              where you put it and nowhere else.
             </p>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">

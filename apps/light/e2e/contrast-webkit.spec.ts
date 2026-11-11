@@ -1074,3 +1074,244 @@ describe('every screen opens at the top of its scroll areas (L-353)', () => {
     await page.context().close();
   });
 });
+
+/**
+ * The mono font cannot move Settings after a jump (L-364).
+ *
+ * The fix for the "known, separate" late shift that the L-353 Settings check
+ * above describes. Settings' backup section shows `.json` in IBM Plex Mono.
+ * On the narrow layout nothing had drawn that face before Settings did, so it
+ * was fetched only then, after Settings had worked out where to scroll. The
+ * fallback face's line box is a different height (0.5px on Windows, about 2px
+ * on CI's Linux), so the section moved once the real face landed, and the
+ * first jump into Settings stopped that far off. The desktop layout was never
+ * affected: the side menu's "Ctrl N" labels draw the same face at startup.
+ *
+ * The fix has two parts. The app loads both Plex Mono faces as it starts
+ * (`app/startupFonts.ts`), so no screen lays out before them; and the `.json`
+ * code carries `leading-none`, so that one line's height does not depend on
+ * any font's metrics, however late the font arrives.
+ *
+ * Every check here serves a DIFFERENT font in place of Plex Mono (Newsreader,
+ * whose line box differs from every platform's fallback mono face). That makes
+ * the shift big and the same on every OS, instead of the half pixel Windows
+ * happened to show.
+ *
+ * "Late" is made exact rather than raced: once the app has started, any Plex
+ * Mono face asked for is HELD until the screen has settled, measured, and then
+ * let through. A screen whose height then changes would have moved under the
+ * user. Holding also keeps slow, unrelated content (a store loading) out of the
+ * comparison, because both measurements are taken after it has arrived.
+ */
+const MONO_FACES = /\/fonts\/ibm-plex-mono-(400|500)-latin\.woff2$/;
+const STAND_IN = join(DIST, 'fonts', 'newsreader-400-latin.woff2');
+
+interface StandInApp {
+  readonly page: Page;
+  /** Every Plex Mono face the page asked for, in order. */
+  readonly served: readonly string[];
+  /** From now on, hold every Plex Mono face asked for until `release`. */
+  holdLateFonts(): void;
+  /** Let held faces through; returns the ones that were held. */
+  release(): string[];
+}
+
+/** The app, started with every Plex Mono face it asks for answered by the stand-in. */
+async function openWithMonoStandIn(
+  viewport: { width: number; height: number },
+  query = '?seen=1',
+): Promise<StandInApp> {
+  const context = await browser.newContext({ viewport, colorScheme: 'light' });
+  const served: string[] = [];
+  let held: string[] = [];
+  let gate: Promise<void> | null = null;
+  let open = (): void => undefined;
+  await context.route(MONO_FACES, async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    served.push(path);
+    if (gate !== null) {
+      held.push(path);
+      await gate;
+    }
+    await route.fulfill({ status: 200, contentType: 'font/woff2', body: readFileSync(STAND_IN) });
+  });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`${origin}/${query}`);
+  await page.waitForSelector('[data-testid="shell"]');
+  // Startup is over only once everything the app asks for while starting has
+  // landed. `fonts.ready` alone can settle before the first frame has even
+  // asked for a face (a face is requested when text first needs it, and the
+  // app's own requests run in an effect after the first paint), and anything
+  // asked for after this point counts as late.
+  await layoutSettled(page, { fonts: true });
+  await page.evaluate(() => document.fonts.ready);
+  assert.deepEqual(errors, [], 'the app threw while drawing');
+  return {
+    page,
+    served,
+    holdLateFonts: () => {
+      gate = new Promise((done) => {
+        open = done;
+      });
+    },
+    release: () => {
+      const was = held;
+      held = [];
+      gate = null;
+      open();
+      return was;
+    },
+  };
+}
+
+/**
+ * No scroll area has moved or changed height for 20 frames. Not waiting for
+ * `document.fonts.ready` when told a font is being held: it would never come.
+ */
+async function layoutSettled(page: Page, { fonts }: { fonts: boolean }): Promise<void> {
+  await page.evaluate(async (waitForFonts) => {
+    if (waitForFonts) await document.fonts.ready;
+    let last = '';
+    let still = 0;
+    for (let frame = 0; frame < 600 && still < 20; frame += 1) {
+      await new Promise((done) => requestAnimationFrame(done));
+      const now = [...document.querySelectorAll('*')]
+        .filter((element) => ['auto', 'scroll'].includes(getComputedStyle(element).overflowY))
+        .map((area) => `${String(area.scrollTop)}:${String(area.scrollHeight)}`)
+        .join(',');
+      still = now === last ? still + 1 : 0;
+      last = now;
+    }
+  }, fonts);
+}
+
+/** How tall everything above Job boards is: where the section starts in its column. */
+async function aboveBoards(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const section = document.querySelector('[data-testid="boards-settings"]');
+    const column = section?.closest('[data-content-column]');
+    if (section === null || column === null || column === undefined) {
+      throw new Error('no Job boards section in a content column');
+    }
+    return section.getBoundingClientRect().top - column.getBoundingClientRect().top;
+  });
+}
+
+/**
+ * The open screen, and every scroll area in it (either direction: the Tracker
+ * board scrolls sideways): its content height, child by child.
+ */
+async function screenHeights(page: Page, view: string): Promise<string[]> {
+  return page.evaluate((selector) => {
+    const screen = document.querySelector(selector);
+    if (screen === null) throw new Error(`no ${selector}`);
+    const scrolls = (element: Element): boolean => {
+      const style = getComputedStyle(element);
+      return [style.overflowY, style.overflowX].some((o) => ['auto', 'scroll'].includes(o));
+    };
+    return [screen, ...[...screen.querySelectorAll('*')].filter(scrolls)].map(
+      (area) =>
+        `${area.getAttribute('data-testid') ?? area.tagName.toLowerCase()}: ` +
+        `${String(area.scrollHeight)} / ` +
+        [...area.children].map((child) => String(child.getBoundingClientRect().height)).join(','),
+    );
+  }, `[data-testid="view-${view}"]`);
+}
+
+/** The other screens, each in a fresh app so its first look is the one measured. */
+const OTHER_VIEWS = ['profile', 'search', 'tracker', 'analysis', 'tailor'] as const;
+
+describe('the mono font cannot move Settings after a jump (L-364)', () => {
+  for (const [width, viewport] of Object.entries(VIEWPORTS)) {
+    const padding = width === 'phone' ? 16 : 20;
+
+    it(`Settings above Job boards is as tall before a late mono font as after, ${width}`, async () => {
+      const app = await openWithMonoStandIn(viewport);
+      app.holdLateFonts();
+      await goTo(app.page, 'settings');
+      await layoutSettled(app.page, { fonts: false });
+      const before = await aboveBoards(app.page);
+      const late = app.release();
+      await layoutSettled(app.page, { fonts: true });
+      const after = await aboveBoards(app.page);
+      console.log(
+        `Settings above Job boards (${width}): ${JSON.stringify({ before, after, late })}`,
+      );
+      // The stand-in really was drawn, or nothing here was tested.
+      assert.ok(
+        app.served.some((path) => path.includes('plex-mono-400')),
+        `Plex Mono 400 was never asked for: ${JSON.stringify(app.served)}`,
+      );
+      assert.ok(before > 0, 'Job boards is at the top: nothing above it to measure');
+      assert.equal(after, before, 'Job boards moved when the mono font landed');
+      await app.page.context().close();
+    });
+
+    // The assertion L-353 had to leave out: where the section really stops,
+    // after every font has landed.
+    it(`Settings opened at Job boards stops the padding below the top, ${width}`, async () => {
+      const app = await openWithMonoStandIn(viewport);
+      await goTo(app.page, 'search');
+      await app.page.click('[data-testid="keyless-manage"]');
+      await app.page.locator('[data-testid="nav-settings"][aria-current="page"]:visible').waitFor();
+      await app.page.locator('[data-testid="boards-settings"]:focus').waitFor();
+      await layoutSettled(app.page, { fonts: true });
+      const seen = await landing(app.page, '[data-testid="boards-settings"]');
+      console.log(`Settings landed at Job boards (${width}): ${JSON.stringify(seen)}`);
+      assert.ok(seen.scrollTop > 0, 'Settings did not scroll at all');
+      assert.ok(!seen.atEnd, 'the area ran out of room, so where it stopped proves nothing');
+      assert.equal(seen.padding, padding);
+      assert.equal(seen.gap, padding, 'Job boards did not stop the padding below the top');
+      await app.page.context().close();
+    });
+
+    // NEGATIVE — no other screen changes height when a mono font lands after
+    // it has drawn.
+    it(`no other screen changes height when a mono font lands late, ${width}`, async () => {
+      const report: string[] = [];
+      for (const view of OTHER_VIEWS) {
+        // An empty board has nothing to scroll; three applications do.
+        const app = await openWithMonoStandIn(
+          viewport,
+          view === 'tracker' ? '?seen=1&entries=1' : '?seen=1',
+        );
+        // Tracker is where the app opens. Step away so it is drawn again.
+        if (view === 'tracker') await goTo(app.page, 'profile');
+        app.holdLateFonts();
+        await goTo(app.page, view);
+        await layoutSettled(app.page, { fonts: false });
+        const before = await screenHeights(app.page, view);
+        const late = app.release();
+        await layoutSettled(app.page, { fonts: true });
+        const after = await screenHeights(app.page, view);
+        console.log(`${view} (${width}): ${JSON.stringify({ heights: after, late })}`);
+        assert.ok(before.length > 1, `${view}: no scroll area measured: ${JSON.stringify(before)}`);
+        if (JSON.stringify(after) !== JSON.stringify(before)) {
+          report.push(`${view}: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+        }
+        await app.page.context().close();
+      }
+      assert.deepEqual(report, []);
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check. A line above Job boards
+  // that grows between the two measurements moves the section, and is caught.
+  it('the check can fail: a line above Job boards growing after it settled is reported', async () => {
+    const app = await openWithMonoStandIn(VIEWPORTS.phone);
+    await goTo(app.page, 'settings');
+    await layoutSettled(app.page, { fonts: true });
+    const before = await aboveBoards(app.page);
+    await app.page.evaluate(() => {
+      const code = document.querySelector<HTMLElement>('[data-content-column] code');
+      if (code === null) throw new Error('no code above Job boards');
+      code.style.lineHeight = '40px';
+    });
+    await layoutSettled(app.page, { fonts: true });
+    const after = await aboveBoards(app.page);
+    assert.notEqual(after, before, `a taller line went unnoticed: ${String(before)}`);
+    await app.page.context().close();
+  });
+});

@@ -43,11 +43,11 @@ import { nextStateAfterCheck } from '../features/settings/updates/model';
 import { createTauriUpdatePort } from '../features/settings/updates/port';
 import { detectMobileOs } from '../platform/os';
 import { readEnvironmentStatus, type EnvironmentStatus } from '../status/environment';
-
 import { BottomNav } from './BottomNav';
 import { QUIET_BUTTON } from './buttons';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Sidebar } from './Sidebar';
+import { useStartupFonts } from './startupFonts';
 import { useViewportClass } from './viewport';
 import { DEFAULT_VIEW, viewForShortcut, type ViewId } from './views';
 import { LiveStatus } from './LiveStatus';
@@ -191,6 +191,7 @@ export default function App({
   boardProgressPort,
 }: AppProps = {}) {
   const [activeView, setActiveView] = useState<ViewId>(DEFAULT_VIEW);
+  useStartupFonts(); // L-364: the mono faces load before any screen needs them
   /**
    * A place for Settings to open at, set by Search's "Manage job boards"
    * (L-310) or "Get a free Reed key" (L-338) and cleared by Settings once it
