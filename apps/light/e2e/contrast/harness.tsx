@@ -15,11 +15,13 @@
  * Neither changes a single class name or colour. What the spec measures —
  * which text colour lands on which painted background — is the app's own.
  *
- * The page reads three switches from the address:
+ * The page reads four switches from the address:
  *   - `?seen=1` skips the first-run welcome, as a returning user sees the app;
  *   - `?entries=1` puts three applications on the board;
  *   - `?results=1` says a job-board key is saved, and answers Search with a long
- *     list of adverts from the fake port (L-342: what results do to the layout).
+ *     list of adverts from the fake port (L-342: what results do to the layout);
+ *   - `?marks=1` draws, instead of the app, the three components that put a
+ *     drawn mark beside words (L-370: is any row taller for its mark).
  *
  * This file is never part of the app's own build: `vite.config.ts` builds
  * `index.html` at the app root, and this page has its own config.
@@ -121,14 +123,85 @@ searchPort?.nextOutcome(
 const root = document.getElementById('root');
 if (root === null) throw new Error('#root missing from the contrast harness');
 
+/**
+ * `?marks=1` (L-370): the three places a drawn mark sits beside words — the
+ * ATS Score table, a job's step bar and a tracker card's dots — on their own,
+ * so a row's height can be measured with and without its mark. The real
+ * components, fed the states that show every mark: OK, Check and Missing, a
+ * rise and a fall; done, skipped, current and to do, and back to the tracker;
+ * three dots and two rings.
+ */
+async function marksSheet(): Promise<React.ReactElement> {
+  const { AtsStep } = await import('../../src/features/tailor/AtsStep');
+  const { JobStepBar } = await import('../../src/features/flow/JobStepBar');
+  const { CardProgress } = await import('../../src/features/flow/CardProgress');
+  const nothing = (): void => undefined;
+  return (
+    <main data-testid="marks-sheet" className="space-y-4 p-4 md:p-5">
+      <AtsStep
+        comparison={{
+          keyword: { before: 16, after: 43, delta: 27, beforeReason: null, afterReason: null },
+          bullets: { before: 84, after: 81, delta: -3, totalBefore: 6, totalAfter: 6 },
+          checks: [
+            {
+              id: 'section_headers',
+              label: 'Structure & sections',
+              before: 'fail',
+              after: 'pass',
+              afterMessage: 'Your CV has the sections a scanner looks for.',
+            },
+            {
+              id: 'contact_info',
+              label: 'Contact details',
+              before: 'warn',
+              after: 'warn',
+              afterMessage: 'Add a phone number.',
+            },
+            {
+              id: 'cv_length',
+              label: 'Length',
+              before: 'fail',
+              after: 'pass',
+              afterMessage: 'A good length.',
+            },
+          ],
+          stillMissing: [],
+          wordsAfter: 500,
+        }}
+        fabrication={{ clean: true, flagged: 0 }}
+      />
+      <JobStepBar
+        title="Insight Analyst"
+        company="Larkspur Water Services"
+        location="Sheffield"
+        current="ats"
+        progress={{ analysed: false, tailored: true, exported: false }}
+        onStep={nothing}
+        onTracker={nothing}
+      />
+      <div className="w-44 rounded-card border border-line bg-card pb-2">
+        <CardProgress
+          applicationId="marks"
+          progress={{ analysed: true, tailored: true, exported: false }}
+          onContinue={nothing}
+        />
+      </div>
+    </main>
+  );
+}
+
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <App
-      trackerPort={createFakeTrackerPort(entries)}
-      profilePort={createFakeProfilePort()}
-      tailorPort={createFakeTailorPort()}
-      {...(searchPort === undefined ? {} : { searchPort })}
-      now={NOW}
-    />
+    {params.get('marks') === '1' ? (
+      await marksSheet()
+    ) : (
+      <App
+        trackerPort={createFakeTrackerPort(entries)}
+        profilePort={createFakeProfilePort()}
+        tailorPort={createFakeTailorPort()}
+        {...(searchPort === undefined ? {} : { searchPort })}
+        now={NOW}
+      />
+    )}
   </React.StrictMode>,
 );
