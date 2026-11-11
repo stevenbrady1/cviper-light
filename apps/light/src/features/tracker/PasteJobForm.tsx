@@ -541,12 +541,7 @@ export function PasteJobForm({
           Fill it in myself
         </button>
 
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="rounded-control px-3 py-1.5 text-ink-muted hover:bg-sunken hover:text-ink"
-        >
+        <button type="button" onClick={onCancel} disabled={busy} className={QUIET_BUTTON}>
           Cancel
         </button>
       </div>
