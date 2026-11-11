@@ -869,3 +869,137 @@ describe('the Search button stays on screen on short windows (L-342)', () => {
     await page.context().close();
   });
 });
+
+/**
+ * Every screen opens at the top of its scroll areas (L-353).
+ *
+ * Tailor scrolls to its current step when it opens, and `scrollWithin`
+ * measured from the scroll area's outer edge, not from where its content
+ * starts — so it counted the area's own top padding (20px, 16px on a phone) as
+ * distance to scroll. Tailor opened 20px down, "Your CV" tight under the step
+ * bar. Settings, opened at Job boards or the Reed key, uses the same function:
+ * its section now lands with that same gap above it rather than flush.
+ *
+ * jsdom does no layout and has no padding, so only a real engine can see this.
+ */
+
+/** Wait until no scroll area has moved for a while: the step scroll is smooth. */
+async function scrollingSettled(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const areas = [...document.querySelectorAll('*')].filter((element) =>
+      ['auto', 'scroll'].includes(getComputedStyle(element).overflowY),
+    );
+    let last = '';
+    let still = 0;
+    for (let frame = 0; frame < 600 && still < 20; frame += 1) {
+      await new Promise((done) => requestAnimationFrame(done));
+      const now = areas.map((area) => String(area.scrollTop)).join(',');
+      still = now === last ? still + 1 : 0;
+      last = now;
+    }
+  });
+}
+
+/** Every scroll area on the page that is not at its top. Empty means all are. */
+async function scrolledAreas(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('*')]
+      .filter((element) => ['auto', 'scroll'].includes(getComputedStyle(element).overflowY))
+      .filter((area) => area.scrollTop !== 0)
+      .map((area) => {
+        const name =
+          area.getAttribute('data-testid') ??
+          area.closest('[data-testid^="view-"]')?.getAttribute('data-testid') ??
+          area.tagName.toLowerCase();
+        return `${name}: scrolled ${String(area.scrollTop)}px`;
+      }),
+  );
+}
+
+/** Where a target sits in its scroll area, against the area's own top padding. */
+async function landing(
+  page: Page,
+  target: string,
+): Promise<{ gap: number; padding: number; scrollTop: number; atEnd: boolean }> {
+  return page.evaluate((selector) => {
+    const element = document.querySelector(selector);
+    const area = element?.parentElement?.closest('.overflow-y-auto');
+    if (element === null || area === null || area === undefined) throw new Error(`no ${selector}`);
+    return {
+      gap: element.getBoundingClientRect().top - area.getBoundingClientRect().top,
+      padding: parseFloat(getComputedStyle(area).paddingTop),
+      scrollTop: area.scrollTop,
+      atEnd: area.scrollTop >= area.scrollHeight - area.clientHeight - 1,
+    };
+  }, target);
+}
+
+describe('every screen opens at the top of its scroll areas (L-353)', () => {
+  for (const [width, viewport] of Object.entries(VIEWPORTS)) {
+    const padding = width === 'phone' ? 16 : 20;
+
+    it(`Tailor opens at the top of its own scroll area, ${width}`, async () => {
+      const page = await open('?seen=1', viewport);
+      await goTo(page, 'tailor');
+      await page.waitForSelector('[data-testid="tailor-scroll"] [data-content-column]');
+      await scrollingSettled(page);
+      const seen = await landing(page, '[data-testid="tailor-scroll"] [data-content-column]');
+      const room = await page.evaluate(() => {
+        const area = document.querySelector('[data-testid="tailor-scroll"]');
+        return area === null ? 0 : area.scrollHeight - area.clientHeight;
+      });
+      console.log(`Tailor opened (${width}): ${JSON.stringify({ ...seen, room })}`);
+      // Room to scroll, or the bug could not show: an area that cannot move
+      // stays at the top whatever it is asked.
+      assert.ok(room > padding, `Tailor's area has only ${String(room)}px to scroll`);
+      assert.equal(seen.scrollTop, 0, 'Tailor opened scrolled down');
+      assert.equal(seen.padding, padding);
+      assert.equal(seen.gap, padding, '"Your CV" is not the padding below the step bar');
+      await page.context().close();
+    });
+
+    it(`no screen opens with a scroll area already scrolled, ${width}`, async () => {
+      const page = await open('?seen=1', viewport);
+      const report: string[] = [];
+      for (const view of VIEWS) {
+        await goTo(page, view);
+        await scrollingSettled(page);
+        report.push(...(await scrolledAreas(page)).map((line) => `${view} — ${line}`));
+      }
+      assert.deepEqual(report, []);
+      await page.context().close();
+    });
+
+    it(`Settings opened at Job boards puts the section the padding below the top, ${width}`, async () => {
+      const page = await open('?seen=1', viewport);
+      await goTo(page, 'search');
+      await page.click('[data-testid="keyless-manage"]');
+      await page.locator('[data-testid="nav-settings"][aria-current="page"]:visible').waitFor();
+      await page.locator('[data-testid="boards-settings"]:focus').waitFor();
+      await scrollingSettled(page);
+      const seen = await landing(page, '[data-testid="boards-settings"]');
+      console.log(`Settings at Job boards (${width}): ${JSON.stringify(seen)}`);
+      assert.ok(seen.scrollTop > 0, 'Settings did not scroll to the section');
+      assert.ok(!seen.atEnd, 'the area ran out of room, so the landing proves nothing');
+      assert.equal(seen.padding, padding);
+      assert.equal(seen.gap, padding, 'the section is not the padding below the top');
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a scroll area moved by hand is reported', async () => {
+    const page = await open('?seen=1', VIEWPORTS.desktop);
+    await goTo(page, 'settings');
+    await page.evaluate(() => {
+      const area = document.querySelector('[data-testid="view-settings"] .overflow-y-auto');
+      if (area !== null) area.scrollTop = 40;
+    });
+    const report = await scrolledAreas(page);
+    assert.ok(
+      report.some((line) => line.includes('scrolled 40px')),
+      `the moved area was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+});
