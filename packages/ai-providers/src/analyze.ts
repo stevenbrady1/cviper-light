@@ -37,6 +37,12 @@ import { clampAnalysis } from './clamp';
 import { extractJson, type JsonFailureKind, type RepairStrategy } from './extract-json';
 import { cvCharBudget } from './prompt/budget';
 import { buildAnalysisPrompt, buildRepairPrompt } from './prompt/build-prompt';
+import {
+  finalFailure,
+  jsonAttemptFailure,
+  schemaAttemptFailure,
+  type AttemptFailure,
+} from './schema-issues';
 import { reasoningFirstSchema } from './schema-order';
 import type { AiProvider, ProviderErrorKind } from './types';
 
@@ -81,56 +87,21 @@ export interface AnalysisSuccess {
 
 export interface AnalysisError {
   readonly kind: ProviderErrorKind | JsonFailureKind | 'schema-invalid';
-  /** Safe to show a user verbatim. */
+  /**
+   * Safe to show a user verbatim. A wrong shape twice is a fixed sentence
+   * (`WRONG_SHAPE_MESSAGE`), never the validator's text — see `schema-issues.ts`.
+   */
   readonly message: string;
+  /** For 'schema-invalid' only: the field names and reasons. Never the raw reply. */
+  readonly detail?: string;
   readonly retryCount: 0 | 1;
 }
-
-/**
- * The failure half of `CvAnalysisSchema.safeParse`.
- *
- * Derived from the schema rather than imported from `zod`, so this package
- * needs no direct dependency on a validation library it never calls itself —
- * and so the type cannot drift from the schema it describes.
- */
-type AnalysisParseFailure = Extract<
-  ReturnType<typeof CvAnalysisSchema.safeParse>,
-  { success: false }
->;
-
-/**
- * Turn Zod's issue list into something a model can act on.
- *
- * The path matters more than the prose: "match_score: expected number, received
- * string" tells the model exactly which key to fix, which is the whole point of
- * the repair turn.
- */
-function describeZodError(error: AnalysisParseFailure['error']): string {
-  const lines = error.issues
-    .slice(0, MAX_REPORTED_ISSUES)
-    .map((issue): string => {
-      const path = issue.path.length > 0 ? issue.path.join('.') : '(root)';
-      return `${path}: ${issue.message}`;
-    })
-    .join('\n');
-
-  return error.issues.length > MAX_REPORTED_ISSUES
-    ? `${lines}\n…and ${error.issues.length - MAX_REPORTED_ISSUES} more.`
-    : lines;
-}
-
-/** Enough to fix the reply, not so many that the repair turn becomes a wall. */
-const MAX_REPORTED_ISSUES = 8;
 
 interface Attempt {
   readonly analysis: CvAnalysis;
   readonly clampsApplied: readonly string[];
   readonly repairStrategy: RepairStrategy;
 }
-
-type AttemptFailure =
-  | { readonly kind: JsonFailureKind; readonly message: string; readonly raw: string }
-  | { readonly kind: 'schema-invalid'; readonly message: string; readonly raw: string };
 
 /**
  * Parse one raw reply. Never calls the provider — so the retry logic above it
@@ -139,7 +110,7 @@ type AttemptFailure =
 function interpret(raw: string): Result<Attempt, AttemptFailure> {
   const extracted = extractJson(raw, CV_ANALYSIS_JSON_SCHEMA.required);
   if (!extracted.ok) {
-    return err({ kind: extracted.failure, message: extracted.message, raw });
+    return err(jsonAttemptFailure(extracted, raw));
   }
 
   // Clamp BEFORE validating. A 3B model gets the edges wrong in a new way every
@@ -149,7 +120,7 @@ function interpret(raw: string): Result<Attempt, AttemptFailure> {
   const parsed = CvAnalysisSchema.safeParse(clamped.value);
 
   if (!parsed.success) {
-    return err({ kind: 'schema-invalid', message: describeZodError(parsed.error), raw });
+    return err(schemaAttemptFailure(parsed.error.issues, raw));
   }
 
   return ok({
@@ -211,7 +182,7 @@ export async function analyzeCv(
   }
 
   // ── Attempt 2: the one repair turn ────────────────────────────────────────
-  const repairUser = buildRepairPrompt(user, firstAttempt.error.raw, firstAttempt.error.message);
+  const repairUser = buildRepairPrompt(user, firstAttempt.error.raw, firstAttempt.error.repairHint);
   const second = await options.provider.chatJson({ ...request, user: repairUser });
   if (!second.ok) {
     return err({ kind: second.error.kind, message: second.error.message, retryCount: 1 });
@@ -219,11 +190,9 @@ export async function analyzeCv(
 
   const secondAttempt = interpret(second.value);
   if (!secondAttempt.ok) {
-    return err({
-      kind: secondAttempt.error.kind,
-      message: secondAttempt.error.message,
-      retryCount: 1,
-    });
+    // Twice. The person gets a sentence; the validator's words stay in
+    // `detail` (L-350). They were written for the model, not for a banner.
+    return err({ ...finalFailure(secondAttempt.error), retryCount: 1 });
   }
 
   return ok({

@@ -198,12 +198,12 @@ export {
   type ReviewPromptInput,
 } from './prompt/build-review-prompt';
 
+export { describeSchemaIssues, type SchemaIssue } from './schema-issues';
+
 export {
-  describeSchemaIssues,
   runStructuredCall,
   type PipelineError,
   type PipelineMeta,
-  type SchemaIssue,
   type StructuredCallOptions,
 } from './tailor-pipeline';
 

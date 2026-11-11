@@ -24,7 +24,16 @@ import { err, ok, type Result } from '@cviper/core-types';
 
 import { extractJson, type JsonFailureKind, type RepairStrategy } from './extract-json';
 import { buildRepairPrompt } from './prompt/build-prompt';
+import {
+  finalFailure,
+  jsonAttemptFailure,
+  schemaAttemptFailure,
+  type AttemptFailure,
+  type SchemaIssue,
+} from './schema-issues';
 import type { AiProvider, ChatJsonRequest, ProviderErrorKind } from './types';
+
+export type { SchemaIssue } from './schema-issues';
 
 export interface PipelineMeta {
   /** 0 when the first attempt validated, 1 when the repair turn rescued it. */
@@ -35,36 +44,14 @@ export interface PipelineMeta {
 
 export interface PipelineError {
   readonly kind: ProviderErrorKind | JsonFailureKind | 'schema-invalid';
-  /** Safe to show a user verbatim. */
+  /**
+   * Safe to show a user verbatim. A wrong shape twice is a fixed sentence
+   * (`WRONG_SHAPE_MESSAGE`), never the validator's text — see `schema-issues.ts`.
+   */
   readonly message: string;
+  /** For 'schema-invalid' only: the field names and reasons. Never the raw reply. */
+  readonly detail?: string;
   readonly retryCount: 0 | 1;
-}
-
-/** One Zod issue, as the caller's schema reports it. */
-export interface SchemaIssue {
-  readonly path: readonly PropertyKey[];
-  readonly message: string;
-}
-
-/** Enough to fix the reply, not so many that the repair turn becomes a wall. */
-const MAX_REPORTED_ISSUES = 8;
-
-/**
- * Turn a Zod issue list into something a model can act on. The path matters
- * more than the prose: "experience.0.bullets: expected array" names the key.
- */
-export function describeSchemaIssues(issues: readonly SchemaIssue[]): string {
-  const lines = issues
-    .slice(0, MAX_REPORTED_ISSUES)
-    .map((issue): string => {
-      const path = issue.path.length > 0 ? issue.path.map(String).join('.') : '(root)';
-      return `${path}: ${issue.message}`;
-    })
-    .join('\n');
-
-  return issues.length > MAX_REPORTED_ISSUES
-    ? `${lines}\n…and ${issues.length - MAX_REPORTED_ISSUES} more.`
-    : lines;
 }
 
 export interface StructuredCallOptions<T> {
@@ -78,24 +65,18 @@ export interface StructuredCallOptions<T> {
   readonly parse: (value: unknown) => Result<T, readonly SchemaIssue[]>;
 }
 
-type AttemptFailure = {
-  readonly kind: JsonFailureKind | 'schema-invalid';
-  readonly message: string;
-  readonly raw: string;
-};
-
 function interpret<T>(
   raw: string,
   options: StructuredCallOptions<T>,
 ): Result<{ value: T; repairStrategy: RepairStrategy }, AttemptFailure> {
   const extracted = extractJson(raw, options.requiredKeys);
   if (!extracted.ok) {
-    return err({ kind: extracted.failure, message: extracted.message, raw });
+    return err(jsonAttemptFailure(extracted, raw));
   }
 
   const parsed = options.parse(extracted.value);
   if (!parsed.ok) {
-    return err({ kind: 'schema-invalid', message: describeSchemaIssues(parsed.error), raw });
+    return err(schemaAttemptFailure(parsed.error, raw));
   }
 
   return ok({ value: parsed.value, repairStrategy: extracted.strategy });
@@ -122,7 +103,7 @@ export async function runStructuredCall<T>(
   const repairUser = buildRepairPrompt(
     options.user,
     firstAttempt.error.raw,
-    firstAttempt.error.message,
+    firstAttempt.error.repairHint,
   );
   const second = await options.provider.chatJson({ ...options.request, user: repairUser });
   if (!second.ok) {
@@ -131,11 +112,9 @@ export async function runStructuredCall<T>(
 
   const secondAttempt = interpret(second.value, options);
   if (!secondAttempt.ok) {
-    return err({
-      kind: secondAttempt.error.kind,
-      message: secondAttempt.error.message,
-      retryCount: 1,
-    });
+    // Twice. The person gets a sentence; the validator's words stay in
+    // `detail` (L-350). They were written for the model, not for a banner.
+    return err({ ...finalFailure(secondAttempt.error), retryCount: 1 });
   }
 
   return ok({

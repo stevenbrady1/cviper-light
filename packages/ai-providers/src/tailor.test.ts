@@ -234,6 +234,7 @@ describe('reviewDraft', () => {
       kind: 'cover_letter',
     });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.message).toContain('verdict');
+    // The field name is for whoever reads `detail`, not for the banner (L-350).
+    if (!result.ok) expect(result.error.detail).toContain('verdict');
   });
 });

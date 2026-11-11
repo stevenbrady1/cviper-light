@@ -55,6 +55,7 @@ import {
 import { extractJson, type JsonFailureKind, type RepairStrategy } from './extract-json';
 import { buildFollowUpPrompt, type FollowUpPromptInput } from './prompt/build-follow-up-prompt';
 import { buildRepairPrompt } from './prompt/build-prompt';
+import { jsonAttemptFailure, schemaAttemptFailure, type AttemptFailure } from './schema-issues';
 import type { AiProvider, ProviderErrorKind } from './types';
 
 /**
@@ -101,47 +102,21 @@ const UNCLASSIFIED = 'The draft could not be written. Try again, or write it by 
 const WRONG_SHAPE_TWICE =
   'The model did not return a usable draft. Try a different model, or write it by hand.';
 
-type ParseFailure = Extract<ReturnType<typeof FollowUpDraftSchema.safeParse>, { success: false }>;
-
-/** Enough to fix the reply, not so many that the repair turn becomes a wall. */
-const MAX_REPORTED_ISSUES = 8;
-
-function describeZodError(error: ParseFailure['error']): string {
-  const lines = error.issues
-    .slice(0, MAX_REPORTED_ISSUES)
-    .map((issue): string => {
-      const path = issue.path.length > 0 ? issue.path.join('.') : '(root)';
-      return `${path}: ${issue.message}`;
-    })
-    .join('\n');
-
-  return error.issues.length > MAX_REPORTED_ISSUES
-    ? `${lines}\n…and ${error.issues.length - MAX_REPORTED_ISSUES} more.`
-    : lines;
-}
-
 interface Attempt {
   readonly draft: FollowUpDraft;
   readonly repairStrategy: RepairStrategy;
-}
-
-interface AttemptFailure {
-  readonly kind: JsonFailureKind | 'schema-invalid';
-  /** Fed back to the model on the repair turn. Never shown to the user as-is. */
-  readonly message: string;
-  readonly raw: string;
 }
 
 /** Parse one raw reply. Never calls the provider. */
 function interpret(raw: string): Result<Attempt, AttemptFailure> {
   const extracted = extractJson(raw, FOLLOW_UP_JSON_SCHEMA.required);
   if (!extracted.ok) {
-    return err({ kind: extracted.failure, message: extracted.message, raw });
+    return err(jsonAttemptFailure(extracted, raw));
   }
 
   const parsed = FollowUpDraftSchema.safeParse(extracted.value);
   if (!parsed.success) {
-    return err({ kind: 'schema-invalid', message: describeZodError(parsed.error), raw });
+    return err(schemaAttemptFailure(parsed.error.issues, raw));
   }
 
   return ok({ draft: parsed.data, repairStrategy: extracted.strategy });
@@ -188,7 +163,7 @@ export async function draftFollowUp(
   }
 
   // ── Attempt 2: the one repair turn ────────────────────────────────────────
-  const repairUser = buildRepairPrompt(user, firstAttempt.error.raw, firstAttempt.error.message);
+  const repairUser = buildRepairPrompt(user, firstAttempt.error.raw, firstAttempt.error.repairHint);
   const second = await ask(repairUser);
   if (second === null) return err({ kind: 'unclassified', message: UNCLASSIFIED, retryCount: 1 });
   if (!second.ok) return err({ ...second.error, retryCount: 1 });

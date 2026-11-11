@@ -261,7 +261,8 @@ describe('analyzeCv — the single retry', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.kind).toBe('schema-invalid');
-      expect(result.error.message).toContain('summary');
+      // The field name is for whoever reads `detail`, not for the banner (L-350).
+      expect(result.error.detail).toContain('summary');
       expect(result.error.retryCount).toBe(1);
     }
   });
