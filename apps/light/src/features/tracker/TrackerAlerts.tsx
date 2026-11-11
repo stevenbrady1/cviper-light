@@ -1,4 +1,5 @@
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { ErrorBox } from '../../ui';
 
 /**
  * The two error strips under the header: the board could not be read or a
@@ -25,11 +26,7 @@ export function TrackerAlerts({
   return (
     <>
       {error === null ? null : (
-        <div
-          role="alert"
-          data-testid="tracker-error"
-          className="flex items-center justify-between gap-3 border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
-        >
+        <ErrorBox variant="strip" layout="row" testId="tracker-error">
           <span>{error}</span>
           {!loadFailed ? null : (
             <button
@@ -41,22 +38,18 @@ export function TrackerAlerts({
               {loading ? 'Retrying…' : 'Retry'}
             </button>
           )}
-        </div>
+        </ErrorBox>
       )}
 
       {substagesFailed === null ? null : (
-        <div
-          role="alert"
-          data-testid="tracker-substages-error"
-          className="flex items-center justify-between gap-3 border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
-        >
+        <ErrorBox variant="strip" layout="row" testId="tracker-substages-error">
           <span>
             {`Your interview stages could not be read: ${substagesFailed} The board is shown without them.`}
           </span>
           <button type="button" className={SECONDARY_BUTTON} onClick={() => void loadSubstages()}>
             Retry
           </button>
-        </div>
+        </ErrorBox>
       )}
     </>
   );

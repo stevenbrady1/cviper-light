@@ -9,6 +9,7 @@
  */
 export { Card, cardClasses, type CardProps } from './Card';
 export { Dialog, type DialogProps } from './Dialog';
+export { ErrorBox, type ErrorBoxProps } from './ErrorBox';
 export { ICON_NAMES, Icon, type IconName } from './Icon';
 export { IconTile, type IconTileTone } from './IconTile';
 export {
