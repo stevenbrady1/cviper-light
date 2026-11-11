@@ -24,6 +24,7 @@ import {
   defaultBackupFilename,
   describeBackupError,
   describeCounts,
+  holdsAnything,
   type BackupCounts,
 } from './backup';
 
@@ -168,6 +169,22 @@ describe('describeCounts', () => {
 
   it('boundary: a single category needs no comma and no "and"', () => {
     expect(describeCounts({ ...NONE, cvs: 4 })).toBe('4 CVs');
+  });
+});
+
+describe('holdsAnything', () => {
+  it('boundary: every count zero and no profile holds nothing', () => {
+    expect(holdsAnything(NONE)).toBe(false);
+  });
+
+  it('boundary: a profile on its own is something', () => {
+    expect(holdsAnything({ ...NONE, profile: true })).toBe(true);
+  });
+
+  it('a single item in any one category is something', () => {
+    for (const key of ['jobs', 'applications', 'cvs', 'analyses', 'documents'] as const) {
+      expect(holdsAnything({ ...NONE, [key]: 1 }), key).toBe(true);
+    }
   });
 });
 

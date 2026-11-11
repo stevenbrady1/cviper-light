@@ -4,6 +4,7 @@
  */
 import { type Result } from '@cviper/core-types';
 
+import { describeCounts, holdsAnything, type BackupCounts } from '../backup';
 import { DATA_LOCATIONS, type EraseStep } from '../privacy/dataLocations';
 
 import { type EraseProblem, type ErasePort } from './port';
@@ -80,6 +81,25 @@ export function summariseErase(outcomes: readonly EraseOutcome[]): EraseSummary 
       outcome.result.ok ? '' : `${STEP_LABELS[outcome.step]}: ${outcome.result.error.message}`,
     ),
   };
+}
+
+/**
+ * The sentence above the "Delete all of it" button. `null` means the database
+ * could not be read to count.
+ *
+ * An empty database has its own sentence (L-351). `describeCounts` says
+ * "nothing at all" for one, which is right as the whole object of a sentence
+ * and wrong as the first item of this list: it used to read "This will delete
+ * nothing at all, every saved API key and every preference."
+ */
+export function eraseConfirmationText(counts: BackupCounts | null): string {
+  if (counts === null) {
+    return 'The database could not be read to count what is in it. Deleting will still empty it.';
+  }
+  if (!holdsAnything(counts)) {
+    return 'Nothing is saved here yet, so there is no work to lose. Your saved API keys and your preferences will still be deleted.';
+  }
+  return `This will delete ${describeCounts(counts)}, every saved API key and every preference.`;
 }
 
 /** Every location a step erases, for the confirmation's "this will remove" list. */

@@ -145,6 +145,17 @@ export function countBackup(source: {
 }
 
 /**
+ * Whether the counts hold anything at all: one item in any category, or a
+ * profile. Read off every field rather than a list of them, so a category
+ * added to `BackupCounts` is counted here without anyone remembering to.
+ */
+export function holdsAnything(counts: BackupCounts): boolean {
+  return Object.values(counts).some((value: number | boolean) =>
+    typeof value === 'number' ? value > 0 : value,
+  );
+}
+
+/**
  * "3 jobs, 1 CV and your profile". Categories with nothing in them are left
  * out entirely, and the profile — which is one row, not a count — comes last,
  * as a noun phrase rather than a number.
