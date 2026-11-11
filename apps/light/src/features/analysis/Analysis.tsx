@@ -7,7 +7,7 @@ import { SECONDARY_BUTTON } from '../../app/buttons';
 import { CONTENT_COLUMN } from '../../app/layout';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
-import { IconTile } from '../../ui';
+import { ErrorBox, IconTile } from '../../ui';
 import { createTauriTransport } from '../../ai/transport';
 import {
   createTauriFilePort,
@@ -571,13 +571,9 @@ export function Analysis({
       )}
 
       {shownError === null ? null : (
-        <p
-          role="alert"
-          data-testid="analysis-error"
-          className="border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
-        >
+        <ErrorBox variant="strip" testId="analysis-error">
           {shownError}
-        </p>
+        </ErrorBox>
       )}
 
       <div className="flex min-h-0 flex-1">

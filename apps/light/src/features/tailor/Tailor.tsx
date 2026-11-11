@@ -9,6 +9,7 @@ import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
+import { ErrorBox } from '../../ui';
 
 import { readAvailability } from '../analysis/availability';
 import { ConsentGate } from '../analysis/ConsentGate';
@@ -636,13 +637,9 @@ export function Tailor({
       )}
 
       {shownError === null ? null : (
-        <p
-          role="alert"
-          data-testid="tailor-error"
-          className="border-b border-danger/30 bg-danger/5 px-4 py-2 text-danger md:px-6"
-        >
+        <ErrorBox variant="strip" testId="tailor-error">
           {shownError}
-        </p>
+        </ErrorBox>
       )}
 
       <div
