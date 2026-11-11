@@ -7,6 +7,7 @@ import {
 } from '@cviper/core-types';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD } from '../../app/fields';
 
 /**
  * Add, rename, reorder and remove the interview stages, in the side pane.
@@ -68,9 +69,8 @@ type Message = { readonly text: string; readonly source: 'add' | 'general' };
 /** The look of a control that is busy, not gone: same shape, dimmer, no pointer. */
 const BUSY = 'aria-disabled:cursor-not-allowed aria-disabled:text-ink-faint';
 
-const FIELD =
-  'min-w-0 rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink ' +
-  'placeholder:text-ink-muted aria-[invalid=true]:border-danger';
+/** A stage-name box: the shared box, plus a muted placeholder and an `aria-invalid` red edge. */
+const STAGE_NAME_FIELD = `${FIELD} min-w-0 placeholder:text-ink-muted aria-[invalid=true]:border-danger`;
 
 export function SubstageEditor({
   substages,
@@ -315,7 +315,7 @@ export function SubstageEditor({
                         discardDraft(substage.id);
                       }
                     }}
-                    className={`${FIELD} min-w-32 flex-1 basis-40`}
+                    className={`${STAGE_NAME_FIELD} min-w-32 flex-1 basis-40`}
                   />
 
                   {asking ? null : (
@@ -471,7 +471,7 @@ export function SubstageEditor({
             aria-invalid={addInvalid ? true : undefined}
             aria-describedby={addInvalid ? `${messageId} substage-count` : 'substage-count'}
             onChange={(event) => setNewName(event.currentTarget.value)}
-            className={`${FIELD} flex-1`}
+            className={`${STAGE_NAME_FIELD} flex-1`}
           />
           <button
             type="submit"

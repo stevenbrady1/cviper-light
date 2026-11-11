@@ -8,6 +8,7 @@ import {
 } from '@cviper/core-types';
 
 import { DESTRUCTIVE_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD } from '../../app/fields';
 import { daysSinceTimestamp } from '../../lib/dates';
 import { useDebouncedField } from '../../lib/useDebouncedField';
 import { isOpenableUrl, type BrowserPort } from '../../platform/browser';
@@ -270,7 +271,7 @@ export function ApplicationDetail({
           data-testid="detail-status"
           value={application.status}
           onChange={(event) => onStatusChange(event.currentTarget.value as ApplicationStatus)}
-          className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+          className={`${FIELD} mt-1 w-full`}
         >
           {TRACKER_COLUMNS.map((status) => (
             <option key={status} value={status}>
@@ -318,7 +319,7 @@ export function ApplicationDetail({
                   : ''
               }
               onChange={(event) => onSubstageChange(orNull(event.currentTarget.value))}
-              className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+              className={`${FIELD} min-w-0 flex-1`}
             >
               <option value="">No stage</option>
               {substages.map((substage) => (
@@ -352,7 +353,7 @@ export function ApplicationDetail({
           placeholder="Chase the recruiter"
           onChange={(event) => nextAction.setDraft(event.currentTarget.value)}
           onBlur={nextAction.flush}
-          className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+          className={`${FIELD} mt-1 w-full`}
         />
       </div>
 
@@ -363,6 +364,7 @@ export function ApplicationDetail({
         >
           Due
         </label>
+        {/* Hand-written, not FIELD (L-365): its text colour comes from NEXT_ACTION_TONES and would clash with FIELD's text-ink. */}
         <input
           id="detail-next-action-date"
           data-testid="detail-next-action-date"
@@ -392,7 +394,7 @@ export function ApplicationDetail({
           placeholder="What happened, who you spoke to, what they said."
           onChange={(event) => notes.setDraft(event.currentTarget.value)}
           onBlur={notes.flush}
-          className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+          className={`${FIELD} mt-1 w-full`}
         />
         <p className="mt-1 text-xs text-ink-faint">Saved as you type.</p>
       </div>
