@@ -15,10 +15,21 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { emptyQuota, type JobProviderId } from '@cviper/job-apis';
+import { ok } from '@cviper/core-types';
+import {
+  emptyQuota,
+  jobApiError,
+  type JobProviderId,
+  type KeylessFetchTransport,
+} from '@cviper/job-apis';
+
+import ARBEITNOW_PAGE from '../../../../../packages/job-apis/src/fixtures/arbeitnow-page1.json';
 
 import { createFakeBrowserPort } from '../../platform/test/fakeBrowserPort';
 import { type KeyState } from '../../status/environment';
+import { SHIPPED_BOARDS } from '../boards/defaults';
+import { NO_PREFERENCES } from '../boards/model';
+import { createFakeBoardPort } from '../boards/test/fakeBoardPort';
 
 import { mainBoards } from './KeylessBar';
 import { Search } from './Search';
@@ -178,7 +189,10 @@ describe('fewer than five results: the boards are offered (L-219)', () => {
     const few = await screen.findByTestId('search-few-results');
     expect(few.textContent).toContain('No matches');
     // Read out by a screen reader, from a region already on the page (L-238).
-    expectSpoken(few, 'No matches in CViper’s sources. Try the same search on a job board.');
+    expectSpoken(
+      few,
+      'No matches in CViper’s sources. Try broader words or a wider distance, or run the same search on a job board.',
+    );
     expect(boardIds(few)).toEqual(DEFAULT_FIVE);
     expect(browser.opened()).toEqual([]);
   });
@@ -326,4 +340,153 @@ describe('phone pass (L-219, part 3)', () => {
     expect(empty.textContent).toContain('press Search');
     expect(empty.textContent).toContain('job board');
   });
+});
+
+/*
+  L-352: after a search that found nothing, the page says so ONCE.
+
+  The few-results panel arrived (L-219) after the "No adverts matched that"
+  line, and the line's list of reasons to stay quiet was never told about it:
+  keyed boards that found nothing showed the panel AND the line under it. And
+  when a free feed's own counted line already said none of its jobs matched,
+  the panel said "No matches" a second time in other words.
+*/
+const FEED_NOW = new Date('2026-09-13T09:00:00.000Z');
+const FEED_TODAY = '2026-09-13';
+
+/** Arbeitnow answering with the page it really sent on 2026-09-13. */
+const FEED_ANSWERS: KeylessFetchTransport = {
+  fetch: async () => ok({ status: 200, body: JSON.stringify(ARBEITNOW_PAGE) }),
+};
+
+const ZERO_STATES = [
+  'keyed boards found none',
+  'the free feed matched none',
+  'both found none',
+  'every board switched off',
+  'a board failed',
+] as const;
+type ZeroState = (typeof ZERO_STATES)[number];
+
+/** Search for something nothing has, in one of the ways a search can find nothing. */
+async function searchNothing(state: ZeroState) {
+  const user = userEvent.setup();
+  const feed = state === 'the free feed matched none' || state === 'both found none';
+  const port = createFakeSearchPort([], feed ? FEED_ANSWERS : undefined);
+  const failed =
+    state === 'a board failed'
+      ? [
+          {
+            provider: 'reed' as const,
+            jobs: [],
+            error: jobApiError('reed', 'server', 'Reed is having trouble at their end.', 503),
+          },
+        ]
+      : [];
+  port.nextOutcome(outcomeOf([], emptyQuota(FEED_TODAY), failed));
+  const prefs =
+    state === 'every board switched off'
+      ? { ...NO_PREFERENCES, disabled: SHIPPED_BOARDS.map((board) => board.id) }
+      : NO_PREFERENCES;
+  render(
+    <Search
+      port={port}
+      browser={createFakeBrowserPort()}
+      boardsPort={createFakeBoardPort(prefs)}
+      readKeyStates={async () => (state === 'the free feed matched none' ? NO_KEYS : BOTH_KEYS)}
+      now={FEED_NOW}
+      newId={() => 'generated'}
+      onOpenSettings={vi.fn()}
+    />,
+  );
+  await screen.findByTestId('search-empty');
+  if (state === 'every board switched off') await screen.findByTestId('keyless-none');
+  // The keyed states search the keyed boards only, so the feed adds nothing.
+  if (!feed) await user.click(screen.getByTestId('keyless-source-arbeitnow'));
+  await user.type(screen.getByTestId('search-keywords'), 'lighthouse keeper');
+  await user.click(screen.getByTestId('search-submit'));
+  await vi.waitFor(() => expect(port.calls.search + port.calls.browseKeyless).toBeGreaterThan(0));
+  // Settled: whatever the state, something on the page now says what happened.
+  await vi.waitFor(() =>
+    expect(
+      screen.queryByTestId('search-few-results') ?? screen.queryByTestId('search-no-results'),
+    ).not.toBeNull(),
+  );
+  if (feed) await screen.findByTestId('keyless-nothing-matched-arbeitnow');
+  if (state === 'a board failed') await screen.findByTestId('search-error-reed');
+  return { port };
+}
+
+/**
+ * Every element outside the screen-reader region whose own words say nothing
+ * matched. The status region is the panel's words spoken (L-238), so it is
+ * not a second sentence on the page.
+ */
+function nothingMatchedSentences(): string[] {
+  return [...document.body.querySelectorAll('*')]
+    .filter((element) => element.closest('[role="status"]') === null)
+    .map((element) =>
+      [...element.childNodes]
+        .filter((node) => node.nodeType === Node.TEXT_NODE)
+        .map((node) => node.textContent ?? '')
+        .join('')
+        .trim(),
+    )
+    .filter((text) => /^(no matches|no adverts matched)|none of them matched/i.test(text));
+}
+
+function spokenText(): string {
+  return screen
+    .queryAllByRole('status')
+    .map((region) => region.textContent ?? '')
+    .join(' ');
+}
+
+describe('a search that found nothing says so once (L-352)', () => {
+  it('0 results: the page says there are no matches once', async () => {
+    await searchNothing('keyed boards found none');
+    const few = await screen.findByTestId('search-few-results');
+    expect(few.textContent).toContain('No matches');
+    expect(screen.queryByTestId('search-no-results')).toBeNull();
+    // The hint the line used to carry now lives in the panel.
+    expect(few.textContent).toContain('Try broader words or a wider distance');
+  });
+
+  it('boundary: every board switched off — the line is still said, and there is no panel', async () => {
+    await searchNothing('every board switched off');
+    expect(screen.getByTestId('search-no-results').textContent).toContain('No adverts matched');
+    expect(screen.queryByTestId('search-few-results')).toBeNull();
+  });
+
+  it('negative: a board that failed — no "no matches" sentence beside its error', async () => {
+    await searchNothing('a board failed');
+    expect(screen.queryByTestId('search-no-results')).toBeNull();
+    expect(nothingMatchedSentences()).toEqual([]);
+    expect(spokenText()).not.toMatch(/no matches/i);
+    // The boards are still offered: they work whatever happened to Reed.
+    expect(screen.getByTestId('search-few-results').textContent).toContain(
+      'Try the same search on a job board:',
+    );
+  });
+
+  it('the free feed matched none: its counted line says it, and the panel does not repeat it', async () => {
+    await searchNothing('the free feed matched none');
+    const few = screen.getByTestId('search-few-results');
+    expect(within(few).getByText('Try the same search on a job board:')).toBeTruthy();
+    expect(few.textContent).not.toMatch(/no matches/i);
+    expectSpoken(few, 'Try the same search on a job board.');
+    expect(spokenText()).not.toMatch(/no matches/i);
+  });
+
+  it.each(ZERO_STATES)(
+    'forbidden in every zero-result state — %s: the panel and the line together, or "nothing matched" said twice',
+    async (state) => {
+      await searchNothing(state);
+      const both =
+        screen.queryByTestId('search-few-results') !== null &&
+        screen.queryByTestId('search-no-results') !== null;
+      expect(both, 'the panel and the "No adverts matched" line on one page').toBe(false);
+      expect(nothingMatchedSentences().length).toBeLessThanOrEqual(1);
+    },
+  );
 });
