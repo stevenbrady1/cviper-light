@@ -2,7 +2,7 @@ import { type CheckStatus } from '@cviper/ats-checks';
 import { atsBand } from '@cviper/keyword-scoring';
 
 import { Hint } from '../../app/Hint';
-import { cardClasses } from '../../ui';
+import { StateMark, cardClasses, type StateMarkName } from '../../ui';
 import {
   ATS_BAND_HINT,
   ATS_CHECK_HINT,
@@ -23,6 +23,11 @@ import { type AtsComparison } from './atsComparison';
  *
  * A table, not a grid of cards: the question is "what changed in each row",
  * and a table with a caption reads to a screen reader as exactly that.
+ *
+ * The marks are drawn (`StateMark`, L-362), not typed, so they look the same
+ * on every machine, and each is its own shape: OK a tick, Check a warning,
+ * Missing a cross, a rise an up arrow, a fall a down arrow. A mark is hidden
+ * from a screen reader; the word or number beside it, and its hint, say it.
  */
 export interface AtsStepProps {
   readonly comparison: AtsComparison;
@@ -30,10 +35,16 @@ export interface AtsStepProps {
   readonly fabrication: { readonly clean: boolean; readonly flagged: number };
 }
 
+const STATUS_MARK: Readonly<Record<CheckStatus, StateMarkName>> = {
+  pass: 'tick',
+  warn: 'warning',
+  fail: 'cross',
+};
+
 const STATUS_WORD: Readonly<Record<CheckStatus, string>> = {
-  pass: '✓ OK',
-  warn: '⚠ Check',
-  fail: '✗ Missing',
+  pass: 'OK',
+  warn: 'Check',
+  fail: 'Missing',
 };
 
 const STATUS_TONE: Readonly<Record<CheckStatus, string>> = {
@@ -42,8 +53,9 @@ const STATUS_TONE: Readonly<Record<CheckStatus, string>> = {
   fail: 'whitespace-nowrap font-medium text-gold-ink',
 };
 
-// Every mark below carries a hint (L-215): what ✓ ⚠ ✗, ▲ ▼ and — mean, in
-// words, on hover, on focus and to a screen reader. See `app/hints.ts`.
+// Every mark below carries a hint (L-215): what the tick, warning and cross,
+// the up and down arrows, and — mean, in words, on hover, on focus and to a
+// screen reader. See `app/hints.ts`.
 
 function Delta({ value }: { readonly value: number | null }) {
   if (value === null) {
@@ -65,7 +77,7 @@ function Delta({ value }: { readonly value: number | null }) {
       text={changeHint(value)}
       className={`whitespace-nowrap ${value > 0 ? 'text-teal-ink' : 'text-gold-ink'}`}
     >
-      {value > 0 ? `▲ +${value}` : `▼ ${value}`}
+      <StateMark name={value > 0 ? 'up' : 'down'} /> {value > 0 ? `+${value}` : value}
     </Hint>
   );
 }
@@ -173,10 +185,14 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
                 <Hint text={ATS_CHECK_HINT[check.id]}>{check.label}</Hint>
               </th>
               <td className={`py-1 pr-3 text-xs ${STATUS_TONE[check.before]}`}>
-                <Hint text={ATS_STATUS_HINT[check.before]}>{STATUS_WORD[check.before]}</Hint>
+                <Hint text={ATS_STATUS_HINT[check.before]}>
+                  <StateMark name={STATUS_MARK[check.before]} /> {STATUS_WORD[check.before]}
+                </Hint>
               </td>
               <td className={`py-1 pr-3 text-xs ${STATUS_TONE[check.after]}`}>
-                <Hint text={ATS_STATUS_HINT[check.after]}>{STATUS_WORD[check.after]}</Hint>
+                <Hint text={ATS_STATUS_HINT[check.after]}>
+                  <StateMark name={STATUS_MARK[check.after]} /> {STATUS_WORD[check.after]}
+                </Hint>
               </td>
               <td className="py-1 pr-3" />
             </tr>

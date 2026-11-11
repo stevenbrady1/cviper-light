@@ -53,7 +53,7 @@ export const ATS_BAND_HINT: Readonly<Record<AtsBand, string>> = {
   good: 'Reads well: 80 or more out of 100. The CV uses the advert’s important words.',
 };
 
-/** ▲ / ▼ beside a score. */
+/** The up / down arrow beside a score. */
 export function changeHint(value: number): string {
   const points = Math.abs(value) === 1 ? 'point' : 'points';
   return value > 0
