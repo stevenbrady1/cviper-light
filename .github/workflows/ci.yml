@@ -219,15 +219,6 @@ jobs:
             webkit-apt-${{ steps.keys.outputs.os }}-
             webkit-apt-Linux-
 
-      # TEMPORARY — evidence for L-367, reverted below. Every apt server host
-      # becomes an unresolvable name, as on 11 Nov 2026.
-      - name: TEMPORARY - point apt at unreachable servers
-        run: |
-          for f in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/*; do
-            if [ -f "$f" ]; then sudo sed -i -E 's,(https?)://[^/[:space:]]+,\1://unreachable.invalid,g' "$f"; fi
-          done
-          grep -rh "unreachable.invalid" /etc/apt/apt-mirrors.txt /etc/apt/sources.list.d/
-
       # L-367. Install those packages from the cache with NO network, before
       # Playwright can run `apt-get update`. That update, not the packages, is
       # what failed on 11 Nov 2026: the cache was a full hit, the runner could
