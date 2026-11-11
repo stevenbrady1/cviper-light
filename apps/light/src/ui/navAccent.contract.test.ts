@@ -7,19 +7,21 @@
  * text colour, so `contrast.contract.test.ts` cannot see it; this does. The nav
  * icons are drawn only on the navy rail and the navy phone bar.
  */
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
 import { describe, expect, it } from 'vitest';
 
-const THEME = readFileSync(fileURLToPath(new URL('../styles/theme.css', import.meta.url)), 'utf8');
+import { lightColours } from '../styles/themeTokens';
+
+/**
+ * The light colour set, from the one shared reader (L-366). It throws, by name,
+ * on a colour it cannot read, one declared twice, or one outside the light set,
+ * so a name here has exactly one declaration or none.
+ */
+const LIGHT = lightColours();
 
 function token(name: string): string {
-  const all = [
-    ...THEME.matchAll(new RegExp(String.raw`--color-${name}:\s*(#[0-9a-fA-F]{6});`, 'g')),
-  ];
+  const all = LIGHT.has(name) ? [LIGHT.get(name)!.hex] : [];
   expect(all, `--color-${name}`).toHaveLength(1);
-  return (all[0]?.[1] ?? '').toLowerCase();
+  return all[0] ?? '';
 }
 
 function luminance(hex: string): number {
