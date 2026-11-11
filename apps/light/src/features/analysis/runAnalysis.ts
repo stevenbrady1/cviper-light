@@ -212,8 +212,11 @@ export async function runAnalysis(
   if (!analysed.ok) {
     // Passed through verbatim. Every message that reaches here was written for
     // a user — by the Rust transport for a stopped daemon, by the adapter for a
-    // rejected key, by `extract-json` for a truncated answer — and rewording
-    // them here would replace advice with a shrug.
+    // rejected key, by `extract-json` for a truncated answer, and by
+    // `schema-issues.ts` for a wrong-shaped answer twice (L-350: once that case
+    // carried the validator's own text; it now arrives as a fixed sentence,
+    // with the field names in `detail`, which is deliberately not passed on).
+    // Rewording them here would replace advice with a shrug.
     return err({ message: analysed.error.message });
   }
 

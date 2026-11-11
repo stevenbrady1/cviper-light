@@ -73,10 +73,11 @@ import {
   type Result,
 } from '@cviper/core-types';
 
-import { extractJson, type JsonFailureKind, type RepairStrategy } from './extract-json';
+import { extractJson, type RepairStrategy } from './extract-json';
 import { clampExtraction } from './extraction-clamp';
 import { buildRepairPrompt } from './prompt/build-prompt';
 import { buildExtractionPrompt, extractionSourceText } from './prompt/build-extraction-prompt';
+import { jsonAttemptFailure, schemaAttemptFailure, type AttemptFailure } from './schema-issues';
 import type { AiProvider } from './types';
 
 /**
@@ -129,43 +130,10 @@ const NOTHING_TO_EXTRACT =
 const UNCLASSIFIED =
   'The extraction could not be completed. Fill the form in by hand, or try again.';
 
-type ParseFailure = Extract<ReturnType<typeof JobExtractionSchema.safeParse>, { success: false }>;
-
-/** Enough to fix the reply, not so many that the repair turn becomes a wall. */
-const MAX_REPORTED_ISSUES = 8;
-
-/**
- * Turn Zod's issue list into something a model can act on.
- *
- * The path matters more than the prose: "salary_min: expected number, received
- * string" tells the model exactly which key to fix, which is the whole point of
- * the repair turn.
- */
-function describeZodError(error: ParseFailure['error']): string {
-  const lines = error.issues
-    .slice(0, MAX_REPORTED_ISSUES)
-    .map((issue): string => {
-      const path = issue.path.length > 0 ? issue.path.join('.') : '(root)';
-      return `${path}: ${issue.message}`;
-    })
-    .join('\n');
-
-  return error.issues.length > MAX_REPORTED_ISSUES
-    ? `${lines}\n…and ${error.issues.length - MAX_REPORTED_ISSUES} more.`
-    : lines;
-}
-
 interface Attempt {
   readonly extraction: JobExtraction;
   readonly clampsApplied: readonly string[];
   readonly repairStrategy: RepairStrategy;
-}
-
-interface AttemptFailure {
-  readonly kind: JsonFailureKind | 'schema-invalid';
-  /** Fed back to the model on the repair turn. Never shown to the user as-is. */
-  readonly message: string;
-  readonly raw: string;
 }
 
 /**
@@ -178,7 +146,7 @@ interface AttemptFailure {
 function interpret(raw: string, sourceText: string): Result<Attempt, AttemptFailure> {
   const extracted = extractJson(raw, JOB_EXTRACTION_JSON_SCHEMA.required);
   if (!extracted.ok) {
-    return err({ kind: extracted.failure, message: extracted.message, raw });
+    return err(jsonAttemptFailure(extracted, raw));
   }
 
   // Clamp BEFORE validating — and this is also where the salary overrule fires,
@@ -188,7 +156,7 @@ function interpret(raw: string, sourceText: string): Result<Attempt, AttemptFail
   const parsed = JobExtractionSchema.safeParse(clamped.value);
 
   if (!parsed.success) {
-    return err({ kind: 'schema-invalid', message: describeZodError(parsed.error), raw });
+    return err(schemaAttemptFailure(parsed.error.issues, raw));
   }
 
   return ok({
@@ -269,7 +237,7 @@ export async function extractJob(options: ExtractJobOptions): Promise<JobExtract
   }
 
   // ── Attempt 2: the one repair turn ────────────────────────────────────────
-  const repairUser = buildRepairPrompt(user, firstAttempt.error.raw, firstAttempt.error.message);
+  const repairUser = buildRepairPrompt(user, firstAttempt.error.raw, firstAttempt.error.repairHint);
   const second = await ask(repairUser);
   if (second === null) return unavailable(UNCLASSIFIED, 1);
   if (!second.ok) return unavailable(second.error, 1);
