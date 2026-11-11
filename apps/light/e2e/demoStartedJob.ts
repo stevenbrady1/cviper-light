@@ -77,13 +77,21 @@ export const REQUEST_COUNT_KEY = 'cviper.light.requests';
 /**
  * The app's own commands that reach the network, by name (`generate_handler!`
  * in `src-tauri/src/lib.rs`). None of them may run while the started job is
- * photographed. A forbid-list: anything else — the database, the settings
- * store, the plugin's own plumbing — is the app reading its own disk.
+ * photographed. A forbid-list of what showing a job could set off: an AI
+ * call, a model list, a job search, a page fetch.
  *
- * `ollama_probe` is NOT here, on purpose. Opening Tailor asks a model server
- * on THIS machine (loopback) whether it is switched on, for every job and for
- * none; it sends no CV, no advert and no prompt, and the app itself does not
- * count it as a request (`probeOllama` in `src/ai/transport.ts`).
+ * Two things that do run are NOT here, on purpose, because neither is about
+ * the job and both happen on every launch of every copy of the app:
+ *
+ * - `ollama_probe`. Opening Tailor asks a model server on THIS machine
+ *   (loopback) whether it is switched on, for every job and for none; it
+ *   sends no CV, no advert and no prompt, and the app itself does not count
+ *   it as a request (`probeOllama` in `src/ai/transport.ts`).
+ * - `plugin:updater|check`. The app looks for an update a moment after it
+ *   starts; the restart that makes Tailor read the draft is a start. It reads
+ *   one fixed file from the project's releases (`tauri.conf.json`,
+ *   `plugins.updater.endpoints`) and sends nothing of the user's. The first CI run of L-363 saw
+ *   it in the recorder's list, so it is named here rather than left implied.
  */
 export const NETWORK_COMMANDS: readonly string[] = [
   'provider_chat',
