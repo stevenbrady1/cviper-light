@@ -164,14 +164,24 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Keyed on the lockfile, so a playwright-core bump misses the cache and
-      # downloads the browser build that matches it. A stale hit cannot go
-      # unnoticed: the install step below re-downloads anything absent, and the
-      # spec fails loudly rather than skipping if the binary is missing.
+      # L-367. Both caches below are named after what decides their contents:
+      # the runner image, whose own package lists say which version of each
+      # Ubuntu package apt will want, and the Playwright version, which decides
+      # the browser build and the package list. ImageOS and ImageVersion live
+      # on the runner, not in `env`, so `${{ }}` cannot see them; this reads
+      # them. A new image or a Playwright bump therefore starts a fresh entry.
+      - name: Name the caches after the runner image and Playwright
+        id: keys
+        run: bash .github/scripts/webkit-apt-cache.sh keys
+
+      # A playwright-core bump misses the cache and downloads the browser build
+      # that matches it. A stale hit cannot go unnoticed: the install step below
+      # re-downloads anything absent, and the spec fails loudly rather than
+      # skipping if the binary is missing.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-webkit-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: playwright-webkit-${{ steps.keys.outputs.os }}-${{ steps.keys.outputs.playwright }}
 
       # `playwright-core`, not `playwright`: the browser download is a lifecycle
       # script pnpm does not run by default, and `playwright-core` has no such
@@ -194,31 +204,66 @@ jobs:
       # L-284. The cap above stops a slow mirror holding the job; this stops the
       # job needing the mirror. `--with-deps` installs ~70 Ubuntu packages, and
       # every slow run on 26 Oct 2026 was those downloads. apt is pointed at a
-      # folder this cache restores and saves, so a warm run fetches only what
-      # Ubuntu has updated since. Keyed on the lockfile like the browser cache
-      # above: a playwright-core bump can change the package list. Only `.deb`
+      # folder this cache restores and saves. Keyed on the runner image and the
+      # Playwright version (L-367); a new key starts from the newest older entry
+      # for the same OS, and on its first run after L-367 from the entries keyed
+      # the old way (`webkit-apt-Linux-`), so it is never empty. Only `.deb`
       # files are saved — apt's lock and its root-owned `partial/` are not
       # readable by the cache action.
       - name: Restore WebKit's system packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/webkit-apt/*.deb
-          key: webkit-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: webkit-apt-${{ runner.os }}-
+          key: webkit-apt-${{ steps.keys.outputs.image }}-playwright-${{ steps.keys.outputs.playwright }}
+          restore-keys: |
+            webkit-apt-${{ steps.keys.outputs.os }}-
+            webkit-apt-Linux-
 
-      - name: Point apt at the cached packages
-        run: bash .github/scripts/webkit-apt-cache.sh configure ~/.cache/webkit-apt
+      # L-367. Install those packages from the cache with NO network, before
+      # Playwright can run `apt-get update`. That update, not the packages, is
+      # what failed on 11 Nov 2026: the cache was a full hit, the runner could
+      # not resolve the Ubuntu servers, and the update alone ran out both caps.
+      # When the cache cannot cover everything, this sets needs-apt and the next
+      # step goes to the servers exactly as before.
+      - name: Install WebKit's system packages from the cache
+        id: deps
+        run: bash .github/scripts/webkit-apt-cache.sh configure ~/.cache/webkit-apt && bash .github/scripts/webkit-apt-cache.sh offline ~/.cache/webkit-apt
 
+      # `--with-deps` (and its `apt-get update`) only when the step above could
+      # not install everything from the cache.
       - name: Install the WebKit browser
-        run: timeout --kill-after=20 300 pnpm --filter @cviper/light exec playwright-core install --with-deps webkit || (bash .github/scripts/release-apt-lock.sh && timeout --kill-after=20 300 pnpm --filter @cviper/light exec playwright-core install --with-deps webkit)
+        id: install
+        env:
+          NEEDS_APT: ${{ steps.deps.outputs.needs-apt }}
+        run: timeout --kill-after=20 300 pnpm --filter @cviper/light exec playwright-core install ${NEEDS_APT:+--with-deps} webkit || (bash .github/scripts/release-apt-lock.sh && timeout --kill-after=20 300 pnpm --filter @cviper/light exec playwright-core install ${NEEDS_APT:+--with-deps} webkit)
 
-      - name: Report the cached packages
+      # Also the gate (L-367): Playwright's own dry run must find nothing
+      # missing, so a missing library fails HERE, as an install problem, and
+      # not as a test that could not launch. It needs no network.
+      - name: Check WebKit's system packages, and report the cache
+        id: check
+        env:
+          NEEDS_APT: ${{ steps.deps.outputs.needs-apt }}
         run: bash .github/scripts/webkit-apt-cache.sh report ~/.cache/webkit-apt
 
       # Builds the harness page, then drives it. A missing browser FAILS here;
       # it never skips.
       - name: Drive pdf.js under WebKit
+        id: drive
         run: pnpm webkit
+
+      # L-367. Runs only when the job is already red AND the tests never ran,
+      # so the annotation names the download that failed instead of leaving
+      # "exit code 124" to be read as a failing test. It exits 1: it can
+      # explain a red job, never turn one green.
+      - name: Say plainly that no test ran
+        if: failure() && steps.drive.outcome != 'success' && steps.drive.outcome != 'failure'
+        env:
+          DEPS: ${{ steps.deps.outcome }}
+          INSTALL: ${{ steps.install.outcome }}
+          CHECK: ${{ steps.check.outcome }}
+          NEEDS_APT: ${{ steps.deps.outputs.needs-apt }}
+        run: bash .github/scripts/webkit-install-failed.sh
 
   # ------------------------------------------------------------------
   # No key of ours is ever compiled into this app (hosted ADR 012, R-COST).
