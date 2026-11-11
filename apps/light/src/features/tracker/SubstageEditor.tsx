@@ -8,6 +8,7 @@ import {
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { FIELD } from '../../app/fields';
+import { Icon } from '../../ui';
 
 /**
  * Add, rename, reorder and remove the interview stages, in the side pane.
@@ -333,7 +334,9 @@ export function SubstageEditor({
                         onClick={() => void move(substage, 'up')}
                         className={`${QUIET_BUTTON} min-w-11 ${BUSY}`}
                       >
-                        ↑
+                        <span className="flex h-lh items-center">
+                          <Icon name="arrowUp" size={16} />
+                        </span>
                       </button>
                       <button
                         type="button"
@@ -345,7 +348,9 @@ export function SubstageEditor({
                         onClick={() => void move(substage, 'down')}
                         className={`${QUIET_BUTTON} min-w-11 ${BUSY}`}
                       >
-                        ↓
+                        <span className="flex h-lh items-center">
+                          <Icon name="arrowDown" size={16} />
+                        </span>
                       </button>
                       <button
                         type="button"
