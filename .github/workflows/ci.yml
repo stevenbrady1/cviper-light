@@ -214,10 +214,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/webkit-apt/*.deb
-          key: webkit-apt-${{ steps.keys.outputs.image }}-playwright-${{ steps.keys.outputs.playwright }}
-          restore-keys: |
-            webkit-apt-${{ steps.keys.outputs.os }}-
-            webkit-apt-Linux-
+          key: webkit-apt-${{ steps.keys.outputs.image }}-playwright-${{ steps.keys.outputs.playwright }}-L367-throwaway-b
 
       # L-367. Install those packages from the cache with NO network, before
       # Playwright can run `apt-get update`. That update, not the packages, is
