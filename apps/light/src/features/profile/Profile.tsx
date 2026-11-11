@@ -12,6 +12,7 @@ import { CONTENT_COLUMN } from '../../app/layout';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
+import { ErrorBox } from '../../ui';
 
 import {
   addLanguage,
@@ -287,13 +288,9 @@ export function Profile({ port, now, gapsPort, filePort, cvPort }: ProfileProps)
       <ViewHeader view={view.id} title={view.label} summary={view.summary} />
 
       {error === null ? null : (
-        <p
-          role="alert"
-          data-testid="profile-error"
-          className="border-b border-line bg-danger/5 px-4 py-2 text-danger md:px-6"
-        >
+        <ErrorBox variant="strip" testId="profile-error">
           {error}
-        </p>
+        </ErrorBox>
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">

@@ -418,3 +418,333 @@ describe('the detector can actually fail', () => {
     expect('pnpm tsc && pnpm webkit && pnpm test'.includes('webkit')).toBe(true);
   });
 });
+
+/**
+ * L-367 — a failed download reads as a failed download, and a warm cache needs
+ * no Ubuntu package server at all.
+ *
+ * On 11 Nov 2026 the job went red twice with no test run (CI #1102, #1107). The
+ * L-284 package cache was a FULL hit both times. What failed was `apt-get
+ * update`, which Playwright's `--with-deps` always runs first and which always
+ * needs the network: the runner could not resolve the Ubuntu servers, each
+ * lookup took ~40 s, and the update never finished inside either 5-minute cap.
+ * The re-runs that "passed" hit the same failure and got lucky on the clock.
+ *
+ *   1. Both caches are keyed on the Playwright version, and the package cache
+ *      on the runner image too: the image's own package lists say which version
+ *      of each package apt will want, so the cached files must match THEM.
+ *   2. A step installs the packages from the cache with `--no-download` — no
+ *      network, no `apt-get update`. Only when that fails does the install step
+ *      add `--with-deps`, and with it the servers.
+ *   3. A check after the install and BEFORE the tests confirms nothing is
+ *      missing, and a last step names the install, not a test, whenever the
+ *      tests never ran.
+ *
+ * Above everything: the job never passes without the tests having run. Each
+ * forbid-list rule below has a mutation of the REAL workflow proving it fails.
+ */
+const KEYS_STEP_ID = 'keys';
+const EXPLAIN_SCRIPT = '.github/scripts/webkit-install-failed.sh';
+const BROWSER_CACHE_DIR = '~/.cache/ms-playwright';
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const indentOf = (line: string): number => line.length - line.trimStart().length;
+
+/** The job's steps, one text block per `- ` item under `steps:`, in order. */
+export function stepsOf(jobText: string): string[] {
+  const lines = jobText.split('\n');
+  const start = lines.findIndex((line) => /^\s+steps:\s*$/.test(line));
+  if (start === -1) return [];
+  const first = lines.slice(start + 1).find((line) => /^\s*-\s/.test(line));
+  if (first === undefined) return [];
+  const indent = indentOf(first);
+  const steps: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() !== '' && indentOf(line) === indent && /^\s*-\s/.test(line)) steps.push(line);
+    else if (steps.length > 0) steps[steps.length - 1] += `\n${line}`;
+  }
+  return steps;
+}
+
+/** A step's (single-line) value for `key`, or undefined. */
+export function stepValue(step: string, key: string): string | undefined {
+  return new RegExp(String.raw`^\s*(?:-\s+)?${key}:\s*(.+?)\s*$`, 'm').exec(step)?.[1];
+}
+
+/** The body of one `mode)` arm of a bash `case`, `#` commentary removed. */
+export function caseArm(script: string, mode: string): string {
+  const arm = new RegExp(String.raw`^\s*${mode}\)\s*$([\s\S]*?)^\s*;;\s*$`, 'm');
+  return arm.exec(readableYaml(script))?.[1] ?? '';
+}
+
+const isInstall = (command: string): boolean =>
+  /playwright-core\s+install\b/.test(command) && /\bwebkit\b/.test(command);
+
+/** Shapes that turn a failed command into a passing one. */
+export const MASKS: readonly RegExp[] = [
+  /\|\|\s*(?:true|:|exit\s+0|echo)\b/,
+  /\|\|\s*:\s*$/,
+  /;\s*(?:true|exit\s+0)\s*\)?\s*$/,
+  /\bset\s+\+e\b/,
+];
+
+/**
+ * Every way the job could finish green without `pnpm webkit` having run and
+ * passed. Forbid-list: each entry names a shape that must be ABSENT.
+ */
+export function neverGreenOffences(jobText: string): string[] {
+  const offences: string[] = [];
+  const lines = jobText.split('\n').filter((line) => line.trim() !== '');
+  const jobIndent = lines.length > 0 ? indentOf(lines[0] ?? '') : 0;
+
+  if (/^\s*(?:-\s+)?continue-on-error\s*:/m.test(jobText))
+    offences.push('`continue-on-error` lets a failing step leave the job green');
+  if (lines.some((line) => indentOf(line) === jobIndent && /^\s*if\s*:/.test(line)))
+    offences.push('a job-level `if:` can skip the whole job, and a skipped check counts as passed');
+
+  const steps = stepsOf(jobText);
+  const drive = steps.findIndex((step) => runCommandsOf(step).includes(SCRIPT));
+  if (drive === -1) offences.push(`no step runs \`${SCRIPT}\``);
+  for (const step of steps.slice(0, drive + 1))
+    if (stepValue(step, 'if') !== undefined)
+      offences.push(
+        `a step up to and including the tests has an \`if:\`: ${step.trim().split('\n')[0]}`,
+      );
+
+  for (const command of runCommandsOf(jobText))
+    if (MASKS.some((mask) => mask.test(command))) offences.push(`\`${command}\` masks a failure`);
+
+  const install = runCommandsOf(jobText).find(isInstall) ?? '';
+  if (!/\|\|\s*\(.*\bwebkit\s*\)\s*$/.test(install))
+    offences.push(
+      'the install line no longer ends in its capped retry, so its status is not the install’s',
+    );
+  return offences;
+}
+
+/** Cache keys that would survive a change of runner image or Playwright version. */
+export function cacheKeyOffences(jobText: string): string[] {
+  const offences: string[] = [];
+  const steps = stepsOf(jobText);
+  const keysAt = steps.findIndex((step) => stepValue(step, 'id') === KEYS_STEP_ID);
+  if (keysAt === -1) offences.push(`no step with \`id: ${KEYS_STEP_ID}\` names the caches`);
+
+  const caches: [string, string, string][] = [
+    ['system packages', `${APT_CACHE_DIR}/*.deb`, 'image'],
+    ['browser', BROWSER_CACHE_DIR, 'os'],
+  ];
+  for (const [what, path, runner] of caches) {
+    const at = steps.findIndex((step) =>
+      new RegExp(String.raw`^\s*path:\s*${escapeRegExp(path)}\s*$`, 'm').test(step),
+    );
+    const key = at === -1 ? undefined : stepValue(steps[at] ?? '', 'key');
+    if (key === undefined) {
+      offences.push(`the ${what} cache has no key`);
+      continue;
+    }
+    for (const output of ['playwright', runner])
+      if (
+        !new RegExp(String.raw`\$\{\{\s*steps\.${KEYS_STEP_ID}\.outputs\.${output}\s*\}\}`).test(
+          key,
+        )
+      )
+        offences.push(`the ${what} cache key does not change with \`${output}\`: ${key}`);
+    if (keysAt === -1 || keysAt > at)
+      offences.push(`the ${what} cache is restored before its key is named`);
+  }
+  return offences;
+}
+
+/** The "no test ran" step: present, failure-only, after the tests, never green. */
+export function explainOffences(jobText: string, script: string): string[] {
+  const offences: string[] = [];
+  const steps = stepsOf(jobText);
+  const drive = steps.findIndex((step) => runCommandsOf(step).includes(SCRIPT));
+  const at = steps.findIndex((step) => runCommandsOf(step).includes(`bash ${EXPLAIN_SCRIPT}`));
+  if (at === -1) return [`no step runs \`bash ${EXPLAIN_SCRIPT}\``];
+  if (at < drive) offences.push('the explanation runs before the tests');
+  const condition = stepValue(steps[at] ?? '', 'if') ?? '';
+  if (!/\bfailure\(\)/.test(condition)) offences.push(`it is not failure-only: if: ${condition}`);
+  if (
+    !/\bsteps\.drive\.outcome\b/.test(condition) ||
+    stepValue(steps[drive] ?? '', 'id') !== 'drive'
+  )
+    offences.push('it does not ask whether the tests ran (steps.drive.outcome)');
+
+  const body = readableYaml(script);
+  if (!/::error\b/.test(body)) offences.push('the script raises no ::error annotation');
+  if (!/no (?:WebKit )?test ran/i.test(body)) offences.push('the script never says no test ran');
+  if (!/GITHUB_STEP_SUMMARY/.test(body)) offences.push('the script writes no job summary');
+  if (/\bexit\s+0\b/.test(body)) offences.push('the script can exit 0');
+  if (!/\bexit\s+1\s*$/.test(body.trimEnd())) offences.push('the script does not end in exit 1');
+  return offences;
+}
+
+describe('the caches change with the runner image and Playwright (L-367)', () => {
+  it('both cache keys are named by a step that reads the image and the Playwright version', () => {
+    expect(cacheKeyOffences(JOB_TEXT)).toEqual([]);
+    const keys = caseArm(read(APT_CACHE_SCRIPT), KEYS_STEP_ID);
+    expect(keys, `${APT_CACHE_SCRIPT} has no "${KEYS_STEP_ID}" mode`).not.toBe('');
+    expect(keys).toMatch(/\$\{?ImageOS\b/);
+    expect(keys).toMatch(/\$\{?ImageVersion\b/);
+    expect(keys).toMatch(/playwright-core\/package\.json/);
+    expect(JOB_COMMANDS).toContain(`bash ${APT_CACHE_SCRIPT} ${KEYS_STEP_ID}`);
+  });
+});
+
+describe('a warm cache does not need the Ubuntu package servers (L-367)', () => {
+  const offline = JOB_COMMANDS.findIndex((c) =>
+    c.includes(`bash ${APT_CACHE_SCRIPT} offline ${APT_CACHE_DIR}`),
+  );
+  const install = JOB_COMMANDS.findIndex(isInstall);
+  const report = JOB_COMMANDS.findIndex((c) => c.startsWith(`bash ${APT_CACHE_SCRIPT} report`));
+
+  it('installs from the cache before the browser step, and checks after it, before the tests', () => {
+    expect(offline, `no step runs ${APT_CACHE_SCRIPT} offline`).toBeGreaterThan(-1);
+    expect(offline).toBeLessThan(install);
+    expect(report).toBeGreaterThan(install);
+    expect(report).toBeLessThan(JOB_COMMANDS.indexOf(SCRIPT));
+  });
+
+  it('the offline install cannot reach the network, and is capped', () => {
+    const arm = caseArm(read(APT_CACHE_SCRIPT), 'offline');
+    expect(arm, `${APT_CACHE_SCRIPT} has no "offline" mode`).toMatch(
+      /apt-get\s+install\b.*--no-download/,
+    );
+    expect(arm).not.toMatch(/apt-get\s+update|--with-deps/);
+    expect(arm).toMatch(/\btimeout\s+(?:--\S+\s+)*\d+\s+apt-get\b/);
+    for (const mask of MASKS) expect(arm).not.toMatch(mask);
+  });
+
+  it('both install attempts ask for the servers only when the cache could not cover it', () => {
+    const line = JOB_COMMANDS[install] ?? '';
+    expect(line.match(/install\s+\$\{NEEDS_APT:\+--with-deps\}\s+webkit\b/g) ?? []).toHaveLength(2);
+    expect(line).not.toMatch(/install\s+--with-deps\b/);
+    const step = stepsOf(JOB_TEXT).find((s) => runCommandsOf(s).some(isInstall)) ?? '';
+    expect(stepValue(step, 'NEEDS_APT')).toMatch(
+      /^\$\{\{\s*steps\.deps\.outputs\.needs-apt\s*\}\}$/,
+    );
+  });
+
+  it('the check before the tests uses Playwright’s own dry run and fails the step', () => {
+    const arm = caseArm(read(APT_CACHE_SCRIPT), 'report');
+    expect(arm).toMatch(/playwright-core\s+install-deps\s+--dry-run\s+webkit/);
+    expect(arm).toMatch(/\bexit\s+1\b/);
+    for (const mask of MASKS) expect(arm).not.toMatch(mask);
+  });
+
+  it('every cap still fits inside the job, leaving time to run the check', () => {
+    const offlineCap = Number(
+      /\btimeout\s+(?:--\S+\s+)*(\d+)\s+apt-get\b/.exec(
+        caseArm(read(APT_CACHE_SCRIPT), 'offline'),
+      )?.[1] ?? NaN,
+    );
+    const installSeconds = installAttempts(JOB_COMMANDS[install] ?? '').reduce((a, b) => a + b, 0);
+    const jobMinutes = Number(/^\s+timeout-minutes:\s*(\d+)\s*$/m.exec(JOB_TEXT)?.[1] ?? NaN);
+    expect((offlineCap + installSeconds) / 60).toBeLessThan(jobMinutes - 5);
+  });
+});
+
+describe('the job never passes without the tests, and says so when they did not run (L-367)', () => {
+  it('nothing in the job can turn a failure green or skip the tests', () => {
+    expect(neverGreenOffences(JOB_TEXT)).toEqual([]);
+  });
+
+  it('a failure before the tests is reported as "no test ran", and stays red', () => {
+    expect(existsSync(join(REPO_ROOT, EXPLAIN_SCRIPT)), `${EXPLAIN_SCRIPT} does not exist`).toBe(
+      true,
+    );
+    expect(explainOffences(JOB_TEXT, read(EXPLAIN_SCRIPT))).toEqual([]);
+  });
+});
+
+describe('the L-367 detectors can actually fail', () => {
+  // Every mutation edits a COPY of the real ci.yml, and first proves the text it
+  // edits is really there, so a mutation that silently changed nothing cannot
+  // pass for a detector that works.
+  const mutate = (from: string | RegExp, to: string): string => {
+    const after = WORKFLOW.replaceAll('\r\n', '\n').replace(from, to);
+    expect(after, `mutation found nothing to change: ${String(from)}`).not.toBe(
+      WORKFLOW.replaceAll('\r\n', '\n'),
+    );
+    return jobTextOf(readableYaml(after), JOB);
+  };
+  const DRIVE_RUN = '        run: pnpm webkit\n';
+
+  it.each([
+    ['`|| true` on the install line', /(webkit\))\n/, '$1 || true\n', /masks a failure/],
+    ['`|| true` on the tests', DRIVE_RUN, '        run: pnpm webkit || true\n', /masks a failure/],
+    ['`; exit 0` after the retry', /(webkit\))\n/, '$1; exit 0\n', /masks a failure/],
+    ['`|| :` on the tests', DRIVE_RUN, '        run: pnpm webkit || :\n', /masks a failure/],
+    [
+      '`set +e` before the tests',
+      DRIVE_RUN,
+      '        run: set +e; pnpm webkit\n',
+      /masks a failure/,
+    ],
+    [
+      '`continue-on-error` on the tests',
+      DRIVE_RUN,
+      `${DRIVE_RUN}        continue-on-error: true\n`,
+      /continue-on-error/,
+    ],
+    ['an `if:` on the tests', DRIVE_RUN, `        if: success()\n${DRIVE_RUN}`, /has an `if:`/],
+    [
+      'an `if:` on the install',
+      '        id: install\n',
+      "        id: install\n        if: github.event_name == 'push'\n",
+      /has an `if:`/,
+    ],
+    [
+      'a job-level `if:`',
+      '    name: drive pdf.js under WebKit\n',
+      "    name: drive pdf.js under WebKit\n    if: github.event_name == 'push'\n",
+      /job-level `if:`/,
+    ],
+  ])('flags %s', (_what, from, to, expected) => {
+    expect(neverGreenOffences(mutate(from, to)).join('\n')).toMatch(expected);
+  });
+
+  it('a commented-out `if:` is not an `if:` — it runs nothing', () => {
+    expect(neverGreenOffences(mutate(DRIVE_RUN, `        # if: false\n${DRIVE_RUN}`))).toEqual([]);
+  });
+
+  it('flags the package cache keyed on the lockfile again, even beside a comment with the right key', () => {
+    const job = mutate(
+      /key: webkit-apt-\$\{\{ steps\.keys\.outputs\.image \}\}.*\n/,
+      "key: webkit-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }} # key: webkit-apt-${{ steps.keys.outputs.image }}-${{ steps.keys.outputs.playwright }}\n",
+    );
+    expect(cacheKeyOffences(job).join('\n')).toMatch(
+      /system packages cache key does not change with `image`/,
+    );
+  });
+
+  it('flags the browser cache losing the Playwright version', () => {
+    const job = mutate(
+      /(key: playwright-webkit-\$\{\{ steps\.keys\.outputs\.os \}\})-.*\n/,
+      "$1-${{ hashFiles('pnpm-lock.yaml') }}\n",
+    );
+    expect(cacheKeyOffences(job).join('\n')).toMatch(
+      /browser cache key does not change with `playwright`/,
+    );
+  });
+
+  it('flags an explanation that could run on a green job, or that ignores whether the tests ran', () => {
+    const script = read(EXPLAIN_SCRIPT);
+    const always = mutate(/if: failure\(\) && (steps\.drive)/, 'if: always() && $1');
+    expect(explainOffences(always, script).join('\n')).toMatch(/not failure-only/);
+    const blind = mutate(/if: failure\(\) && .*\n/, 'if: failure()\n');
+    expect(explainOffences(blind, script).join('\n')).toMatch(/whether the tests ran/);
+  });
+
+  it('flags an explanation script that exits 0 or stays quiet', () => {
+    expect(
+      explainOffences(
+        JOB_TEXT,
+        'echo "::error::No test ran" >> "$GITHUB_STEP_SUMMARY"\nexit 0\n',
+      ).join('\n'),
+    ).toMatch(/exit 0/);
+    expect(explainOffences(JOB_TEXT, 'echo hi\nexit 1\n').join('\n')).toMatch(/::error/);
+  });
+});
