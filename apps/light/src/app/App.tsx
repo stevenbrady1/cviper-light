@@ -1,35 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { type Result } from '@cviper/core-types';
 
-import { Analysis, type AnalysisProps } from '../features/analysis/Analysis';
-import { jobAdvertText } from '../features/analysis/model';
+import { type AnalysisProps } from '../features/analysis/Analysis';
 import { createAnalysisSession } from '../features/analysis/session';
-import {
-  loadJobIntoAnalysis,
-  type AnalyseHandoff,
-  gapsFromSession,
-  type TailorHandoff,
-} from '../features/flow/handoff';
+import { type TailorHandoff } from '../features/flow/handoff';
 import { Welcome } from '../features/onboarding/Welcome';
-import { Profile, type ProfileProps } from '../features/profile/Profile';
+import { type ProfileProps } from '../features/profile/Profile';
 import { forgetWelcome, hasSeenWelcome, markWelcomeSeen } from '../features/onboarding/store';
-import { Search, type SearchProps } from '../features/search/Search';
-import { Settings, type SettingsProps } from '../features/settings/Settings';
+import { type SearchProps } from '../features/search/Search';
+import { type SettingsProps } from '../features/settings/Settings';
 import { createJobSessions } from '../features/tailor/jobSessions';
-import {
-  createTauriWorkflowPort,
-  hydrateJobSessions,
-  startWriteThrough,
-  type WorkflowPort,
-} from '../features/tailor/persistence';
-import { createDbTailorPort } from '../features/tailor/port';
+import { type WorkflowPort } from '../features/tailor/persistence';
 import { ResumeBanner, resumeBannerText } from '../features/tailor/ResumeBanner';
-import { Tailor, type TailorProps } from '../features/tailor/Tailor';
-import { Tracker, type TrackerProps } from '../features/tracker/Tracker';
-import { type TrackerEntry } from '../features/tracker/model';
+import { type TailorProps } from '../features/tailor/Tailor';
+import { type TrackerProps } from '../features/tracker/Tracker';
 import { type StepId } from '../features/flow/steps';
-import { type TailorStep } from '../features/tailor/Tailor';
 import { type Job } from '@cviper/core-types';
 import {
   createTauriOpenedCvPort,
@@ -38,18 +24,19 @@ import {
   type PickedCv,
 } from '../platform/files';
 import { UpdateBanner, updateBannerText } from '../features/settings/updates/UpdateBanner';
-import { updateCheckOnLaunchEnabled } from '../features/settings/updates/launchCheck';
-import { nextStateAfterCheck } from '../features/settings/updates/model';
-import { createTauriUpdatePort } from '../features/settings/updates/port';
-import { detectMobileOs } from '../platform/os';
 import { readEnvironmentStatus, type EnvironmentStatus } from '../status/environment';
 import { BottomNav } from './BottomNav';
 import { QUIET_BUTTON } from './buttons';
 import { ErrorBoundary } from './ErrorBoundary';
+import { renderView } from './renderView';
 import { Sidebar } from './Sidebar';
 import { useStartupFonts } from './startupFonts';
+import { useJobFlow } from './useJobFlow';
+import { useLaunchUpdate } from './useLaunchUpdate';
+import { useTailorWorkRestore } from './useTailorWorkRestore';
+import { useViewShortcuts } from './useViewShortcuts';
 import { useViewportClass } from './viewport';
-import { DEFAULT_VIEW, viewForShortcut, type ViewId } from './views';
+import { DEFAULT_VIEW, type ViewId } from './views';
 import { LiveStatus } from './LiveStatus';
 
 /**
@@ -254,110 +241,23 @@ export default function App({
   /** A write-through that failed: said once, on a strip, never swallowed. */
   const [keepProblem, setKeepProblem] = useState<string | null>(null);
 
-  // Once the user is on Tailor, the offer has been taken up either way.
-  useEffect(() => {
-    if (activeView === 'tailor') setResumeOffer(null);
-  }, [activeView]);
+  // The hooks below are called exactly where their effects used to be (L-373).
+  // React runs effects in the order they are declared, so moving a call moves
+  // the start-up order with it.
 
-  // Restore every job's Tailor work, then keep writing it through (L-199).
-  useEffect(() => {
-    let stopped = false;
-    let stopWriting: (() => void) | null = null;
+  // Tailor's work across a restart (L-199): `useTailorWorkRestore.ts`.
+  useTailorWorkRestore({
+    activeView,
+    jobSessions,
+    tailorPort,
+    workflowPort,
+    setResumeOffer,
+    setKeepProblem,
+  });
 
-    void (async () => {
-      const port =
-        workflowPort !== undefined
-          ? workflowPort
-          : tailorPort === undefined
-            ? await createTauriWorkflowPort()
-            : null;
-      if (port === null || stopped) return;
-
-      const resumed = await hydrateJobSessions(jobSessions, port);
-      if (stopped) return;
-      stopWriting = startWriteThrough(jobSessions, port, undefined, setKeepProblem);
-      if (resumed === null) return;
-
-      // The job's title and company, for the sentence. A failed read still
-      // offers the work back, just without naming the job.
-      const jobs = await (tailorPort ?? createDbTailorPort()).loadJobs();
-      if (stopped) return;
-      const job = jobs.ok ? jobs.value.find((candidate) => candidate.id === resumed) : undefined;
-      setResumeOffer({ title: job?.title ?? '', company: job?.company ?? '' });
-    })();
-
-    return () => {
-      stopped = true;
-      stopWriting?.();
-    };
-  }, [jobSessions, tailorPort, workflowPort]);
-
-  /**
-   * The update offered by the check on launch, or `null` for the usual case.
-   *
-   * ============================================================================
-   * ONE PORT, SHARED WITH SETTINGS
-   * ============================================================================
-   * `install` can only install the update the last `check` found, and that
-   * handle lives inside the port. A second port here would leave the banner's
-   * Install button with nothing to install.
-   */
-  const updatePortInstance = useMemo(() => updatePort ?? createTauriUpdatePort(), [updatePort]);
-  const [offeredUpdate, setOfferedUpdate] = useState<{
-    readonly version: string;
-    readonly notes: string | null;
-  } | null>(null);
-  const [installPhase, setInstallPhase] = useState<'idle' | 'installing' | 'installed'>('idle');
-
-  /**
-   * Look for a newer version once, at startup, unless the user said not to.
-   *
-   * ============================================================================
-   * THE PREFERENCE IS READ BEFORE ANYTHING IS REQUESTED
-   * ============================================================================
-   * That ordering is the whole promise. Reading it afterwards would mean the
-   * request the user switched off had already been made, and no amount of
-   * "we only use the result if..." undoes a packet that has left.
-   *
-   * It is SILENT about failure. Nobody asked for this check, so a banner saying
-   * GitHub could not be reached would be an error message for an action the
-   * user did not take. The button in Settings is where a failure is worth
-   * reporting, because somebody is waiting for that answer.
-   *
-   * Once, on mount, and deliberately not on view changes: "check when the user
-   * opens a screen" is still a request they did not ask for.
-   */
-  useEffect(() => {
-    const readToggle = readUpdateCheckOnLaunch ?? updateCheckOnLaunchEnabled;
-    if (!readToggle()) return;
-
-    // Not on a phone. The store delivers updates there and the updater plugin
-    // is not compiled into those builds at all (L-80).
-    if (detectMobileOs() !== null) return;
-
-    let cancelled = false;
-    void updatePortInstance.check().then((result) => {
-      if (cancelled) return;
-      const next = nextStateAfterCheck(result);
-      if (next.kind === 'available') {
-        setOfferedUpdate({ version: next.version, notes: next.notes });
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const onInstallUpdate = useCallback(async () => {
-    setInstallPhase('installing');
-
-    const installed = await updatePortInstance.install();
-    // Never swallowed. A failed install must not leave the strip looking like
-    // it worked; it goes back to offering, and Settings is where the reason
-    // can be read in full.
-    setInstallPhase(installed.ok ? 'installed' : 'idle');
-  }, [updatePortInstance]);
+  // The update check on launch (L-92): `useLaunchUpdate.ts`.
+  const { updatePortInstance, offeredUpdate, setOfferedUpdate, installPhase, onInstallUpdate } =
+    useLaunchUpdate({ updatePort, readUpdateCheckOnLaunch });
 
   useEffect(() => {
     const port = openedCv ?? createTauriOpenedCvPort();
@@ -393,144 +293,25 @@ export default function App({
     };
   }, [activeView]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent): void {
-      // Ctrl, and only Ctrl. `Ctrl+Alt+2` is AltGr on a good many European
-      // keyboard layouts and types a character; stealing it would make the app
-      // impossible to type in.
-      if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+  // Ctrl+1 to Ctrl+5 (KEYBOARD, above): `useViewShortcuts.ts`.
+  useViewShortcuts(setActiveView);
 
-      const digit = Number(event.key);
-      if (!Number.isInteger(digit)) return;
-
-      const target = viewForShortcut(digit);
-      if (target === null) return;
-
-      event.preventDefault();
-      setActiveView(target);
-    }
-
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
-
-  /**
-   * Which of Tailor's own steps it opens on (L-200). Set by a step bar on
-   * another screen; the sidebar and every other route open it on Tailor.
-   */
-  const [tailorEntryStep, setTailorEntryStep] = useState<TailorStep>('tailor');
-
-  const onSelect = useCallback((id: ViewId) => {
-    setTailorEntryStep('tailor');
-    setActiveView(id);
-  }, []);
-
-  // ── Find Job → Analyse → Tailor CV (L-190) ──────────────────────────────
-
-  /** A job from Search or the tracker, loaded into Analysis — and shown. */
-  const onAnalyseJob = useCallback(
-    (handoff: AnalyseHandoff) => {
-      loadJobIntoAnalysis(analysisSession, handoff);
-      setActiveView('analysis');
-    },
-    [analysisSession],
-  );
-
-  /** A job, CV and option from Analysis or the tracker, handed to Tailor. */
-  const onTailorJob = useCallback((handoff: TailorHandoff) => {
-    setTailorHandoff(handoff);
-    setActiveView('tailor');
-  }, []);
-
-  const onTailorHandoffHandled = useCallback(() => setTailorHandoff(null), []);
-
-  /**
-   * A step on a job's step bar that lives on another screen (L-200). Only
-   * MOVES the user — nothing here runs a check or a model.
-   *
-   * Going to Tailor reopens the job's own work when it has some; only a job
-   * with none takes the hand-off ("Tailor my CV for this job"), which would
-   * otherwise start its draft again (L-205).
-   */
-  const onJobStep = useCallback(
-    (step: StepId, job: Job, handoff?: TailorHandoff) => {
-      if (step === 'find') {
-        setActiveView('search');
-        return;
-      }
-      if (step === 'analyse') {
-        // The same job stays as it is — its result included.
-        if (analysisSession.get().jobId !== job.id) {
-          loadJobIntoAnalysis(analysisSession, { job, applicationId: null, note: null });
-        }
-        setActiveView('analysis');
-        return;
-      }
-      if (jobSessions.has(job.id) || handoff === undefined) {
-        jobSessions.open(job.id, () => ({ advert: jobAdvertText(job) }));
-        setActiveView('tailor');
-      } else {
-        onTailorJob(handoff);
-      }
-      setTailorEntryStep(step);
-    },
-    [analysisSession, jobSessions, onTailorJob],
-  );
-
-  const onTracker = useCallback(() => setActiveView('tracker'), []);
-
-  // "Pick once" (L-200): a job's CV and engine live in its Tailor session, so
-  // a choice made on either screen is the one the other opens with.
-  const jobChoice = useCallback(
-    (jobId: string) => {
-      if (!jobSessions.has(jobId)) return null;
-      const { cvId, optionKey } = jobSessions.session(jobId);
-      return { cvId, optionKey };
-    },
-    [jobSessions],
-  );
-  const onJobChoice = useCallback(
-    (job: Job, choice: { readonly cvId?: string | null; readonly optionKey?: string | null }) => {
-      jobSessions.ensure(job.id, () => ({ advert: jobAdvertText(job) }));
-      // As on Tailor: a draft written from another CV is not this CV's draft.
-      jobSessions.patch(job.id, (current) =>
-        choice.cvId !== undefined && current.cvId !== choice.cvId
-          ? { ...choice, result: null, review: null, letter: null, error: null }
-          : choice,
-      );
-    },
-    [jobSessions],
-  );
-  const tailoredJob = useCallback(
-    (jobId: string) => jobSessions.session(jobId).result !== null,
-    [jobSessions],
-  );
-
-  // The tracker's two buttons. Its job holds the advert as saved, so nothing
-  // is fetched and there is no note: the pane has its own "Open the advert"
-  // for a thin one. Tailor gets the CV and option last used on Analysis —
-  // the user's choice, if they have made one; Tailor falls back if not.
-  const onTrackerAnalyse = useCallback(
-    (entry: TrackerEntry) =>
-      onAnalyseJob({ job: entry.job, applicationId: entry.application.id, note: null }),
-    [onAnalyseJob],
-  );
-
-  const onTrackerTailor = useCallback(
-    (entry: TrackerEntry) => {
-      const state = analysisSession.get();
-      onTailorJob({
-        jobId: entry.job.id,
-        jobText: jobAdvertText(entry.job),
-        cvId: state.selectedCvId,
-        optionKey: state.optionKey,
-        // Only used by Tailor if the last analysis was of this job's advert
-        // and this CV (L-202) — `gapsForTailor` checks both.
-        keywordGaps: gapsFromSession(state),
-      });
-    },
-    [analysisSession, onTailorJob],
-  );
+  // Carrying a job between screens (L-190, L-200): `useJobFlow.ts`.
+  const {
+    tailorEntryStep,
+    setTailorEntryStep,
+    onSelect,
+    onAnalyseJob,
+    onTailorJob,
+    onTailorHandoffHandled,
+    onJobStep,
+    onTracker,
+    jobChoice,
+    onJobChoice,
+    tailoredJob,
+    onTrackerAnalyse,
+    onTrackerTailor,
+  } = useJobFlow({ analysisSession, jobSessions, setActiveView, setTailorHandoff });
 
   /**
    * Close the introduction.
@@ -770,31 +551,4 @@ export default function App({
       {narrow ? <BottomNav activeView={activeView} onSelect={onSelect} /> : null}
     </div>
   );
-}
-
-/** The props each view needs, gathered in one place the switch below reads. */
-interface ViewProps {
-  readonly profile: ProfileProps;
-  readonly search: SearchProps;
-  readonly tracker: TrackerProps;
-  readonly analysis: AnalysisProps;
-  readonly tailor: TailorProps;
-  readonly settings: SettingsProps;
-}
-
-function renderView(id: ViewId, props: ViewProps) {
-  switch (id) {
-    case 'profile':
-      return <Profile {...props.profile} />;
-    case 'search':
-      return <Search {...props.search} />;
-    case 'tracker':
-      return <Tracker {...props.tracker} />;
-    case 'analysis':
-      return <Analysis {...props.analysis} />;
-    case 'tailor':
-      return <Tailor {...props.tailor} />;
-    case 'settings':
-      return <Settings {...props.settings} />;
-  }
 }
