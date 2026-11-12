@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type ModelInfo } from '@cviper/ai-providers';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
-import { cardClasses, StatusPill } from '../../../ui';
+import { cardClasses, ErrorBox, StatusPill } from '../../../ui';
 import { type KeyState } from '../../../status/environment';
 import {
   chooseCustomModel,
@@ -333,13 +333,9 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
         </p>
       )}
       {problem === null ? null : (
-        <p
-          role="alert"
-          data-testid="custom-service-problem"
-          className="mt-3 rounded-control bg-danger/5 px-3 py-2 text-danger"
-        >
+        <ErrorBox variant="box" gapAbove="mt-3" testId="custom-service-problem">
           {problem}
-        </p>
+        </ErrorBox>
       )}
 
       {saved === undefined || saved === null ? null : (

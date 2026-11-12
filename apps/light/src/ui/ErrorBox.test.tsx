@@ -269,3 +269,181 @@ describe('ErrorBox — what goes inside', () => {
     }
   });
 });
+
+/**
+ * L-377: the boxes inside Settings, job boards, CV upload and the CV pickers
+ * move onto the `box` shape. Two of them hold more than one block — Settings'
+ * notice (two paragraphs) and Erase everything's failure (a paragraph and a
+ * list) — and a `<p>` cannot hold a `<ul>` or another `<p>`. So the box can be
+ * drawn as a `div`: `as="div"`. Nothing else about it changes.
+ */
+describe('ErrorBox — a box that holds more than one block (L-377)', () => {
+  it('as="div" is a div with the box classes, and the blocks as given', () => {
+    render(
+      <ErrorBox variant="box" as="div" testId="block-box">
+        <p className="font-medium">Some of it could not be removed.</p>
+        <ul className="mt-1 list-disc pl-5 text-ink-muted">
+          <li>The CV folder</li>
+          <li>The saved keys</li>
+        </ul>
+      </ErrorBox>,
+    );
+    const box = screen.getByTestId('block-box');
+    expect(box.tagName).toBe('DIV');
+    expect(box.className).toBe(BOX);
+    expect(box.innerHTML).toBe(
+      '<p class="font-medium">Some of it could not be removed.</p>' +
+        '<ul class="mt-1 list-disc pl-5 text-ink-muted"><li>The CV folder</li><li>The saved keys</li></ul>',
+    );
+  });
+
+  it('two paragraphs, with the space above first, as Settings and Erase everything carry it', () => {
+    render(
+      <>
+        <ErrorBox variant="box" as="div" testId="two-paragraphs">
+          <p className="font-medium">That file could not be read.</p>
+          <p className="mt-1 whitespace-pre-line text-ink-muted">It is not a CViper backup.</p>
+        </ErrorBox>
+        <ErrorBox variant="box" as="div" gapAbove="mt-3" testId="spaced">
+          <p>a</p>
+        </ErrorBox>
+      </>,
+    );
+    const two = screen.getByTestId('two-paragraphs');
+    expect(two.className).toBe(BOX);
+    expect([...two.children].map((child) => child.tagName)).toEqual(['P', 'P']);
+    expect(screen.getByTestId('spaced').className).toBe(`mt-3 ${BOX}`);
+  });
+
+  it('as="p" is the paragraph it always was', () => {
+    render(
+      <ErrorBox variant="box" as="p" gapAbove="mt-2" testId="text-box">
+        That did not work.
+      </ErrorBox>,
+    );
+    const box = screen.getByTestId('text-box');
+    expect(box.tagName).toBe('P');
+    expect(box.className).toBe(`mt-2 ${BOX}`);
+  });
+
+  it('the div form is still always an alert, with its own test id', () => {
+    render(
+      <>
+        <ErrorBox variant="box" as="div" testId="settings-problem">
+          <p>a</p>
+        </ErrorBox>
+        <ErrorBox variant="box" as="div" gapAbove="mt-3" testId="settings-erase-problem">
+          <p>b</p>
+        </ErrorBox>
+      </>,
+    );
+    expect(screen.getAllByRole('alert').map((el) => el.dataset['testid'])).toEqual([
+      'settings-problem',
+      'settings-erase-problem',
+    ]);
+  });
+
+  it('NEGATIVE: only a p or a div, only on a box, and the role still cannot be changed', () => {
+    const typed = (
+      <>
+        {/* @ts-expect-error a box is a `p` or a `div`, nothing else. */}
+        <ErrorBox variant="box" as="section" testId="section">
+          x
+        </ErrorBox>
+        {/* @ts-expect-error `as` belongs to the box; a strip is drawn by `layout`. */}
+        <ErrorBox variant="strip" as="div" testId="strip-as">
+          y
+        </ErrorBox>
+      </>
+    );
+    // Forced through anyway: anything but "div" draws the paragraph, and
+    // nothing else that is forced through reaches the element.
+    const forced = {
+      as: 'span',
+      role: 'presentation',
+      'aria-live': 'off',
+      className: 'hidden',
+      hidden: true,
+    };
+    const forcedDiv = { role: 'status', className: 'border border-danger/30', id: 'x' };
+    render(
+      <>
+        {typed}
+        <ErrorBox variant="box" testId="forced" {...(forced as object)}>
+          z
+        </ErrorBox>
+        <ErrorBox variant="box" as="div" testId="forced-div" {...(forcedDiv as object)}>
+          <p>w</p>
+        </ErrorBox>
+      </>,
+    );
+
+    expect(screen.getByTestId('section').tagName).toBe('P');
+    expect(screen.getByTestId('strip-as').tagName).toBe('P');
+    expect(screen.getByTestId('strip-as').className).toBe(STRIP);
+
+    const forcedP = screen.getByTestId('forced');
+    expect(forcedP.tagName).toBe('P');
+    expect(forcedP.getAttribute('role')).toBe('alert');
+    expect(forcedP.hasAttribute('aria-live')).toBe(false);
+    expect(forcedP.hasAttribute('hidden')).toBe(false);
+    expect(forcedP.className).toBe(BOX);
+
+    const div = screen.getByTestId('forced-div');
+    expect(div.tagName).toBe('DIV');
+    expect(div.getAttribute('role')).toBe('alert');
+    expect(div.hasAttribute('id')).toBe(false);
+    expect(div.className).toBe(BOX);
+  });
+
+  it('BOUNDARY: empty children in the div form still draw one alert', () => {
+    render(
+      <ErrorBox variant="box" as="div" gapAbove="mt-3" testId="empty-div">
+        {''}
+      </ErrorBox>,
+    );
+    const empty = screen.getByRole('alert');
+    expect(empty).toBe(screen.getByTestId('empty-div'));
+    expect(empty.tagName).toBe('DIV');
+    expect(empty.textContent).toBe('');
+    expect(empty.className).toBe(`mt-3 ${BOX}`);
+  });
+
+  it('a button inside the div form works: the click reaches its handler', async () => {
+    const onRetry = vi.fn();
+    render(
+      <ErrorBox variant="box" as="div" testId="div-with-button">
+        <p>The file could not be read.</p>
+        <button type="button" onClick={onRetry}>
+          Try again
+        </button>
+      </ErrorBox>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole('alert').contains(screen.getByRole('button', { name: 'Try again' })),
+    ).toBe(true);
+  });
+
+  it('a long UNBROKEN path in the div form breaks too, and nothing clips it', () => {
+    const path = `C:\\Users\\someone\\AppData\\Roaming\\com.cviper.light\\${'NestedFolder\\'.repeat(12)}cviper.json`;
+    render(
+      <ErrorBox variant="box" as="div" gapAbove="mt-3" testId="div-path">
+        <p className="font-medium">Some of it could not be removed.</p>
+        <ul className="mt-1 list-disc pl-5 text-ink-muted">
+          <li>{path}</li>
+        </ul>
+      </ErrorBox>,
+    );
+    const box = screen.getByTestId('div-path');
+    const classes = box.className.split(' ');
+    // `overflow-wrap` is inherited, so the paragraph and the list inside break too.
+    expect(classes).toContain('break-words');
+    expect(classes).not.toContain('break-all');
+    expect(box.className).not.toMatch(CLIPPING);
+    expect(box.textContent).toBe(`Some of it could not be removed.${path}`);
+  });
+});

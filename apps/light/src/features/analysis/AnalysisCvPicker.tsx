@@ -4,6 +4,7 @@ import { SECONDARY_BUTTON } from '../../app/buttons';
 import { Hint } from '../../app/Hint';
 import { JSON_RESUME_HINT } from '../../app/hints';
 import { LiveStatus } from '../../app/LiveStatus';
+import { ErrorBox } from '../../ui';
 
 export interface AnalysisCvPickerProps {
   readonly cvs: readonly Cv[];
@@ -115,13 +116,9 @@ export function AnalysisCvPicker({
       )}
 
       {uploadProblem === null ? null : (
-        <p
-          role="alert"
-          data-testid="analysis-upload-problem"
-          className="mt-2 rounded-control bg-danger/5 px-3 py-2 text-danger"
-        >
+        <ErrorBox variant="box" gapAbove="mt-2" testId="analysis-upload-problem">
           {uploadProblem}
-        </p>
+        </ErrorBox>
       )}
 
       {warnings.length === 0 ? null : (

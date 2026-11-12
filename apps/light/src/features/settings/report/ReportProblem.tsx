@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { SECONDARY_BUTTON } from '../../../app/buttons';
-import { SectionHeading } from '../../../ui';
+import { ErrorBox, SectionHeading } from '../../../ui';
 import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 
 import { reportUrl } from './model';
@@ -86,13 +86,9 @@ export function ReportProblem({ browser, port }: ReportProblemProps = {}) {
       </div>
 
       {problem === null ? null : (
-        <p
-          role="alert"
-          data-testid="settings-report-problem"
-          className="mt-3 rounded-control bg-danger/5 px-3 py-2 text-danger"
-        >
+        <ErrorBox variant="box" gapAbove="mt-3" testId="settings-report-problem">
           {problem}
-        </p>
+        </ErrorBox>
       )}
     </section>
   );

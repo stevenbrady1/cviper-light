@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
 import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 import { combineKeyState, type KeyState } from '../../../status/environment';
-import { cardClasses, SectionHeading, StatusPill } from '../../../ui';
+import { cardClasses, ErrorBox, SectionHeading, StatusPill } from '../../../ui';
 import { AI_COST_LINE } from '../../onboarding/cards';
 import {
   AI_MODEL_CHOICES,
@@ -461,13 +461,9 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
       )}
 
       {outcome.problem === null ? null : (
-        <p
-          role="alert"
-          data-testid={`ai-key-problem-${provider.id}`}
-          className="mt-3 rounded-control bg-danger/5 px-3 py-2 text-danger"
-        >
+        <ErrorBox variant="box" gapAbove="mt-3" testId={`ai-key-problem-${provider.id}`}>
           {outcome.problem}
-        </p>
+        </ErrorBox>
       )}
 
       <ModelPicker providerId={provider.id} />

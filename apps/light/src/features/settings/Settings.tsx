@@ -13,7 +13,7 @@ import { CONTENT_COLUMN } from '../../app/layout';
 import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
-import { cardClasses, SectionHeading } from '../../ui';
+import { cardClasses, ErrorBox, SectionHeading } from '../../ui';
 import { BoardSettings } from '../boards/BoardSettings';
 import { type BoardPreferencesPort } from '../boards/port';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
@@ -424,14 +424,10 @@ export function Settings({
           )}
 
           {problem === null ? null : (
-            <div
-              role="alert"
-              data-testid="settings-problem"
-              className="rounded-control bg-danger/5 px-3 py-2 text-danger"
-            >
+            <ErrorBox variant="box" as="div" testId="settings-problem">
               <p className="font-medium">{problem.headline}</p>
               <p className="mt-1 whitespace-pre-line text-ink-muted">{problem.detail}</p>
-            </div>
+            </ErrorBox>
           )}
 
           {stage.kind === 'confirm' ? (
