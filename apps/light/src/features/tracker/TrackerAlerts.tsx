@@ -27,7 +27,7 @@ export function TrackerAlerts({
     <>
       {error === null ? null : (
         <ErrorBox variant="strip" layout="row" testId="tracker-error">
-          <span>{error}</span>
+          <span className="min-w-0">{error}</span>
           {!loadFailed ? null : (
             <button
               type="button"
@@ -43,7 +43,7 @@ export function TrackerAlerts({
 
       {substagesFailed === null ? null : (
         <ErrorBox variant="strip" layout="row" testId="tracker-substages-error">
-          <span>
+          <span className="min-w-0">
             {`Your interview stages could not be read: ${substagesFailed} The board is shown without them.`}
           </span>
           <button type="button" className={SECONDARY_BUTTON} onClick={() => void loadSubstages()}>

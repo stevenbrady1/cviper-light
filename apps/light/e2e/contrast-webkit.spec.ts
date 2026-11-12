@@ -1315,3 +1315,439 @@ describe('the mono font cannot move Settings after a jump (L-364)', () => {
     await app.page.context().close();
   });
 });
+
+/**
+ * A long unbroken word in an error message wraps (L-374).
+ *
+ * An error that carries a file path or a web address has a "word" with no
+ * spaces in it. Nothing told the error strips (`ui/ErrorBox.tsx`, L-368) to
+ * break such a word, so in a narrow window it ran on past the strip's edge.
+ * Measured on `main` before the fix, with a 200-character Windows path:
+ *   - the page itself never scrolled sideways: the shell clips (`overflow-x:
+ *     clip`). The text was simply CUT OFF at the window's edge, unreadable.
+ *   - Tracker's strip is a row with Retry at the end. The path would not let
+ *     its span shrink (a flex item is never narrower than its longest word), so
+ *     Retry was pushed out to x≈1680 at 375px: off screen, and not pressable.
+ *   - the box inside a panel spilled out of the panel, and the Settings scroll
+ *     area grew a sideways scroll.
+ *
+ * The fix is `break-words` on every shape (a word breaks only when it cannot
+ * fit on a line of its own), and `min-w-0` on the span holding a row strip's
+ * message, so it can be narrower than that word.
+ *
+ * jsdom does no layout, so only a real engine can see any of this. The checks
+ * also draw a REFERENCE: a copy of the same strip with the fix's classes taken
+ * off, next to it in the same place. That is what `main` drew, so "an ordinary
+ * sentence wraps exactly as before" is a comparison on the same machine and
+ * fonts, not a pixel count that would differ on CI's Linux.
+ */
+const LONG_PATH = ((): string => {
+  let path = 'C:\\Users\\someone\\AppData\\Roaming\\com.cviper.light\\backups';
+  while (path.length < 195) path += '\\NestedFolder';
+  return `${path.slice(0, 195)}.json`;
+})();
+
+const ORDINARY =
+  'The database is locked by another copy of CViper. Close the other copy, then open this ' +
+  'one again so your board can be read.';
+
+/** The classes the fix adds: on the strip itself, and on a row strip's message span. */
+const WRAP_FIX = { strip: ['break-words'], span: ['min-w-0'] } as const;
+
+const ERROR_WIDTHS = [375, 1000] as const;
+
+interface ErrorLayout {
+  readonly viewport: number;
+  readonly strip: { readonly left: number; readonly right: number; readonly height: number };
+  /** How far the page scrolls sideways. 0 is none. */
+  readonly pageScroll: number;
+  /** The element holding the words: the strip, or a row strip's span. */
+  readonly message: {
+    readonly scrollWidth: number;
+    readonly clientWidth: number;
+    readonly width: number;
+    /**
+     * How far the furthest word reaches past the right of the message's content
+     * box. `scrollWidth` alone misses words running into the padding.
+     */
+    readonly overrun: number;
+  };
+  /** The message and everything around it, out to the page, whose content is wider than it. */
+  readonly wider: readonly string[];
+  readonly button: {
+    readonly left: number;
+    readonly right: number;
+    readonly width: number;
+    /** A click at the button's centre lands on the button. */
+    readonly onTop: boolean;
+  } | null;
+}
+
+async function errorLayout(page: Page, testId: string): Promise<ErrorLayout> {
+  return page.evaluate((id) => {
+    const strip = document.querySelector(`[data-testid="${id}"]`);
+    if (strip === null) throw new Error(`no ${id}`);
+    const message = strip.querySelector(':scope > span') ?? strip;
+    const wider: string[] = [];
+    for (let node: Element | null = message; node !== null; node = node.parentElement) {
+      if (node.scrollWidth > node.clientWidth) {
+        const name = node.getAttribute('data-testid') ?? node.tagName.toLowerCase();
+        wider.push(`${name}: ${String(node.scrollWidth - node.clientWidth)}px wider than it is`);
+      }
+    }
+    const style = getComputedStyle(message);
+    const contentRight =
+      message.getBoundingClientRect().right -
+      parseFloat(style.paddingRight) -
+      parseFloat(style.borderRightWidth);
+    let furthest = -Infinity;
+    const walker = document.createTreeWalker(message, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      for (const word of (node.textContent ?? '').matchAll(/\S+/g)) {
+        const range = document.createRange();
+        range.setStart(node, word.index);
+        range.setEnd(node, word.index + word[0].length);
+        for (const rect of range.getClientRects()) furthest = Math.max(furthest, rect.right);
+      }
+    }
+    const box = strip.getBoundingClientRect();
+    const button = strip.querySelector('button');
+    let pressable: ErrorLayout['button'] = null;
+    if (button !== null) {
+      const at = button.getBoundingClientRect();
+      const hit = document.elementFromPoint(at.left + at.width / 2, at.top + at.height / 2);
+      pressable = {
+        left: at.left,
+        right: at.right,
+        width: at.width,
+        onTop: hit !== null && button.contains(hit),
+      };
+    }
+    const root = document.documentElement;
+    return {
+      viewport: window.innerWidth,
+      strip: { left: box.left, right: box.right, height: box.height },
+      pageScroll: root.scrollWidth - root.clientWidth,
+      message: {
+        scrollWidth: message.scrollWidth,
+        clientWidth: message.clientWidth,
+        width: message.getBoundingClientRect().width,
+        overrun: furthest === -Infinity ? 0 : Math.max(0, furthest - contentRight),
+      },
+      wider,
+      button: pressable,
+    };
+  }, testId);
+}
+
+/**
+ * Put a copy of the strip straight after it, with the fix's classes taken off:
+ * what `main` drew, in the same place, with the same fonts. Not an alert, so a
+ * screen reader is not told twice. Its test id is `<id>-reference`.
+ */
+async function drawReference(page: Page, testId: string): Promise<string> {
+  await page.evaluate(
+    ({ id, fix }) => {
+      const strip = document.querySelector(`[data-testid="${id}"]`);
+      if (strip === null) throw new Error(`no ${id}`);
+      const copy = strip.cloneNode(true) as Element;
+      copy.setAttribute('data-testid', `${id}-reference`);
+      copy.removeAttribute('role');
+      copy.classList.remove(...fix.strip);
+      copy.querySelector(':scope > span')?.classList.remove(...fix.span);
+      strip.after(copy);
+    },
+    { id: testId, fix: WRAP_FIX },
+  );
+  return `${testId}-reference`;
+}
+
+/** The word each line starts with: where a sentence wraps. */
+async function lineStarts(page: Page, testId: string): Promise<string[]> {
+  return page.evaluate((id) => {
+    const strip = document.querySelector(`[data-testid="${id}"]`);
+    if (strip === null) throw new Error(`no ${id}`);
+    const message = strip.querySelector(':scope > span') ?? strip;
+    const walker = document.createTreeWalker(message, NodeFilter.SHOW_TEXT);
+    const starts: string[] = [];
+    let lastTop: number | null = null;
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      const text = node.textContent ?? '';
+      for (const word of text.matchAll(/\S+/g)) {
+        const range = document.createRange();
+        range.setStart(node, word.index);
+        range.setEnd(node, word.index + 1);
+        const top = Math.round(range.getBoundingClientRect().top);
+        if (top !== lastTop) starts.push(word[0]);
+        lastTop = top;
+      }
+    }
+    return starts;
+  }, testId);
+}
+
+/** Everything in the strip, its words included, is inside the strip and the window. */
+function assertFits(name: string, seen: ErrorLayout): void {
+  console.log(`${name}: ${JSON.stringify(seen)}`);
+  assert.ok(seen.strip.right <= seen.viewport, `${name}: the strip runs past the window's edge`);
+  assert.equal(seen.pageScroll, 0, `${name}: the page scrolls sideways`);
+  assert.ok(
+    seen.message.scrollWidth <= seen.message.clientWidth,
+    `${name}: the words run ${String(seen.message.scrollWidth - seen.message.clientWidth)}px past the strip`,
+  );
+  // Sub-pixel rounding only: a letter that runs over is several pixels.
+  assert.ok(
+    seen.message.overrun < 0.5,
+    `${name}: the words run ${String(seen.message.overrun)}px into the padding or past it`,
+  );
+  assert.deepEqual(seen.wider, [], `${name}: something around the message got wider`);
+}
+
+/** Tracker, with the board failing to load: its row strip, with Retry. */
+async function trackerFailing(width: number, message: string): Promise<Page> {
+  const page = await open(`?seen=1&trackerLoadError=${encodeURIComponent(message)}`, {
+    width,
+    height: 800,
+  });
+  await page.waitForSelector('[data-testid="tracker-error"] button');
+  return page;
+}
+
+/** Profile, with the profile failing to load: its plain strip. */
+async function profileFailing(width: number, message: string): Promise<Page> {
+  const page = await open(`?seen=1&profileLoadError=${encodeURIComponent(message)}`, {
+    width,
+    height: 800,
+  });
+  await goTo(page, 'profile');
+  await page.waitForSelector('[data-testid="profile-error"]');
+  return page;
+}
+
+interface Mount {
+  readonly variant: 'strip' | 'box';
+  readonly layout?: 'row';
+  readonly testId: string;
+  readonly message: string;
+}
+
+/**
+ * The app's own `ErrorBox`, drawn where that shape lives: a strip straight
+ * under Profile's header, a box at the end of the AI key panel in Settings
+ * (where that panel's own hand-built error box sits).
+ */
+async function mountErrorBox(page: Page, box: Mount): Promise<void> {
+  await page.evaluate((props) => {
+    const into = document.createElement('div');
+    if (props.variant === 'box') {
+      document.querySelector('[data-testid="ai-key-setup"]')?.append(into);
+    } else {
+      const screen = document.querySelector('[data-testid="view-profile"]');
+      screen?.insertBefore(into, screen.children[1] ?? null);
+    }
+    if (!into.isConnected) throw new Error(`nowhere to draw ${props.testId}`);
+    (
+      window as unknown as { __mountErrorBox: (into: Element, box: unknown) => void }
+    ).__mountErrorBox(into, props.variant === 'box' ? { ...props, gapAbove: 'mt-3' } : props);
+  }, box);
+  await page.waitForSelector(`[data-testid="${box.testId}"]`, { state: 'attached' });
+}
+
+async function settingsPanel(width: number): Promise<Page> {
+  const page = await open('?seen=1', { width, height: 800 });
+  await goTo(page, 'settings');
+  await page.waitForSelector('[data-testid="ai-key-setup"]');
+  return page;
+}
+
+async function profileScreen(width: number): Promise<Page> {
+  const page = await open('?seen=1', { width, height: 800 });
+  await goTo(page, 'profile');
+  return page;
+}
+
+describe('a long unbroken word in an error message wraps (L-374)', () => {
+  it('the path is 200 characters with nowhere a browser may break it', () => {
+    assert.equal(LONG_PATH.length, 200);
+    // No space, hyphen or slash: letters, colons, dots and backslashes only.
+    assert.match(LONG_PATH, /^[A-Za-z:.\\]+$/);
+  });
+
+  for (const width of ERROR_WIDTHS) {
+    const px = `${String(width)}px`;
+
+    it(`the strip under Profile's header keeps the path inside the window at ${px}`, async () => {
+      const page = await profileFailing(width, LONG_PATH);
+      assertFits(`profile strip, path (${px})`, await errorLayout(page, 'profile-error'));
+      // The message is whole: the path, then the words after it.
+      assert.equal(
+        await page.locator('[data-testid="profile-error"]').textContent(),
+        `${LONG_PATH} Your data is still on this machine.`,
+      );
+      await page.context().close();
+    });
+
+    it(`Tracker's strip keeps the path inside, with Retry on screen and pressable, at ${px}`, async () => {
+      const page = await trackerFailing(width, LONG_PATH);
+      const seen = await errorLayout(page, 'tracker-error');
+      assertFits(`tracker strip, path (${px})`, seen);
+      assert.ok(seen.button !== null, 'no Retry button');
+      assert.ok(
+        seen.button.left >= 0 && seen.button.right <= seen.viewport,
+        `Retry is not inside the window: ${JSON.stringify(seen.button)}`,
+      );
+      assert.ok(seen.button.onTop, 'something else is over Retry');
+      // As wide as with an ordinary message: the path did not squash it.
+      const ordinary = await trackerFailing(width, ORDINARY);
+      assert.equal(
+        seen.button.width,
+        (await errorLayout(ordinary, 'tracker-error')).button?.width,
+        'Retry was squashed',
+      );
+      await ordinary.context().close();
+      // And it can really be pressed. The board fails again, so the strip stays.
+      await page.locator('[data-testid="tracker-error"] button').click({ timeout: 5000 });
+      await page.waitForSelector('[data-testid="tracker-error"] button:has-text("Retry")');
+      await page.context().close();
+    });
+
+    it(`the box inside a Settings panel keeps the path inside at ${px}`, async () => {
+      const page = await settingsPanel(width);
+      await mountErrorBox(page, { variant: 'box', testId: 'probe-box', message: LONG_PATH });
+      assertFits(`panel box, path (${px})`, await errorLayout(page, 'probe-box'));
+      await page.context().close();
+    });
+
+    // NEGATIVE — the fix may change nothing else. An ordinary sentence wraps at
+    // the same words, and the strip is the same height, as without the fix.
+    it(`NEGATIVE: an ordinary sentence wraps exactly as before, in all three shapes, at ${px}`, async () => {
+      const box = await settingsPanel(width);
+      await mountErrorBox(box, { variant: 'box', testId: 'probe-box', message: ORDINARY });
+      const shapes = [
+        { page: await profileFailing(width, ORDINARY), id: 'profile-error' },
+        { page: await trackerFailing(width, ORDINARY), id: 'tracker-error' },
+        { page: box, id: 'probe-box' },
+      ];
+      for (const { page, id } of shapes) {
+        const reference = await drawReference(page, id);
+        const now = await errorLayout(page, id);
+        const before = await errorLayout(page, reference);
+        const starts = await lineStarts(page, id);
+        console.log(
+          `${id}, ordinary sentence (${px}): height ${String(now.strip.height)}, ` +
+            `lines start ${JSON.stringify(starts)}`,
+        );
+        assertFits(`${id}, ordinary (${px})`, now);
+        assert.ok(starts.length > 1, `${id}: the sentence is on one line, so wrapping is untested`);
+        assert.deepEqual(starts, await lineStarts(page, reference), `${id}: wraps elsewhere`);
+        assert.equal(now.strip.height, before.strip.height, `${id}: a different height`);
+        assert.equal(now.message.width, before.message.width, `${id}: the words take a new width`);
+        assert.equal(now.button?.width, before.button?.width, `${id}: Retry is a different width`);
+        await page.context().close();
+      }
+    });
+
+    // BOUNDARY — a word that just fits stays whole on one line; one letter
+    // more and it breaks, instead of running off.
+    it(`BOUNDARY: a word exactly as wide as the line stays whole; one letter more wraps, at ${px}`, async () => {
+      const page = await profileScreen(width);
+      await mountErrorBox(page, { variant: 'strip', testId: 'one-line', message: 'x' });
+      // The longest run of x that fits the strip's line (its content box, inside
+      // the padding), measured on a copy without the fix, which never breaks it.
+      const fits = await page.evaluate((fix) => {
+        const strip = document.querySelector('[data-testid="one-line"]');
+        if (strip === null) throw new Error('no strip');
+        const probe = strip.cloneNode(true) as HTMLElement;
+        probe.classList.remove(...fix);
+        probe.removeAttribute('data-testid');
+        probe.removeAttribute('role');
+        strip.after(probe);
+        const style = getComputedStyle(probe);
+        const line =
+          probe.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        const range = document.createRange();
+        let count = 1;
+        for (; count < 1000; count += 1) {
+          probe.textContent = 'x'.repeat(count + 1);
+          range.selectNodeContents(probe);
+          if (range.getBoundingClientRect().width > line) break;
+        }
+        probe.remove();
+        return count;
+      }, WRAP_FIX.strip);
+      // Each measured before the next is drawn: one that spills makes the
+      // screen around it wider, and that must not be blamed on the other.
+      const line = await errorLayout(page, 'one-line');
+      await mountErrorBox(page, { variant: 'strip', testId: 'exact', message: 'x'.repeat(fits) });
+      const exact = await errorLayout(page, 'exact');
+      await mountErrorBox(page, {
+        variant: 'strip',
+        testId: 'over',
+        message: 'x'.repeat(fits + 1),
+      });
+      const over = await errorLayout(page, 'over');
+      console.log(
+        `a word as wide as the line (${px}): ${String(fits)} letters; heights ` +
+          `${String(line.strip.height)} / ${String(exact.strip.height)} / ${String(over.strip.height)}`,
+      );
+      assert.ok(fits > 10 && fits < 1000, `${String(fits)} letters is not a line`);
+      assertFits('exactly as wide', exact);
+      assertFits('one letter more', over);
+      assert.equal(exact.strip.height, line.strip.height, 'a word that fits was broken');
+      assert.ok(over.strip.height > line.strip.height, 'one letter more did not wrap');
+      await page.context().close();
+    });
+
+    it(`BOUNDARY: an empty message draws as it did before, in all three shapes, at ${px}`, async () => {
+      const page = await profileScreen(width);
+      await mountErrorBox(page, { variant: 'strip', testId: 'empty-strip', message: '' });
+      await mountErrorBox(page, {
+        variant: 'strip',
+        layout: 'row',
+        testId: 'empty-row',
+        message: '',
+      });
+      const panel = await settingsPanel(width);
+      await mountErrorBox(panel, { variant: 'box', testId: 'empty-box', message: '' });
+      for (const [on, id] of [
+        [page, 'empty-strip'],
+        [page, 'empty-row'],
+        [panel, 'empty-box'],
+      ] as const) {
+        const reference = await drawReference(on, id);
+        const now = await errorLayout(on, id);
+        assertFits(`${id} (${px})`, now);
+        assert.ok(now.strip.height > 0, `${id}: not drawn`);
+        assert.equal(now.strip.height, (await errorLayout(on, reference)).strip.height, id);
+        assert.equal(await on.locator(`[role="alert"][data-testid="${id}"]`).count(), 1, id);
+      }
+      await page.context().close();
+      await panel.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check. The same strips with
+  // the fix's classes taken off (what `main` drew) are reported.
+  it('the check can fail: without the fix the path runs off, and Retry is off screen', async () => {
+    const page = await trackerFailing(375, LONG_PATH);
+    const without = await errorLayout(page, await drawReference(page, 'tracker-error'));
+    console.log(`tracker strip without the fix: ${JSON.stringify(without)}`);
+    // A row's span grows with the path, so it is the strip that is too wide.
+    assert.ok(
+      without.wider.some((line) => line.startsWith('tracker-error-reference')),
+      `the spilling strip was not reported: ${JSON.stringify(without.wider)}`,
+    );
+    assert.ok((without.button?.right ?? 0) > without.viewport, 'Retry stayed on screen anyway');
+    assert.ok(without.button?.onTop === false, 'Retry was pressable anyway');
+    await page.context().close();
+
+    const panel = await settingsPanel(375);
+    await mountErrorBox(panel, { variant: 'box', testId: 'probe-box', message: LONG_PATH });
+    const box = await errorLayout(panel, await drawReference(panel, 'probe-box'));
+    assert.ok(
+      box.wider.some((line) => line.startsWith('probe-box-reference')),
+      `the spilling box was not reported: ${JSON.stringify(box.wider)}`,
+    );
+    await panel.context().close();
+  });
+});
