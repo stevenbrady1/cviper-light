@@ -7,6 +7,8 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { atsBand } from '@cviper/keyword-scoring';
+
 import {
   ATS_BAND_HINT,
   ATS_CHECK_HINT,
@@ -117,6 +119,20 @@ describe('ATS Score hints (L-215)', () => {
     expect(
       markedHintOn('cross', 'Missing', screen.getByTestId('tailor-ats-check-contact_info')),
     ).toBe(ATS_STATUS_HINT.fail);
+  });
+
+  // The band words have no Tab stop, so the label's hint carries the ranges (L-385).
+  it("the Keyword coverage label's hint gives the three score ranges, matching atsBand", () => {
+    render(<AtsStep comparison={BASE} fabrication={{ clean: true, flagged: 0 }} />);
+    expect(hintOn('Keyword coverage')).toMatch(
+      / Under 60 needs work, 60 to 79 is getting there, 80 or more reads well\.$/,
+    );
+    expect([59, 60, 79, 80].map((score) => atsBand(score))).toEqual([
+      'low',
+      'fair',
+      'fair',
+      'good',
+    ]);
   });
 
   it('▼ and ▲ say which way and by how much, and the band word gives its range', () => {

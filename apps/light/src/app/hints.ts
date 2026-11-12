@@ -19,7 +19,8 @@ export const ATS_HINT = {
   after: 'This tailored draft.',
   keyword:
     'How many of the important words in the advert also appear in your CV, out of 100. ' +
-    'Screening software looks for these words.',
+    'Screening software looks for these words. ' +
+    'Under 60 needs work, 60 to 79 is getting there, 80 or more reads well.',
   bullets:
     'How strong your bullet points are, out of 100. A strong bullet starts with an action verb, ' +
     'shows a result, and includes a number.',
