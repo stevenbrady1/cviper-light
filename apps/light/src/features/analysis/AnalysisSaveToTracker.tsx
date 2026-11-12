@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { type Analysis as AnalysisRow, type Job } from '@cviper/core-types';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD, FIELD_INVALID } from '../../app/fields';
 import { LiveStatus } from '../../app/LiveStatus';
 import { type DraftErrors } from '../tracker/model';
 
@@ -24,7 +25,6 @@ export interface AnalysisSaveToTrackerProps {
   readonly onLinked: (job: Job, record: AnalysisRow | null) => void;
 }
 
-const FIELD = 'mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink';
 const SAVED = 'Saved to your tracker, under Saved.';
 const NOT_LINKED = 'This check could not be added to the job: ';
 
@@ -138,7 +138,7 @@ export function AnalysisSaveToTracker({
         aria-invalid={errors[id] === undefined ? undefined : true}
         aria-describedby={errors[id] === undefined ? undefined : `analysis-tracker-${id}-error`}
         onChange={(event) => onChange(event.currentTarget.value)}
-        className={`${FIELD} ${errors[id] === undefined ? 'border-field-line' : 'border-danger'}`}
+        className={`${errors[id] === undefined ? FIELD : FIELD_INVALID} mt-1 w-full`}
       />
       {errors[id] === undefined ? null : (
         <p

@@ -1,6 +1,7 @@
 import { wordCount, type Cv } from '@cviper/core-types';
 
 import { QUIET_BUTTON } from '../../app/buttons';
+import { FIELD } from '../../app/fields';
 import { type FilePort } from '../../platform/files';
 import { CvUpload } from '../cv/CvUpload';
 import { type CvStorePort } from '../cv/ingestCv';
@@ -56,7 +57,7 @@ export function TailorCvPicker({
           const id = event.currentTarget.value;
           onPick(id === '' ? null : id);
         }}
-        className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+        className={`${FIELD} mt-1 w-full`}
       >
         {cvs.length > 0 ? null : (
           <option value="">{cvsLoaded ? 'No CV uploaded yet' : 'Reading your CVs…'}</option>

@@ -1,5 +1,6 @@
 import { type Job } from '@cviper/core-types';
 
+import { FIELD, FIELD_COMPACT } from '../../app/fields';
 import { LiveStatus } from '../../app/LiveStatus';
 
 export interface AnalysisAdvertProps {
@@ -47,7 +48,7 @@ export function AnalysisAdvert({
         value={jobText}
         placeholder="Paste the whole advert, including the requirements list."
         onChange={(event) => onJobTextChange(event.currentTarget.value)}
-        className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+        className={`${FIELD} mt-1 w-full`}
       />
 
       {jobs.length === 0 ? null : (
@@ -63,7 +64,7 @@ export function AnalysisAdvert({
               const job = jobs.find((candidate) => candidate.id === event.currentTarget.value);
               if (job !== undefined) onPickJob(job);
             }}
-            className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1 text-ink"
+            className={`${FIELD_COMPACT} min-w-0 flex-1`}
           >
             <option value="">Choose a tracked job…</option>
             {jobs.map((job) => (

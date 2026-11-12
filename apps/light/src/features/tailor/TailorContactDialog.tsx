@@ -1,13 +1,15 @@
 import { useRef, useState } from 'react';
 
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD } from '../../app/fields';
 import { Dialog } from '../../ui';
 
 import { contactLine, type CvContact } from './cvContact';
 import { layoutBlocks } from './pdf';
 import { type ContactQuestion } from './useCvContact';
 
-const FIELD = 'mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink';
+/** A contact box: the shared box, full width under its label. */
+const CONTACT_FIELD = `${FIELD} mt-1 w-full`;
 const LABEL = 'block text-xs font-medium text-ink-muted';
 
 const FIELDS = [
@@ -93,7 +95,7 @@ export function TailorContactDialog({ question, onConfirm, onCancel }: TailorCon
                   const value = event.currentTarget.value;
                   setDraft((current) => ({ ...current, [field.key]: value }));
                 }}
-                className={FIELD}
+                className={CONTACT_FIELD}
               />
               {notFound ? (
                 <p

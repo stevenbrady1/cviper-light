@@ -381,7 +381,10 @@ so rather than starting one. CI does the build in its own step
 place the build is allowed to happen — see the hard rules in
 [CLAUDE.md](CLAUDE.md). To run it on your own machine, build once with
 `pnpm --filter @cviper/light tauri build --debug --features wdio`, then
-`pnpm smoke`.
+`pnpm smoke`. Before each picture it takes, the test moves the mouse cursor to an
+empty spot — but only on CI, or on your PC if you set `SMOKE_PARK_POINTER=1` (it
+only sets the cursor's position: no clicks, no keys); without that your cursor is
+left alone, and that run's pictures may not match CI's.
 
 ## Layout
 

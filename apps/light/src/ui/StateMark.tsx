@@ -11,9 +11,22 @@ import { WARNING_TRIANGLE } from './Icon';
  * These used to be typed characters — ✓ ⚠ ✗ ▲ ▼ ⊘ ● ○ ◀ — which render in
  * whatever fallback font the machine happens to pick, so their size, weight
  * and even their shape changed from one computer to the next. Drawn, they
- * match the icons: the same 24-unit grid, the same 2-unit round stroke, and
- * `currentColor` set by SVG attribute (never a `fill-*`/`stroke-*` utility,
- * which the contrast contract cannot check).
+ * match the icons: the same 24-unit grid, a round stroke, and `currentColor`
+ * set by SVG attribute (never a `fill-*`/`stroke-*` utility, which the
+ * contrast contract cannot check).
+ *
+ * ============================================================================
+ * SIZED TO READ BESIDE THEIR WORDS (L-370)
+ * ============================================================================
+ * The first drawings filled too little of the 1em box — the tick was 48% of
+ * it tall, the cross 50% — so beside 13px text the cross was a 6px speck where
+ * the typed one had been about 11px. Every mark now covers 60–73% of its box
+ * top to bottom (the shared warning triangle 81%), between the height of a
+ * lower-case x and a capital, and the line is 2.5 units, not the icons' 2: about
+ * the stem of the medium-weight text the marks sit beside. The up, down and
+ * back arrows are one triangle, turned. The box itself is still exactly 1em
+ * and aligned as before, so no row grows. `StateMark.size.test.tsx` holds the
+ * size; `e2e/contrast-webkit.spec.ts` measures the rows in a real browser.
  *
  * They are a component of their own, not nine more `Icon` names, because an
  * icon is decorative and a state mark is not. The L-215 check ("no symbol
@@ -34,20 +47,20 @@ import { WARNING_TRIANGLE } from './Icon';
 
 const MARKS = {
   /** Done, passed. */
-  tick: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  tick: <path d="m4.5 13.5 5 5 10-13" />,
   /** Needs a look. The `alert` icon's triangle. */
   warning: WARNING_TRIANGLE,
   /** Failed, missing. */
   cross: (
     <>
-      <path d="m7 7 10 10" />
-      <path d="M17 7 7 17" />
+      <path d="m5.5 5.5 13 13" />
+      <path d="M18.5 5.5 5.5 18.5" />
     </>
   ),
   /** Went up. A solid triangle, point up. */
-  up: <path d="M12 6.5 18.5 17h-13z" fill="currentColor" />,
+  up: <path d="M12 4.5 19.5 17.5h-15z" fill="currentColor" />,
   /** Went down. A solid triangle, point down. */
-  down: <path d="M12 17.5 5.5 7h13z" fill="currentColor" />,
+  down: <path d="M12 19.5 4.5 6.5h15z" fill="currentColor" />,
   /** Skipped: a ring struck through. */
   skipped: (
     <>
@@ -60,7 +73,7 @@ const MARKS = {
   /** A step still to do: an empty ring, the same size as the disc. */
   ring: <circle cx="12" cy="12" r="6" />,
   /** Back to an earlier step. A solid triangle, point left. */
-  back: <path d="M6.5 12 17 5.5v13z" fill="currentColor" />,
+  back: <path d="M5.5 12 18.5 4.5v15z" fill="currentColor" />,
 } satisfies Record<string, ReactNode>;
 
 export type StateMarkName = keyof typeof MARKS;
@@ -87,7 +100,7 @@ export function StateMark({ name }: StateMarkProps) {
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth={2}
+        strokeWidth={2.5}
         strokeLinecap="round"
         strokeLinejoin="round"
         className="block"
