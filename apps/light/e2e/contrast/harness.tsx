@@ -15,20 +15,28 @@
  * Neither changes a single class name or colour. What the spec measures —
  * which text colour lands on which painted background — is the app's own.
  *
- * The page reads four switches from the address:
+ * The page reads five switches from the address:
  *   - `?seen=1` skips the first-run welcome, as a returning user sees the app;
  *   - `?entries=1` puts three applications on the board;
  *   - `?results=1` says a job-board key is saved, and answers Search with a long
- *     list of adverts from the fake port (L-342: what results do to the layout);
+ *     list of adverts from the fake port (L-342: what results do to the layout).
+ *   - `?trackerLoadError=<text>` and `?profileLoadError=<text>` make the
+ *     Tracker board or the profile fail to load with that message, so the
+ *     real screen draws its real error strip (L-374: how an error lays out).
  *   - `?marks=1` draws, instead of the app, the three components that put a
  *     drawn mark beside words (L-370: is any row taller for its mark).
+ *
+ * And it puts one helper on `window`: `__mountErrorBox`, which draws the app's
+ * own `ErrorBox` into an element the spec has placed. The panel `box` shape has
+ * no screen that draws it yet (L-368 moved only the strips), so this is how the
+ * spec lays one out inside a real panel (L-374).
  *
  * This file is never part of the app's own build: `vite.config.ts` builds
  * `index.html` at the app root, and this page has its own config.
  */
 import './harness.css';
 
-import { type Application, type Job } from '@cviper/core-types';
+import { err, type Application, type Job } from '@cviper/core-types';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
@@ -96,6 +104,8 @@ const { createFakeSearchPort, outcomeOf } =
   await import('../../src/features/search/test/fakeSearchPort');
 const { entry } = await import('../../src/features/search/test/fixtures');
 const { emptyQuota } = await import('@cviper/job-apis');
+const { ErrorBox } = await import('../../src/ui');
+const { SECONDARY_BUTTON } = await import('../../src/app/buttons');
 
 if (params.get('seen') === '1') markWelcomeSeen();
 
@@ -103,6 +113,51 @@ const entries =
   params.get('entries') === '1'
     ? [application('a', 'saved'), application('b', 'applied'), application('c', 'interviewing')]
     : [];
+
+/** A load that fails the way the database does, with the message from the address. */
+function failsToLoad(message: string | null) {
+  return message === null
+    ? undefined
+    : () => Promise.resolve(err({ code: 'QUERY_FAILED' as const, message, table: 'harness' }));
+}
+
+const trackerPort = createFakeTrackerPort(entries);
+const trackerLoad = failsToLoad(params.get('trackerLoadError'));
+const profilePort = createFakeProfilePort();
+const profileLoad = failsToLoad(params.get('profileLoadError'));
+
+/** What the spec asks `__mountErrorBox` to draw. */
+interface MountedErrorBox {
+  readonly variant: 'strip' | 'box';
+  readonly layout?: 'text' | 'row';
+  readonly gapAbove?: 'mt-2' | 'mt-3';
+  readonly testId: string;
+  readonly message: string;
+}
+
+(
+  window as unknown as { __mountErrorBox: (into: Element, box: MountedErrorBox) => void }
+).__mountErrorBox = (into, { variant, layout, gapAbove, testId, message }) => {
+  // A row strip holds its message in a `min-w-0` span, then Retry, as Tracker's do.
+  const element =
+    variant === 'box' ? (
+      <ErrorBox variant="box" testId={testId} {...(gapAbove === undefined ? {} : { gapAbove })}>
+        {message}
+      </ErrorBox>
+    ) : layout === 'row' ? (
+      <ErrorBox variant="strip" layout="row" testId={testId}>
+        <span className="min-w-0">{message}</span>
+        <button type="button" className={SECONDARY_BUTTON}>
+          Retry
+        </button>
+      </ErrorBox>
+    ) : (
+      <ErrorBox variant="strip" testId={testId}>
+        {message}
+      </ErrorBox>
+    );
+  ReactDOM.createRoot(into).render(element);
+};
 
 const searchPort = params.get('results') === '1' ? createFakeSearchPort() : undefined;
 searchPort?.nextOutcome(
@@ -196,8 +251,12 @@ ReactDOM.createRoot(root).render(
       await marksSheet()
     ) : (
       <App
-        trackerPort={createFakeTrackerPort(entries)}
-        profilePort={createFakeProfilePort()}
+        trackerPort={
+          trackerLoad === undefined ? trackerPort : { ...trackerPort, load: trackerLoad }
+        }
+        profilePort={
+          profileLoad === undefined ? profilePort : { ...profilePort, load: profileLoad }
+        }
         tailorPort={createFakeTailorPort()}
         {...(searchPort === undefined ? {} : { searchPort })}
         now={NOW}
