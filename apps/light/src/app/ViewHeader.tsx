@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 
 import { PageHeader } from '../ui';
 
+import { CONTENT_COLUMN } from './layout';
 import { NAV_ICON } from './NavIcon';
 
 import { type ViewId } from './views';
@@ -19,6 +20,10 @@ import { type ViewId } from './views';
  *
  * The tile shows the view's duotone navigation icon (`NAV_ICON`, L-254) — the
  * same drawing as the rail, from the same table, so the two cannot drift.
+ *
+ * The title row carries `CONTENT_COLUMN` (L-326), so on a wide window the title
+ * starts where the centred content starts. Not on Tracker: its board is full
+ * width, and a centred title would sit away from the board's left edge.
  */
 
 interface ViewHeaderProps {
@@ -37,6 +42,7 @@ export function ViewHeader({ title, summary, action = null, view }: ViewHeaderPr
       subtitle={summary}
       actions={action}
       glyph={view === undefined ? undefined : NAV_ICON[view]}
+      column={view === 'tracker' ? '' : CONTENT_COLUMN}
     />
   );
 }

@@ -4,7 +4,7 @@ import { type Analysis as AnalysisRow, type Cv, type Job, type Result } from '@c
 import { runGates } from '@cviper/keyword-scoring';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
-import { CONTENT_COLUMN } from '../../app/layout';
+import { CONTENT_COLUMN, SIDE_PADDING } from '../../app/layout';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { ErrorBox, IconTile } from '../../ui';
@@ -577,7 +577,7 @@ export function Analysis({
       )}
 
       <div className="flex min-h-0 flex-1">
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+        <div className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${SIDE_PADDING} py-4 md:py-5`}>
           <div data-content-column className={`${CONTENT_COLUMN} space-y-5`}>
             <AnalysisCvPicker
               cvs={cvs}
