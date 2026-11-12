@@ -2313,3 +2313,118 @@ describe('the last hand-built error boxes (L-380)', () => {
     }
   });
 });
+
+/**
+ * A suggestion's priority label stays on one line, inside its card (L-378).
+ *
+ * The label is the shared `StatusPill`, which does not shrink: when a long
+ * section name squeezes the row on a phone, the section name wraps and the
+ * label keeps its one line. Before L-378 the hand-built label shrank and broke
+ * onto two lines ("Do this / first"). jsdom does no layout, so only a real
+ * browser can say which of the two happened.
+ *
+ * The harness's `__mountPrioritySuggestions` draws the app's own
+ * `AnalysisResult` with one suggestion of each priority and long section
+ * names, in a phone-width column. One line is measured, not written down: the
+ * label's height must be its own line height plus its padding.
+ */
+const PRIORITY_WINDOW = { width: 375, height: 800 } as const;
+
+interface PriorityReport {
+  readonly labels: readonly string[];
+  readonly problems: readonly string[];
+}
+
+async function openPriorities(): Promise<Page> {
+  const context = await browser.newContext({ viewport: PRIORITY_WINDOW, colorScheme: 'light' });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`${origin}/?seen=1`);
+  await page.waitForSelector('[data-testid="nav-analysis"]');
+  await page.evaluate(async () => {
+    document.getElementById('root')?.setAttribute('hidden', '');
+    const column = document.createElement('main');
+    column.className = 'p-4';
+    document.body.append(column);
+    await (
+      window as unknown as { __mountPrioritySuggestions: (into: Element) => Promise<void> }
+    ).__mountPrioritySuggestions(column);
+  });
+  await page.waitForSelector('main [data-testid="analysis-suggestion-low"]');
+  await page.evaluate(() => document.fonts.ready);
+  assert.deepEqual(errors, [], 'the suggestions threw while drawing');
+  return page;
+}
+
+async function priorityProblems(page: Page): Promise<PriorityReport> {
+  return page.evaluate(() => {
+    const problems: string[] = [];
+    const labels: string[] = [];
+    for (const card of document.querySelectorAll('main [data-testid^="analysis-suggestion-"]')) {
+      // The first thing in the card's top row: the label, before or after L-378.
+      const label = card.querySelector(':scope > div > span:first-child');
+      const name = card.getAttribute('data-testid') ?? '?';
+      if (label === null) {
+        problems.push(`${name}: no label`);
+        continue;
+      }
+      labels.push(label.textContent ?? '');
+      const style = getComputedStyle(label);
+      const oneLine =
+        parseFloat(style.lineHeight) +
+        parseFloat(style.paddingTop) +
+        parseFloat(style.paddingBottom);
+      const box = label.getBoundingClientRect();
+      if (box.height > oneLine + 0.5) {
+        problems.push(
+          `${name}: label is ${String(box.height)}px tall, one line is ${String(oneLine)}px`,
+        );
+      }
+      const room = card.getBoundingClientRect();
+      if (box.left < room.left - 0.5 || box.right > room.right + 0.5) {
+        problems.push(`${name}: label is outside its card`);
+      }
+      // The squeeze is real: the section name beside it did wrap.
+      const section = label.nextElementSibling;
+      if (section === null || section.getBoundingClientRect().height <= oneLine) {
+        problems.push(`${name}: the section name did not wrap, so the row was never squeezed`);
+      }
+    }
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      problems.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    return { labels, problems };
+  });
+}
+
+describe('a suggestion priority label stays on one line, inside its card (L-378)', () => {
+  it('each priority label keeps one line beside a long section name at 375px', async () => {
+    const page = await openPriorities();
+    const report = await priorityProblems(page);
+    console.log(`priority labels (375px): ${JSON.stringify(report)}`);
+    assert.deepEqual(report.labels, ['Do this first', 'Worth doing', 'If you have time']);
+    assert.deepEqual(report.problems, []);
+    await page.context().close();
+  });
+
+  // NEGATIVE — a label allowed to shrink (as the hand-built one did) breaks
+  // onto two lines, and is caught.
+  it('the check can fail: a label that may shrink wraps, and is reported', async () => {
+    const page = await openPriorities();
+    await page.evaluate(() => {
+      for (const label of document.querySelectorAll<HTMLElement>(
+        'main [data-testid^="analysis-suggestion-"] > div > span:first-child',
+      )) {
+        label.style.flexShrink = '1';
+      }
+    });
+    const report = await priorityProblems(page);
+    assert.ok(
+      report.problems.some((line) => line.includes('analysis-suggestion-high: label is')),
+      `the wrapped label was not flagged: ${JSON.stringify(report.problems)}`,
+    );
+    await page.context().close();
+  });
+});

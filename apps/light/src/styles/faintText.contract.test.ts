@@ -58,13 +58,6 @@ const CUE = /(?<![\w:-])(text-xs|text-\[1[01]px\]|font-normal)(?![\w-])/;
  */
 const ALLOWED: readonly { file: string; classes: string; reason: string }[] = [
   {
-    file: 'apps/light/src/features/analysis/AnalysisResult.tsx',
-    classes: 'bg-sunken text-ink-faint',
-    reason:
-      'The "low" priority tone, spread into a pill that is already text-xs font-medium. The ' +
-      'pill’s own words ("If you have time" against "Worth doing") carry the rank.',
-  },
-  {
     file: 'apps/light/src/features/flow/JobStepBar.tsx',
     classes: 'hidden text-ink-faint md:inline',
     reason: 'A decorative separator between steps, hidden from screen readers. Not text.',
