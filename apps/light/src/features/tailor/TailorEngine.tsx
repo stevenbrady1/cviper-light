@@ -1,3 +1,4 @@
+import { FIELD } from '../../app/fields';
 import { type BrowserPort } from '../../platform/browser';
 import { ConsentStatus } from '../analysis/ConsentGate';
 import { type ConsentProviderKind } from '../analysis/consent';
@@ -44,7 +45,7 @@ export function TailorEngine({
         value={optionKey}
         disabled={!aiAvailable}
         onChange={(event) => onOptionChange(event.currentTarget.value)}
-        className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+        className={`${FIELD} mt-1 w-full`}
       >
         {aiAvailable ? null : (
           <option value="">

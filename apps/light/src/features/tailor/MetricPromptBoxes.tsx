@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD } from '../../app/fields';
 import { cardClasses } from '../../ui';
 
 import {
@@ -221,7 +222,7 @@ function MetricBox({ prompt, state, disabled, onChange, announce }: MetricBoxPro
             onChange={(event) => {
               onChange(setDraft(state, prompt.key, event.currentTarget.value));
             }}
-            className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+            className={`${FIELD} mt-1 w-full`}
           />
           <p id={counterId} className="mt-0.5 text-xs text-ink-muted">
             {`${draft.length} / ${MAX_METRIC_CHARS}`} - only what you type and add is used.

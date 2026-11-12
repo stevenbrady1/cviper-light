@@ -23,6 +23,7 @@ import { useState } from 'react';
 import { wordCount, type Cv } from '@cviper/core-types';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD } from '../../app/fields';
 
 import { MAX_CV_TEXT_CHARS, correctedCv, isCorrected, restoredCv } from './cvCorrection';
 import { lineDiff } from './diff';
@@ -84,7 +85,7 @@ export function CvTextPanel({ cv, disabled, onSave }: CvTextPanelProps) {
           // A deliberate step the user just took: the box is where they are.
           autoFocus
           onChange={(event) => setDraft(event.currentTarget.value)}
-          className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 font-sans text-ink"
+          className={`${FIELD} mt-1 w-full font-sans`}
         />
         <p className="mt-1 text-xs text-ink-faint">
           Fix anything that was misread. Add only what is true: the AI treats this text as your

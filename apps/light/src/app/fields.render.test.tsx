@@ -5,15 +5,24 @@
  * `fields.contract.test.ts` pins the constants and forbids copies. This file
  * checks the other half: a box that uses them still renders its invalid look
  * when it is invalid, and keeps its own layout classes on top of the shared
- * style. Read from the New application form, whose boxes use both.
+ * style. Read from the New application form, whose boxes use both, and (L-376)
+ * from the Analysis and Tailor boxes: the save-to-tracker form, the compact
+ * job and application pickers, the contact dialog and the CV correction box.
  */
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { type Application, type Cv, type Job } from '@cviper/core-types';
+
+import { AnalysisAdvert } from '../features/analysis/AnalysisAdvert';
+import { AnalysisSaveToTracker } from '../features/analysis/AnalysisSaveToTracker';
+import { CvTextPanel } from '../features/tailor/CvTextPanel';
+import { TailorContactDialog } from '../features/tailor/TailorContactDialog';
+import { TailorSaveApplication } from '../features/tailor/TailorSaveApplication';
 import { NewApplicationForm } from '../features/tracker/NewApplicationForm';
 
-import { FIELD, FIELD_INVALID } from './fields';
+import { FIELD, FIELD_COMPACT, FIELD_INVALID } from './fields';
 
 afterEach(cleanup);
 
@@ -58,6 +67,143 @@ describe('a text box on the shared style (L-365)', () => {
     const title = screen.getByLabelText('Job title');
     expect([...title.classList].sort()).toEqual(
       [...classesOf(FIELD_INVALID), 'mt-1', 'w-full'].sort(),
+    );
+  });
+});
+
+const JOB: Job = {
+  id: 'job-1',
+  source: 'manual',
+  external_id: null,
+  title: 'Platform Engineer',
+  company: 'Acme',
+  agency: null,
+  location: null,
+  salary_min: null,
+  salary_max: null,
+  salary_currency: null,
+  salary_period: null,
+  description: 'Run the platform.',
+  url: null,
+  posted_date: null,
+  created_at: '2026-11-01T09:00:00.000Z',
+};
+
+const APPLICATION: Application = {
+  id: 'app-1',
+  job_id: 'job-1',
+  status: 'saved',
+  applied_date: null,
+  notes: null,
+  next_action: null,
+  next_action_date: null,
+  updated_at: '2026-11-01T09:00:00.000Z',
+};
+
+function exactly(element: HTMLElement): string[] {
+  return [...element.classList].sort();
+}
+
+function renderSaveToTracker() {
+  render(
+    <AnalysisSaveToTracker
+      checkedAdvert="A pasted advert for a platform engineer."
+      jobId={null}
+      jobs={[]}
+      record={null}
+      addToTracker={() => Promise.resolve({ ok: true, value: undefined })}
+      saveAnalysis={() => Promise.resolve({ ok: true, value: undefined })}
+      now={undefined}
+      onLinked={() => undefined}
+    />,
+  );
+  return userEvent.setup();
+}
+
+describe('the Analysis and Tailor boxes on the shared style (L-376)', () => {
+  it('happy path: the save-to-tracker title box at rest wears exactly FIELD and its layout', async () => {
+    const user = renderSaveToTracker();
+    await user.click(screen.getByTestId('analysis-save-to-tracker'));
+    expect(exactly(screen.getByTestId('analysis-tracker-title'))).toEqual(
+      [...classesOf(FIELD), 'mt-1', 'w-full'].sort(),
+    );
+  });
+
+  it('negative: an invalid save-to-tracker box wears FIELD_INVALID and loses the resting edge', async () => {
+    const user = renderSaveToTracker();
+    await user.click(screen.getByTestId('analysis-save-to-tracker'));
+    await user.click(screen.getByTestId('analysis-tracker-save'));
+
+    const title = screen.getByTestId('analysis-tracker-title');
+    expect(title.getAttribute('aria-invalid')).toBe('true');
+    expect(exactly(title)).toEqual([...classesOf(FIELD_INVALID), 'mt-1', 'w-full'].sort());
+    expect(title.classList.contains('border-field-line')).toBe(false);
+  });
+
+  it('boundary: the compact job picker wears exactly FIELD_COMPACT and its row layout, no standard padding', () => {
+    render(
+      <AnalysisAdvert
+        jobNote={null}
+        jobText=""
+        onJobTextChange={() => undefined}
+        jobs={[JOB]}
+        onPickJob={() => undefined}
+      />,
+    );
+    const picker = screen.getByTestId('analysis-job-pick');
+    expect(exactly(picker)).toEqual([...classesOf(FIELD_COMPACT), 'min-w-0', 'flex-1'].sort());
+    expect(picker.classList.contains('py-1.5')).toBe(false);
+    expect(exactly(screen.getByTestId('analysis-job-text'))).toEqual(
+      [...classesOf(FIELD), 'mt-1', 'w-full'].sort(),
+    );
+  });
+
+  it('boundary: the application picker wears exactly FIELD_COMPACT and min-w-0', () => {
+    render(
+      <TailorSaveApplication
+        applications={[APPLICATION]}
+        selectedApplicationId="app-1"
+        onSelectApplication={() => undefined}
+        selectedJobId="job-1"
+        applicationsFor="job-1"
+        busy={false}
+        saving={false}
+        onSave={() => undefined}
+      />,
+    );
+    expect(exactly(screen.getByTestId('tailor-application'))).toEqual(
+      [...classesOf(FIELD_COMPACT), 'min-w-0'].sort(),
+    );
+  });
+
+  it('boundary: a contact box wears exactly FIELD and its layout, from the renamed local style', () => {
+    const empty = { name: '', email: '', phone: '' };
+    render(
+      <TailorContactDialog
+        question={{ initial: empty, found: empty, format: 'docx', then: null }}
+        onConfirm={() => undefined}
+        onCancel={() => undefined}
+      />,
+    );
+    expect(exactly(screen.getByTestId('tailor-contact-email'))).toEqual(
+      [...classesOf(FIELD), 'mt-1', 'w-full'].sort(),
+    );
+  });
+
+  it('boundary: the CV correction box keeps its own font class on top of FIELD', async () => {
+    const cv: Cv = {
+      id: 'cv-1',
+      name: 'CV.pdf',
+      file_path: null,
+      extracted_text: 'A CV.',
+      json_resume: null,
+      created_at: '2026-11-01T09:00:00.000Z',
+    };
+    render(<CvTextPanel cv={cv} disabled={false} onSave={() => Promise.resolve(null)} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('tailor-cv-correct'));
+    expect(exactly(screen.getByTestId('tailor-cv-edit-text'))).toEqual(
+      [...classesOf(FIELD), 'mt-1', 'w-full', 'font-sans'].sort(),
     );
   });
 });

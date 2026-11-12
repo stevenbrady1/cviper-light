@@ -40,13 +40,17 @@ import { describe, expect, it } from 'vitest';
 import { displayPath, walk } from '../lib/repo-scan';
 
 import * as fields from './fields';
-import { FIELD, FIELD_INVALID } from './fields';
+import { FIELD, FIELD_COMPACT, FIELD_INVALID } from './fields';
 
 /** `apps/light/src`. */
 const SRC = fileURLToPath(new URL('../', import.meta.url));
 
 /** Folders (relative to `apps/light/src`) whose boxes must use `fields.ts`. */
-const SHARED_FOLDERS: readonly string[] = ['features/tracker'];
+const SHARED_FOLDERS: readonly string[] = [
+  'features/tracker',
+  'features/analysis',
+  'features/tailor',
+];
 
 function classesOf(style: string): string[] {
   return style.split(/\s+/).filter((name) => name !== '');
@@ -111,7 +115,7 @@ const FILES = SHARED_FOLDERS.flatMap((folder) =>
 
 describe('the shared text-box styles hold exactly what the boxes carried (L-365)', () => {
   it('exports these constants and no others, so a new one arrives with a pin', () => {
-    expect(Object.keys(fields).sort()).toEqual(['FIELD', 'FIELD_INVALID']);
+    expect(Object.keys(fields).sort()).toEqual(['FIELD', 'FIELD_COMPACT', 'FIELD_INVALID']);
   });
 
   it('FIELD is the standard box, class for class', () => {
@@ -145,6 +149,25 @@ describe('the shared text-box styles hold exactly what the boxes carried (L-365)
     expect([...invalid].filter((name) => !valid.has(name))).toEqual(['border-danger']);
   });
 
+  it('FIELD_COMPACT is the smaller picker box, class for class (L-376)', () => {
+    expect(classesOf(FIELD_COMPACT)).toEqual([
+      'rounded-control',
+      'border',
+      'border-field-line',
+      'bg-card',
+      'px-2.5',
+      'py-1',
+      'text-ink',
+    ]);
+  });
+
+  it('FIELD_COMPACT differs from FIELD in the vertical padding and nothing else (L-376)', () => {
+    const standard = new Set(classesOf(FIELD));
+    const compact = new Set(classesOf(FIELD_COMPACT));
+    expect([...standard].filter((name) => !compact.has(name))).toEqual(['py-1.5']);
+    expect([...compact].filter((name) => !standard.has(name))).toEqual(['py-1']);
+  });
+
   it.each(SHARED)('%s carries no layout, which stays at the call site', (_name, style) => {
     const layout = /^-?(?:m[trblxy]?|w|h|min-[wh]|max-[wh]|flex|basis|grow|shrink|self|order)-/;
     expect(classesOf(style).filter((name) => layout.test(name))).toEqual([]);
@@ -159,6 +182,11 @@ describe('no box in a shared folder copies the style by hand (L-365)', () => {
   it('finds the files, so this contract cannot pass by reading nothing', () => {
     expect(FILES.length).toBeGreaterThan(20);
     expect(FILES.some((path) => path.endsWith('NewApplicationForm.tsx'))).toBe(true);
+  });
+
+  it('reads the analysis and tailor folders too (L-376)', () => {
+    expect(FILES.some((path) => path.endsWith('AnalysisAdvert.tsx'))).toBe(true);
+    expect(FILES.some((path) => path.endsWith('TailorAdvert.tsx'))).toBe(true);
   });
 
   it('no string in shipped source holds every class of a shared style', () => {
@@ -176,7 +204,37 @@ describe('no box in a shared folder copies the style by hand (L-365)', () => {
       `${file}:1 copies FIELD / FIELD_INVALID by hand; import it from app/fields`;
 
     it('reads both constants as one shape, differing only in the edge colour', () => {
-      expect(SHAPES.map((shape) => shape.names)).toEqual(['FIELD / FIELD_INVALID']);
+      expect(SHAPES.map((shape) => shape.names)).toEqual([
+        'FIELD / FIELD_INVALID',
+        'FIELD_COMPACT',
+      ]);
+    });
+
+    it('negative: catches the compact base pasted into a className, named as FIELD_COMPACT (L-376)', () => {
+      const source = `export const A = () => <select className="min-w-0 flex-1 ${FIELD_COMPACT}" />;`;
+      expect(handMadeCopies('a.tsx', source)).toEqual([
+        'a.tsx:1 copies FIELD_COMPACT by hand; import it from app/fields',
+      ]);
+    });
+
+    it('negative: catches a compact copy in another class order (L-376)', () => {
+      const shuffled = [...classesOf(FIELD_COMPACT)].reverse().join(' ');
+      expect(handMadeCopies('a.ts', `const PICK = 'min-w-0 ${shuffled}';`)).toEqual([
+        'a.ts:1 copies FIELD_COMPACT by hand; import it from app/fields',
+      ]);
+    });
+
+    it('boundary: the standard base is not read as a compact copy, nor the compact as standard (L-376)', () => {
+      expect(handMadeCopies('a.ts', `const A = '${FIELD}';`)).toEqual([COPY('a.ts')]);
+      expect(handMadeCopies('a.ts', `const A = '${FIELD_COMPACT}';`)).toEqual([
+        'a.ts:1 copies FIELD_COMPACT by hand; import it from app/fields',
+      ]);
+    });
+
+    it('boundary: FIELD_COMPACT used at the call site is not a copy (L-376)', () => {
+      const source =
+        'export const A = () => <select className={`${FIELD_COMPACT} min-w-0 flex-1`} />;';
+      expect(handMadeCopies('a.tsx', source)).toEqual([]);
     });
 
     it('negative: catches the base string pasted into a className', () => {
