@@ -1955,3 +1955,175 @@ describe('drawn marks sit at a readable size beside their words (L-370)', () => 
     await page.context().close();
   });
 });
+
+/**
+ * A box that holds more than one block (L-377).
+ *
+ * Settings' notice (two paragraphs) and Erase everything's failure (a paragraph
+ * and a list) moved onto `ErrorBox` as `variant="box" as="div"`. They gained
+ * `break-words`, which is inherited, so a path inside a paragraph or a list
+ * item breaks too. These checks draw the app's own `ErrorBox` in the `div` form
+ * at the end of the Delete everything section, where the list form lives,
+ * through `__mountBlockErrorBox` in the harness. With `reference`, the harness
+ * draws the hand-built box `main` drew right after it, so "ordinary content
+ * looks as it did" compares two boxes on the same machine with the same fonts.
+ *
+ * Uses the L-374 helpers above (`LONG_PATH`, `ORDINARY`, `errorLayout`,
+ * `assertFits`, `lineStarts`, `open`, `goTo`); defines nothing they define.
+ */
+interface BlockMount {
+  readonly holds: 'list' | 'paragraphs';
+  readonly testId: string;
+  readonly heading: string;
+  readonly lines: readonly string[];
+  readonly reference: boolean;
+}
+
+async function eraseSection(width: number): Promise<Page> {
+  const page = await open('?seen=1', { width, height: 800 });
+  await goTo(page, 'settings');
+  await page.waitForSelector('[data-testid="settings-erase-section"]');
+  return page;
+}
+
+async function mountBlockErrorBox(page: Page, box: BlockMount): Promise<void> {
+  await page.evaluate((props) => {
+    const into = document.createElement('div');
+    document.querySelector('[data-testid="settings-erase-section"]')?.append(into);
+    if (!into.isConnected) throw new Error(`nowhere to draw ${props.testId}`);
+    (
+      window as unknown as { __mountBlockErrorBox: (into: Element, box: unknown) => void }
+    ).__mountBlockErrorBox(into, props);
+  }, box);
+  await page.waitForSelector(`[data-testid="${box.testId}"]`, { state: 'attached' });
+}
+
+/** The element, its role, and whether it sits inside the section, edge to edge. */
+async function blockBox(
+  page: Page,
+  testId: string,
+): Promise<{ tag: string; role: string | null; inside: boolean; text: string }> {
+  return page.evaluate((id) => {
+    const box = document.querySelector(`[data-testid="${id}"]`);
+    const section = document.querySelector('[data-testid="settings-erase-section"]');
+    if (box === null || section === null) throw new Error(`no ${id}`);
+    const b = box.getBoundingClientRect();
+    const s = section.getBoundingClientRect();
+    return {
+      tag: box.tagName,
+      role: box.getAttribute('role'),
+      inside: b.left >= s.left && b.right <= s.right,
+      text: box.textContent ?? '',
+    };
+  }, testId);
+}
+
+const BLOCK_HEADING = 'Some of it could not be removed.';
+
+describe('a box that holds more than one block (L-377)', () => {
+  for (const width of ERROR_WIDTHS) {
+    const px = `${String(width)}px`;
+
+    for (const holds of ['list', 'paragraphs'] as const) {
+      it(`the div form holding ${holds} keeps a 200-character path inside its panel at ${px}`, async () => {
+        const page = await eraseSection(width);
+        const lines = [LONG_PATH, 'Nothing else was changed.'];
+        await mountBlockErrorBox(page, {
+          holds,
+          testId: 'block-box',
+          heading: BLOCK_HEADING,
+          lines,
+          reference: false,
+        });
+        const box = await blockBox(page, 'block-box');
+        assert.equal(box.tag, 'DIV', 'a box holding blocks must be a div, not a p');
+        assert.equal(box.role, 'alert');
+        assert.ok(box.inside, `the box is not inside its section at ${px}`);
+        assertFits(`div box holding ${holds}, path (${px})`, await errorLayout(page, 'block-box'));
+        // Every word is there: nothing was cut to make it fit.
+        assert.equal(
+          box.text,
+          holds === 'list'
+            ? `${BLOCK_HEADING}${lines.join('')}`
+            : `${BLOCK_HEADING}${lines.join('\n')}`,
+        );
+        await page.context().close();
+      });
+    }
+
+    // NEGATIVE — moving the box changed nothing with ordinary words: the same
+    // height, width and line breaks as the hand-built box drawn beside it.
+    it(`NEGATIVE: ordinary content looks exactly as the hand-built box did, both forms, at ${px}`, async () => {
+      for (const holds of ['list', 'paragraphs'] as const) {
+        const page = await eraseSection(width);
+        await mountBlockErrorBox(page, {
+          holds,
+          testId: 'block-box',
+          heading: BLOCK_HEADING,
+          lines: [ORDINARY, 'The saved keys'],
+          reference: true,
+        });
+        const now = await errorLayout(page, 'block-box');
+        const before = await errorLayout(page, 'block-box-reference');
+        const starts = await lineStarts(page, 'block-box');
+        console.log(
+          `div box holding ${holds}, ordinary (${px}): height ${String(now.strip.height)}, ` +
+            `lines start ${JSON.stringify(starts)}`,
+        );
+        assertFits(`div box holding ${holds}, ordinary (${px})`, now);
+        assert.ok(starts.length > 2, `${holds}: the content is on too few lines to test wrapping`);
+        assert.deepEqual(
+          starts,
+          await lineStarts(page, 'block-box-reference'),
+          `${holds}: wraps elsewhere`,
+        );
+        assert.equal(now.strip.height, before.strip.height, `${holds}: a different height`);
+        assert.equal(now.message.width, before.message.width, `${holds}: a different width`);
+        await page.context().close();
+      }
+    });
+
+    it(`BOUNDARY: an empty div box draws as the hand-built one did, at ${px}`, async () => {
+      const page = await eraseSection(width);
+      await mountBlockErrorBox(page, {
+        holds: 'paragraphs',
+        testId: 'empty-block',
+        heading: '',
+        lines: [],
+        reference: true,
+      });
+      const now = await errorLayout(page, 'empty-block');
+      assertFits(`empty div box (${px})`, now);
+      assert.ok(now.strip.height > 0, 'not drawn');
+      assert.equal(
+        now.strip.height,
+        (await errorLayout(page, 'empty-block-reference')).strip.height,
+      );
+      assert.equal(await page.locator('[role="alert"][data-testid="empty-block"]').count(), 1);
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check. The hand-built box,
+  // without `break-words`, holding the path is reported spilling.
+  it('the check can fail: the hand-built box holding the path spills out of its panel', async () => {
+    for (const holds of ['list', 'paragraphs'] as const) {
+      const page = await eraseSection(375);
+      await mountBlockErrorBox(page, {
+        holds,
+        testId: 'block-box',
+        heading: BLOCK_HEADING,
+        lines: [LONG_PATH],
+        reference: true,
+      });
+      const without = await errorLayout(page, 'block-box-reference');
+      console.log(`hand-built box holding ${holds}, without the fix: ${JSON.stringify(without)}`);
+      assert.ok(
+        without.wider.some((line) => line.startsWith('block-box-reference')),
+        `${holds}: the spilling box was not reported: ${JSON.stringify(without.wider)}`,
+      );
+      assert.ok(without.message.overrun > 100, `${holds}: the path did not run past the box`);
+      await page.context().close();
+    }
+  });
+});

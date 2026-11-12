@@ -4,7 +4,7 @@ import { buildBoardUrl } from '@cviper/job-apis';
 import { BOARD_ENCODINGS, type BoardEncoding } from '@cviper/core-types';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
-import { cardClasses, Icon, SectionHeading, StatusPill } from '../../ui';
+import { cardClasses, ErrorBox, Icon, SectionHeading, StatusPill } from '../../ui';
 
 import { SHIPPED_BOARDS } from './defaults';
 import {
@@ -272,13 +272,9 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
       )}
 
       {saveProblem === null ? null : (
-        <p
-          role="alert"
-          data-testid="boards-problem"
-          className="mt-2 rounded-control bg-danger/5 px-3 py-2 text-danger"
-        >
+        <ErrorBox variant="box" gapAbove="mt-2" testId="boards-problem">
           {saveProblem}
-        </p>
+        </ErrorBox>
       )}
 
       {adding ? (

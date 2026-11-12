@@ -159,6 +159,68 @@ interface MountedErrorBox {
   ReactDOM.createRoot(into).render(element);
 };
 
+/**
+ * L-377: `__mountBlockErrorBox` draws the `box` shape in its `div` form, with
+ * the blocks the two real ones hold: a paragraph and a list (Erase everything's
+ * failure, `mt-3`) or two paragraphs (Settings' notice, no space above). With
+ * `reference`, it also draws the HAND-BUILT box `main` drew, class for class,
+ * straight after it: not an alert, test id `<id>-reference`. Same place, same
+ * fonts, so "it looks as it did" is a comparison, not a pixel count.
+ */
+interface MountedBlockErrorBox {
+  readonly holds: 'list' | 'paragraphs';
+  readonly testId: string;
+  readonly heading: string;
+  readonly lines: readonly string[];
+  readonly reference: boolean;
+}
+
+(
+  window as unknown as {
+    __mountBlockErrorBox: (into: Element, box: MountedBlockErrorBox) => void;
+  }
+).__mountBlockErrorBox = (into, { holds, testId, heading, lines, reference }) => {
+  const blocks =
+    holds === 'list' ? (
+      <>
+        <p className="font-medium">{heading}</p>
+        <ul className="mt-1 list-disc pl-5 text-ink-muted">
+          {lines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </>
+    ) : (
+      <>
+        <p className="font-medium">{heading}</p>
+        <p className="mt-1 whitespace-pre-line text-ink-muted">{lines.join('\n')}</p>
+      </>
+    );
+  // What `main` drew by hand before L-377 (EraseEverything.tsx, Settings.tsx).
+  const handBuilt =
+    holds === 'list'
+      ? 'mt-3 rounded-control bg-danger/5 px-3 py-2 text-danger'
+      : 'rounded-control bg-danger/5 px-3 py-2 text-danger';
+  ReactDOM.createRoot(into).render(
+    <>
+      {holds === 'list' ? (
+        <ErrorBox variant="box" as="div" gapAbove="mt-3" testId={testId}>
+          {blocks}
+        </ErrorBox>
+      ) : (
+        <ErrorBox variant="box" as="div" testId={testId}>
+          {blocks}
+        </ErrorBox>
+      )}
+      {reference ? (
+        <div data-testid={`${testId}-reference`} className={handBuilt}>
+          {blocks}
+        </div>
+      ) : null}
+    </>,
+  );
+};
+
 const searchPort = params.get('results') === '1' ? createFakeSearchPort() : undefined;
 searchPort?.nextOutcome(
   outcomeOf(
