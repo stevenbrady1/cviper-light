@@ -194,6 +194,65 @@ return target.tagName.toLowerCase() + (id ? '[' + id + ']' : '');
 export const POINTER_PARK = { x: 120, y: 500 } as const;
 
 /**
+ * May this run move the real cursor? Only where nobody is using it.
+ *
+ * On a CI runner (`GITHUB_ACTIONS=true`) nobody is at the mouse. On a person's
+ * own PC, a test that moves the cursor while they work takes their mouse from
+ * under them, so it happens only when they ask for it with
+ * `SMOKE_PARK_POINTER=1` (or `true`). Anything else, including `0` and an empty
+ * value, is no. Never off Windows: the move is a Windows PowerShell command.
+ */
+export type PointerParking =
+  | { readonly move: true; readonly why: 'ci' | 'opted in' }
+  | { readonly move: false; readonly why: 'not windows' | 'not asked' };
+
+export function pointerParking(
+  env: Readonly<Record<string, string | undefined>>,
+  platform: string,
+): PointerParking {
+  if (platform !== 'win32') return { move: false, why: 'not windows' };
+  if (env['GITHUB_ACTIONS'] === 'true') return { move: true, why: 'ci' };
+  const optIn = env['SMOKE_PARK_POINTER'];
+  if (optIn === '1' || optIn === 'true') return { move: true, why: 'opted in' };
+  return { move: false, why: 'not asked' };
+}
+
+export type ParkResult =
+  | { readonly moved: true; readonly at: string }
+  | { readonly moved: false; readonly notice: string };
+
+/**
+ * Move the cursor to (x, y) if `pointerParking` allows it, through `run` (which
+ * runs PowerShell with the given arguments and returns what it printed). When
+ * it does not allow it, `run` is never called, and the notice says why this
+ * run's pictures cannot be compared with CI's.
+ */
+export function parkOsPointer(options: {
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly platform: string;
+  readonly x: number;
+  readonly y: number;
+  readonly run: (args: readonly string[]) => string;
+}): ParkResult {
+  const decision = pointerParking(options.env, options.platform);
+  if (!decision.move) {
+    const where =
+      decision.why === 'not windows'
+        ? 'this is not Windows'
+        : 'this is not CI and SMOKE_PARK_POINTER is not set';
+    return {
+      moved: false,
+      notice:
+        `smoke: pointer  = left where it is (${where}). The pictures from this run are not ` +
+        'comparable with CI’s: whatever is under your cursor may be drawn hovered. To let ' +
+        'the run move the cursor (it only sets its position: no clicks, no keys, no window ' +
+        'brought to the front), set SMOKE_PARK_POINTER=1.',
+    };
+  }
+  return { moved: true, at: options.run(moveOsPointerArgs(options.x, options.y)).trim() };
+}
+
+/**
  * The PowerShell arguments that move the real Windows cursor to (x, y).
  *
  * WebDriver cannot do this: the app's embedded server sends pointer actions as

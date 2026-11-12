@@ -18,6 +18,8 @@ import {
   POINTER_PARK,
   SETTLE_PROBE,
   moveOsPointerArgs,
+  parkOsPointer,
+  pointerParking,
   waitForStill,
   type StillProbe,
 } from '../../e2e/smokeSettle.ts';
@@ -394,5 +396,134 @@ describe('moveOsPointerArgs', () => {
 
   it('accepts the screen origin (0, 0)', () => {
     expect(moveOsPointerArgs(0, 0)[2]).toContain('Point(0, 0)');
+  });
+});
+
+// ── Whose cursor may be moved (L-375) ───────────────────────────────────────
+//
+// On a CI runner nobody is using the mouse. On a person's own PC, a test that
+// grabs the cursor while they work is exactly what must never happen silently,
+// so it moves only on CI or when the person asks for it.
+
+describe('pointerParking', () => {
+  it('moves the cursor on CI (GitHub Actions) on Windows', () => {
+    expect(pointerParking({ GITHUB_ACTIONS: 'true' }, 'win32')).toEqual({ move: true, why: 'ci' });
+  });
+
+  it('moves the cursor on a person’s PC only when they opt in', () => {
+    expect(pointerParking({ SMOKE_PARK_POINTER: '1' }, 'win32')).toEqual({
+      move: true,
+      why: 'opted in',
+    });
+    expect(pointerParking({ SMOKE_PARK_POINTER: 'true' }, 'win32').move).toBe(true);
+  });
+
+  it('does not move the cursor when neither is set', () => {
+    expect(pointerParking({}, 'win32').move).toBe(false);
+  });
+
+  it('treats an opt-in of "0", "" or "false", and GITHUB_ACTIONS other than "true", as no', () => {
+    for (const value of ['0', '', 'false', 'no']) {
+      expect(pointerParking({ SMOKE_PARK_POINTER: value }, 'win32').move).toBe(false);
+    }
+    expect(pointerParking({ GITHUB_ACTIONS: 'false' }, 'win32').move).toBe(false);
+    expect(pointerParking({ GITHUB_ACTIONS: '' }, 'win32').move).toBe(false);
+  });
+
+  it('never moves it off Windows, even on CI or opted in (PowerShell moves a Windows cursor)', () => {
+    expect(pointerParking({ GITHUB_ACTIONS: 'true' }, 'linux').move).toBe(false);
+    expect(pointerParking({ SMOKE_PARK_POINTER: '1' }, 'darwin').move).toBe(false);
+  });
+});
+
+describe('parkOsPointer', () => {
+  const at = { x: 120, y: 500 };
+
+  it('on CI, runs the move once and reports where the cursor ended up', () => {
+    const run = vi.fn((_args: readonly string[]) => '120,500\r\n');
+    const result = parkOsPointer({
+      env: { GITHUB_ACTIONS: 'true' },
+      platform: 'win32',
+      ...at,
+      run,
+    });
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledWith(moveOsPointerArgs(120, 500));
+    expect(result).toEqual({ moved: true, at: '120,500' });
+  });
+
+  it('opted in, runs the move', () => {
+    const run = vi.fn((_args: readonly string[]) => '120,500');
+    const result = parkOsPointer({
+      env: { SMOKE_PARK_POINTER: '1' },
+      platform: 'win32',
+      ...at,
+      run,
+    });
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(result.moved).toBe(true);
+  });
+
+  it('on a person’s PC with no opt-in, never calls PowerShell and says why the pictures differ', () => {
+    const run = vi.fn((_args: readonly string[]) => '');
+    const result = parkOsPointer({ env: {}, platform: 'win32', ...at, run });
+    expect(run).not.toHaveBeenCalled();
+    expect(result.moved).toBe(false);
+    if (result.moved) return;
+    expect(result.notice).toMatch(/not comparable with CI/);
+    expect(result.notice).toMatch(/SMOKE_PARK_POINTER=1/);
+  });
+
+  it('with the opt-in set to "0" or "", never calls PowerShell', () => {
+    for (const value of ['0', '']) {
+      const run = vi.fn((_args: readonly string[]) => '');
+      expect(
+        parkOsPointer({ env: { SMOKE_PARK_POINTER: value }, platform: 'win32', ...at, run }).moved,
+      ).toBe(false);
+      expect(run).not.toHaveBeenCalled();
+    }
+  });
+
+  it('off Windows, never calls PowerShell and does not throw, even on CI', () => {
+    const run = vi.fn((_args: readonly string[]) => {
+      throw new Error('powershell: command not found');
+    });
+    const result = parkOsPointer({
+      env: { GITHUB_ACTIONS: 'true' },
+      platform: 'linux',
+      ...at,
+      run,
+    });
+    expect(run).not.toHaveBeenCalled();
+    expect(result.moved).toBe(false);
+  });
+});
+
+describe('the cursor move only sets the cursor position', () => {
+  // Forbid-list: nothing in the command may click, type, or bring a window to the front.
+  const FORBIDDEN = [
+    /mouse_event/i,
+    /SendInput/i,
+    /SendKeys/i,
+    /SendWait/i,
+    /keybd_event/i,
+    /SetForegroundWindow/i,
+    /AppActivate/i,
+    /BringToFront/i,
+    /Activate\(/i,
+    /Click/i,
+    /DllImport/i,
+    /user32/i,
+    /wscript/i,
+  ];
+
+  it('touches nothing but [System.Windows.Forms.Cursor]::Position', () => {
+    const command = moveOsPointerArgs(120, 500)[2] ?? '';
+    for (const pattern of FORBIDDEN) expect(command).not.toMatch(pattern);
+    const assignments = command.match(/\[[^\]]+\]::\w+\s*=/g) ?? [];
+    expect(assignments.length).toBeGreaterThan(0);
+    for (const assignment of assignments) {
+      expect(assignment).toMatch(/^\[System\.Windows\.Forms\.Cursor\]::Position\s*=$/);
+    }
   });
 });

@@ -182,7 +182,7 @@ import {
   HOVERED_INTERACTIVE,
   POINTER_PARK,
   SETTLE_PROBE,
-  moveOsPointerArgs,
+  parkOsPointer,
   waitForStill,
   type StillProbe,
 } from './smokeSettle.ts';
@@ -675,6 +675,9 @@ const SETTLE_INTERVAL = 150;
 
 /** How long the page stays hidden, and then shown, for the fresh paint. */
 const REPAINT_PAUSE = 150;
+
+/** Whether the "cursor left where it is" line has been printed this run. */
+let pointerNoticeShown = false;
 
 /** Type into a field the way a person does: click it, then keys. */
 async function typeInto(selector: string, text: string): Promise<void> {
@@ -1203,15 +1206,30 @@ describe('the built CViper Light binary', () => {
    * pointer actions as JavaScript events, and those never change `:hover`.
    *
    * Moved there through PowerShell, the one thing on the runner that moves
-   * the real cursor. Then checked: whatever the page says is hovered must be nothing that
-   * draws a hover — never a button, link, field or hint.
+   * the real cursor — and it only sets the cursor's position: no click, no
+   * key, no window brought to the front. Then checked: whatever the page
+   * says is hovered must be nothing that draws a hover — never a button,
+   * link, field or hint.
+   *
+   * ONLY ON CI, OR WHEN A PERSON ASKS. On somebody's own PC the cursor is
+   * theirs: it is moved only with `SMOKE_PARK_POINTER=1`. Without it the
+   * cursor is left alone, nothing hovered fails the run, and one line says
+   * this run's pictures are not comparable with CI's (`pointerParking`).
    */
   async function parkPointer(name: string): Promise<void> {
-    if (process.platform !== 'win32') return;
-    const at = execFileSync('powershell', moveOsPointerArgs(POINTER_PARK.x, POINTER_PARK.y), {
-      encoding: 'utf8',
-      timeout: 30_000,
-    }).trim();
+    const parked = parkOsPointer({
+      env: process.env,
+      platform: process.platform,
+      x: POINTER_PARK.x,
+      y: POINTER_PARK.y,
+      run: (args) => execFileSync('powershell', args, { encoding: 'utf8', timeout: 30_000 }),
+    });
+    if (!parked.moved) {
+      if (!pointerNoticeShown) console.log(parked.notice);
+      pointerNoticeShown = true;
+      return;
+    }
+    const at = parked.at;
     const hovered = await session().executeScript<string>(HOVERED_INTERACTIVE);
     assert.equal(
       hovered,
@@ -1223,7 +1241,8 @@ describe('the built CViper Light binary', () => {
   /**
    * Make the screen still, and return the picture of it (L-375).
    *
-   * 1. The cursor is parked and the focus dropped (see `parkPointer`). No focus
+   * 1. The cursor is parked (on CI, or when asked) and the focus dropped (see
+   *    `parkPointer`). No focus
    *    ring in a picture: the app moves focus to each screen's heading
    *    (WCAG 2.4.3), and WebDriver's clicks do not count as a mouse, so the
    *    ring a pointer user never sees would be drawn here.
