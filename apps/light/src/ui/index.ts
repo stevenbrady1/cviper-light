@@ -34,6 +34,6 @@ export {
   YourDataIcon,
   type SettingsIconProps,
 } from './SettingsIcons';
-export { PageHeader, SectionHeading } from './PageHeader';
+export { PAGE_TITLE, PageHeader, SectionHeading } from './PageHeader';
 export { PILL_TONES, StatusPill, type PillTone } from './StatusPill';
 export { STATE_MARK_NAMES, StateMark, type StateMarkName } from './StateMark';

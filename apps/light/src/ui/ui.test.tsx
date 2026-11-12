@@ -9,12 +9,14 @@
  * no stylesheet, so this is the only place that meaning can be pinned.
  */
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { ResultCard } from '../features/search/ResultCard';
+import { REED_DAY_RATE } from '../features/search/test/fixtures';
 import { Card } from './Card';
 import { Icon, ICON_NAMES } from './Icon';
 import { IconTile } from './IconTile';
-import { PageHeader } from './PageHeader';
+import { PageHeader, SectionHeading } from './PageHeader';
 import { STATE_MARK_NAMES, StateMark } from './StateMark';
 import { PILL_TONES, StatusPill, type PillTone } from './StatusPill';
 
@@ -246,5 +248,72 @@ describe('PageHeader', () => {
       <PageHeader title="Search" subtitle="Find roles." icon="search" />,
     );
     expect(container.querySelector('svg')).toBeTruthy();
+  });
+});
+
+/**
+ * The title ladder (L-382). The serif ships at weight 400 only, so a serif
+ * title must say `font-normal` itself: a bold parent would otherwise make the
+ * browser fake a bold serif. Lining numerals, because Newsreader's default
+ * figures wobble on the baseline.
+ */
+const HEAVIER = /\bfont-(medium|semibold|bold|extrabold|black)\b/;
+
+function expectSerifRegular(className: string): void {
+  expect(className).toContain('font-display');
+  expect(className).toContain('font-normal');
+  expect(className).toContain('lining-nums');
+  expect(className).not.toMatch(HEAVIER);
+}
+
+describe('title ladder (L-382)', () => {
+  it('PageHeader title is serif, regular weight, 24px', () => {
+    render(<PageHeader title="Tracker" subtitle="Every application." />);
+    const title = screen.getByRole('heading', { level: 1 }).className;
+    expectSerifRegular(title);
+    expect(title).toMatch(/(^|\s)text-2xl(\s|$)/);
+  });
+
+  it('the welcome hero title is serif, regular weight, 30px then 36px', () => {
+    render(<PageHeader variant="hero" title="CViper Light" subtitle="Your job hunt." />);
+    const title = screen.getByRole('heading', { level: 1 }).className;
+    expectSerifRegular(title);
+    expect(title).toMatch(/(^|\s)text-3xl(\s|$)/);
+    expect(title).toContain('md:text-4xl');
+  });
+
+  it('SectionHeading is serif, regular weight, 20px, at either level', () => {
+    render(
+      <>
+        <SectionHeading title="Your CVs" />
+        <SectionHeading title="Skills" level={3} />
+      </>,
+    );
+    for (const level of [2, 3]) {
+      const title = screen.getByRole('heading', { level }).className;
+      expectSerifRegular(title);
+      expect(title).toMatch(/(^|\s)text-xl(\s|$)/);
+    }
+  });
+
+  it('negative: a search result card title stays in the body font', () => {
+    render(
+      <ResultCard
+        entry={REED_DAY_RATE}
+        today="2026-09-29"
+        clusterSize={null}
+        tracked={false}
+        busy={false}
+        note={null}
+        problem={null}
+        rank={null}
+        dealBreakers={[]}
+        onSave={vi.fn()}
+        onOpen={vi.fn()}
+      />,
+    );
+    const title = screen.getByRole('heading', { name: 'Credit Risk Contractor' }).className;
+    expect(title).not.toContain('font-display');
+    expect(title).toContain('font-medium');
   });
 });
