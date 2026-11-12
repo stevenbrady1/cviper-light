@@ -62,9 +62,8 @@ export function CardProgress({ applicationId, progress, onContinue }: CardProgre
       >
         Step {position} of {STEPS.length} · {label}
       </p>
-      {/* "Continue: ATS Score" and the dots do not fit side by side in a narrow
-          column (L-319): the button wraps under the dots, which never squash. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+      {/* The dots never squash (L-319): too narrow for both, Continue wraps under them. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Hint text={FLOW_HINT.cardDots} focusable={false} className="shrink-0">
           <span
             aria-hidden="true"
@@ -81,13 +80,11 @@ export function CardProgress({ applicationId, progress, onContinue }: CardProgre
         <button
           type="button"
           data-testid={`tracker-card-continue-${applicationId}`}
+          aria-label={`Continue: ${label}`}
           onClick={() => onContinue(next)}
           className={`${QUIET_BUTTON} text-xs`}
         >
-          {/* One flex item, so a tight card breaks after "Continue:", never inside "ATS Score". */}
-          <span>
-            Continue: <span className="whitespace-nowrap">{label}</span>
-          </span>
+          Continue
         </button>
       </div>
     </div>
