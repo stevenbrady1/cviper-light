@@ -111,7 +111,7 @@ describe('tracker cards for started jobs (L-200)', () => {
 
   it('a job that is only analysed continues to Tailor; one only exported shows its dot', async () => {
     await renderBoard({ saved: { 'job-b': { analysed: true }, 'job-c': { exported: true } } });
-    expect((await screen.findByTestId('tracker-card-continue-b')).getAttribute('aria-label')).toBe(
+    expect((await screen.findByTestId('tracker-card-continue-b')).textContent).toBe(
       'Continue: Tailor',
     );
     expect(marksIn(screen.getByTestId('tracker-card-progress-c'))).toEqual([

@@ -210,3 +210,56 @@ describe('CardProgress draws its dots (L-360)', () => {
     expect(holder.hasAttribute('tabindex')).toBe(false);
   });
 });
+
+/**
+ * L-319: the button said only "Continue". Where it goes was in its accessible
+ * name alone, so a sighted user had to press it to find out. It now SAYS where
+ * — "Continue: Tailor" — and that visible text is the whole accessible name, so
+ * the words read and the words heard are one string, not two kept in step.
+ */
+describe('Continue says where it goes, in words (L-319)', () => {
+  function button(): HTMLElement {
+    return screen.getByTestId('tracker-card-continue-app-1');
+  }
+
+  it('happy: an analysed job’s button reads "Continue: Tailor"', () => {
+    renderProgress({ analysed: true, tailored: false, exported: false });
+    expect(button().textContent).toBe('Continue: Tailor');
+  });
+
+  it('boundary: everything done still shows the button, enabled, reading "Continue: Export"', () => {
+    renderProgress({ analysed: true, tailored: true, exported: true });
+    expect(button().textContent).toBe('Continue: Export');
+    expect((button() as HTMLButtonElement).disabled).toBe(false);
+    expect(button().getAttribute('aria-disabled')).toBeNull();
+  });
+
+  it('negative: the visible text IS the accessible name, for all 8 progress states', () => {
+    for (const analysed of [false, true]) {
+      for (const tailored of [false, true]) {
+        for (const exported of [false, true]) {
+          renderProgress({ analysed, tailored, exported });
+          const visible = button().textContent ?? '';
+          const state = JSON.stringify({ analysed, tailored, exported });
+          expect(visible, state).toMatch(/^Continue: \S/);
+          // No aria-label to drift away from the words on screen.
+          expect(button().hasAttribute('aria-label'), state).toBe(false);
+          expect(screen.getByRole('button', { name: visible }), state).toBe(button());
+          cleanup();
+        }
+      }
+    }
+  });
+
+  it('a click fires Continue once, with the step the button names', async () => {
+    const { onContinue, user } = renderProgress({
+      analysed: true,
+      tailored: true,
+      exported: false,
+    });
+    expect(button().textContent).toBe('Continue: ATS Score');
+    await user.click(button());
+    expect(onContinue).toHaveBeenCalledTimes(1);
+    expect(onContinue).toHaveBeenCalledWith('ats');
+  });
+});
