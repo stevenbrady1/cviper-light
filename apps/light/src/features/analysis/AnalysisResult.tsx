@@ -8,7 +8,7 @@ import {
 } from '@cviper/keyword-scoring';
 
 import { Hint } from '../../app/Hint';
-import { cardClasses } from '../../ui';
+import { cardClasses, StatusPill, type PillTone } from '../../ui';
 import { ATS_BAND_HINT, VERDICT_HINT } from '../../app/hints';
 import { displayTerm, displayTerms } from './acronyms';
 import { ATS_BAND_TONE, ATS_BAND_WORD } from './atsBandWords';
@@ -58,10 +58,15 @@ const PRIORITY_LABEL: Record<SuggestionPriority, string> = {
   low: 'If you have time',
 };
 
-const PRIORITY_TONE: Record<SuggestionPriority, string> = {
-  high: 'bg-gold/10 text-gold-ink',
-  medium: 'bg-sunken text-ink-muted',
-  low: 'bg-sunken text-ink-faint',
+/**
+ * The priority label is the shared small label (L-378). Gold for "do this
+ * first" (it needs the user); plain for the rest, which are ranked by their
+ * words, not by two shades of grey ink that most eyes cannot tell apart.
+ */
+const PRIORITY_TONE: Record<SuggestionPriority, PillTone> = {
+  high: 'attention',
+  medium: 'neutral',
+  low: 'neutral',
 };
 
 const PRIORITY_ORDER: readonly SuggestionPriority[] = ['high', 'medium', 'low'];
@@ -401,11 +406,9 @@ export function AnalysisResult({
                     className={cardClasses({ padding: 'none' }) + ' p-3'}
                   >
                     <div className="flex items-center gap-2">
-                      <span
-                        className={`rounded-pill px-2 py-0.5 text-xs font-medium ${PRIORITY_TONE[priority]}`}
-                      >
+                      <StatusPill tone={PRIORITY_TONE[priority]}>
                         {PRIORITY_LABEL[priority]}
-                      </span>
+                      </StatusPill>
                       <span className="font-medium text-ink">{suggestion.section}</span>
                     </div>
                     <p className="mt-1.5 text-ink-muted">{suggestion.issue}</p>

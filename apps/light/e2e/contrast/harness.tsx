@@ -15,7 +15,7 @@
  * Neither changes a single class name or colour. What the spec measures —
  * which text colour lands on which painted background — is the app's own.
  *
- * The page reads five switches from the address:
+ * The page reads six switches from the address:
  *   - `?seen=1` skips the first-run welcome, as a returning user sees the app;
  *   - `?entries=1` puts three applications on the board;
  *   - `?results=1` says a job-board key is saved, and answers Search with a long
@@ -26,10 +26,15 @@
  *   - `?marks=1` draws, instead of the app, the three components that put a
  *     drawn mark beside words (L-370: is any row taller for its mark).
  *
- * And it puts one helper on `window`: `__mountErrorBox`, which draws the app's
- * own `ErrorBox` into an element the spec has placed. The panel `box` shape has
- * no screen that draws it yet (L-368 moved only the strips), so this is how the
- * spec lays one out inside a real panel (L-374).
+ * And it puts three helpers on `window`, each drawing real app components into
+ * an element the spec has placed:
+ *   - `__mountErrorBox` draws the app's own `ErrorBox`. The panel `box` shape
+ *     has no screen that draws it yet (L-368 moved only the strips), so this is
+ *     how the spec lays one out inside a real panel (L-374);
+ *   - `__mountBlockErrorBox` draws the `box` shape in its `div` form, holding
+ *     more than one block (L-377);
+ *   - `__mountPrioritySuggestions` draws `AnalysisResult` with one suggestion
+ *     of each priority and long section names (L-378).
  *
  * This file is never part of the app's own build: `vite.config.ts` builds
  * `index.html` at the app root, and this page has its own config.
@@ -236,6 +241,46 @@ searchPort?.nextOutcome(
     emptyQuota('2026-08-19'),
   ),
 );
+
+/**
+ * L-378: `__mountPrioritySuggestions` draws the app's own `AnalysisResult`
+ * into an element the spec has placed, with one suggestion of each priority
+ * and section names long enough to squeeze the label's row on a phone. The
+ * spec checks that each priority label stays on one line, inside its card.
+ */
+(
+  window as unknown as { __mountPrioritySuggestions: (into: Element) => Promise<void> }
+).__mountPrioritySuggestions = async (into) => {
+  const { AnalysisResult } = await import('../../src/features/analysis/AnalysisResult');
+  const suggestion = (priority: 'high' | 'medium' | 'low', section: string) => ({
+    section,
+    issue: 'The advert asks for something your CV does not say.',
+    recommendation: 'Say it where you did the work.',
+    priority,
+  });
+  ReactDOM.createRoot(into).render(
+    <AnalysisResult
+      analysis={{
+        match_score: 62,
+        verdict: 'possible',
+        summary: 'A summary.',
+        matched_skills: [],
+        missing_skills: [],
+        keyword_gaps: [],
+        matched_keywords: [],
+        suggestions: [
+          suggestion('high', 'Professional experience and achievements'),
+          suggestion('medium', 'Education, training and professional qualifications'),
+          suggestion('low', 'Interests, hobbies and volunteering'),
+        ],
+        ats_notes: [],
+      }}
+      provider="keyword"
+      model="keyword-v3"
+      aiAvailable={false}
+    />,
+  );
+};
 
 const root = document.getElementById('root');
 if (root === null) throw new Error('#root missing from the contrast harness');
