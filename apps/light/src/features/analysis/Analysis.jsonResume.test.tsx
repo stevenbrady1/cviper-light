@@ -93,7 +93,11 @@ describe('Save as JSON Resume', () => {
   it('is disabled, never hidden, for a CV that came from a PDF', async () => {
     await renderWith([PDF_CV]);
     expect(saveButton().disabled).toBe(true);
-    expect(saveButton().title).toMatch(/JSON Resume/);
+    // Changed on purpose (L-387): the reason moved from a hover-only `title` to a Hint.
+    const describer = saveButton().closest('[aria-describedby]');
+    expect(
+      document.getElementById(describer?.getAttribute('aria-describedby') ?? '')?.textContent,
+    ).toMatch(/JSON Resume/);
   });
 
   it('is disabled when there is no CV at all', async () => {

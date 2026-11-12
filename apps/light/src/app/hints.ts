@@ -19,7 +19,8 @@ export const ATS_HINT = {
   after: 'This tailored draft.',
   keyword:
     'How many of the important words in the advert also appear in your CV, out of 100. ' +
-    'Screening software looks for these words.',
+    'Screening software looks for these words. ' +
+    'Under 60 needs work, 60 to 79 is getting there, 80 or more reads well.',
   bullets:
     'How strong your bullet points are, out of 100. A strong bullet starts with an action verb, ' +
     'shows a result, and includes a number.',
@@ -82,6 +83,13 @@ export const FLOW_HINT = {
 export const JSON_RESUME_HINT =
   'A standard file format for CVs, used by some CV builders and job sites. Most people never ' +
   'need it: a PDF or Word file works just as well.';
+
+/** Beside "Save as JSON Resume" when it is greyed out for a PDF or Word CV (L-387). */
+export const SAVE_JSON_RESUME_HINT = 'Only a CV that arrived as a JSON Resume can be saved as one.';
+
+/** "Applied so far" on the Tracker's funnel strip: its counts add up (L-175, L-387). */
+export const FUNNEL_SO_FAR_HINT =
+  'Every application that got this far, including the ones that moved on';
 
 export const RAIL_HINT = {
   dots: 'Green: ready to use. Amber: needs attention in Settings. A service that is not set up is not listed.',

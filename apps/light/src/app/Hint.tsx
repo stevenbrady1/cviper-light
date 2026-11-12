@@ -17,10 +17,15 @@
  *     button, named "What this means", and it is the Tab stop (L-384) — and
  *     Escape closes it, leaving focus on the button;
  *   * a tap or click, on the words or the "i": the first opens it, the next
- *     closes it.
+ *     closes it. A tip opened this way also closes when the page scrolls,
+ *     since it is drawn where the mark was (L-385).
  * And a screen reader gets the same words at all times through
  * `aria-describedby`: the tip stays in the page while it is hidden, so the
- * description never depends on anything having been hovered.
+ * description never depends on anything having been hovered. That holds for
+ * anything a keyboard can reach. A `focusable={false}` mark has no Tab stop,
+ * so its meaning must be spoken another way: a card's dots carry their own
+ * screen-reader text, and in the ATS table the band words ("Needs work") lean
+ * on the "Keyword coverage" label's hint, which gives the score ranges.
  *
  * A mark that is already a button (a step on the step bar, a rail item) uses
  * the render-function form: the button keeps its own click and takes the
@@ -40,7 +45,8 @@
  * toggled, the made-up hover opened the tip and the click shut it straight
  * away. So a hover or focus only SHOWS the tip, and a click PINS it: a click
  * closes only a tip that a click opened. A mouse user who hovers and then
- * clicks gets the same: the click keeps it open, the next one closes it.
+ * clicks gets the same: the click keeps it open, and the next click, or moving
+ * the mouse away, closes it.
  *
  * The "i" is 24×24px through its padding, the WCAG 2.2 AA minimum, with a
  * negative margin so a line of text is no taller for it. The owner accepted
@@ -49,6 +55,7 @@
  */
 import {
   useCallback,
+  useEffect,
   useId,
   useLayoutEffect,
   useRef,
@@ -124,6 +131,15 @@ export function Hint({ text, children, className, label, focusable = true }: Hin
 
   const show = useCallback(() => setShown((was) => was ?? 'shown'), []);
   const hide = useCallback(() => setShown(null), []);
+
+  // Only a pinned tip: Tab to an off-screen "i" scrolls it into view, and that
+  // scroll must not shut the tip the keyboard just opened.
+  useEffect(() => {
+    if (shown !== 'pinned') return;
+    // Capture, because the panel that scrolls is inside the page and its scroll does not bubble.
+    window.addEventListener('scroll', hide, true);
+    return () => window.removeEventListener('scroll', hide, true);
+  }, [shown, hide]);
 
   const props: HintTriggerProps = {
     ref: (element) => {

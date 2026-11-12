@@ -355,7 +355,68 @@ describe('the Tracker funnel strip fits a phone (L-383)', () => {
     assert.ok(report.length > 0, 'the widened label was not flagged');
     await page.context().close();
   });
+
+  // L-387: the strip's one hint "i", on "Applied so far", is at least 24×24 and
+  // takes no extra row: the strip is no taller than with the "i" taken out.
+  for (const width of [375, 1264]) {
+    it(`its one hint "i" is at least 24×24 and adds no row, at ${String(width)}px`, async () => {
+      const page = await openTrackerAt(width);
+      const report = await funnelHintReport(page);
+      console.log(`funnel hint at ${String(width)}px: ${JSON.stringify(report)}`);
+      assert.equal(report.count, 1, `${String(report.count)} "i" on the strip, not 1`);
+      assert.ok(report.width >= 24 && report.height >= 24, `"i" is ${JSON.stringify(report)}`);
+      assert.equal(report.withIt, report.without, 'the "i" gave the strip another row');
+      assert.deepEqual(await funnelOverflow(page), []);
+      await page.context().close();
+    });
+  }
+
+  it('the check can fail: an "i" too wide for its row is reported as another row', async () => {
+    const page = await openTrackerAt(375);
+    await page.evaluate(() => {
+      const button = document.querySelector<HTMLElement>(
+        '[data-testid="tracker-funnel"] [data-testid="hint-info"]',
+      );
+      if (button !== null) button.style.minWidth = '260px';
+    });
+    const report = await funnelHintReport(page);
+    assert.ok(
+      report.withIt > report.without,
+      `the extra row was not seen: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
 });
+
+async function openTrackerAt(width: number): Promise<Page> {
+  const page = await open('?seen=1&entries=1', { width, height: 700 });
+  await goTo(page, 'tracker');
+  await page.waitForSelector('[data-testid="tracker-funnel"]');
+  return page;
+}
+
+/** The strip's "i" count and size, and the strip's height with and without the first "i". */
+async function funnelHintReport(page: Page): Promise<{
+  count: number;
+  width: number;
+  height: number;
+  withIt: number;
+  without: number;
+}> {
+  return page.evaluate(() => {
+    const strip = document.querySelector('[data-testid="tracker-funnel"]');
+    if (strip === null) throw new Error('no funnel strip');
+    const buttons = [...strip.querySelectorAll<HTMLElement>('[data-testid="hint-info"]')];
+    const button = buttons[0];
+    if (button === undefined) return { count: 0, width: 0, height: 0, withIt: 0, without: 0 };
+    const box = button.getBoundingClientRect();
+    const withIt = strip.getBoundingClientRect().height;
+    button.style.display = 'none';
+    const without = strip.getBoundingClientRect().height;
+    button.style.display = '';
+    return { count: buttons.length, width: box.width, height: box.height, withIt, without };
+  });
+}
 
 /**
  * The shared content column (L-341) never makes a screen scroll sideways.
@@ -2577,6 +2638,56 @@ describe('hints show a small "i" button (L-384)', () => {
       await page.context().close();
     });
   }
+
+  // L-385: the tip is placed once at fixed screen coordinates, so a pinned tip
+  // must close when the panel under it scrolls. The sheet itself does not
+  // scroll, so its <main> is made a scroll panel here, as the app's screens
+  // are: a panel's scroll event does not bubble, which is the case to prove.
+  // The "i" is tapped, not the words, because a tap that scrolled it into view
+  // would open the tip and shut it straight away — the first assertion.
+  // TRAP — after a scroll WebKit sends a made-up mouseout from where the tap
+  // was, and the mouse leaving closes a tip too. So the wait is on the tip's
+  // own `hidden` changing, and it must change before any mouseout arrives.
+  it('a tip opened by a real tap on the i closes when its panel scrolls', async () => {
+    const page = await openHintSheet(HINT_WINDOWS['phone 375px'], true);
+    await page.evaluate(() => {
+      const sheet = document.querySelector<HTMLElement>('[data-testid="marks-sheet"]');
+      if (sheet === null) throw new Error('no marks sheet');
+      sheet.style.height = '400px';
+      sheet.style.overflowY = 'auto';
+    });
+    const wrapper = page.locator('[data-testid="tailor-ats"] thead .cursor-help', {
+      hasText: 'Before',
+    });
+    await tapAndSettle(page, wrapper.locator(HINT_BUTTON));
+    assert.equal(await tipShowing(page, 'Before'), true, 'one tap did not leave the tip open');
+
+    const seen = await page.evaluate(
+      () =>
+        new Promise<{ scrollTop: number; closedBy: string }>((done) => {
+          const sheet = document.querySelector<HTMLElement>('[data-testid="marks-sheet"]');
+          const words = [
+            ...document.querySelectorAll('[data-testid="tailor-ats"] thead .cursor-help'),
+          ].find((element) => (element.textContent ?? '').includes('Before'));
+          const tip = document.getElementById(words?.getAttribute('aria-describedby') ?? '');
+          if (sheet === null || words === undefined || tip === null) {
+            throw new Error('no sheet, words or tip');
+          }
+          const report = (closedBy: string) => done({ scrollTop: sheet.scrollTop, closedBy });
+          new MutationObserver(() => {
+            if (tip.hidden) report('the scroll');
+          }).observe(tip, { attributes: true, attributeFilter: ['hidden'] });
+          words.addEventListener('mouseout', () => report('the mouse leaving'), true);
+          // Only the failure path waits on a clock: nothing closed it at all.
+          setTimeout(() => report('nothing'), 3000);
+          sheet.scrollTop = 100;
+        }),
+    );
+    assert.ok(seen.scrollTop > 0, 'the panel did not scroll');
+    assert.equal(seen.closedBy, 'the scroll', 'the tip stayed open over the scroll');
+    assert.equal(await tipShowing(page, 'Before'), false, 'the tip is showing after the scroll');
+    await page.context().close();
+  });
 
   // NEGATIVE — a size check that cannot fail is not a check.
   it('the check can fail: a shrunk "i", and one that makes its row taller, are reported', async () => {

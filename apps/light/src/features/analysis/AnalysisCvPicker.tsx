@@ -3,7 +3,7 @@ import { type Cv } from '@cviper/core-types';
 import { SECONDARY_BUTTON } from '../../app/buttons';
 import { FIELD } from '../../app/fields';
 import { Hint } from '../../app/Hint';
-import { JSON_RESUME_HINT } from '../../app/hints';
+import { JSON_RESUME_HINT, SAVE_JSON_RESUME_HINT } from '../../app/hints';
 import { LiveStatus } from '../../app/LiveStatus';
 import { ErrorBox } from '../../ui';
 
@@ -39,6 +39,18 @@ export function AnalysisCvPicker({
   uploadProblem,
   warnings,
 }: AnalysisCvPickerProps) {
+  const saveJson = (
+    <button
+      type="button"
+      data-testid="analysis-save-json"
+      disabled={selectedCv === null || selectedCv.json_resume === null || exporting}
+      onClick={onSaveJsonResume}
+      className={SECONDARY_BUTTON}
+    >
+      {exporting ? 'Saving…' : 'Save as JSON Resume'}
+    </button>
+  );
+
   return (
     <div>
       <label htmlFor="analysis-cv" className="block text-xs font-medium text-ink-muted">
@@ -79,21 +91,14 @@ export function AnalysisCvPicker({
           Disabled, never hidden, for a CV that came from a PDF or a
           .docx: there is no JSON Resume to give back for those, and a
           control that comes and goes is one the user cannot learn.
+          The reason is a Hint with an "i", not the render-function form:
+          a disabled button takes no focus and no tap (L-387).
         */}
-        <button
-          type="button"
-          data-testid="analysis-save-json"
-          disabled={selectedCv === null || selectedCv.json_resume === null || exporting}
-          title={
-            selectedCv !== null && selectedCv.json_resume === null
-              ? 'Only a CV that arrived as a JSON Resume can be saved as one.'
-              : undefined
-          }
-          onClick={onSaveJsonResume}
-          className={SECONDARY_BUTTON}
-        >
-          {exporting ? 'Saving…' : 'Save as JSON Resume'}
-        </button>
+        {selectedCv !== null && selectedCv.json_resume === null ? (
+          <Hint text={SAVE_JSON_RESUME_HINT}>{saveJson}</Hint>
+        ) : (
+          saveJson
+        )}
       </div>
 
       <p className="mt-1 text-xs text-ink-faint">
