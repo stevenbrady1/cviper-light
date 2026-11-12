@@ -15,7 +15,7 @@
  * Neither changes a single class name or colour. What the spec measures —
  * which text colour lands on which painted background — is the app's own.
  *
- * The page reads five switches from the address:
+ * The page reads six switches from the address:
  *   - `?seen=1` skips the first-run welcome, as a returning user sees the app;
  *   - `?entries=1` puts three applications on the board;
  *   - `?results=1` says a job-board key is saved, and answers Search with a long
@@ -26,10 +26,15 @@
  *   - `?marks=1` draws, instead of the app, the three components that put a
  *     drawn mark beside words (L-370: is any row taller for its mark).
  *
- * And it puts one helper on `window`: `__mountErrorBox`, which draws the app's
- * own `ErrorBox` into an element the spec has placed. The panel `box` shape has
- * no screen that draws it yet (L-368 moved only the strips), so this is how the
- * spec lays one out inside a real panel (L-374).
+ * And it puts three helpers on `window`, each drawing real app components into
+ * an element the spec has placed:
+ *   - `__mountErrorBox` draws the app's own `ErrorBox`. The panel `box` shape
+ *     has no screen that draws it yet (L-368 moved only the strips), so this is
+ *     how the spec lays one out inside a real panel (L-374);
+ *   - `__mountBlockErrorBox` draws the `box` shape in its `div` form, holding
+ *     more than one block (L-377);
+ *   - `__mountPrioritySuggestions` draws `AnalysisResult` with one suggestion
+ *     of each priority and long section names (L-378).
  *
  * This file is never part of the app's own build: `vite.config.ts` builds
  * `index.html` at the app root, and this page has its own config.
@@ -157,6 +162,68 @@ interface MountedErrorBox {
       </ErrorBox>
     );
   ReactDOM.createRoot(into).render(element);
+};
+
+/**
+ * L-377: `__mountBlockErrorBox` draws the `box` shape in its `div` form, with
+ * the blocks the two real ones hold: a paragraph and a list (Erase everything's
+ * failure, `mt-3`) or two paragraphs (Settings' notice, no space above). With
+ * `reference`, it also draws the HAND-BUILT box `main` drew, class for class,
+ * straight after it: not an alert, test id `<id>-reference`. Same place, same
+ * fonts, so "it looks as it did" is a comparison, not a pixel count.
+ */
+interface MountedBlockErrorBox {
+  readonly holds: 'list' | 'paragraphs';
+  readonly testId: string;
+  readonly heading: string;
+  readonly lines: readonly string[];
+  readonly reference: boolean;
+}
+
+(
+  window as unknown as {
+    __mountBlockErrorBox: (into: Element, box: MountedBlockErrorBox) => void;
+  }
+).__mountBlockErrorBox = (into, { holds, testId, heading, lines, reference }) => {
+  const blocks =
+    holds === 'list' ? (
+      <>
+        <p className="font-medium">{heading}</p>
+        <ul className="mt-1 list-disc pl-5 text-ink-muted">
+          {lines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </>
+    ) : (
+      <>
+        <p className="font-medium">{heading}</p>
+        <p className="mt-1 whitespace-pre-line text-ink-muted">{lines.join('\n')}</p>
+      </>
+    );
+  // What `main` drew by hand before L-377 (EraseEverything.tsx, Settings.tsx).
+  const handBuilt =
+    holds === 'list'
+      ? 'mt-3 rounded-control bg-danger/5 px-3 py-2 text-danger'
+      : 'rounded-control bg-danger/5 px-3 py-2 text-danger';
+  ReactDOM.createRoot(into).render(
+    <>
+      {holds === 'list' ? (
+        <ErrorBox variant="box" as="div" gapAbove="mt-3" testId={testId}>
+          {blocks}
+        </ErrorBox>
+      ) : (
+        <ErrorBox variant="box" as="div" testId={testId}>
+          {blocks}
+        </ErrorBox>
+      )}
+      {reference ? (
+        <div data-testid={`${testId}-reference`} className={handBuilt}>
+          {blocks}
+        </div>
+      ) : null}
+    </>,
+  );
 };
 
 const searchPort = params.get('results') === '1' ? createFakeSearchPort() : undefined;

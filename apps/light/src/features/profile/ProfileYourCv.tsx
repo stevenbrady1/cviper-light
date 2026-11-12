@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { type Cv } from '@cviper/core-types';
 
-import { cardClasses, SectionHeading } from '../../ui';
+import { cardClasses, ErrorBox, SectionHeading } from '../../ui';
 import { type FilePort } from '../../platform/files';
 
 import { CvUpload } from '../cv/CvUpload';
@@ -73,13 +73,9 @@ export function YourCv({ store, files, now }: YourCvProps) {
       </p>
 
       {cvError === null ? null : (
-        <p
-          role="alert"
-          data-testid="profile-cv-error"
-          className="mt-2 rounded-control bg-danger/5 px-3 py-2 text-danger"
-        >
+        <ErrorBox variant="box" gapAbove="mt-2" testId="profile-cv-error">
           {cvError}
-        </p>
+        </ErrorBox>
       )}
 
       <div className="mt-3">

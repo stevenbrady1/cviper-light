@@ -13,7 +13,8 @@ import { type ReactNode } from 'react';
  *           along the bottom. `layout="row"` lays it out as a row, for a strip
  *           with a control (Retry) at the end of the line: Tracker's two.
  *   box     a rounded red-tinted box inside a panel. `gapAbove` is the space
- *           above it that the hand-built boxes carry.
+ *           above it that the hand-built boxes carry. `as="div"` draws it as
+ *           a `div`, for a box that holds paragraphs or a list (L-377).
  *
  * One component with a `variant`, not two exports: the alert role, and later
  * the check that forbids hand-built copies, have one name to point at.
@@ -66,6 +67,15 @@ export interface ErrorStripProps extends Common {
 export interface ErrorPanelBoxProps extends Common {
   readonly variant: 'box';
   readonly gapAbove?: 'mt-2' | 'mt-3';
+  /**
+   * `div`: a box that holds blocks, not just words (L-377). A `<p>` cannot hold
+   * a `<ul>` or another `<p>`, and Settings' notice (two paragraphs) and Erase
+   * everything's failure (a paragraph and a list) are two of the boxes. Only
+   * the element changes: the classes, the role and the test id are the same.
+   * Chosen by the caller, not guessed from the children: a component child that
+   * draws a `<p>` cannot be seen from here, and a wrong guess is invalid HTML.
+   */
+  readonly as?: 'p' | 'div';
 }
 
 export type ErrorBoxProps = ErrorStripProps | ErrorPanelBoxProps;
@@ -91,6 +101,14 @@ export function ErrorBox(props: ErrorBoxProps) {
       : props.gapAbove === undefined
         ? BOX
         : `${props.gapAbove} ${BOX}`;
+
+  if (props.variant === 'box' && props.as === 'div') {
+    return (
+      <div role="alert" data-testid={testId} className={className}>
+        {children}
+      </div>
+    );
+  }
 
   return (
     <p role="alert" data-testid={testId} className={className}>

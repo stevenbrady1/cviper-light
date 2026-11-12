@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type JobProviderId } from '@cviper/job-apis';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
-import { cardClasses, SectionHeading, StatusPill } from '../../../ui';
+import { cardClasses, ErrorBox, SectionHeading, StatusPill } from '../../../ui';
 import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 import { type KeyState, type SecretKeyName } from '../../../status/environment';
 
@@ -378,13 +378,9 @@ function KeyCard({ provider, port, browser, focused, onFocused }: KeyCardProps) 
       )}
 
       {outcome.problem === null ? null : (
-        <p
-          role="alert"
-          data-testid={`key-problem-${provider.id}`}
-          className="mt-3 rounded-control bg-danger/5 px-3 py-2 text-danger"
-        >
+        <ErrorBox variant="box" gapAbove="mt-3" testId={`key-problem-${provider.id}`}>
           {outcome.problem}
-        </p>
+        </ErrorBox>
       )}
 
       <p className="mt-3 text-xs text-ink-faint">{provider.privacyNote}</p>

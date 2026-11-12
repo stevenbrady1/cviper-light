@@ -4,6 +4,7 @@ import { type Cv } from '@cviper/core-types';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
 import { type FilePort } from '../../platform/files';
+import { ErrorBox } from '../../ui';
 
 import { uploadCv, type CvStorePort } from './ingestCv';
 
@@ -63,13 +64,9 @@ export function CvUpload({ idPrefix, files, saveCv, now, onUploaded }: CvUploadP
       </button>
 
       {problem === null ? null : (
-        <p
-          role="alert"
-          data-testid={`${idPrefix}-upload-problem`}
-          className="mt-2 rounded-control bg-danger/5 px-3 py-2 text-danger"
-        >
+        <ErrorBox variant="box" gapAbove="mt-2" testId={`${idPrefix}-upload-problem`}>
           {problem}
-        </p>
+        </ErrorBox>
       )}
 
       {warnings.length === 0 ? null : (

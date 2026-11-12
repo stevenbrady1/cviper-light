@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { DESTRUCTIVE_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
-import { SectionHeading } from '../../../ui';
+import { ErrorBox, SectionHeading } from '../../../ui';
 import { countBackup, type BackupCounts, type BackupPort } from '../backup';
 import { DATA_LOCATIONS } from '../privacy/dataLocations';
 
@@ -160,18 +160,14 @@ export function EraseEverything({ port, backupPort, onErased }: EraseEverythingP
           {summary.headline}
         </p>
       ) : (
-        <div
-          role="alert"
-          data-testid="settings-erase-problem"
-          className="mt-3 rounded-control bg-danger/5 px-3 py-2 text-danger"
-        >
+        <ErrorBox variant="box" as="div" gapAbove="mt-3" testId="settings-erase-problem">
           <p className="font-medium">{summary.headline}</p>
           <ul className="mt-1 list-disc pl-5 text-ink-muted">
             {summary.failures.map((failure) => (
               <li key={failure}>{failure}</li>
             ))}
           </ul>
-        </div>
+        </ErrorBox>
       )}
     </section>
   );

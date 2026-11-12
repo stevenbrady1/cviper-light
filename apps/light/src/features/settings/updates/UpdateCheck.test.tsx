@@ -150,3 +150,25 @@ describe('installing', () => {
     );
   });
 });
+
+describe('a failed check is not an alert (L-377)', () => {
+  // It is drawn in the red of the shared error box, but it must not interrupt:
+  // the user asked, and the words reach a screen reader through the polite
+  // live region (`LiveStatus`). The panel error boxes moved onto `ErrorBox`,
+  // which is always an alert, so this one stays hand-built on purpose.
+  it('negative: no alert role anywhere, and the words go to the polite status region', async () => {
+    const user = userEvent.setup();
+    const port = createFakeUpdatePort();
+    port.nextCheck(UNVERIFIABLE);
+    render(<UpdateCheck port={port} version="0.1.0" />);
+
+    await user.click(screen.getByTestId('settings-check-updates'));
+
+    const status = await screen.findByTestId('settings-update-status');
+    expect(status.className.split(' ')).toContain('bg-danger/5');
+    expect(status.hasAttribute('role')).toBe(false);
+    expect(status.hasAttribute('aria-live')).toBe(false);
+    expect(screen.queryAllByRole('alert')).toEqual([]);
+    expect(screen.getByRole('status').textContent).toContain('verified as genuine');
+  });
+});

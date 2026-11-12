@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { SECONDARY_BUTTON } from '../../app/buttons';
 import { LiveStatus } from '../../app/LiveStatus';
 import { type SecretKeyName } from '../../status/environment';
+import { ErrorBox } from '../../ui';
 
 import {
   createTauriLeftoverKeysPort,
@@ -131,13 +132,9 @@ export function LeftoverKeysNotice({ port }: LeftoverKeysNoticeProps) {
           </button>
         </div>
         {problem === null ? null : (
-          <p
-            role="alert"
-            data-testid="leftover-keys-problem"
-            className="mt-3 rounded-control bg-danger/5 px-3 py-2 text-danger"
-          >
+          <ErrorBox variant="box" gapAbove="mt-3" testId="leftover-keys-problem">
             {problem}
-          </p>
+          </ErrorBox>
         )}
       </section>
     </>
