@@ -345,16 +345,17 @@ describe('D5: touch targets', () => {
 });
 
 describe('D6: the column header button', () => {
-  it('says "Edit stages" until there is a stage, then a compact "Stages"', async () => {
+  it('says "Interview stages" with no stage and with some, one name seen and heard (L-319)', async () => {
     await board([entry('one')], []);
     const empty = await screen.findByTestId('tracker-edit-substages');
-    expect(empty.textContent).toBe('Edit stages');
+    expect(empty.textContent).toBe('Interview stages');
+    expect(empty.hasAttribute('aria-label')).toBe(false);
     cleanup();
 
     await board([entry('one')]);
-    const compact = await screen.findByTestId('tracker-edit-substages');
-    expect(compact.textContent).toBe('Stages');
-    expect(compact.getAttribute('aria-label')).toBe('Edit interview stages');
+    const some = await screen.findByTestId('tracker-edit-substages');
+    expect(some.textContent).toBe('Interview stages');
+    expect(some.hasAttribute('aria-label')).toBe(false);
   });
 });
 

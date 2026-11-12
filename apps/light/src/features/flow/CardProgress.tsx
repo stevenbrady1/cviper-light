@@ -62,8 +62,9 @@ export function CardProgress({ applicationId, progress, onContinue }: CardProgre
       >
         Step {position} of {STEPS.length} · {label}
       </p>
-      <div className="flex items-center justify-between gap-2">
-        <Hint text={FLOW_HINT.cardDots} focusable={false}>
+      {/* The dots never squash (L-319): too narrow for both, Continue wraps under them. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Hint text={FLOW_HINT.cardDots} focusable={false} className="shrink-0">
           <span
             aria-hidden="true"
             className="font-mono text-[11px] tracking-[0.2em] text-ink-muted"

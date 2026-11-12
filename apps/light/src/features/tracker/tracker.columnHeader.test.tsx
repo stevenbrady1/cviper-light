@@ -101,7 +101,7 @@ describe('every column header is title, then count, and nothing else (L-332)', (
     }
   });
 
-  it('Edit stages sits after the header and before the first card, so focus goes header, button, cards', async () => {
+  it('Interview stages sits after the header and before the first card, so focus goes header, button, cards', async () => {
     await board([entry('a', 'interviewing')]);
     const column = screen.getByTestId('tracker-column-interviewing');
     const button = within(column).getByTestId('tracker-edit-substages');
@@ -113,24 +113,27 @@ describe('every column header is title, then count, and nothing else (L-332)', (
     expect(follows(button, card)).toBe(true);
   });
 
-  it('the moved control still opens the same stages editor', async () => {
+  it('happy (L-319): with no stages yet it reads "Interview stages" and opens the stages editor', async () => {
     const { user } = await board([entry('a', 'interviewing')]);
     const button = screen.getByTestId('tracker-edit-substages');
-    expect(button.textContent).toBe('Edit stages');
+    expect(button.textContent).toBe('Interview stages');
+    expect(screen.getByRole('button', { name: 'Interview stages' })).toBe(button);
     await user.click(button);
     expect(await screen.findByTestId('substage-editor')).toBeTruthy();
   });
 
-  it('with stages saved, the compact "Stages" control is also outside the header and opens the editor', async () => {
+  it('boundary (L-319): with stages saved it reads the same "Interview stages", is outside the header and opens the editor', async () => {
     const { user } = await board([entry('a', 'interviewing')], STAGES);
     const button = screen.getByTestId('tracker-edit-substages');
-    expect(button.textContent).toBe('Stages');
+    expect(button.textContent).toBe('Interview stages');
+    expect(button.hasAttribute('aria-label')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Interview stages' })).toBe(button);
     expect(headerOf('interviewing').contains(button)).toBe(false);
     await user.click(button);
     expect(await screen.findByTestId('substage-editor')).toBeTruthy();
   });
 
-  it('negative: no other column draws an Edit stages control', async () => {
+  it('negative: no other column draws an Interview stages control', async () => {
     await board([entry('a', 'saved'), entry('b', 'applied'), entry('c', 'offer')]);
     expect(screen.getAllByTestId('tracker-edit-substages')).toHaveLength(1);
     for (const status of TRACKER_COLUMNS) {

@@ -2038,6 +2038,92 @@ describe('drawn marks sit at a readable size beside their words (L-370)', () => 
 });
 
 /**
+ * A tracker card's Continue and its dots (L-319).
+ *
+ * The button keeps its short word, "Continue", so in the sheet's 176px card it
+ * sits on the dots' line, as it always has. A card in a column at its minimum
+ * (`md:min-w-44`, 176px, less the list's `px-2`) is 160px, and there the dots
+ * (55px), the gap and "Continue" (80px) are about 9px too wide for one line:
+ * the button wraps under the dots instead of squashing them onto two lines, as
+ * it used to, or poking out of the card.
+ */
+async function continueProblems(
+  page: Page,
+  cardWidth: string | null,
+  oneLine: boolean,
+): Promise<string[]> {
+  return page.evaluate(
+    ([width, sameLine]) => {
+      const row = document.querySelector('[data-testid="tracker-card-progress-marks"]');
+      const button = row?.querySelector('button');
+      if (!(row instanceof HTMLElement) || !button || !row.parentElement) return ['no card'];
+      if (width !== null) row.parentElement.style.width = width;
+      const problems: string[] = [];
+      const room = row.getBoundingClientRect();
+      const box = button.getBoundingClientRect();
+      if (box.left < room.left - 0.5 || box.right > room.right + 0.5) {
+        problems.push(`Continue: ${String(box.width)}px wide in a ${String(room.width)}px row`);
+      }
+      if (button.scrollWidth > button.clientWidth) problems.push('Continue: its words overflow it');
+      const marks = [...row.querySelectorAll('[data-mark]')].map((mark) =>
+        mark.getBoundingClientRect(),
+      );
+      const dotTops = new Set(marks.map((mark) => Math.round(mark.top)));
+      if (dotTops.size !== 1) problems.push(`dots: squashed onto ${String(dotTops.size)} lines`);
+      // One line: the dots' middle falls within the button's height.
+      const dots = marks[0];
+      if (sameLine && dots !== undefined) {
+        const middle = dots.top + dots.height / 2;
+        if (middle < box.top || middle > box.bottom) {
+          problems.push(
+            `Continue: not beside the dots (top ${String(box.top)}, dots ${String(middle)})`,
+          );
+        }
+      }
+      return problems;
+    },
+    [cardWidth, oneLine] as const,
+  );
+}
+
+describe('a tracker card’s Continue fits its card (L-319)', () => {
+  for (const [name, markWindow] of Object.entries(MARK_WINDOWS)) {
+    it(`sits beside the dots on one line in a 176px card, ${name}`, async () => {
+      const page = await openMarks(markWindow);
+      assert.equal(
+        await page.textContent('[data-testid="tracker-card-continue-marks"]'),
+        'Continue',
+      );
+      assert.deepEqual(await continueProblems(page, null, true), []);
+      await page.context().close();
+    });
+
+    it(`stays inside the narrowest desktop card, 160px, and the dots stay one line, ${name}`, async () => {
+      const page = await openMarks(markWindow);
+      assert.deepEqual(await continueProblems(page, '160px', false), []);
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — the long "Continue: ATS Score" does not fit beside the dots in
+  // a 176px card, and is caught.
+  it('the check can fail: a Continue too long for the dots’ line is reported', async () => {
+    const page = await openMarks(MARK_WINDOWS.desktop);
+    await page.evaluate(() => {
+      const button = document.querySelector('[data-testid="tracker-card-continue-marks"]');
+      if (button === null) throw new Error('no Continue on the sheet');
+      button.textContent = 'Continue: ATS Score';
+    });
+    const report = await continueProblems(page, null, true);
+    assert.ok(
+      report.some((line) => line.startsWith('Continue:')),
+      `the long button was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
  * A box that holds more than one block (L-377).
  *
  * Settings' notice (two paragraphs) and Erase everything's failure (a paragraph
