@@ -175,6 +175,46 @@ searchPort?.nextOutcome(
   ),
 );
 
+/**
+ * L-378: `__mountPrioritySuggestions` draws the app's own `AnalysisResult`
+ * into an element the spec has placed, with one suggestion of each priority
+ * and section names long enough to squeeze the label's row on a phone. The
+ * spec checks that each priority label stays on one line, inside its card.
+ */
+(
+  window as unknown as { __mountPrioritySuggestions: (into: Element) => Promise<void> }
+).__mountPrioritySuggestions = async (into) => {
+  const { AnalysisResult } = await import('../../src/features/analysis/AnalysisResult');
+  const suggestion = (priority: 'high' | 'medium' | 'low', section: string) => ({
+    section,
+    issue: 'The advert asks for something your CV does not say.',
+    recommendation: 'Say it where you did the work.',
+    priority,
+  });
+  ReactDOM.createRoot(into).render(
+    <AnalysisResult
+      analysis={{
+        match_score: 62,
+        verdict: 'possible',
+        summary: 'A summary.',
+        matched_skills: [],
+        missing_skills: [],
+        keyword_gaps: [],
+        matched_keywords: [],
+        suggestions: [
+          suggestion('high', 'Professional experience and achievements'),
+          suggestion('medium', 'Education, training and professional qualifications'),
+          suggestion('low', 'Interests, hobbies and volunteering'),
+        ],
+        ats_notes: [],
+      }}
+      provider="keyword"
+      model="keyword-v3"
+      aiAvailable={false}
+    />,
+  );
+};
+
 const root = document.getElementById('root');
 if (root === null) throw new Error('#root missing from the contrast harness');
 
