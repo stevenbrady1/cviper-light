@@ -1,6 +1,7 @@
 import { type Job } from '@cviper/core-types';
 
 import { QUIET_BUTTON } from '../../app/buttons';
+import { FIELD, FIELD_COMPACT } from '../../app/fields';
 
 import { MetricPromptBoxes } from './MetricPromptBoxes';
 import { type MetricPrompt, type MetricState } from './metricPrompts';
@@ -58,7 +59,7 @@ export function TailorAdvert({
           // the text is the user's version of its advert.
           onAdvertChange(event.currentTarget.value);
         }}
-        className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+        className={`${FIELD} mt-1 w-full`}
       />
 
       {!advertEdited || selectedJob === null ? null : (
@@ -91,7 +92,7 @@ export function TailorAdvert({
               const picked = jobs.find((candidate) => candidate.id === event.currentTarget.value);
               if (picked !== undefined) onPickJob(picked);
             }}
-            className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1 text-ink"
+            className={`${FIELD_COMPACT} min-w-0 flex-1`}
           >
             <option value="">Choose a tracked job…</option>
             {jobs.map((job) => (

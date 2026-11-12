@@ -1,6 +1,7 @@
 import { type Cv } from '@cviper/core-types';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD } from '../../app/fields';
 import { Hint } from '../../app/Hint';
 import { JSON_RESUME_HINT } from '../../app/hints';
 import { LiveStatus } from '../../app/LiveStatus';
@@ -52,7 +53,7 @@ export function AnalysisCvPicker({
             const id = event.currentTarget.value;
             onPick(id === '' ? null : id);
           }}
-          className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+          className={`${FIELD} min-w-0 flex-1`}
         >
           {cvs.length > 0 ? null : (
             <option value="">{cvsLoaded ? 'No CV uploaded yet' : 'Reading your CVs…'}</option>

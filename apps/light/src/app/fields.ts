@@ -12,7 +12,7 @@
  * Layout (margin, width, flex) is NOT here. It belongs to the place a box sits,
  * so it stays at the call site, after the constant.
  *
- * `fields.contract.test.ts` pins both values class for class and fails on a
+ * `fields.contract.test.ts` pins every value class for class and fails on a
  * hand-made copy in a folder that has moved onto them.
  */
 
@@ -21,3 +21,13 @@ export const FIELD = 'rounded-control border border-field-line bg-card px-2.5 py
 
 /** The same box with its edge in the danger red, for a value that will not save. */
 export const FIELD_INVALID = 'rounded-control border border-danger bg-card px-2.5 py-1.5 text-ink';
+
+/**
+ * The smaller box (L-376): a picker that sits on one line beside its label or
+ * button. The tracked-job pickers on Analysis and Tailor, and Tailor's
+ * application picker. Same edge, fill and text as FIELD; only the vertical
+ * padding is smaller (`py-1`, not `py-1.5`). Never put `py-1` after FIELD to
+ * get this: two padding classes on one box leave the winner to the stylesheet.
+ */
+export const FIELD_COMPACT =
+  'rounded-control border border-field-line bg-card px-2.5 py-1 text-ink';

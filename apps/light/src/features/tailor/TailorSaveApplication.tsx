@@ -1,6 +1,7 @@
 import { type Application } from '@cviper/core-types';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD_COMPACT } from '../../app/fields';
 
 export interface TailorSaveApplicationProps {
   readonly applications: readonly Application[];
@@ -34,7 +35,7 @@ export function TailorSaveApplication({
           aria-label="Application to save into"
           value={selectedApplicationId ?? ''}
           onChange={(event) => onSelectApplication(event.currentTarget.value || null)}
-          className="min-w-0 rounded-control border border-field-line bg-card px-2.5 py-1 text-ink"
+          className={`${FIELD_COMPACT} min-w-0`}
         >
           {applications.map((application) => (
             <option key={application.id} value={application.id}>

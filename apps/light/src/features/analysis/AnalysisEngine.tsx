@@ -1,3 +1,4 @@
+import { FIELD } from '../../app/fields';
 import { type BrowserPort } from '../../platform/browser';
 
 import { ConsentStatus } from './ConsentGate';
@@ -40,7 +41,7 @@ export function AnalysisEngine({
         data-testid="analysis-provider"
         value={optionKey}
         onChange={(event) => onOptionChange(event.currentTarget.value)}
-        className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+        className={`${FIELD} mt-1 w-full`}
       >
         {options.map((option) => (
           <option key={option.key} value={option.key}>
