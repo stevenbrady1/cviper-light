@@ -1,3 +1,5 @@
+import { Hint } from '../../app/Hint';
+import { FUNNEL_SO_FAR_HINT } from '../../app/hints';
 import { formatRate, funnelFrom, MIN_SENT_FOR_RATE } from './funnel';
 import { type TrackerEntry } from './model';
 
@@ -16,7 +18,7 @@ import { type TrackerEntry } from './model';
  * screen. So: a single row, bordered like the error strip above it, eyebrow
  * labels in the same mono style every section heading in the app uses, and
  * the figures in tabular mono so a 9 becoming a 10 does not shove the row
- * sideways. Nothing here is clickable and nothing is coloured. The rates are
+ * sideways. Nothing here is clickable but one hint's "i", and nothing is coloured. The rates are
  * plain ink, never teal: teal means "ready" in this app, and "Interview rate
  * 0%" in teal read as good news (L-317). Until five have been applied a rate
  * is a dash and says when it will appear: "Interview rate — after 5 applied".
@@ -32,13 +34,18 @@ import { type TrackerEntry } from './model';
  * the second being a column name. "Interviewing 2" sat directly above an
  * Interviewing column holding one card and read as a contradiction. So the
  * labels are past tense where the figure is "got this far" (Applied,
- * Interviewed), and the strip's `title` says so in a sentence. The test ids
- * and `funnel.ts` keep their names: only the words a person reads changed.
+ * Interviewed), and a sentence says so. The test ids and `funnel.ts` keep
+ * their names: only the words a person reads changed.
  *
- * The `title` is hover-only, so a touch user never saw it, and "Applied 5"
- * above an Applied column of 2 still looked wrong. Those two labels now say
- * "so far" on the strip itself (L-383). Saved, Offers and Rejected are plain
- * counts of what is there now, so they do not.
+ * That sentence was a hover-only `title`, so a touch user never saw it, and
+ * "Applied 5" above an Applied column of 2 still looked wrong. Those two labels
+ * now say "so far" on the strip itself (L-383). Saved, Offers and Rejected are
+ * plain counts of what is there now, so they do not.
+ *
+ * The sentence is now a Hint on "Applied so far" (L-387): ONE "i" for the
+ * strip, on the first "so far", where keyboard and touch reach it too. That
+ * label is on the phone's first row, which has room for it, so the strip takes
+ * no extra row at 375px (measured in contrast-webkit.spec.ts).
  */
 
 interface FunnelStripProps {
@@ -61,7 +68,6 @@ export function FunnelStrip({ entries }: FunnelStripProps) {
   return (
     <div
       data-testid="tracker-funnel"
-      title="Every application that got this far, including the ones that moved on"
       className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-line px-4 py-2 md:px-6"
     >
       <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
@@ -71,7 +77,9 @@ export function FunnelStrip({ entries }: FunnelStripProps) {
               The label comes first in the DOM, where a screen reader wants it,
               and second on screen, where the number is the thing to scan for.
             */}
-            <dt className={`order-1 ${EYEBROW}`}>{label}</dt>
+            <dt className={`order-1 ${EYEBROW}`}>
+              {key === 'sent' ? <Hint text={FUNNEL_SO_FAR_HINT}>{label}</Hint> : label}
+            </dt>
             <dd
               className="font-mono tabular-nums text-ink"
               data-testid={`tracker-funnel-count-${key}`}
