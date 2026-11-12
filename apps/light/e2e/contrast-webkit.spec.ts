@@ -2402,6 +2402,56 @@ describe('hints show a small "i" button (L-384)', () => {
     });
   }
 
+  // L-385: the tip is placed once at fixed screen coordinates, so a pinned tip
+  // must close when the panel under it scrolls. The sheet itself does not
+  // scroll, so its <main> is made a scroll panel here, as the app's screens
+  // are: a panel's scroll event does not bubble, which is the case to prove.
+  // The "i" is tapped, not the words, because a tap that scrolled it into view
+  // would open the tip and shut it straight away — the first assertion.
+  // TRAP — after a scroll WebKit sends a made-up mouseout from where the tap
+  // was, and the mouse leaving closes a tip too. So the wait is on the tip's
+  // own `hidden` changing, and it must change before any mouseout arrives.
+  it('a tip opened by a real tap on the i closes when its panel scrolls', async () => {
+    const page = await openHintSheet(HINT_WINDOWS['phone 375px'], true);
+    await page.evaluate(() => {
+      const sheet = document.querySelector<HTMLElement>('[data-testid="marks-sheet"]');
+      if (sheet === null) throw new Error('no marks sheet');
+      sheet.style.height = '400px';
+      sheet.style.overflowY = 'auto';
+    });
+    const wrapper = page.locator('[data-testid="tailor-ats"] thead .cursor-help', {
+      hasText: 'Before',
+    });
+    await tapAndSettle(page, wrapper.locator(HINT_BUTTON));
+    assert.equal(await tipShowing(page, 'Before'), true, 'one tap did not leave the tip open');
+
+    const seen = await page.evaluate(
+      () =>
+        new Promise<{ scrollTop: number; closedBy: string }>((done) => {
+          const sheet = document.querySelector<HTMLElement>('[data-testid="marks-sheet"]');
+          const words = [
+            ...document.querySelectorAll('[data-testid="tailor-ats"] thead .cursor-help'),
+          ].find((element) => (element.textContent ?? '').includes('Before'));
+          const tip = document.getElementById(words?.getAttribute('aria-describedby') ?? '');
+          if (sheet === null || words === undefined || tip === null) {
+            throw new Error('no sheet, words or tip');
+          }
+          const report = (closedBy: string) => done({ scrollTop: sheet.scrollTop, closedBy });
+          new MutationObserver(() => {
+            if (tip.hidden) report('the scroll');
+          }).observe(tip, { attributes: true, attributeFilter: ['hidden'] });
+          words.addEventListener('mouseout', () => report('the mouse leaving'), true);
+          // Only the failure path waits on a clock: nothing closed it at all.
+          setTimeout(() => report('nothing'), 3000);
+          sheet.scrollTop = 100;
+        }),
+    );
+    assert.ok(seen.scrollTop > 0, 'the panel did not scroll');
+    assert.equal(seen.closedBy, 'the scroll', 'the tip stayed open over the scroll');
+    assert.equal(await tipShowing(page, 'Before'), false, 'the tip is showing after the scroll');
+    await page.context().close();
+  });
+
   // NEGATIVE — a size check that cannot fail is not a check.
   it('the check can fail: a shrunk "i", and one that makes its row taller, are reported', async () => {
     const page = await openHintSheet(HINT_WINDOWS.desktop);

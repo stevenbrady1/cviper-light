@@ -231,6 +231,46 @@ describe('Hint', () => {
     expect(a).not.toBe(b);
   });
 
+  // A pinned tip sits at fixed screen coordinates, so a scroll would leave it
+  // floating over other content (L-385). A scroll event does not bubble: the
+  // one fired here on a panel only reaches a listener that captures.
+  function inPanel() {
+    render(
+      <div data-testid="panel">
+        <Hint text="This check passed.">✓ OK</Hint>
+      </div>,
+    );
+    return {
+      panel: screen.getByTestId('panel'),
+      button: screen.getByRole('button', { name: 'What this means' }),
+    };
+  }
+
+  it('happy: a tip pinned by a tap closes when the panel around it scrolls', () => {
+    const { panel, button } = inPanel();
+    fireEvent.click(button);
+    expect(tip().hidden).toBe(false);
+    fireEvent.scroll(panel);
+    expect(tip().hidden).toBe(true);
+  });
+
+  it('negative: a tip opened by keyboard focus stays open when the panel scrolls', () => {
+    const { panel, button } = inPanel();
+    act(() => button.focus());
+    expect(tip().hidden).toBe(false);
+    fireEvent.scroll(panel);
+    expect(tip().hidden).toBe(false);
+  });
+
+  it('boundary: after a scroll closed it, one tap opens it again', () => {
+    const { panel, button } = inPanel();
+    fireEvent.click(button);
+    fireEvent.scroll(panel);
+    expect(tip().hidden).toBe(true);
+    fireEvent.click(button);
+    expect(tip().hidden).toBe(false);
+  });
+
   it('focusable={false}: hover and tap still show it, but Tab passes it by', async () => {
     const user = userEvent.setup();
     render(
