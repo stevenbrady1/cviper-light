@@ -8,7 +8,7 @@ import {
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { FIELD } from '../../app/fields';
-import { Icon } from '../../ui';
+import { ErrorBox, Icon } from '../../ui';
 
 /**
  * Add, rename, reorder and remove the interview stages, in the side pane.
@@ -259,14 +259,9 @@ export function SubstageEditor({
       </p>
 
       {message === null ? null : (
-        <p
-          id={messageId}
-          role="alert"
-          data-testid="substage-error"
-          className="rounded-control border border-danger/30 bg-danger/5 px-3 py-2 text-danger"
-        >
+        <ErrorBox variant="box" bordered messageId={messageId} testId="substage-error">
           {message.text}
-        </p>
+        </ErrorBox>
       )}
 
       {substages.length === 0 ? (

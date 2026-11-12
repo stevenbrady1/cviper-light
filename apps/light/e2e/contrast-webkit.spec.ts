@@ -2127,3 +2127,189 @@ describe('a box that holds more than one block (L-377)', () => {
     }
   });
 });
+
+/**
+ * The last hand-built error boxes (L-380).
+ *
+ * The two boxes in the search results (one per job board, one per free feed
+ * that failed) and the follow-up panel's box moved onto `ErrorBox`, so they
+ * gained `break-words`. On `main` they were built by hand without it, and a
+ * failed board's path ran 1666px wide in a 327px column (L-374's measurement).
+ *
+ * These checks draw the app's OWN `SearchResults` and `FollowUpPanel` through
+ * the harness (`__mountSearchFailures`, `__mountFollowUpPanel`) — not a copy of
+ * the box — in the real Search column and the real Tracker detail pane. So the
+ * same spec, run on `main`'s screens, measures the hand-built boxes and is red.
+ * "Looks as it did" compares against a reference drawn beside each box with the
+ * fix's class taken off (`drawReference`, L-374): what `main` drew.
+ *
+ * Uses the L-374 helpers above (`LONG_PATH`, `ORDINARY`, `errorLayout`,
+ * `assertFits`, `lineStarts`, `drawReference`, `open`, `goTo`); defines nothing
+ * they define.
+ */
+const SEARCH_BOXES = ['search-error-reed', 'keyless-error-arbeitnow'] as const;
+const FOLLOW_UP_BOX = 'detail-followup-error';
+const FOLLOW_UP_WORDS = 'Your archived documents could not be read: ';
+
+/** The Search screen with the real `SearchResults` drawn into its results column. */
+async function searchWithFailures(width: number, message: string): Promise<Page> {
+  const page = await open('?seen=1', { width, height: 800 });
+  await goTo(page, 'search');
+  await page.waitForSelector('[data-testid="search-empty"]');
+  await page.evaluate(async (text) => {
+    const empty = document.querySelector('[data-testid="search-empty"]');
+    const into = document.createElement('div');
+    into.setAttribute('data-testid', 'l380-search-results');
+    empty?.before(into);
+    if (!into.isConnected) throw new Error('nowhere to draw the search results');
+    await (
+      window as unknown as {
+        __mountSearchFailures: (into: Element, props: { message: string }) => Promise<void>;
+      }
+    ).__mountSearchFailures(into, { message: text });
+  }, message);
+  for (const id of SEARCH_BOXES) await page.waitForSelector(`[data-testid="${id}"]`);
+  return page;
+}
+
+/** Tracker with an application open, and the real `FollowUpPanel` failing to draft in its pane. */
+async function followUpFailing(width: number, message: string): Promise<Page> {
+  const page = await open('?seen=1&entries=1', { width, height: 800 });
+  await goTo(page, 'tracker');
+  await page.waitForSelector('[data-testid="tracker-card-c"]');
+  await page.click('[data-testid="tracker-card-c"]');
+  await page.waitForSelector('[data-testid="detail-followup"]');
+  await page.evaluate(async (text) => {
+    const panel = document.querySelector('[data-testid="detail-followup"]');
+    const into = document.createElement('div');
+    into.setAttribute('data-testid', 'l380-followup');
+    panel?.after(into);
+    if (!into.isConnected) throw new Error('nowhere to draw the follow-up panel');
+    await (
+      window as unknown as {
+        __mountFollowUpPanel: (into: Element, props: { message: string }) => Promise<void>;
+      }
+    ).__mountFollowUpPanel(into, { message: text });
+  }, message);
+  const draft = page.locator('[data-testid="l380-followup"] [data-testid="detail-followup-draft"]');
+  await draft.waitFor();
+  await page.waitForFunction(() => {
+    const button = document.querySelector(
+      '[data-testid="l380-followup"] [data-testid="detail-followup-draft"]',
+    );
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
+  await draft.click();
+  await page.waitForSelector(`[data-testid="l380-followup"] [data-testid="${FOLLOW_UP_BOX}"]`);
+  return page;
+}
+
+/** The box: its element, role and kind, its words, and whether it sits inside its column. */
+async function lastBox(
+  page: Page,
+  testId: string,
+): Promise<{
+  tag: string;
+  role: string | null;
+  kind: string | null;
+  inside: boolean;
+  text: string;
+}> {
+  return page.evaluate((id) => {
+    const box = document.querySelector(`[data-testid="${id}"]`);
+    const column = box?.closest('[data-testid^="l380-"]')?.parentElement;
+    if (box === null || column === null || column === undefined) throw new Error(`no ${id}`);
+    const b = box.getBoundingClientRect();
+    const c = column.getBoundingClientRect();
+    return {
+      tag: box.tagName,
+      role: box.getAttribute('role'),
+      kind: box.getAttribute('data-kind'),
+      inside: b.left >= c.left - 0.5 && b.right <= c.right + 0.5,
+      text: box.textContent ?? '',
+    };
+  }, testId);
+}
+
+describe('the last hand-built error boxes (L-380)', () => {
+  for (const width of ERROR_WIDTHS) {
+    const px = `${String(width)}px`;
+
+    it(`a failed board and a failed feed keep a 200-character path inside the search column at ${px}`, async () => {
+      const page = await searchWithFailures(width, LONG_PATH);
+      for (const id of SEARCH_BOXES) {
+        const box = await lastBox(page, id);
+        assert.equal(box.tag, 'P');
+        assert.equal(box.role, 'alert');
+        assert.equal(box.kind, 'server', `${id}: the kind of failure is not marked`);
+        assert.ok(box.inside, `${id}: the box is not inside the search column at ${px}`);
+        assert.equal(box.text, LONG_PATH, `${id}: words were lost`);
+        assertFits(`${id}, path (${px})`, await errorLayout(page, id));
+      }
+      await page.context().close();
+    });
+
+    it(`the follow-up panel's box keeps a 200-character path inside the detail pane at ${px}`, async () => {
+      const page = await followUpFailing(width, LONG_PATH);
+      const box = await lastBox(page, FOLLOW_UP_BOX);
+      assert.equal(box.tag, 'P');
+      assert.equal(box.role, 'alert');
+      assert.ok(box.inside, `the box is not inside the detail pane at ${px}`);
+      assert.equal(box.text, `${FOLLOW_UP_WORDS}${LONG_PATH}`);
+      assertFits(`follow-up box, path (${px})`, await errorLayout(page, FOLLOW_UP_BOX));
+      await page.context().close();
+    });
+
+    // NEGATIVE — moving the boxes changed nothing with ordinary words: the same
+    // height, width and line breaks as the hand-built box drawn beside each.
+    it(`NEGATIVE: ordinary messages look exactly as the hand-built boxes did, at ${px}`, async () => {
+      const pages = [
+        { page: await searchWithFailures(width, ORDINARY), ids: SEARCH_BOXES },
+        { page: await followUpFailing(width, ORDINARY), ids: [FOLLOW_UP_BOX] },
+      ];
+      for (const { page, ids } of pages) {
+        for (const id of ids) {
+          const reference = await drawReference(page, id);
+          const now = await errorLayout(page, id);
+          const before = await errorLayout(page, reference);
+          const starts = await lineStarts(page, id);
+          console.log(
+            `${id}, ordinary (${px}): height ${String(now.strip.height)}, ` +
+              `lines start ${JSON.stringify(starts)}`,
+          );
+          assertFits(`${id}, ordinary (${px})`, now);
+          assert.ok(
+            starts.length >= 2,
+            `${id}: the message is on one line, so wrapping is untested`,
+          );
+          assert.deepEqual(starts, await lineStarts(page, reference), `${id}: wraps elsewhere`);
+          assert.equal(now.strip.height, before.strip.height, `${id}: a different height`);
+          assert.equal(now.message.width, before.message.width, `${id}: a different width`);
+        }
+        await page.context().close();
+      }
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check. Without `break-words`
+  // (what `main` drew), the path spills out of the box and widens its column.
+  it('the check can fail: the hand-built boxes holding the path spill out', async () => {
+    const pages = [
+      { page: await searchWithFailures(375, LONG_PATH), ids: SEARCH_BOXES },
+      { page: await followUpFailing(375, LONG_PATH), ids: [FOLLOW_UP_BOX] },
+    ];
+    for (const { page, ids } of pages) {
+      for (const id of ids) {
+        const reference = await drawReference(page, id);
+        const without = await errorLayout(page, reference);
+        console.log(`${id}, hand-built, without the fix: ${JSON.stringify(without)}`);
+        assert.ok(
+          without.wider.some((line) => line.startsWith(reference)),
+          `${id}: the spilling box was not reported: ${JSON.stringify(without.wider)}`,
+        );
+        assert.ok(without.message.overrun > 100, `${id}: the path did not run past the box`);
+      }
+      await page.context().close();
+    }
+  });
+});

@@ -221,6 +221,110 @@ interface MountedBlockErrorBox {
   );
 };
 
+/**
+ * L-380: the last hand-built boxes, drawn by the app's OWN screens' code, so
+ * the spec measures what the user sees — on `main` the hand-built box, on the
+ * branch the shared one — not a copy of either.
+ *   - `__mountSearchFailures` draws the real `SearchResults` after a search in
+ *     which one job board and one free feed failed, each with the message.
+ *   - `__mountFollowUpPanel` draws the real `FollowUpPanel` for an application
+ *     whose follow-up is due, with a local model to draft it, and an archive
+ *     that cannot be read: pressing "Draft a follow-up" shows its red box.
+ * Self-contained: nothing above is changed, and the helpers import what they
+ * need when called.
+ */
+(
+  window as unknown as {
+    __mountSearchFailures: (into: Element, props: { message: string }) => Promise<void>;
+  }
+).__mountSearchFailures = async (into, { message }) => {
+  const { SearchResults } = await import('../../src/features/search/SearchResults');
+  const { combineResults } = await import('../../src/features/search/keylessModel');
+  const { EMPTY_FORM } = await import('../../src/features/search/model');
+  const { ok } = await import('@cviper/core-types');
+  const outcome = {
+    outcomes: [
+      {
+        provider: 'reed' as const,
+        jobs: [],
+        error: { provider: 'reed' as const, kind: 'server' as const, message },
+      },
+    ],
+    jobs: [],
+    clusters: [],
+    quota: emptyQuota('2026-08-19'),
+  };
+  const keylessOutcome = {
+    outcomes: [
+      {
+        source: 'arbeitnow' as const,
+        fetched: 0,
+        jobs: [],
+        error: { source: 'arbeitnow' as const, kind: 'server' as const, message },
+      },
+    ],
+    jobs: [],
+  };
+  const results = combineResults(outcome, keylessOutcome);
+  const nothing = (): void => undefined;
+  ReactDOM.createRoot(into).render(
+    <SearchResults
+      outcome={outcome}
+      keylessOutcome={keylessOutcome}
+      results={results}
+      ordered={results.jobs}
+      running={false}
+      form={EMPTY_FORM}
+      jobBoards={[]}
+      browser={{ open: () => Promise.resolve(ok(undefined)) }}
+      today="2026-08-19"
+      tracked={new Set()}
+      savingId={null}
+      notes={{}}
+      problems={{}}
+      bands={new Map()}
+      dealBreakers={[]}
+      onSave={nothing}
+      onOpen={nothing}
+      onAnalyse={undefined}
+      searchBlocked={false}
+      noFreeFeedHere={false}
+    />,
+  );
+};
+
+(
+  window as unknown as {
+    __mountFollowUpPanel: (into: Element, props: { message: string }) => Promise<void>;
+  }
+).__mountFollowUpPanel = async (into, { message }) => {
+  const { FollowUpPanel } = await import('../../src/features/tracker/FollowUpPanel');
+  // Applied 13 days before `today`: quiet long enough for a follow-up to be due.
+  const applied = application('followup', 'applied');
+  const entry = { ...applied, application: { ...applied.application, applied_date: '2026-08-19' } };
+  const port = createFakeTrackerPort([entry]);
+  ReactDOM.createRoot(into).render(
+    <FollowUpPanel
+      entry={entry}
+      today="2026-09-01"
+      port={{
+        ...port,
+        documentsFor: () =>
+          Promise.resolve(err({ code: 'QUERY_FAILED' as const, message, table: 'documents' })),
+      }}
+      readAvailability={() =>
+        Promise.resolve({
+          ollamaRunning: true,
+          ollamaModels: [{ id: 'llama3.2:latest', label: 'llama3.2 (3.2B)' }],
+          anthropicKey: false,
+          openaiKey: false,
+        })
+      }
+      onEdit={() => undefined}
+    />,
+  );
+};
+
 const searchPort = params.get('results') === '1' ? createFakeSearchPort() : undefined;
 searchPort?.nextOutcome(
   outcomeOf(

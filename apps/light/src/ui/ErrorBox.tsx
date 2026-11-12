@@ -15,9 +15,12 @@ import { type ReactNode } from 'react';
  *   box     a rounded red-tinted box inside a panel. `gapAbove` is the space
  *           above it that the hand-built boxes carry. `as="div"` draws it as
  *           a `div`, for a box that holds paragraphs or a list (L-377).
+ *           `kind`, `messageId` and `bordered` are what the last three
+ *           hand-built boxes carried (L-380): see their props.
  *
- * One component with a `variant`, not two exports: the alert role, and later
- * the check that forbids hand-built copies, have one name to point at.
+ * One component with a `variant`, not two exports: the alert role, and the
+ * check that forbids hand-built copies, have one name to point at. That check
+ * is `lib/one-error-box.contract.test.ts` (L-380).
  *
  * ============================================================================
  * ALWAYS AN ALERT
@@ -45,6 +48,9 @@ import { type ReactNode } from 'react';
 const STRIP = 'border-b border-danger/30 bg-danger/5 px-4 py-2 break-words text-danger md:px-6';
 /** Inside a panel (settings, CV upload, search, …). */
 const BOX = 'rounded-control bg-danger/5 px-3 py-2 break-words text-danger';
+/** The stage editor's box, which alone of the sixteen had a red border (L-380). */
+const BOX_BORDERED =
+  'rounded-control border border-danger/30 bg-danger/5 px-3 py-2 break-words text-danger';
 
 interface Common {
   readonly testId: string;
@@ -59,7 +65,9 @@ export interface ErrorStripProps extends Common {
    * drawn as given, so the caller wraps the message in its own `<span>`, and
    * gives it `className="min-w-0"`. A flex item is never narrower than its
    * longest word unless told, so without it a long path pushes the control
-   * off screen however the words are allowed to break (L-374).
+   * off screen however the words are allowed to break (L-374). The message
+   * span must be the FIRST child: `lib/one-error-box.contract.test.ts` checks
+   * every row strip for it (L-380).
    */
   readonly layout?: 'text' | 'row';
 }
@@ -76,6 +84,27 @@ export interface ErrorPanelBoxProps extends Common {
    * draws a `<p>` cannot be seen from here, and a wrong guess is invalid HTML.
    */
   readonly as?: 'p' | 'div';
+  /**
+   * Which kind of failure this was, drawn as `data-kind` (L-380). The search
+   * results draw one box per board or feed that failed, and say why in a word
+   * (`auth`, `server`, `empty-feed`, …) that their tests read. Data, not
+   * style: it changes nothing a user sees. Left undefined, no attribute.
+   */
+  readonly kind?: string | undefined;
+  /**
+   * The box's `id`, for a text box to point at with `aria-describedby`, so a
+   * screen reader reads the error with the box it is about: the stage editor's
+   * "New interview stage" (L-380). Not called `id`: a caller cannot set any
+   * attribute it likes, only this one, for this reason.
+   */
+  readonly messageId?: string;
+  /**
+   * A thin red border, `border border-danger/30`, as the stage editor's box
+   * has carried. The other fifteen boxes have none: whether it stays is an
+   * owner decision (L-380), so it is kept exactly, and named, not dropped
+   * quietly or made the default. Only `true` draws it.
+   */
+  readonly bordered?: boolean;
 }
 
 export type ErrorBoxProps = ErrorStripProps | ErrorPanelBoxProps;
@@ -95,23 +124,31 @@ export function ErrorBox(props: ErrorBoxProps) {
     );
   }
 
-  const className =
-    props.variant === 'strip'
-      ? STRIP
-      : props.gapAbove === undefined
-        ? BOX
-        : `${props.gapAbove} ${BOX}`;
-
-  if (props.variant === 'box' && props.as === 'div') {
+  if (props.variant === 'strip') {
     return (
-      <div role="alert" data-testid={testId} className={className}>
+      <p role="alert" data-testid={testId} className={STRIP}>
+        {children}
+      </p>
+    );
+  }
+
+  // The attributes come out in the order the hand-built boxes had them: the
+  // stage editor's `id` first, the search results' `data-kind` after the test
+  // id. Undefined ones are not drawn at all.
+  const { gapAbove, kind, messageId } = props;
+  const look = props.bordered === true ? BOX_BORDERED : BOX;
+  const className = gapAbove === undefined ? look : `${gapAbove} ${look}`;
+
+  if (props.as === 'div') {
+    return (
+      <div id={messageId} role="alert" data-testid={testId} data-kind={kind} className={className}>
         {children}
       </div>
     );
   }
 
   return (
-    <p role="alert" data-testid={testId} className={className}>
+    <p id={messageId} role="alert" data-testid={testId} data-kind={kind} className={className}>
       {children}
     </p>
   );
