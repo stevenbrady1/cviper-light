@@ -2179,6 +2179,255 @@ describe('a tracker card’s Continue fits its card (L-319)', () => {
 });
 
 /**
+ * Hints show a small "i" button instead of a dotted underline (L-384).
+ *
+ * The words of a hint are plain text now; straight after them sits a small
+ * circled "i" that is a real button and the Tab stop. Three things only a real
+ * engine can say, measured on the same `?marks=1` sheet as the block above (the
+ * ATS table, the step bar and a card's dots, drawn by the app's own code):
+ *   - every "i" is at least 24×24 — the WCAG 2.2 AA minimum, the owner's named
+ *     exception to the 44px phone rule — sits in no other button or link, and
+ *     no ATS row is taller for its HEIGHT (its negative margin keeps the line
+ *     height). The twin keeps each "i" as a flat box of the same width, so the
+ *     words wrap the same way in both and only the height is compared: on a
+ *     phone a cell may wrap onto one more line for the "i"'s width, and that is
+ *     shown in the 375px picture rather than hidden by this check;
+ *   - in the ATS table only the labels carry an "i" — the heading, the two
+ *     column headers, the five row labels and the line under the table: nine
+ *     on the sheet. The result cells (status, change, band) open their hint on
+ *     hover and tap with no "i" (owner decision, 12 Nov 2026). The table still
+ *     fits a 375px window;
+ *   - a REAL tap opens the tip and leaves it open. A tap is followed by the
+ *     mouse events a touch screen makes up, so the tip used to open on the
+ *     made-up hover and shut on the click straight after it. Waits are on the
+ *     click itself reaching the page, never on a clock.
+ */
+const HINT_WINDOWS = {
+  desktop: { width: 1280, height: 800 },
+  'phone 375px': { width: 375, height: 800 },
+} as const;
+
+/** The "i" every span-form hint draws. */
+const HINT_BUTTON = '[data-testid="hint-info"]';
+
+async function openHintSheet(
+  viewport: { width: number; height: number },
+  touch = false,
+): Promise<Page> {
+  const context = await browser.newContext({ viewport, hasTouch: touch, colorScheme: 'light' });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`${origin}/?marks=1`);
+  await page.waitForSelector('[data-testid="marks-sheet"] [data-mark]');
+  await page.evaluate(() => document.fonts.ready);
+  assert.deepEqual(errors, [], 'the sheet threw while drawing');
+  return page;
+}
+
+interface HintButtonReport {
+  readonly count: number;
+  readonly problems: readonly string[];
+}
+
+/** Every "i" under 24×24 or inside another control, every ATS row it makes taller, a too-wide page. */
+async function hintButtonProblems(page: Page): Promise<HintButtonReport> {
+  return page.evaluate((selector) => {
+    const problems: string[] = [];
+    const words = (button: Element): string =>
+      (button.parentElement?.textContent ?? '?').trim().slice(0, 30);
+    const buttons = [...document.querySelectorAll(selector)];
+    for (const button of buttons) {
+      const box = button.getBoundingClientRect();
+      if (box.width < 24 || box.height < 24) {
+        problems.push(`"${words(button)}": ${String(box.width)}×${String(box.height)}px`);
+      }
+      if (button.parentElement?.closest('button, a') != null) {
+        problems.push(`"${words(button)}": inside another button or link`);
+      }
+      if (box.right > window.innerWidth + 0.5 || box.left < -0.5) {
+        problems.push(`"${words(button)}": off the side of the window`);
+      }
+    }
+    // The same row, beside itself, with each "i" flattened to no height.
+    for (const row of document.querySelectorAll('[data-testid="tailor-ats"] tr')) {
+      if (row.querySelector(selector) === null) continue;
+      const twin = row.cloneNode(true) as Element;
+      for (const button of twin.querySelectorAll<HTMLElement>(selector)) {
+        button.replaceChildren();
+        button.style.minHeight = '0';
+        button.style.height = '0';
+      }
+      row.after(twin);
+      const withButtons = row.getBoundingClientRect().height;
+      const without = twin.getBoundingClientRect().height;
+      twin.remove();
+      if (Math.abs(withButtons - without) > 0.01) {
+        problems.push(
+          `ATS row "${(row.textContent ?? '').slice(0, 24)}": ${String(withButtons)}px, ${String(without)}px without its i`,
+        );
+      }
+    }
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      problems.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    return { count: buttons.length, problems };
+  }, HINT_BUTTON);
+}
+
+/** The ATS table's overflow past its own card, in px (0 when it fits). */
+async function atsTableOverflow(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const card = document.querySelector('[data-testid="tailor-ats"]');
+    const table = card?.querySelector('table');
+    if (card === null || card === undefined || table === null || table === undefined) {
+      throw new Error('no ATS table on the sheet');
+    }
+    const inner =
+      card.getBoundingClientRect().right - parseFloat(getComputedStyle(card).paddingRight);
+    return Math.max(
+      0,
+      table.getBoundingClientRect().right - inner,
+      table.scrollWidth - table.clientWidth,
+    );
+  });
+}
+
+/** Whether the tip of the hint whose words include `words` is showing. */
+async function tipShowing(page: Page, words: string): Promise<boolean> {
+  return page.evaluate((text) => {
+    const wrapper = [...document.querySelectorAll('[data-testid="tailor-ats"] .cursor-help')].find(
+      (element) => (element.textContent ?? '').includes(text),
+    );
+    const tip = document.getElementById(wrapper?.getAttribute('aria-describedby') ?? '');
+    if (tip === null) throw new Error(`no hint on "${text}"`);
+    return !tip.hidden;
+  }, words);
+}
+
+/** Tap, then wait for the tap's click to reach the page and React to draw after it. */
+async function tapAndSettle(page: Page, target: ReturnType<Page['locator']>): Promise<void> {
+  const before = await page.evaluate(() => {
+    const counted = window as unknown as { __clicks?: number };
+    if (counted.__clicks === undefined) {
+      counted.__clicks = 0;
+      document.addEventListener(
+        'click',
+        () => (counted.__clicks = (counted.__clicks ?? 0) + 1),
+        true,
+      );
+    }
+    return counted.__clicks;
+  });
+  await target.tap();
+  await page.waitForFunction(
+    (count) => ((window as unknown as { __clicks?: number }).__clicks ?? 0) > count,
+    before,
+  );
+  await page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  );
+}
+
+describe('hints show a small "i" button (L-384)', () => {
+  for (const [name, viewport] of Object.entries(HINT_WINDOWS)) {
+    it(`every hint button is at least 24×24 and no row is taller for it, ${name}`, async () => {
+      const page = await openHintSheet(viewport);
+      const report = await hintButtonProblems(page);
+      console.log(`hint buttons (${name}): ${JSON.stringify(report)}`);
+      // ATS score, Before, After, five row labels, Fabrication check: the
+      // result cells, the step bar's buttons and the card's dots draw none.
+      assert.equal(report.count, 9, `${String(report.count)} hint buttons on the sheet, not 9`);
+      assert.deepEqual(report.problems, []);
+      await page.context().close();
+    });
+  }
+
+  it('the ATS table does not scroll sideways at 375px with its hint buttons', async () => {
+    const page = await openHintSheet(HINT_WINDOWS['phone 375px']);
+    assert.equal(await page.locator(`[data-testid="tailor-ats"] ${HINT_BUTTON}`).count(), 9);
+    assert.equal(
+      await page.locator(`[data-testid="tailor-ats"] tbody td ${HINT_BUTTON}`).count(),
+      0,
+    );
+    assert.equal(await atsTableOverflow(page), 0, 'the ATS table is wider than its card');
+    await page.context().close();
+  });
+
+  it("a real tap on a status cell's words opens its tip and it stays open", async () => {
+    const page = await openHintSheet(HINT_WINDOWS['phone 375px'], true);
+    const words = page
+      .locator('[data-testid="tailor-ats-check-section_headers"] td .cursor-help')
+      .first();
+    assert.equal(await words.locator('button').count(), 0, 'a status cell has a button');
+    assert.equal(await tipShowing(page, 'Missing'), false, 'the tip showed before any tap');
+    await tapAndSettle(page, words);
+    assert.equal(await tipShowing(page, 'Missing'), true, 'one tap did not leave the tip open');
+    await tapAndSettle(page, page.locator('[data-testid="tailor-ats"] p').first());
+    assert.equal(await tipShowing(page, 'Missing'), false, 'a tap elsewhere left it open');
+    await page.context().close();
+  });
+
+  it('the Tracker card dots draw no "i"', async () => {
+    const page = await openHintSheet(HINT_WINDOWS['phone 375px']);
+    assert.equal(
+      await page.locator(`[data-testid^="tracker-card-progress-"] ${HINT_BUTTON}`).count(),
+      0,
+    );
+    await page.context().close();
+  });
+
+  // The words and the "i" are both ways in, so a tap on either must work.
+  for (const target of ['the words', 'the i'] as const) {
+    it(`a real tap on ${target} opens the tip and it stays open; a tap elsewhere closes it`, async () => {
+      const page = await openHintSheet(HINT_WINDOWS['phone 375px'], true);
+      const wrapper = page.locator('[data-testid="tailor-ats"] thead .cursor-help', {
+        hasText: 'Before',
+      });
+      const tapped = target === 'the i' ? wrapper.locator(HINT_BUTTON) : wrapper;
+      assert.equal(await tipShowing(page, 'Before'), false, 'the tip showed before any tap');
+
+      await tapAndSettle(page, tapped);
+      assert.equal(await tipShowing(page, 'Before'), true, 'one tap did not leave the tip open');
+
+      await tapAndSettle(page, tapped);
+      assert.equal(await tipShowing(page, 'Before'), false, 'a second tap did not close it');
+
+      await tapAndSettle(page, tapped);
+      assert.equal(await tipShowing(page, 'Before'), true, 'a third tap did not open it again');
+      await tapAndSettle(page, page.locator('[data-testid="tailor-ats"] p').first());
+      assert.equal(await tipShowing(page, 'Before'), false, 'a tap elsewhere left it open');
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a size check that cannot fail is not a check.
+  it('the check can fail: a shrunk "i", and one that makes its row taller, are reported', async () => {
+    const page = await openHintSheet(HINT_WINDOWS.desktop);
+    await page.evaluate((selector) => {
+      const [first, second] = document.querySelectorAll<HTMLElement>(selector);
+      if (first === undefined || second === undefined) throw new Error('no hint buttons');
+      first.style.minWidth = '0';
+      first.style.minHeight = '0';
+      first.style.padding = '0';
+      second.style.margin = '0';
+      second.style.minHeight = '40px';
+    }, HINT_BUTTON);
+    const report = await hintButtonProblems(page);
+    assert.ok(
+      report.problems.some((line) => /: \d+(\.\d+)?×\d+(\.\d+)?px$/.test(line)),
+      `the shrunk button was not reported: ${JSON.stringify(report.problems)}`,
+    );
+    assert.ok(
+      report.problems.some((line) => line.startsWith('ATS row')),
+      `the taller row was not reported: ${JSON.stringify(report.problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
  * A box that holds more than one block (L-377).
  *
  * Settings' notice (two paragraphs) and Erase everything's failure (a paragraph

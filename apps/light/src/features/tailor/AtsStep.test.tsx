@@ -4,7 +4,7 @@
  * a dash with a reason (never a zero), the "only if it is true" wording beside
  * still-missing words, and the fabrication result repeated on this step.
  */
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { AtsStep } from './AtsStep';
@@ -256,9 +256,11 @@ describe('AtsStep draws its marks (L-362)', () => {
     for (const mark of marks) {
       expect(mark.closest('[aria-hidden="true"]')).not.toBeNull();
       expect(mark.querySelector('[tabindex]')).toBeNull();
-      // The focus stop is the hint around the mark, as it was around the typed one.
+      // A result cell's hint opens on hover and tap, with no "i" and no Tab
+      // stop: the "i" is on the row and column labels (L-384, owner decision).
       const hint = mark.closest('[aria-describedby]')!;
-      expect(hint.getAttribute('tabindex')).toBe('0');
+      expect(hint.hasAttribute('tabindex')).toBe(false);
+      expect(hint.querySelector('button')).toBeNull();
     }
     // What a screen reader reads in each cell: the words and numbers, no mark.
     const read = (id: string) => screen.getByTestId(id).textContent;
@@ -269,5 +271,96 @@ describe('AtsStep draws its marks (L-362)', () => {
         .slice(0, 2)
         .map((cell) => cell.textContent),
     ).toEqual([' Missing', ' Missing']);
+  });
+});
+
+/**
+ * Which hints carry the "i" (L-384, owner decision 12 Nov 2026): the labels —
+ * the heading, the column headers, the row labels and the two line labels
+ * under the table. The result cells (status, change, band, the no-score dash)
+ * open their hint on hover and tap, with no "i": an "i" in every cell made the
+ * table about nineteen icons busy, and on a phone it dropped onto its own line.
+ */
+describe('the "i" is on the labels, not the results (L-384)', () => {
+  const I = 'button[aria-label="What this means"]';
+
+  /** The tip a hint on `element` (or around it) points at. */
+  function tipOf(element: Element): HTMLElement {
+    const id = element.closest('[aria-describedby]')?.getAttribute('aria-describedby') ?? '';
+    const tip = document.getElementById(id);
+    if (tip === null) throw new Error('no hint here');
+    return tip;
+  }
+
+  it('happy: the heading, both column headers, every row label and both line labels have an "i"', () => {
+    renderStep(BASE, { clean: false, flagged: 1 });
+    const step = screen.getByTestId('tailor-ats');
+    const labelled = [
+      step.querySelector('#tailor-ats-heading')!,
+      ...step.querySelectorAll('thead th:not(:first-child):not(:last-child)'),
+      ...step.querySelectorAll('tbody th'),
+      screen.getByTestId('tailor-ats-missing'),
+      screen.getByTestId('tailor-ats-fabrication'),
+    ];
+    expect(labelled.map((element) => element.textContent?.trim())).toEqual([
+      'ATS score',
+      'Before',
+      'After',
+      'Keyword coverage',
+      'Bullet strength',
+      'Structure & sections',
+      'Contact details',
+      'Length',
+      expect.stringContaining('Still missing from the advert:'),
+      expect.stringContaining('Fabrication check:'),
+    ]);
+    for (const element of labelled) expect(element.querySelectorAll(I)).toHaveLength(1);
+    expect(step.querySelectorAll(I)).toHaveLength(labelled.length);
+  });
+
+  it('negative: no result cell — status, change, band — holds a button', () => {
+    renderStep({ ...BASE, checks: BASE.checks.map((check) => ({ ...check, before: 'fail' })) });
+    const cells = [
+      ...screen.getByTestId('tailor-ats').querySelectorAll('tbody td'),
+      screen.getByTestId('tailor-ats-band'),
+    ];
+    expect(cells.length).toBeGreaterThanOrEqual(14);
+    for (const cell of cells) expect(cell.querySelector('button')).toBeNull();
+  });
+
+  it('negative boundary: the no-score dash and "no change" hold no button either', () => {
+    renderStep({
+      ...BASE,
+      keyword: { before: null, after: null, delta: null, beforeReason: 'x', afterReason: 'y' },
+      bullets: { ...BASE.bullets, after: 41, delta: 0 },
+    });
+    const body = screen.getByTestId('tailor-ats').querySelector('tbody')!;
+    expect(within(body as HTMLElement).getAllByText('—').length).toBeGreaterThanOrEqual(3);
+    expect(within(body as HTMLElement).getByText('no change')).toBeTruthy();
+    expect(body.querySelectorAll('td button')).toHaveLength(0);
+  });
+
+  it("a click on a status cell's words opens its tip, and a second click closes it", () => {
+    renderStep();
+    const cell = screen.getByTestId('tailor-ats-check-contact_info').querySelectorAll('td')[0]!;
+    const words = within(cell).getByText('Check');
+    expect(tipOf(words).hidden).toBe(true);
+    fireEvent.click(words);
+    expect(tipOf(words).hidden).toBe(false);
+    fireEvent.click(words);
+    expect(tipOf(words).hidden).toBe(true);
+  });
+
+  it('hovering a change or the band word still shows its tip', () => {
+    renderStep();
+    for (const element of [
+      within(screen.getByTestId('tailor-ats-keyword-delta')).getByText('+27'),
+      screen.getByTestId('tailor-ats-band').firstElementChild!,
+    ]) {
+      fireEvent.mouseEnter(element);
+      expect(tipOf(element).hidden).toBe(false);
+      fireEvent.mouseLeave(element);
+      expect(tipOf(element).hidden).toBe(true);
+    }
   });
 });
