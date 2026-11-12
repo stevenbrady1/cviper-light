@@ -7,7 +7,7 @@ import {
 } from '@cviper/job-apis';
 
 import { LiveStatus } from '../../app/LiveStatus';
-import { IconTile } from '../../ui';
+import { ErrorBox, IconTile } from '../../ui';
 import { type Board } from '../boards/model';
 import { ANALYSE_DISCLOSURE } from '../flow/advert';
 import { type BrowserPort } from '../../platform/browser';
@@ -116,15 +116,14 @@ export function SearchResults({
         failure this shape exists to prevent.
       */}
       {failures.map((entry) => (
-        <p
+        <ErrorBox
           key={entry.provider}
-          role="alert"
-          data-testid={`search-error-${entry.provider}`}
-          data-kind={entry.error?.kind}
-          className="rounded-control bg-danger/5 px-3 py-2 text-danger"
+          variant="box"
+          kind={entry.error?.kind}
+          testId={`search-error-${entry.provider}`}
         >
           {entry.error?.message}
-        </p>
+        </ErrorBox>
       ))}
 
       {/*
@@ -134,15 +133,14 @@ export function SearchResults({
         failures — none of them may reach the user as an empty list.
       */}
       {keylessFailures.map((entry) => (
-        <p
+        <ErrorBox
           key={entry.source}
-          role="alert"
-          data-testid={`keyless-error-${entry.source}`}
-          data-kind={entry.error?.kind}
-          className="rounded-control bg-danger/5 px-3 py-2 text-danger"
+          variant="box"
+          kind={entry.error?.kind}
+          testId={`keyless-error-${entry.source}`}
         >
           {entry.error?.message}
-        </p>
+        </ErrorBox>
       ))}
 
       <NothingMatchedNotes entries={nothingMatched} />

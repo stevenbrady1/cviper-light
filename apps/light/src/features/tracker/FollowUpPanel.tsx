@@ -33,6 +33,7 @@ import { type TrackerEntry } from './model';
 import { type TrackerPort } from './port';
 import { runFollowUp } from './runFollowUp';
 import { LiveStatus } from '../../app/LiveStatus';
+import { ErrorBox } from '../../ui';
 
 /**
  * Follow-up and thank-you DRAFTS, in the detail pane (L-162).
@@ -474,13 +475,9 @@ export function FollowUpPanel({
       ) : null}
 
       {error === null ? null : (
-        <p
-          role="alert"
-          data-testid="detail-followup-error"
-          className="rounded-control bg-danger/5 px-3 py-2 text-danger"
-        >
+        <ErrorBox variant="box" testId="detail-followup-error">
           {error}
-        </p>
+        </ErrorBox>
       )}
 
       {draft === null ? null : (

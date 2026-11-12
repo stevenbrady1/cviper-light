@@ -447,3 +447,162 @@ describe('ErrorBox — a box that holds more than one block (L-377)', () => {
     expect(box.textContent).toBe(`Some of it could not be removed.${path}`);
   });
 });
+
+/**
+ * L-380: the last five hand-built boxes move onto the `box` shape. Three of
+ * them carry something the others do not: the search results' two say WHICH
+ * kind of failure it was (`data-kind`, read by their tests), and the stage
+ * editor's box has an `id` its text box points at (`aria-describedby`) and a
+ * red border none of the other fifteen boxes have. Each is a closed option on
+ * the box, and the attributes come out in the order the hand-built ones had
+ * them, so a screen moving onto the shared part draws the same markup.
+ */
+describe('ErrorBox — the search results and the stage editor (L-380)', () => {
+  it('kind is drawn as data-kind, after the test id, as the search results had it', () => {
+    render(
+      <ErrorBox variant="box" kind="auth" testId="search-error-reed">
+        Reed did not accept the key.
+      </ErrorBox>,
+    );
+    expect(screen.getByTestId('search-error-reed').outerHTML).toBe(
+      `<p role="alert" data-testid="search-error-reed" data-kind="auth" class="${BOX}">Reed did not accept the key.</p>`,
+    );
+  });
+
+  it('no kind, or kind left undefined, draws no data-kind at all', () => {
+    render(
+      <>
+        <ErrorBox variant="box" testId="none">
+          a
+        </ErrorBox>
+        <ErrorBox variant="box" kind={undefined} testId="undefined-kind">
+          b
+        </ErrorBox>
+      </>,
+    );
+    expect(screen.getByTestId('none').hasAttribute('data-kind')).toBe(false);
+    expect(screen.getByTestId('undefined-kind').hasAttribute('data-kind')).toBe(false);
+  });
+
+  it('BOUNDARY: an empty kind is drawn as an empty data-kind, as the hand-built ones drew it', () => {
+    render(
+      <ErrorBox variant="box" kind="" testId="empty-kind">
+        c
+      </ErrorBox>,
+    );
+    expect(screen.getByTestId('empty-kind').getAttribute('data-kind')).toBe('');
+  });
+
+  it('messageId is drawn as the id, first, and bordered adds the stage editor border', () => {
+    render(
+      <ErrorBox variant="box" bordered messageId="substage-message" testId="substage-error">
+        That stage already exists.
+      </ErrorBox>,
+    );
+    expect(screen.getByTestId('substage-error').outerHTML).toBe(
+      '<p id="substage-message" role="alert" data-testid="substage-error" ' +
+        'class="rounded-control border border-danger/30 bg-danger/5 px-3 py-2 break-words text-danger">' +
+        'That stage already exists.</p>',
+    );
+  });
+
+  it('a text box that points at the message by its id finds the alert', () => {
+    render(
+      <>
+        <input aria-describedby="substage-message substage-count" aria-invalid="true" />
+        <span id="substage-count">3 / 60</span>
+        <ErrorBox variant="box" bordered messageId="substage-message" testId="substage-error">
+          That stage already exists.
+        </ErrorBox>
+      </>,
+    );
+    const ids = (screen.getByRole('textbox').getAttribute('aria-describedby') ?? '').split(' ');
+    const described = ids.map((id) => document.getElementById(id));
+    expect(described.every((element) => element !== null)).toBe(true);
+    expect(described[0]).toBe(screen.getByRole('alert'));
+    expect(
+      screen.getByRole('textbox', { description: /That stage already exists\./ }),
+    ).toBeTruthy();
+  });
+
+  it('bordered keeps the space above first, and works in the div form', () => {
+    render(
+      <>
+        <ErrorBox variant="box" bordered gapAbove="mt-2" testId="spaced">
+          a
+        </ErrorBox>
+        <ErrorBox variant="box" as="div" bordered testId="div-bordered">
+          <p>b</p>
+        </ErrorBox>
+      </>,
+    );
+    const bordered =
+      'rounded-control border border-danger/30 bg-danger/5 px-3 py-2 break-words text-danger';
+    expect(screen.getByTestId('spaced').className).toBe(`mt-2 ${bordered}`);
+    expect(screen.getByTestId('div-bordered').tagName).toBe('DIV');
+    expect(screen.getByTestId('div-bordered').className).toBe(bordered);
+  });
+
+  it('bordered={false} is the plain box', () => {
+    render(
+      <ErrorBox variant="box" bordered={false} testId="plain">
+        a
+      </ErrorBox>,
+    );
+    expect(screen.getByTestId('plain').className).toBe(BOX);
+  });
+
+  it('NEGATIVE: the new options belong to the box, and nothing else gets through', () => {
+    const typed = (
+      <>
+        {/* @ts-expect-error `kind` belongs to the box. */}
+        <ErrorBox variant="strip" kind="auth" testId="strip-kind">
+          x
+        </ErrorBox>
+        {/* @ts-expect-error `messageId` belongs to the box. */}
+        <ErrorBox variant="strip" layout="row" messageId="m" testId="strip-id">
+          <span className="min-w-0">y</span>
+        </ErrorBox>
+        {/* @ts-expect-error `bordered` belongs to the box. */}
+        <ErrorBox variant="strip" bordered testId="strip-border">
+          z
+        </ErrorBox>
+      </>
+    );
+    // Forced through anyway: a truthy non-boolean is not `true`, and an `id`
+    // or a `data-kind` spread in is dropped, not drawn.
+    const forced = { bordered: 'yes', id: 'x', 'data-kind': 'spread', role: 'status' };
+    render(
+      <>
+        {typed}
+        <ErrorBox variant="box" testId="forced" {...(forced as object)}>
+          w
+        </ErrorBox>
+      </>,
+    );
+    for (const id of ['strip-kind', 'strip-id', 'strip-border']) {
+      const strip = screen.getByTestId(id);
+      expect(strip.hasAttribute('data-kind'), id).toBe(false);
+      expect(strip.hasAttribute('id'), id).toBe(false);
+      expect(strip.className, id).not.toContain('border border-danger/30');
+    }
+    const box = screen.getByTestId('forced');
+    expect(box.className).toBe(BOX);
+    expect(box.hasAttribute('id')).toBe(false);
+    expect(box.hasAttribute('data-kind')).toBe(false);
+    expect(box.getAttribute('role')).toBe('alert');
+  });
+
+  it('BOUNDARY: a long UNBROKEN path in a bordered box with an id still breaks', () => {
+    const path = `C:\\Users\\someone\\AppData\\Roaming\\com.cviper.light\\${'NestedFolder\\'.repeat(12)}cviper.json`;
+    render(
+      <ErrorBox variant="box" bordered messageId="substage-message" kind="server" testId="long">
+        {path}
+      </ErrorBox>,
+    );
+    const box = screen.getByTestId('long');
+    expect(box.className.split(' ')).toContain('break-words');
+    expect(box.className).not.toMatch(CLIPPING);
+    expect(box.textContent).toBe(path);
+  });
+});

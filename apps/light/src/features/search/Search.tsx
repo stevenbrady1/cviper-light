@@ -25,6 +25,7 @@ import { readQuota, writeQuota } from '../../jobs/quotaStore';
 import { todayIsoDate } from '../../lib/dates';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { readJobKeyStates, type KeyState } from '../../status/environment';
+import { ErrorBox } from '../../ui';
 
 import {
   chooseBoards,
@@ -696,13 +697,9 @@ export function Search({
             </div>
 
             {boardsProblem.length === 0 ? null : (
-              <p
-                role="alert"
-                data-testid="search-boards-problem"
-                className="mt-2 rounded-control bg-danger/5 px-3 py-2 text-danger"
-              >
+              <ErrorBox variant="box" gapAbove="mt-2" testId="search-boards-problem">
                 {`${boardsProblem.join(', ')} did not open in your browser. Check that a default browser is set, then try again.`}
-              </p>
+              </ErrorBox>
             )}
           </form>
 

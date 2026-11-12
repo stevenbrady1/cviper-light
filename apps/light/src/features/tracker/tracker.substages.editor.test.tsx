@@ -430,3 +430,45 @@ describe('D9: one word, "stage"', () => {
     expect(screen.getByTestId('detail-pane').textContent ?? '').not.toMatch(/\bsteps?\b/i);
   });
 });
+
+/**
+ * L-380: the stage editor's error moved onto the shared `ErrorBox`. Its id is
+ * what the "New interview stage" box points at, so a screen reader reads the
+ * error with the box. "Contains `message.id`" above would also pass if the id
+ * were gone (every string contains ""), so this resolves each id instead.
+ */
+describe('L-380: the refused add still points at its message', () => {
+  it('every id in the box’s aria-describedby names an element, and the first is the alert', async () => {
+    const { user } = await board([entry('one')]);
+    const { editor } = await openEditor(user);
+    const box = within(editor).getByLabelText('New interview stage');
+
+    await user.type(box, 'hr screen{Enter}');
+
+    const message = await screen.findByTestId('substage-error');
+    expect(message.id).toBe('substage-message');
+    expect(message.getAttribute('role')).toBe('alert');
+    const ids = (box.getAttribute('aria-describedby') ?? '').split(' ');
+    expect(ids).toEqual(['substage-message', 'substage-count']);
+    expect(ids.map((id) => document.getElementById(id))).toEqual([
+      message,
+      screen.getByTestId('substage-count'),
+    ]);
+    expect(
+      within(editor).getByRole('textbox', {
+        name: 'New interview stage',
+        description: (text) => text.startsWith(message.textContent ?? '(none)'),
+      }),
+    ).toBe(box);
+  });
+
+  it('NEGATIVE: before anything is refused, the box points only at its count', async () => {
+    const { user } = await board([entry('one')]);
+    const { editor } = await openEditor(user);
+    const box = within(editor).getByLabelText('New interview stage');
+
+    expect(screen.queryByTestId('substage-error')).toBeNull();
+    expect(box.getAttribute('aria-describedby')).toBe('substage-count');
+    expect(box.hasAttribute('aria-invalid')).toBe(false);
+  });
+});
