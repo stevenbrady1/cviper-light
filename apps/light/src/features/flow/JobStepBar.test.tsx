@@ -258,3 +258,109 @@ describe('JobStepBar draws its marks (L-360)', () => {
     expect(screen.getByRole('button', { name: 'Tracker' })).toBe(tracker);
   });
 });
+
+/**
+ * L-386: a slimmer bar. On a desktop, two rows — the job with Back and Next,
+ * then the steps joined by DRAWN lines. On a phone the steps are marks only,
+ * so one line of visible words under them says where the user is and what was
+ * skipped: on touch a tap on a step navigates, so its hint cannot be reached,
+ * and those words are what explains the marks.
+ */
+describe('a slimmer step bar (L-386)', () => {
+  const where = () => screen.getByTestId('job-steps-where');
+
+  it('the connector is drawn, not typed', () => {
+    renderBar();
+    const bar = screen.getByTestId('job-steps');
+    expect(bar.textContent).not.toContain('─');
+    const lines = screen.getAllByTestId('job-steps-line');
+    // One between each pair of the five steps.
+    expect(lines).toHaveLength(4);
+    for (const line of lines) {
+      expect(line.textContent).toBe('');
+      expect(line.getAttribute('aria-hidden')).toBe('true');
+    }
+  });
+
+  it('skipped is said in visible words', () => {
+    renderBar('ats', { analysed: false, tailored: true, exported: false });
+    expect(where().textContent).toBe('Step 4 of 5 · ATS Score. Skipped: Analyse.');
+    // Visible words: not tucked away for screen readers only, nor hidden from them.
+    expect(where().className).not.toMatch(/\bsr-only\b/);
+    expect(where().closest('[aria-hidden="true"]')).toBeNull();
+  });
+
+  it('boundary: on the first step Back is disabled and the words say "Step 1 of 5"', () => {
+    renderBar('find', { analysed: false, tailored: false, exported: false });
+    expect(screen.getByTestId('job-steps-back')).toHaveProperty('disabled', true);
+    expect(where().textContent).toBe('Step 1 of 5 · Find.');
+  });
+
+  it('boundary: on the last step Next is disabled and the words say "Step 5 of 5"', () => {
+    renderBar('export', { analysed: true, tailored: true, exported: true });
+    expect(screen.getByTestId('job-steps-next')).toHaveProperty('disabled', true);
+    expect(where().textContent).toBe('Step 5 of 5 · Export.');
+  });
+
+  it('negative: with nothing skipped the words name no skipped step', () => {
+    renderBar('tailor', { analysed: true, tailored: false, exported: false });
+    expect(where().textContent).toBe('Step 3 of 5 · Tailor.');
+    expect(where().textContent).not.toMatch(/skipped/i);
+  });
+
+  it('edge: every step that can be skipped is named, in order', () => {
+    renderBar('export', { analysed: false, tailored: false, exported: false });
+    expect(where().textContent).toBe('Step 5 of 5 · Export. Skipped: Analyse, Tailor, ATS Score.');
+  });
+
+  it('a step click still fires once', async () => {
+    const { onStep, user } = renderBar();
+    await user.click(screen.getByTestId('job-step-ats'));
+    expect(onStep).toHaveBeenCalledTimes(1);
+    expect(onStep).toHaveBeenCalledWith('ats');
+  });
+
+  it('on a phone a step shows its mark only, and keeps its name for screen readers', () => {
+    renderBar('ats', { analysed: false, tailored: true, exported: false });
+    for (const [id, name] of [
+      ['find', 'Find, done'],
+      ['analyse', 'Analyse, skipped'],
+      ['ats', 'ATS Score, you are here'],
+    ] as const) {
+      const step = screen.getByTestId(`job-step-${id}`);
+      expect(screen.getByRole('button', { name })).toBe(step);
+      // The words are hidden below md: and shown from it; 44px wide on a phone.
+      const label = step.querySelector('[data-mark] + span')!;
+      expect(label.className).toMatch(/(^|\s)sr-only(\s|$)/);
+      expect(label.className).toMatch(/(^|\s)md:not-sr-only(\s|$)/);
+      expect(step.className).toMatch(/(^|\s)min-w-11(\s|$)/);
+    }
+  });
+
+  it('the words line is for a phone only: a desktop has the step names', () => {
+    renderBar();
+    expect(where().className).toMatch(/(^|\s)md:hidden(\s|$)/);
+  });
+
+  it('Back and Next share the job’s row, above the steps', () => {
+    renderBar();
+    const row = screen.getByTestId('job-steps-job').parentElement!.parentElement!;
+    expect(row.contains(screen.getByTestId('job-steps-back'))).toBe(true);
+    expect(row.contains(screen.getByTestId('job-steps-next'))).toBe(true);
+    expect(row.contains(screen.getByTestId('job-step-find'))).toBe(false);
+  });
+
+  it('edge: a very long job name is cut short on one line, not wrapped', () => {
+    render(
+      <JobStepBar
+        title={'Principal '.repeat(30)}
+        company="Acme"
+        location="Leeds"
+        current="tailor"
+        progress={{ analysed: true, tailored: false, exported: false }}
+        onStep={() => undefined}
+      />,
+    );
+    expect(screen.getByTestId('job-steps-job').className).toMatch(/(^|\s)truncate(\s|$)/);
+  });
+});

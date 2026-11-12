@@ -16,9 +16,19 @@ import {
 /**
  * Where this job is: Find → Analyse → Tailor → ATS Score → Export (L-200).
  *
- *   ◀ Tracker   Senior Data Analyst · Acme Ltd · Leeds
- *   ✓ Find ─ ✓ Analyse ─ ● Tailor ─ ○ ATS Score ─ ○ Export
- *   [Back]  [Next: ATS Score]
+ *   ◀ Tracker   Senior Data Analyst · Acme Ltd · Leeds     [Back] [Next: ATS Score]
+ *               CV: cv.docx · Engine: Keyword match
+ *   ✓ Find —— ✓ Analyse —— ● Tailor —— ○ ATS Score —— ○ Export
+ *
+ * Two rows on a desktop (L-386): the job, with Back and Next at its right, and
+ * the steps joined by DRAWN lines. A long job name is cut short on its line
+ * rather than pushing Back and Next off it.
+ *
+ * On a phone the steps show their marks only — one row of five 44px buttons,
+ * each still NAMED for a screen reader — and one line of words under them
+ * says "Step 4 of 5 · ATS Score. Skipped: Analyse.". The marks must never go
+ * without that line: on touch a tap on a step navigates, so its hint cannot be
+ * reached, and the words are what explain the marks.
  *
  * An ORDERED LIST with `aria-current="step"`, so a screen reader says "list,
  * 5 items" and reads the current one as the current step. Every step is a
@@ -86,6 +96,11 @@ export function JobStepBar({
     .map((part) => part.trim())
     .filter((part) => part !== '')
     .join(' · ');
+  const skipped = steps.filter((step) => step.state === 'skipped').map((step) => step.label);
+  const where =
+    `Step ${String(steps.findIndex((step) => step.id === current) + 1)} of ${String(steps.length)}` +
+    ` · ${labelOf(current)}.` +
+    (skipped.length === 0 ? '' : ` Skipped: ${skipped.join(', ')}.`);
 
   return (
     <section
@@ -93,7 +108,8 @@ export function JobStepBar({
       aria-label="This job’s steps"
       className="border-b border-line bg-card px-4 py-2 md:px-6"
     >
-      <div className="flex flex-wrap items-center gap-2">
+      {/* A phone wraps Back and Next onto a line of their own. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 md:flex-nowrap">
         {onTracker === undefined ? null : (
           <Hint text={FLOW_HINT.tracker}>
             {(trigger) => (
@@ -109,32 +125,57 @@ export function JobStepBar({
             )}
           </Hint>
         )}
-        <p data-testid="job-steps-job" className="min-w-0 flex-1 font-medium text-ink">
-          {job}
-        </p>
+        <div className="min-w-0 flex-1">
+          <p data-testid="job-steps-job" className="truncate font-medium text-ink">
+            {job}
+          </p>
+          {choice === undefined ? null : (
+            <p data-testid="job-steps-choice" className="break-words text-xs text-ink-muted">
+              <Hint text={FLOW_HINT.choice}>
+                CV: <span className="text-ink">{choice.cv ?? 'none chosen'}</span>
+                <span aria-hidden="true"> · </span>
+                <span className="sr-only">, </span>
+                Engine: <span className="text-ink">{choice.engine ?? 'none set up'}</span>
+              </Hint>
+            </p>
+          )}
+        </div>
+        <div className="flex basis-full items-center gap-2 md:basis-auto md:shrink-0">
+          <button
+            type="button"
+            data-testid="job-steps-back"
+            disabled={back === null}
+            onClick={() => {
+              if (back !== null) onStep(back);
+            }}
+            className={SECONDARY_BUTTON}
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            data-testid="job-steps-next"
+            disabled={next === null}
+            onClick={() => {
+              if (next !== null) onStep(next);
+            }}
+            className={SECONDARY_BUTTON}
+          >
+            {next === null ? 'Next' : `Next: ${labelOf(next)}`}
+          </button>
+        </div>
       </div>
 
-      {choice === undefined ? null : (
-        <p data-testid="job-steps-choice" className="break-words text-xs text-ink-muted">
-          <Hint text={FLOW_HINT.choice}>
-            CV: <span className="text-ink">{choice.cv ?? 'none chosen'}</span>
-            <span aria-hidden="true"> · </span>
-            <span className="sr-only">, </span>
-            Engine: <span className="text-ink">{choice.engine ?? 'none set up'}</span>
-          </Hint>
-        </p>
-      )}
-
-      <nav aria-label="Steps for this job">
-        <ol className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
+      <nav aria-label="Steps for this job" className="mt-1">
+        <ol className="flex items-center gap-1 md:flex-wrap">
           {steps.map((step, index) => (
             <li key={step.id} className="flex items-center gap-1">
               {index === 0 ? null : (
-                // Hidden on a phone: the steps wrap there, and a divider
-                // would start the second line.
-                <span aria-hidden="true" className="hidden text-ink-faint md:inline">
-                  ─
-                </span>
+                <span
+                  data-testid="job-steps-line"
+                  aria-hidden="true"
+                  className="h-px w-3 bg-ink-faint md:w-4"
+                />
               )}
               <Hint text={STEP_HINT[step.state]}>
                 {(trigger) => (
@@ -144,11 +185,14 @@ export function JobStepBar({
                     data-state={step.state}
                     aria-current={step.state === 'current' ? 'step' : undefined}
                     onClick={() => onStep(step.id)}
-                    className={QUIET_BUTTON}
+                    className={`${QUIET_BUTTON} min-w-11 md:min-w-0`}
                     {...trigger}
                   >
                     <StateMark name={MARK[step.state]} />
-                    <span className={step.state === 'current' ? 'font-semibold text-ink' : ''}>
+                    {/* A phone shows the mark only; the name stays for a screen reader. */}
+                    <span
+                      className={`sr-only md:not-sr-only ${step.state === 'current' ? 'font-semibold text-ink' : ''}`}
+                    >
                       {step.label}
                     </span>
                     <span className="sr-only">, {SPOKEN[step.state]}</span>
@@ -158,32 +202,10 @@ export function JobStepBar({
             </li>
           ))}
         </ol>
+        <p data-testid="job-steps-where" className="mt-1 text-xs text-ink-muted md:hidden">
+          {where}
+        </p>
       </nav>
-
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          data-testid="job-steps-back"
-          disabled={back === null}
-          onClick={() => {
-            if (back !== null) onStep(back);
-          }}
-          className={SECONDARY_BUTTON}
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          data-testid="job-steps-next"
-          disabled={next === null}
-          onClick={() => {
-            if (next !== null) onStep(next);
-          }}
-          className={SECONDARY_BUTTON}
-        >
-          {next === null ? 'Next' : `Next: ${labelOf(next)}`}
-        </button>
-      </div>
     </section>
   );
 }
