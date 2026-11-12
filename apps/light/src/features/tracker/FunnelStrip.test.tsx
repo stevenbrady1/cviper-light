@@ -72,8 +72,9 @@ describe('FunnelStrip', () => {
     expect(within(strip).getByTestId('tracker-funnel-count-rejected').textContent).toBe('0');
 
     // Flow words, not the column words (L-175): "Interviewing 2" above a column
-    // holding one card read as a contradiction.
-    for (const label of ['Saved', 'Applied', 'Interviewed', 'Offers', 'Rejected']) {
+    // holding one card read as a contradiction. The two cumulative ones say
+    // "so far" (L-383).
+    for (const label of ['Saved', 'Applied so far', 'Interviewed so far', 'Offers', 'Rejected']) {
       expect(within(strip).getByText(label)).toBeTruthy();
     }
   });
@@ -172,5 +173,61 @@ describe('the strip says it counts flow, not columns (L-175)', () => {
     const strip = screen.getByTestId('tracker-funnel');
     expect(within(strip).queryByText('Interviewing')).toBeNull();
     expect(within(strip).queryByText('Sent')).toBeNull();
+  });
+});
+
+/** The label printed with a count: the `dt` in the same figure as its `dd`. */
+function labelOf(key: string): string | null | undefined {
+  return screen.getByTestId(`tracker-funnel-count-${key}`).parentElement?.querySelector('dt')
+    ?.textContent;
+}
+
+describe('the cumulative counts say "so far" (L-383)', () => {
+  it('labels the five figures, in pipeline order, with "so far" on the two that add up', () => {
+    render(
+      <FunnelStrip entries={board('saved', 'applied', 'interviewing', 'offer', 'rejected')} />,
+    );
+
+    const labels = [...screen.getByTestId('tracker-funnel').querySelectorAll('dt')].map(
+      (dt) => dt.textContent,
+    );
+    expect(labels).toEqual(['Saved', 'Applied so far', 'Interviewed so far', 'Offers', 'Rejected']);
+  });
+
+  it('negative: "so far" is only on Applied and Interviewed, and the bare words are gone', () => {
+    render(
+      <FunnelStrip entries={board('saved', 'applied', 'interviewing', 'offer', 'rejected')} />,
+    );
+
+    for (const key of ['saved', 'offers', 'rejected']) {
+      expect(labelOf(key), key).not.toMatch(/so far/i);
+    }
+    const strip = screen.getByTestId('tracker-funnel');
+    expect(within(strip).queryByText('Applied')).toBeNull();
+    expect(within(strip).queryByText('Interviewed')).toBeNull();
+  });
+
+  it('boundary: nothing applied still shows "0" with its "Applied so far" label', () => {
+    render(<FunnelStrip entries={board('saved')} />);
+
+    expect(screen.getByTestId('tracker-funnel-count-sent').textContent).toBe('0');
+    expect(labelOf('sent')).toBe('Applied so far');
+    expect(screen.getByTestId('tracker-funnel-count-interviewing').textContent).toBe('0');
+    expect(labelOf('interviewing')).toBe('Interviewed so far');
+  });
+
+  it('boundary: one application reads "1" / "Applied so far"', () => {
+    render(<FunnelStrip entries={board('applied')} />);
+
+    expect(screen.getByTestId('tracker-funnel-count-sent').textContent).toBe('1');
+    expect(labelOf('sent')).toBe('Applied so far');
+  });
+
+  it('leaves the rate wording alone: "Interview rate — after 5 applied"', () => {
+    render(<FunnelStrip entries={board('applied')} />);
+
+    expect(screen.getByTestId('tracker-funnel-interview-rate').textContent).toBe(
+      'Interview rate — after 5 applied',
+    );
   });
 });

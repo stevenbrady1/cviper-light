@@ -303,6 +303,61 @@ describe('the Tracker board lays out (L-311)', () => {
 });
 
 /**
+ * The funnel strip above the board wraps on a phone and never runs past the
+ * window (L-383). "Applied so far" and "Interviewed so far" made two labels
+ * longer, so at 375px the strip may take one more row, never a sideways scroll.
+ */
+async function funnelOverflow(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const strip = document.querySelector('[data-testid="tracker-funnel"]');
+    if (strip === null) return ['no funnel strip'];
+    const over: string[] = [];
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      over.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    if (strip.scrollWidth > strip.clientWidth) {
+      over.push(`strip: ${String(strip.scrollWidth - strip.clientWidth)}px too wide`);
+    }
+    for (const part of strip.querySelectorAll('dt, dd, p')) {
+      const right = part.getBoundingClientRect().right;
+      if (right > root.clientWidth + 0.5) {
+        over.push(`"${part.textContent ?? ''}" ends at ${String(right)}px`);
+      }
+    }
+    return over;
+  });
+}
+
+describe('the Tracker funnel strip fits a phone (L-383)', () => {
+  it('at 375px the strip wraps and nothing runs past the window', async () => {
+    const page = await open('?seen=1&entries=1', { width: 375, height: 700 });
+    await goTo(page, 'tracker');
+    await page.waitForSelector('[data-testid="tracker-funnel"]');
+    const height = await page.evaluate(
+      () =>
+        document.querySelector('[data-testid="tracker-funnel"]')?.getBoundingClientRect().height,
+    );
+    console.log(`funnel strip at 375px: ${String(height)}px tall`);
+    assert.deepEqual(await funnelOverflow(page), []);
+    await page.context().close();
+  });
+
+  it('the check can fail: a label too wide for the window is reported', async () => {
+    const page = await open('?seen=1&entries=1', { width: 375, height: 700 });
+    await goTo(page, 'tracker');
+    await page.waitForSelector('[data-testid="tracker-funnel"]');
+    await page.evaluate(() => {
+      const label = document.querySelector('[data-testid="tracker-funnel"] dt');
+      if (label !== null) label.textContent = 'W'.repeat(200);
+    });
+    const report = await funnelOverflow(page);
+    assert.ok(report.length > 0, 'the widened label was not flagged');
+    await page.context().close();
+  });
+});
+
+/**
  * The shared content column (L-341) never makes a screen scroll sideways.
  *
  * jsdom does no layout, so `contentColumn.contract.test.tsx` can only read the
