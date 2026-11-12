@@ -7,20 +7,28 @@
  * when it is invalid, and keeps its own layout classes on top of the shared
  * style. Read from the New application form, whose boxes use both, and (L-376)
  * from the Analysis and Tailor boxes: the save-to-tracker form, the compact
- * job and application pickers, the contact dialog and the CV correction box.
+ * job and application pickers, the contact dialog and the CV correction box,
+ * and (L-379) from Search, the AI key card and Profile.
  */
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { type Application, type Cv, type Job } from '@cviper/core-types';
+import { emptyProfile, type Application, type Cv, type Job } from '@cviper/core-types';
 
 import { AnalysisAdvert } from '../features/analysis/AnalysisAdvert';
 import { AnalysisSaveToTracker } from '../features/analysis/AnalysisSaveToTracker';
+import { ProfileForm } from '../features/profile/ProfileForm';
+import { EMPTY_FORM } from '../features/search/model';
+import { SearchFields } from '../features/search/SearchFields';
+import { SearchSaved } from '../features/search/SearchSaved';
+import { AiKeySetup } from '../features/settings/keys/AiKeySetup';
+import { createFakeAiKeyPort } from '../features/settings/keys/test/fakeAiKeyPort';
 import { CvTextPanel } from '../features/tailor/CvTextPanel';
 import { TailorContactDialog } from '../features/tailor/TailorContactDialog';
 import { TailorSaveApplication } from '../features/tailor/TailorSaveApplication';
 import { NewApplicationForm } from '../features/tracker/NewApplicationForm';
+import { createFakeBrowserPort } from '../platform/test/fakeBrowserPort';
 
 import { FIELD, FIELD_COMPACT, FIELD_INVALID } from './fields';
 
@@ -205,5 +213,87 @@ describe('the Analysis and Tailor boxes on the shared style (L-376)', () => {
     expect(exactly(screen.getByTestId('tailor-cv-edit-text'))).toEqual(
       [...classesOf(FIELD), 'mt-1', 'w-full', 'font-sans'].sort(),
     );
+  });
+});
+
+function renderAiKeyCard() {
+  render(
+    <AiKeySetup ports={{ openai: createFakeAiKeyPort() }} browser={createFakeBrowserPort()} />,
+  );
+  return userEvent.setup();
+}
+
+describe('the Search, Settings key and Profile boxes on the shared style (L-379)', () => {
+  it('happy path: an AI key box at rest wears exactly FIELD and its layout', async () => {
+    renderAiKeyCard();
+    await screen.findByTestId('ai-key-card-openai');
+    expect(exactly(screen.getByTestId('ai-key-input-openai'))).toEqual(
+      [...classesOf(FIELD), 'mt-1', 'w-full'].sort(),
+    );
+  });
+
+  it('negative: an AI key box with an error wears FIELD_INVALID and loses the resting edge', async () => {
+    const user = renderAiKeyCard();
+    await screen.findByTestId('ai-key-card-openai');
+    // Testing an empty box is refused before anything is sent.
+    await user.click(screen.getByTestId('ai-key-test-openai'));
+    await screen.findByTestId('ai-key-error-openai');
+
+    const input = screen.getByTestId('ai-key-input-openai');
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(exactly(input)).toEqual([...classesOf(FIELD_INVALID), 'mt-1', 'w-full'].sort());
+    expect(input.classList.contains('border-field-line')).toBe(false);
+  });
+
+  it('boundary: the Search boxes keep their own layout: full width, or none for the contract picker', () => {
+    render(<SearchFields form={EMPTY_FORM} errors={{}} onField={() => undefined} />);
+    expect(exactly(screen.getByTestId('search-keywords'))).toEqual(
+      [...classesOf(FIELD), 'mt-1', 'w-full'].sort(),
+    );
+    expect(exactly(screen.getByTestId('search-contract'))).toEqual(
+      [...classesOf(FIELD), 'mt-1'].sort(),
+    );
+  });
+
+  it('boundary: the saved-search name box keeps its fixed width on top of FIELD', async () => {
+    render(
+      <SearchSaved
+        saved={[]}
+        suggestedName="Analyst in Leeds"
+        disabled={false}
+        note={null}
+        onSave={() => null}
+        onRun={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+    await userEvent.setup().click(screen.getByTestId('saved-search-open'));
+    expect(exactly(screen.getByTestId('saved-search-name'))).toEqual(
+      [...classesOf(FIELD), 'mt-1', 'w-64', 'max-w-full'].sort(),
+    );
+  });
+
+  it('boundary: a Profile box wears exactly FIELD and its layout, from the renamed local style', () => {
+    render(
+      <ProfileForm
+        loaded={{
+          profile: emptyProfile('2026-11-01T09:00:00.000Z'),
+          languageKeys: [],
+          starKeys: [],
+        }}
+        onEdit={() => undefined}
+        onAddLanguage={() => undefined}
+        onLanguageChange={() => undefined}
+        onRemoveLanguage={() => undefined}
+        onAddStar={() => undefined}
+        onStarChange={() => undefined}
+        onRemoveStar={() => undefined}
+      />,
+    );
+    for (const id of ['profile-headline', 'profile-writing-style']) {
+      expect(exactly(screen.getByTestId(id)), id).toEqual(
+        [...classesOf(FIELD), 'mt-1', 'w-full'].sort(),
+      );
+    }
   });
 });

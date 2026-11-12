@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
+import { FIELD, FIELD_INVALID } from '../../../app/fields';
 import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 import { combineKeyState, type KeyState } from '../../../status/environment';
 import { cardClasses, ErrorBox, SectionHeading, StatusPill } from '../../../ui';
@@ -421,9 +422,7 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
             // fixes the thing it complained about is just noise.
             setFieldError(null);
           }}
-          className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
-            fieldError === null ? 'border-field-line' : 'border-danger'
-          }`}
+          className={`${fieldError === null ? FIELD : FIELD_INVALID} mt-1 w-full`}
         />
         <p className="mt-1 text-xs text-ink-faint">{provider.fieldHint}</p>
 
@@ -501,7 +500,7 @@ function ModelPicker({ providerId }: { readonly providerId: AiKeyProviderId }) {
           // save would run a different model from the one on screen.
           if (chooseModel(providerId, next)) setModel(next);
         }}
-        className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+        className={`${FIELD} mt-1 w-full`}
       >
         {AI_MODEL_CHOICES[providerId].map((choice) => (
           <option key={choice.id} value={choice.id}>
