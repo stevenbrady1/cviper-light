@@ -4,8 +4,8 @@ import { type TrackerEntry } from './model';
 /**
  * One quiet row under the board header: the campaign as a funnel (L-159).
  *
- *   SAVED   APPLIED   INTERVIEWED   OFFERS   REJECTED    Interview rate 33%
- *     6      12         4           1         5          Offer rate 8%
+ *   SAVED   APPLIED SO FAR   INTERVIEWED SO FAR   OFFERS   REJECTED    Interview rate 33%
+ *     6         12                 4               1         5          Offer rate 8%
  *
  * ============================================================================
  * WHY IT IS A STRIP AND NOT A DASHBOARD
@@ -34,6 +34,11 @@ import { type TrackerEntry } from './model';
  * labels are past tense where the figure is "got this far" (Applied,
  * Interviewed), and the strip's `title` says so in a sentence. The test ids
  * and `funnel.ts` keep their names: only the words a person reads changed.
+ *
+ * The `title` is hover-only, so a touch user never saw it, and "Applied 5"
+ * above an Applied column of 2 still looked wrong. Those two labels now say
+ * "so far" on the strip itself (L-383). Saved, Offers and Rejected are plain
+ * counts of what is there now, so they do not.
  */
 
 interface FunnelStripProps {
@@ -47,8 +52,8 @@ export function FunnelStrip({ entries }: FunnelStripProps) {
 
   const figures: ReadonlyArray<readonly [key: string, label: string, value: number]> = [
     ['saved', 'Saved', funnel.saved],
-    ['sent', 'Applied', funnel.sent],
-    ['interviewing', 'Interviewed', funnel.interviewing],
+    ['sent', 'Applied so far', funnel.sent],
+    ['interviewing', 'Interviewed so far', funnel.interviewing],
     ['offers', 'Offers', funnel.offers],
     ['rejected', 'Rejected', funnel.rejected],
   ];

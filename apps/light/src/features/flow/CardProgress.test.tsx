@@ -210,3 +210,60 @@ describe('CardProgress draws its dots (L-360)', () => {
     expect(holder.hasAttribute('tabindex')).toBe(false);
   });
 });
+
+/**
+ * L-319: the button keeps its short visible word, "Continue" — the line just
+ * above it already says the step in words ("Step 4 of 5 · ATS Score", L-331),
+ * and the long form never fitted beside the dots. Where it goes is in its
+ * accessible name, "Continue: ATS Score", the same step the line above names.
+ */
+describe('Continue reads "Continue" and is named for its step (L-319)', () => {
+  function button(): HTMLElement {
+    return screen.getByTestId('tracker-card-continue-app-1');
+  }
+
+  it('happy: an analysed job’s button reads "Continue", named "Continue: Tailor"', () => {
+    renderProgress({ analysed: true, tailored: false, exported: false });
+    expect(button().textContent).toBe('Continue');
+    expect(screen.getByRole('button', { name: 'Continue: Tailor' })).toBe(button());
+  });
+
+  it('boundary: everything done still shows the button, enabled, named "Continue: Export"', () => {
+    renderProgress({ analysed: true, tailored: true, exported: true });
+    expect(button().textContent).toBe('Continue');
+    expect(screen.getByRole('button', { name: 'Continue: Export' })).toBe(button());
+    expect((button() as HTMLButtonElement).disabled).toBe(false);
+    expect(button().getAttribute('aria-disabled')).toBeNull();
+  });
+
+  it('negative: for all 8 progress states the word is "Continue" and the name is the step the line above says', () => {
+    for (const analysed of [false, true]) {
+      for (const tailored of [false, true]) {
+        for (const exported of [false, true]) {
+          renderProgress({ analysed, tailored, exported });
+          const state = JSON.stringify({ analysed, tailored, exported });
+          expect(button().textContent, state).toBe('Continue');
+          const step = /^Step [1-5] of 5 · (.+)$/.exec(
+            screen.getByTestId('tracker-card-step-app-1').textContent ?? '',
+          )?.[1];
+          expect(['Analyse', 'Tailor', 'ATS Score', 'Export'], state).toContain(step);
+          expect(screen.getByRole('button', { name: `Continue: ${String(step)}` }), state).toBe(
+            button(),
+          );
+          cleanup();
+        }
+      }
+    }
+  });
+
+  it('a click fires Continue once, with the step its name says', async () => {
+    const { onContinue, user } = renderProgress({
+      analysed: true,
+      tailored: true,
+      exported: false,
+    });
+    await user.click(screen.getByRole('button', { name: 'Continue: ATS Score' }));
+    expect(onContinue).toHaveBeenCalledTimes(1);
+    expect(onContinue).toHaveBeenCalledWith('ats');
+  });
+});

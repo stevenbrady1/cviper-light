@@ -128,11 +128,11 @@ export function TrackerColumn({
           <button
             type="button"
             data-testid="tracker-edit-substages"
-            aria-label={substages.length === 0 ? undefined : 'Edit interview stages'}
             onClick={(event) => onEditSubstages(event.currentTarget)}
             className={`${QUIET_BUTTON} text-xs`}
           >
-            {substages.length === 0 ? 'Edit stages' : 'Stages'}
+            {/* One name, seen and heard, with or without stages (L-319). */}
+            Interview stages
           </button>
         </div>
       )}

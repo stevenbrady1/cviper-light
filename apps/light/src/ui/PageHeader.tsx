@@ -18,6 +18,18 @@ import { type NavIconProps } from './NavIcons';
  *         sit in. Bigger title, no strip.
  */
 
+/*
+ * The title ladder (L-382): the display serif at regular weight, 24px page
+ * titles, 20px section titles, 30px (36px from md) on the welcome page.
+ * Newsreader ships one weight, 400, so `font-normal` is said outright: a bold
+ * parent would otherwise make the browser fake a bold serif. `lining-nums`
+ * because its default figures wobble on the baseline.
+ * `heading-ladder.contract.test.ts` holds all of this.
+ */
+export const PAGE_TITLE = 'font-display text-2xl font-normal text-ink lining-nums';
+export const SECTION_TITLE = 'font-display text-xl font-normal text-ink lining-nums';
+export const HERO_TITLE = 'font-display text-3xl font-normal text-ink lining-nums md:text-4xl';
+
 export interface PageHeaderProps {
   readonly title: string;
   readonly subtitle: ReactNode;
@@ -54,7 +66,7 @@ export function PageHeader({
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0">
           {eyebrow}
-          <h1 className="mt-3 text-2xl font-bold tracking-tight text-ink md:text-3xl">{title}</h1>
+          <h1 className={`mt-3 ${HERO_TITLE}`}>{title}</h1>
           <p className="mt-1 text-base text-ink-muted">{subtitle}</p>
         </div>
         {actionsBox}
@@ -63,7 +75,7 @@ export function PageHeader({
   }
 
   return (
-    <header className="border-b border-line bg-card px-4 py-3 md:px-6 md:py-4">
+    <header className="border-b border-line bg-card px-4 py-2.5 md:px-6 md:py-3.5">
       <div
         className={`flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4 ${column}`}
       >
@@ -74,7 +86,7 @@ export function PageHeader({
             <IconTile icon={icon} />
           ) : null}
           <div className="min-w-0">
-            <h1 className="text-lg font-semibold text-ink">{title}</h1>
+            <h1 className={PAGE_TITLE}>{title}</h1>
             <p className="text-ink-muted">{subtitle}</p>
           </div>
         </div>
@@ -114,7 +126,7 @@ export function SectionHeading({
       {icon === undefined ? null : <IconTile icon={icon} tone={tone} size="sm" />}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Heading id={id} className="font-semibold text-ink">
+          <Heading id={id} className={SECTION_TITLE}>
             {title}
           </Heading>
           {aside}

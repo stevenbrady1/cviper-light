@@ -303,6 +303,61 @@ describe('the Tracker board lays out (L-311)', () => {
 });
 
 /**
+ * The funnel strip above the board wraps on a phone and never runs past the
+ * window (L-383). "Applied so far" and "Interviewed so far" made two labels
+ * longer, so at 375px the strip may take one more row, never a sideways scroll.
+ */
+async function funnelOverflow(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const strip = document.querySelector('[data-testid="tracker-funnel"]');
+    if (strip === null) return ['no funnel strip'];
+    const over: string[] = [];
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      over.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    if (strip.scrollWidth > strip.clientWidth) {
+      over.push(`strip: ${String(strip.scrollWidth - strip.clientWidth)}px too wide`);
+    }
+    for (const part of strip.querySelectorAll('dt, dd, p')) {
+      const right = part.getBoundingClientRect().right;
+      if (right > root.clientWidth + 0.5) {
+        over.push(`"${part.textContent ?? ''}" ends at ${String(right)}px`);
+      }
+    }
+    return over;
+  });
+}
+
+describe('the Tracker funnel strip fits a phone (L-383)', () => {
+  it('at 375px the strip wraps and nothing runs past the window', async () => {
+    const page = await open('?seen=1&entries=1', { width: 375, height: 700 });
+    await goTo(page, 'tracker');
+    await page.waitForSelector('[data-testid="tracker-funnel"]');
+    const height = await page.evaluate(
+      () =>
+        document.querySelector('[data-testid="tracker-funnel"]')?.getBoundingClientRect().height,
+    );
+    console.log(`funnel strip at 375px: ${String(height)}px tall`);
+    assert.deepEqual(await funnelOverflow(page), []);
+    await page.context().close();
+  });
+
+  it('the check can fail: a label too wide for the window is reported', async () => {
+    const page = await open('?seen=1&entries=1', { width: 375, height: 700 });
+    await goTo(page, 'tracker');
+    await page.waitForSelector('[data-testid="tracker-funnel"]');
+    await page.evaluate(() => {
+      const label = document.querySelector('[data-testid="tracker-funnel"] dt');
+      if (label !== null) label.textContent = 'W'.repeat(200);
+    });
+    const report = await funnelOverflow(page);
+    assert.ok(report.length > 0, 'the widened label was not flagged');
+    await page.context().close();
+  });
+});
+
+/**
  * The shared content column (L-341) never makes a screen scroll sideways.
  *
  * jsdom does no layout, so `contentColumn.contract.test.tsx` can only read the
@@ -2038,6 +2093,92 @@ describe('drawn marks sit at a readable size beside their words (L-370)', () => 
 });
 
 /**
+ * A tracker card's Continue and its dots (L-319).
+ *
+ * The button keeps its short word, "Continue", so in the sheet's 176px card it
+ * sits on the dots' line, as it always has. A card in a column at its minimum
+ * (`md:min-w-44`, 176px, less the list's `px-2`) is 160px, and there the dots
+ * (55px), the gap and "Continue" (80px) are about 9px too wide for one line:
+ * the button wraps under the dots instead of squashing them onto two lines, as
+ * it used to, or poking out of the card.
+ */
+async function continueProblems(
+  page: Page,
+  cardWidth: string | null,
+  oneLine: boolean,
+): Promise<string[]> {
+  return page.evaluate(
+    ([width, sameLine]) => {
+      const row = document.querySelector('[data-testid="tracker-card-progress-marks"]');
+      const button = row?.querySelector('button');
+      if (!(row instanceof HTMLElement) || !button || !row.parentElement) return ['no card'];
+      if (width !== null) row.parentElement.style.width = width;
+      const problems: string[] = [];
+      const room = row.getBoundingClientRect();
+      const box = button.getBoundingClientRect();
+      if (box.left < room.left - 0.5 || box.right > room.right + 0.5) {
+        problems.push(`Continue: ${String(box.width)}px wide in a ${String(room.width)}px row`);
+      }
+      if (button.scrollWidth > button.clientWidth) problems.push('Continue: its words overflow it');
+      const marks = [...row.querySelectorAll('[data-mark]')].map((mark) =>
+        mark.getBoundingClientRect(),
+      );
+      const dotTops = new Set(marks.map((mark) => Math.round(mark.top)));
+      if (dotTops.size !== 1) problems.push(`dots: squashed onto ${String(dotTops.size)} lines`);
+      // One line: the dots' middle falls within the button's height.
+      const dots = marks[0];
+      if (sameLine && dots !== undefined) {
+        const middle = dots.top + dots.height / 2;
+        if (middle < box.top || middle > box.bottom) {
+          problems.push(
+            `Continue: not beside the dots (top ${String(box.top)}, dots ${String(middle)})`,
+          );
+        }
+      }
+      return problems;
+    },
+    [cardWidth, oneLine] as const,
+  );
+}
+
+describe('a tracker card’s Continue fits its card (L-319)', () => {
+  for (const [name, markWindow] of Object.entries(MARK_WINDOWS)) {
+    it(`sits beside the dots on one line in a 176px card, ${name}`, async () => {
+      const page = await openMarks(markWindow);
+      assert.equal(
+        await page.textContent('[data-testid="tracker-card-continue-marks"]'),
+        'Continue',
+      );
+      assert.deepEqual(await continueProblems(page, null, true), []);
+      await page.context().close();
+    });
+
+    it(`stays inside the narrowest desktop card, 160px, and the dots stay one line, ${name}`, async () => {
+      const page = await openMarks(markWindow);
+      assert.deepEqual(await continueProblems(page, '160px', false), []);
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — the long "Continue: ATS Score" does not fit beside the dots in
+  // a 176px card, and is caught.
+  it('the check can fail: a Continue too long for the dots’ line is reported', async () => {
+    const page = await openMarks(MARK_WINDOWS.desktop);
+    await page.evaluate(() => {
+      const button = document.querySelector('[data-testid="tracker-card-continue-marks"]');
+      if (button === null) throw new Error('no Continue on the sheet');
+      button.textContent = 'Continue: ATS Score';
+    });
+    const report = await continueProblems(page, null, true);
+    assert.ok(
+      report.some((line) => line.startsWith('Continue:')),
+      `the long button was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
  * Hints show a small "i" button instead of a dotted underline (L-384).
  *
  * The words of a hint are plain text now; straight after them sits a small
@@ -2742,6 +2883,122 @@ describe('a suggestion priority label stays on one line, inside its card (L-378)
     assert.ok(
       report.problems.some((line) => line.includes('analysis-suggestion-high: label is')),
       `the wrapped label was not flagged: ${JSON.stringify(report.problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
+ * Page titles: one line, in the serif, and the header no taller (L-382).
+ *
+ * The page title grew from 18px on a 28px line to 24px on a 32px line, set in
+ * Newsreader at regular weight, and the header bar's padding shrank by the same
+ * 4px. The header must not grow: the Search form fits the 1000×700 minimum
+ * window by only 2px (the L-342 checks above), and the Smoke pictures need the
+ * step bar and the ATS table fully on screen. On main before L-382 every
+ * screen's header measured 85px at 1000×700 in this harness; that is the cap.
+ *
+ * One line is measured, not written down: the title's height must be its own
+ * line height. jsdom does no layout and loads no fonts, so only a real engine
+ * can say either.
+ */
+const HEADER_CAP_PX = 85;
+const TITLE_WINDOWS = {
+  smallest: { width: 1000, height: 700 },
+  phone: { width: 375, height: 800 },
+} as const;
+
+async function titleProblems(
+  page: Page,
+  view: string,
+  headerCap: number | null,
+): Promise<string[]> {
+  return page.evaluate(
+    ({ view, headerCap }) => {
+      const title = document.querySelector<HTMLElement>(`[data-testid="view-${view}"] h1`);
+      const header = title?.closest('header');
+      if (title === null || title === undefined || header === null || header === undefined) {
+        return [`${view}: no title in a header`];
+      }
+      const problems: string[] = [];
+      const line = parseFloat(getComputedStyle(title).lineHeight);
+      const height = title.getBoundingClientRect().height;
+      if (height > line + 0.5) {
+        problems.push(`${view}: title is ${String(height)}px tall, one line is ${String(line)}px`);
+      }
+      if (title.scrollWidth > title.clientWidth + 0.5) {
+        problems.push(`${view}: title is clipped`);
+      }
+      const tall = header.getBoundingClientRect().height;
+      if (headerCap !== null && tall > headerCap + 0.5) {
+        problems.push(
+          `${view}: header is ${String(tall)}px tall, the cap is ${String(headerCap)}px`,
+        );
+      }
+      return problems;
+    },
+    { view, headerCap },
+  );
+}
+
+async function everyTitle(
+  viewport: { width: number; height: number },
+  headerCap: number | null,
+): Promise<string[]> {
+  const page = await open('?seen=1', viewport);
+  const problems: string[] = [];
+  for (const view of VIEWS) {
+    await goTo(page, view);
+    problems.push(...(await titleProblems(page, view, headerCap)));
+  }
+  await page.context().close();
+  return problems;
+}
+
+describe('page titles stay on one line in the serif, and the header does not grow (L-382)', () => {
+  it(`every screen's title is one line and the header is no taller than ${String(HEADER_CAP_PX)}px at 1000×700`, async () => {
+    assert.deepEqual(await everyTitle(TITLE_WINDOWS.smallest, HEADER_CAP_PX), []);
+  });
+
+  it("every screen's title is one line at 375×800", async () => {
+    assert.deepEqual(await everyTitle(TITLE_WINDOWS.phone, null), []);
+  });
+
+  it("the title's computed font family is Newsreader at weight 400, and the face loaded", async () => {
+    const page = await open('?seen=1', TITLE_WINDOWS.smallest);
+    await goTo(page, 'settings');
+    const seen = await page.evaluate(() => {
+      const title = document.querySelector('[data-testid="view-settings"] h1');
+      const style = title === null ? null : getComputedStyle(title);
+      return {
+        family: style?.fontFamily.split(',')[0]?.trim().replaceAll(/['"]/g, '') ?? '',
+        weight: style?.fontWeight ?? '',
+        size: style?.fontSize ?? '',
+        // A family name in the computed style proves nothing if the file never
+        // arrived: the browser would draw the Georgia fallback under that name.
+        loaded: document.fonts.check('400 24px Newsreader'),
+      };
+    });
+    assert.deepEqual(seen, { family: 'Newsreader', weight: '400', size: '24px', loaded: true });
+    await page.context().close();
+  });
+
+  // NEGATIVE — a title too long for its row wraps, and is caught.
+  it('the check can fail: a long title is reported', async () => {
+    const page = await open('?seen=1', TITLE_WINDOWS.smallest);
+    await goTo(page, 'settings');
+    await page.evaluate(() => {
+      const title = document.querySelector('[data-testid="view-settings"] h1');
+      if (title !== null) title.textContent = 'Settings '.repeat(20).trim();
+    });
+    const problems = await titleProblems(page, 'settings', HEADER_CAP_PX);
+    assert.ok(
+      problems.some((line) => line.startsWith('settings: title is')),
+      `the wrapped title was not flagged: ${JSON.stringify(problems)}`,
+    );
+    assert.ok(
+      problems.some((line) => line.startsWith('settings: header is')),
+      `the taller header was not flagged: ${JSON.stringify(problems)}`,
     );
     await page.context().close();
   });
