@@ -58,11 +58,6 @@ const CUE = /(?<![\w:-])(text-xs|text-\[1[01]px\]|font-normal)(?![\w-])/;
  */
 const ALLOWED: readonly { file: string; classes: string; reason: string }[] = [
   {
-    file: 'apps/light/src/features/flow/JobStepBar.tsx',
-    classes: 'hidden text-ink-faint md:inline',
-    reason: 'A decorative separator between steps, hidden from screen readers. Not text.',
-  },
-  {
     file: 'apps/light/src/features/tailor/AtsStep.tsx',
     classes: 'text-ink-faint',
     reason:

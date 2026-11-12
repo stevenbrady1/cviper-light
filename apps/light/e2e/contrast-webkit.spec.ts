@@ -2154,6 +2154,182 @@ describe('drawn marks sit at a readable size beside their words (L-370)', () => 
 });
 
 /**
+ * A slimmer step bar (L-386).
+ *
+ * The bar under the page header was four stacked rows. On a desktop it is now
+ * two: the job, its CV and engine, and Back and Next on one; the five steps,
+ * joined by drawn lines, on the next. On a phone the steps are marks only, one
+ * row of five 44px buttons, and one line of words under them says where the
+ * user is and what was skipped — a tap on a step navigates, so its hint cannot
+ * be reached there, and the words are what explain the marks.
+ *
+ * Measured on the real Tailor screen, opened from a tracker card's "Tailor".
+ */
+async function tailorWithBar(width: number): Promise<Page> {
+  const page = await open('?seen=1&entries=1', { width, height: 800 });
+  await goTo(page, 'tracker');
+  await page.waitForSelector('[data-testid="tracker-card-c"]');
+  await page.click('[data-testid="tracker-card-c"]');
+  await page.click('[data-testid="detail-tailor"]');
+  await page.waitForSelector('[data-testid="job-steps"] [data-testid="job-step-tailor"]');
+  return page;
+}
+
+/**
+ * The bar's height on main before L-386, measured with this harness in WebKit:
+ * 227px at 375px (the steps wrapped onto two rows, Back and Next on a fourth)
+ * and 153px at 1000px (four rows).
+ */
+const STEP_BAR_BEFORE_PX = { 375: 227, 1000: 153 } as const;
+
+/** Everything about the bar's layout that is not as L-386 says, at this window's width. */
+async function stepBarProblems(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const bar = document.querySelector('[data-testid="job-steps"]');
+    if (bar === null) return ['no step bar'];
+    const problems: string[] = [];
+    const phone = window.innerWidth < 768;
+    const box = (element: Element): DOMRect => element.getBoundingClientRect();
+
+    const steps = [...bar.querySelectorAll('[data-testid^="job-step-"][data-state]')];
+    if (steps.length !== 5) problems.push(`${String(steps.length)} steps, not 5`);
+    const rows = new Set(steps.map((step) => Math.round(box(step).top)));
+    if (rows.size !== 1) problems.push(`steps: on ${String(rows.size)} rows`);
+    for (const step of steps) {
+      const { width, height } = box(step);
+      if (phone && (width < 44 || height < 44)) {
+        problems.push(
+          `${step.getAttribute('data-testid') ?? '?'}: ${String(width)}×${String(height)}px`,
+        );
+      }
+    }
+
+    // Drawn, not typed: no text, a painted fill, and a size on screen.
+    const lines = [...bar.querySelectorAll('[data-testid="job-steps-line"]')];
+    if (lines.length !== 4) problems.push(`${String(lines.length)} connectors, not 4`);
+    for (const line of lines) {
+      const { width, height } = box(line);
+      const fill = getComputedStyle(line).backgroundColor;
+      const painted = fill !== 'rgba(0, 0, 0, 0)' && fill !== 'transparent';
+      if ((line.textContent ?? '') !== '' || !painted || width < 1 || height < 0.5) {
+        problems.push(`connector: not drawn (${String(width)}×${String(height)}px, ${fill})`);
+      }
+    }
+
+    const where = bar.querySelector('[data-testid="job-steps-where"]');
+    const shown = where !== null && box(where).height > 0;
+    const stepsBottom = Math.max(...steps.map((step) => box(step).bottom));
+    if (phone && !shown) problems.push('words line: not shown on a phone');
+    if (phone && shown && box(where).top < stepsBottom - 0.5) {
+      problems.push('words line: not under the steps');
+    }
+    if (!phone && shown) problems.push('words line: shown on a desktop, a third row');
+
+    const job = bar.querySelector('[data-testid="job-steps-job"]');
+    if (job === null) return [...problems, 'no job name'];
+    const lineHeight = parseFloat(getComputedStyle(job).lineHeight);
+    if (box(job).height > lineHeight * 1.5) {
+      problems.push(`job name: wraps (${String(box(job).height)}px)`);
+    }
+    for (const id of ['job-steps-back', 'job-steps-next']) {
+      const button = bar.querySelector(`[data-testid="${id}"]`);
+      if (button === null) {
+        problems.push(`${id}: missing`);
+        continue;
+      }
+      const at = box(button);
+      if (at.left < -0.5 || at.right > window.innerWidth + 0.5) problems.push(`${id}: off screen`);
+      // A desktop's first row: Back and Next level with the job name.
+      if (!phone && (at.top > box(job).bottom || at.bottom < box(job).top)) {
+        problems.push(`${id}: not on the job's row`);
+      }
+      if (at.top >= stepsBottom) problems.push(`${id}: below the steps`);
+    }
+
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      problems.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    return problems;
+  });
+}
+
+async function stepBarHeight(page: Page): Promise<number> {
+  return page.evaluate(
+    () => document.querySelector('[data-testid="job-steps"]')?.getBoundingClientRect().height ?? 0,
+  );
+}
+
+describe('a slimmer step bar (L-386)', () => {
+  it('at 375px the steps are one row and each is at least 44px', async () => {
+    const page = await tailorWithBar(375);
+    assert.deepEqual(await stepBarProblems(page), []);
+    await page.context().close();
+  });
+
+  it('at 1000px: the job with Back and Next, then the steps joined by drawn lines', async () => {
+    const page = await tailorWithBar(1000);
+    assert.deepEqual(await stepBarProblems(page), []);
+    await page.context().close();
+  });
+
+  for (const width of [375, 1000] as const) {
+    it(`the bar is shorter than before at ${String(width)}px`, async () => {
+      const page = await tailorWithBar(width);
+      const height = await stepBarHeight(page);
+      console.log(
+        `step bar at ${String(width)}px: ${String(height)}px (before L-386: ${String(STEP_BAR_BEFORE_PX[width])}px)`,
+      );
+      assert.ok(height > 0, 'the bar drew nothing');
+      assert.ok(
+        height < STEP_BAR_BEFORE_PX[width],
+        `${String(height)}px is not shorter than ${String(STEP_BAR_BEFORE_PX[width])}px`,
+      );
+      await page.context().close();
+    });
+
+    it(`edge: a very long job name is cut short, and Back and Next stay put, at ${String(width)}px`, async () => {
+      const page = await tailorWithBar(width);
+      const before = await stepBarHeight(page);
+      const cut = await page.evaluate(() => {
+        const job = document.querySelector<HTMLElement>('[data-testid="job-steps-job"]');
+        if (job === null) throw new Error('no job name');
+        job.textContent = 'Principal Senior Lead Data Analyst '.repeat(8);
+        return job.scrollWidth > job.clientWidth;
+      });
+      assert.ok(cut, 'the long name was not cut short');
+      assert.deepEqual(await stepBarProblems(page), []);
+      assert.equal(await stepBarHeight(page), before, 'the long name made the bar taller');
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a small step, no words line and a typed connector are reported', async () => {
+    const page = await tailorWithBar(375);
+    await page.evaluate(() => {
+      const step = document.querySelector<HTMLElement>('[data-testid="job-step-find"]');
+      const where = document.querySelector<HTMLElement>('[data-testid="job-steps-where"]');
+      const line = document.querySelector<HTMLElement>('[data-testid="job-steps-line"]');
+      if (step === null || where === null || line === null) throw new Error('bar parts missing');
+      step.style.minWidth = '0';
+      step.style.padding = '0';
+      where.style.display = 'none';
+      line.className = '';
+      line.textContent = '─';
+    });
+    const problems = await stepBarProblems(page);
+    for (const expected of ['job-step-find: ', 'words line: not shown', 'connector: not drawn']) {
+      assert.ok(
+        problems.some((line) => line.startsWith(expected)),
+        `"${expected}" went unreported: ${JSON.stringify(problems)}`,
+      );
+    }
+    await page.context().close();
+  });
+});
+
+/**
  * A tracker card's Continue and its dots (L-319).
  *
  * The button keeps its short word, "Continue", so in the sheet's 176px card it

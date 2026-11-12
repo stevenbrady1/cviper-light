@@ -17,7 +17,9 @@
  *
  * The page reads six switches from the address:
  *   - `?seen=1` skips the first-run welcome, as a returning user sees the app;
- *   - `?entries=1` puts three applications on the board;
+ *   - `?entries=1` puts three applications on the board, and gives Tailor
+ *     their jobs, so a card's "Tailor" opens the real screen with its step
+ *     bar (L-386);
  *   - `?results=1` says a job-board key is saved, and answers Search with a long
  *     list of adverts from the fake port (L-342: what results do to the layout).
  *   - `?trackerLoadError=<text>` and `?profileLoadError=<text>` make the
@@ -470,7 +472,10 @@ ReactDOM.createRoot(root).render(
         profilePort={
           profileLoad === undefined ? profilePort : { ...profilePort, load: profileLoad }
         }
-        tailorPort={createFakeTailorPort()}
+        tailorPort={createFakeTailorPort({
+          jobs: entries.map((tracked) => tracked.job),
+          applications: entries.map((tracked) => tracked.application),
+        })}
         {...(searchPort === undefined ? {} : { searchPort })}
         now={NOW}
       />

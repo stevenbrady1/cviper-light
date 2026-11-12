@@ -5,7 +5,7 @@
  * user for every step that lives on another screen — and nothing on the bar
  * ever running a check or a model. Also at phone width, and with no job.
  */
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -257,6 +257,34 @@ describe('at phone width (375px)', () => {
     await screen.findByTestId('view-tailor');
     expect(current()).toBe('job-step-tailor');
     expect(screen.getByTestId('nav-tailor').getAttribute('aria-current')).toBe('page');
+  });
+
+  // L-386: on a phone the steps draw their marks only. They must still be five
+  // buttons a screen reader can name, and the words line under them says what
+  // a tap cannot reach: where the user is and what was skipped.
+  it('five steps stay five named buttons, with the words line under them', async () => {
+    installMatchMedia(375);
+    const { user } = await renderApp();
+    await analyseTrackedJob(user);
+    await user.click(screen.getByTestId('job-steps-next'));
+    await screen.findByTestId('view-tailor');
+    await vi.waitFor(() => expect(current()).toBe('job-step-tailor'));
+
+    const nav = screen.getByRole('navigation', { name: 'Steps for this job' });
+    const names = within(nav)
+      .getAllByRole('button')
+      .map((button) => button.textContent);
+    expect(names).toEqual([
+      'Find, done',
+      'Analyse, skipped',
+      'Tailor, you are here',
+      'ATS Score, not started',
+      'Export, not started',
+    ]);
+    for (const name of names) expect(within(nav).getByRole('button', { name: name! })).toBeTruthy();
+    expect(screen.getByTestId('job-steps-where').textContent).toBe(
+      'Step 3 of 5 · Tailor. Skipped: Analyse.',
+    );
   });
 });
 
