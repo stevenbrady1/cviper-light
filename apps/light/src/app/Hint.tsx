@@ -12,10 +12,12 @@
  * ============================================================================
  * THREE WAYS IN, AND ONE THAT IS ALWAYS THERE
  * ============================================================================
- *   * hover with a mouse;
- *   * keyboard focus — a plain mark is made focusable for this, so Tab finds
- *     it — and Escape closes it;
- *   * a tap on a touch screen, which toggles it.
+ *   * hover with a mouse, on the words or the "i";
+ *   * keyboard focus — the small circled "i" after the words is a real
+ *     button, named "What this means", and it is the Tab stop (L-384) — and
+ *     Escape closes it, leaving focus on the button;
+ *   * a tap or click, on the words or the "i": the first opens it, the next
+ *     closes it.
  * And a screen reader gets the same words at all times through
  * `aria-describedby`: the tip stays in the page while it is hidden, so the
  * description never depends on anything having been hovered.
@@ -29,6 +31,21 @@
  * it when there is no room), and kept 8px inside the window at both sides —
  * so a hint on the last column of a table on a 375px phone does not run off
  * the screen.
+ *
+ * ============================================================================
+ * WHY A TAP DOES NOT SHUT WHAT IT JUST OPENED
+ * ============================================================================
+ * A touch screen follows a tap with a made-up hover, a focus and then the
+ * click, in that order (measured in WebKit, L-384). When the click simply
+ * toggled, the made-up hover opened the tip and the click shut it straight
+ * away. So a hover or focus only SHOWS the tip, and a click PINS it: a click
+ * closes only a tip that a click opened. A mouse user who hovers and then
+ * clicks gets the same: the click keeps it open, the next one closes it.
+ *
+ * The "i" is 24×24px through its padding, the WCAG 2.2 AA minimum, with a
+ * negative margin so a line of text is no taller for it. The owner accepted
+ * that instead of the house 44px phone rule for this one inline icon (the
+ * named exception in `buttons-are-shared.contract.test.ts`).
  */
 import {
   useCallback,
@@ -41,6 +58,8 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+
+import { Icon } from '../ui/Icon';
 
 /** What a trigger needs to carry the hint. Spread it onto the element. */
 export interface HintTriggerProps {
@@ -66,8 +85,9 @@ export interface HintProps {
    */
   readonly label?: string | undefined;
   /**
-   * `false` keeps the mark out of the Tab order: hover and tap only. For a
-   * mark repeated many times whose meaning is already spoken another way —
+   * `false` draws no "i" and keeps the mark out of the Tab order: hover and
+   * tap only. For a mark repeated many times whose meaning is already spoken
+   * another way —
    * a tracker card's dots carry "3 of 5 steps done" as screen-reader text —
    * where a Tab stop on every card would only slow a keyboard user down.
    */
@@ -78,9 +98,13 @@ export interface HintProps {
 const EDGE = 8;
 const GAP = 6;
 
+/** Shown by a hover or focus, pinned by a click; `null` when hidden. */
+type Shown = 'shown' | 'pinned' | null;
+
 export function Hint({ text, children, className, label, focusable = true }: HintProps) {
   const id = useId();
-  const [open, setOpen] = useState(false);
+  const [shown, setShown] = useState<Shown>(null);
+  const open = shown !== null;
   const [place, setPlace] = useState({ top: 0, left: 0 });
   const trigger = useRef<HTMLElement | null>(null);
   const tip = useRef<HTMLSpanElement | null>(null);
@@ -98,8 +122,8 @@ export function Hint({ text, children, className, label, focusable = true }: Hin
     setPlace({ top: Math.max(EDGE, top), left });
   }, [open]);
 
-  const show = useCallback(() => setOpen(true), []);
-  const hide = useCallback(() => setOpen(false), []);
+  const show = useCallback(() => setShown((was) => was ?? 'shown'), []);
+  const hide = useCallback(() => setShown(null), []);
 
   const props: HintTriggerProps = {
     ref: (element) => {
@@ -146,12 +170,28 @@ export function Hint({ text, children, className, label, focusable = true }: Hin
     <>
       <span
         {...props}
-        tabIndex={focusable ? 0 : undefined}
         aria-label={label}
-        onClick={() => setOpen((was) => !was)}
-        className={`cursor-help underline decoration-dotted decoration-1 underline-offset-2 ${className ?? ''}`}
+        onClick={() => setShown((was) => (was === 'pinned' ? null : 'pinned'))}
+        className={`cursor-help ${className ?? ''}`}
       >
         {children}
+        {focusable ? (
+          // A place to wrap before the "i", even where the words may not wrap
+          // (`whitespace-nowrap` keeps "✓ OK" together): a zero-width space,
+          // drawn by CSS so it adds nothing to the words' text. Without it the
+          // ATS table is wider than a 375px phone (L-384).
+          <span className="whitespace-normal before:content-['\200b']">
+            <button
+              type="button"
+              data-testid="hint-info"
+              aria-label="What this means"
+              aria-describedby={id}
+              className="-my-1.5 ml-0.5 inline-flex min-h-6 min-w-6 cursor-help items-center justify-center rounded-pill align-middle"
+            >
+              <Icon name="info" size={14} monochrome />
+            </button>
+          </span>
+        ) : null}
       </span>
       {tooltip}
     </>

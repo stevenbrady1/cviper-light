@@ -164,6 +164,11 @@ const ALLOWED: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   'app/BottomNav.tsx': {
     'nav-${view.id}': 'A navigation tab: icon over label, with the teal marker rule on top.',
   },
+  'app/Hint.tsx': {
+    'hint-info':
+      'The small "i" after a hint\'s words, inline in a line of text. Named exception (owner, ' +
+      'L-384): 24×24px, the WCAG 2.2 AA minimum, not the 44px phone rule, so no row grows.',
+  },
   'app/Sidebar.tsx': {
     'nav-${view.id}': 'A navigation item in the rail, with the teal marker rule on its left edge.',
   },

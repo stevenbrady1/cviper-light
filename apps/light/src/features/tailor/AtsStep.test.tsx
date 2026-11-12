@@ -256,9 +256,10 @@ describe('AtsStep draws its marks (L-362)', () => {
     for (const mark of marks) {
       expect(mark.closest('[aria-hidden="true"]')).not.toBeNull();
       expect(mark.querySelector('[tabindex]')).toBeNull();
-      // The focus stop is the hint around the mark, as it was around the typed one.
+      // The focus stop is the hint's "i" button, after the mark and its word (L-384).
       const hint = mark.closest('[aria-describedby]')!;
-      expect(hint.getAttribute('tabindex')).toBe('0');
+      expect(hint.hasAttribute('tabindex')).toBe(false);
+      expect(hint.querySelector('button[aria-label="What this means"]')).not.toBeNull();
     }
     // What a screen reader reads in each cell: the words and numbers, no mark.
     const read = (id: string) => screen.getByTestId(id).textContent;
