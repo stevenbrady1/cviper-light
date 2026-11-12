@@ -17,14 +17,21 @@
  * the screen's scroll area, or on the column's own children. A screen that
  * wants a different width changes this file, and so changes all five.
  *
- * The column is LEFT-aligned, under the screen's title (no `mx-auto`). It goes
- * INSIDE the scroll area, never on it: the scroll area stays full width, so
- * its scrollbar stays at the window's edge, not in the middle of it. Headers,
- * step bars and error banners stay full width, outside the column.
+ * The column is 1024px and CENTRED (L-326): on a wide window a left-aligned
+ * column left half of every screenshot empty. It goes INSIDE the scroll area,
+ * never on it: the scroll area stays full width, so its scrollbar stays at the
+ * window's edge, not in the middle of it. Step bars and error banners stay
+ * full width, outside the column. The page header's strip is full width too,
+ * but its title row carries this same class (`ViewHeader`), so the title
+ * starts where the content starts.
  *
  * Tracker (a board of columns) and the first-run welcome are not read top to
- * bottom, and keep their own widths.
+ * bottom, and keep their own widths. Tracker's title stays at the left, in
+ * line with its full-width board.
  *
  * `contentColumn.contract.test.tsx` checks all of this on the rendered screens.
  */
-export const CONTENT_COLUMN = 'max-w-4xl';
+export const CONTENT_COLUMN = 'mx-auto max-w-5xl';
+
+/** The side padding of every screen's scroll area, the same as the header's. */
+export const SIDE_PADDING = 'px-4 md:px-6';

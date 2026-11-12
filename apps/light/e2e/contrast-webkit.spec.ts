@@ -307,8 +307,12 @@ describe('the Tracker board lays out (L-311)', () => {
  *
  * jsdom does no layout, so `contentColumn.contract.test.tsx` can only read the
  * classes. Here the real engine measures, at 1000px — a narrow desktop window,
- * where the column's `max-w-4xl` (896px) plus the rail is wider than the window
- * and the column must give way, not overflow.
+ * where the column's `max-w-5xl` (1024px) plus the rail is wider than the
+ * window and the column must give way, not overflow — and at 768 and 375.
+ *
+ * L-326 centred the column. At 1440 and 1920 it is 1024px with equal gaps each
+ * side, and the page title starts where the column starts. The Tracker board
+ * is not in it, and is measured wider than 1024px.
  */
 const COLUMN_VIEWS = ['profile', 'search', 'settings', 'analysis', 'tailor'] as const;
 
@@ -331,21 +335,98 @@ async function sidewaysOverflow(page: Page): Promise<string[]> {
   });
 }
 
-describe('the shared content column fits the window (L-341)', () => {
-  for (const view of COLUMN_VIEWS) {
-    it(`the ${view} screen has no sideways scroll at 1000px`, async () => {
-      const page = await open('?seen=1', { width: 1000, height: 800 });
-      await goTo(page, view);
-      await page.waitForSelector('[data-content-column]');
-      const width = await page.evaluate(
-        () => document.querySelector('[data-content-column]')?.getBoundingClientRect().width ?? 0,
-      );
-      console.log(`${view} at 1000px: column ${String(Math.round(width))}px wide`);
-      assert.ok(width > 0 && width <= 896, `${view}: column ${String(width)}px`);
-      assert.deepEqual(await sidewaysOverflow(page), []);
-      await page.context().close();
-    });
+/** Where the column sits in its scroll area, and where the page title's row starts. */
+async function columnBox(page: Page): Promise<{
+  width: number;
+  left: number;
+  gapLeft: number;
+  gapRight: number;
+  areaInner: number;
+  titleLeft: number;
+}> {
+  return page.evaluate(() => {
+    const column = document.querySelector('[data-content-column]');
+    const area = column?.parentElement?.closest('.overflow-y-auto');
+    const title = column?.closest('section')?.querySelector('header h1');
+    if (!column || !area || !title) throw new Error('no column, scroll area or page title');
+    const box = column.getBoundingClientRect();
+    const inner = area.getBoundingClientRect();
+    const style = getComputedStyle(area);
+    const padLeft = parseFloat(style.paddingLeft);
+    const padRight = parseFloat(style.paddingRight);
+    // The title's row: the header's first child, which carries the column's width.
+    const row = title.closest('header')?.firstElementChild ?? title;
+    return {
+      width: box.width,
+      left: box.left,
+      gapLeft: box.left - (inner.left + padLeft),
+      gapRight: inner.left + area.clientWidth - padRight - box.right,
+      areaInner: area.clientWidth - padLeft - padRight,
+      titleLeft: row.getBoundingClientRect().left,
+    };
+  });
+}
+
+describe('the shared content column fits the window (L-341, L-326)', () => {
+  for (const viewport of [
+    { width: 1000, height: 700 },
+    { width: 768, height: 700 },
+    { width: 375, height: 700 },
+  ]) {
+    for (const view of COLUMN_VIEWS) {
+      it(`the ${view} screen has no sideways scroll at ${String(viewport.width)}px`, async () => {
+        const page = await open('?seen=1', viewport);
+        await goTo(page, view);
+        await page.waitForSelector('[data-content-column]');
+        const box = await columnBox(page);
+        console.log(`${view} at ${String(viewport.width)}px: column ${String(box.width)}px wide`);
+        assert.ok(box.width > 0 && box.width <= 1024, `${view}: column ${String(box.width)}px`);
+        assert.ok(box.width <= box.areaInner + 0.5, `${view}: column wider than its area`);
+        assert.deepEqual(await sidewaysOverflow(page), []);
+        await page.context().close();
+      });
+    }
   }
+
+  for (const width of [1440, 1920]) {
+    for (const view of COLUMN_VIEWS) {
+      it(`the ${view} screen at ${String(width)}px: a 1024px column with equal gaps`, async () => {
+        const page = await open('?seen=1', { width, height: 900 });
+        await goTo(page, view);
+        await page.waitForSelector('[data-content-column]');
+        const box = await columnBox(page);
+        console.log(`${view} at ${String(width)}px: ${JSON.stringify(box)}`);
+        assert.equal(Math.round(box.width), 1024, `${view}: column ${String(box.width)}px`);
+        assert.ok(box.gapLeft > 0, `${view}: no gap left of the column`);
+        assert.ok(Math.abs(box.gapLeft - box.gapRight) <= 1, `${view}: gaps are not equal`);
+        // The page title lines up with the column, not the far left (owner decision 2).
+        assert.ok(Math.abs(box.titleLeft - box.left) <= 1, `${view}: title not in line`);
+        assert.deepEqual(await sidewaysOverflow(page), []);
+        await page.context().close();
+      });
+    }
+  }
+
+  it('negative: the Tracker board is NOT held to 1024px — wider than that at 1920', async () => {
+    const page = await open('?seen=1&entries=1', { width: 1920, height: 900 });
+    await goTo(page, 'tracker');
+    await page.waitForSelector('[data-testid="tracker-card-c"]');
+    const board = await page.evaluate(() => {
+      const view = document.querySelector('[data-testid="view-tracker"]');
+      const boxes = [...(view?.querySelectorAll('[data-testid^="tracker-column-"]') ?? [])].map(
+        (column) => column.getBoundingClientRect(),
+      );
+      return {
+        columns: view?.querySelectorAll('[data-content-column]').length ?? -1,
+        width:
+          Math.max(...boxes.map((box) => box.right)) - Math.min(...boxes.map((box) => box.left)),
+      };
+    });
+    console.log(`tracker at 1920px: board ${String(board.width)}px wide`);
+    assert.equal(board.columns, 0);
+    assert.ok(board.width > 1024, `board only ${String(board.width)}px wide`);
+    await page.context().close();
+  });
 
   it('the check can fail: content wider than the window is reported', async () => {
     const page = await open('?seen=1', { width: 1000, height: 800 });

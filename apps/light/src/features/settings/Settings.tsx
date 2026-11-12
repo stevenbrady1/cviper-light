@@ -9,7 +9,7 @@ import {
 } from '@cviper/core-types';
 
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
-import { CONTENT_COLUMN } from '../../app/layout';
+import { CONTENT_COLUMN, SIDE_PADDING } from '../../app/layout';
 import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
@@ -358,7 +358,10 @@ export function Settings({
         }
       />
 
-      <div ref={scrollArea} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+      <div
+        ref={scrollArea}
+        className={`min-h-0 flex-1 overflow-y-auto ${SIDE_PADDING} py-4 md:py-5`}
+      >
         <div data-content-column className={`${CONTENT_COLUMN} space-y-6`}>
           {/*
             First, because it is what most people open Settings for (L-176).
