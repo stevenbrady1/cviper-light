@@ -4,6 +4,7 @@ import { buildBoardUrl } from '@cviper/job-apis';
 import { BOARD_ENCODINGS, type BoardEncoding } from '@cviper/core-types';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD } from '../../app/fields';
 import { cardClasses, ErrorBox, Icon, SectionHeading, StatusPill } from '../../ui';
 
 import { SHIPPED_BOARDS } from './defaults';
@@ -333,7 +334,7 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
                 const encoding = event.currentTarget.value as BoardEncoding;
                 setDraft((current) => ({ ...current, encoding }));
               }}
-              className="mt-1 rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+              className={`${FIELD} mt-1`}
             >
               {BOARD_ENCODINGS.map((encoding) => (
                 <option key={encoding} value={encoding}>
@@ -405,7 +406,7 @@ function Field({ id, label, value, error, placeholder, onChange }: FieldProps) {
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.currentTarget.value)}
-        className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+        className={`${FIELD} mt-1 w-full`}
       />
       {error === undefined ? null : (
         <p data-testid={`${id}-error`} className="mt-1 text-xs text-danger">

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type JobProviderId } from '@cviper/job-apis';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
+import { FIELD } from '../../../app/fields';
 import { cardClasses, ErrorBox, SectionHeading, StatusPill } from '../../../ui';
 import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 import { type KeyState, type SecretKeyName } from '../../../status/environment';
@@ -325,7 +326,7 @@ function KeyCard({ provider, port, browser, focused, onFocused }: KeyCardProps) 
                 // user fixes the thing it complained about is just noise.
                 setErrors((current) => ({ ...current, [field.key]: undefined }));
               }}
-              className="mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+              className={`${FIELD} mt-1 w-full`}
             />
             <p className="mt-1 text-xs text-ink-faint">{field.hint}</p>
 

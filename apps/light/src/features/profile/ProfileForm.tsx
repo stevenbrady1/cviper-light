@@ -5,6 +5,7 @@ import {
 } from '@cviper/core-types';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD } from '../../app/fields';
 import { cardClasses, SectionHeading } from '../../ui';
 import { useDebouncedField } from '../../lib/useDebouncedField';
 
@@ -20,7 +21,8 @@ export interface Loaded {
   readonly starKeys: readonly number[];
 }
 
-const FIELD = 'mt-1 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink';
+/** Every profile box: the shared text box, full width under its label. */
+const PROFILE_FIELD = `${FIELD} mt-1 w-full`;
 const LABEL = 'block text-xs font-medium text-ink-muted';
 
 // --- The form ---------------------------------------------------------------
@@ -113,7 +115,7 @@ export function ProfileForm({
               placeholder="e.g. Credit risk analyst moving into quant development"
               onChange={(event) => headline.setDraft(event.currentTarget.value)}
               onBlur={headline.flush}
-              className={FIELD}
+              className={PROFILE_FIELD}
             />
           </div>
 
@@ -128,7 +130,7 @@ export function ProfileForm({
               placeholder="e.g. UK citizen, no sponsorship needed"
               onChange={(event) => workRights.setDraft(event.currentTarget.value)}
               onBlur={workRights.flush}
-              className={FIELD}
+              className={PROFILE_FIELD}
             />
           </div>
 
@@ -144,7 +146,7 @@ export function ProfileForm({
               placeholder="e.g. Plain, short sentences. No buzzwords. British spelling."
               onChange={(event) => writingStyle.setDraft(event.currentTarget.value)}
               onBlur={writingStyle.flush}
-              className={FIELD}
+              className={PROFILE_FIELD}
             />
             <p className="mt-1 text-xs text-ink-faint">Saved as you type.</p>
           </div>
@@ -204,7 +206,7 @@ export function ProfileForm({
               placeholder={'e.g. Fully on-site\nBelow GBP 70k'}
               onChange={(event) => dealBreakers.setDraft(event.currentTarget.value)}
               onBlur={dealBreakers.flush}
-              className={FIELD}
+              className={PROFILE_FIELD}
             />
           </div>
 
@@ -220,7 +222,7 @@ export function ProfileForm({
               placeholder={'e.g. Banking\nHedge funds'}
               onChange={(event) => targetSectors.setDraft(event.currentTarget.value)}
               onBlur={targetSectors.flush}
-              className={FIELD}
+              className={PROFILE_FIELD}
             />
           </div>
 
@@ -236,7 +238,7 @@ export function ProfileForm({
               placeholder="e.g. Lead a small modelling team within three years"
               onChange={(event) => careerGoals.setDraft(event.currentTarget.value)}
               onBlur={careerGoals.flush}
-              className={FIELD}
+              className={PROFILE_FIELD}
             />
           </div>
         </div>
@@ -261,7 +263,7 @@ export function ProfileForm({
               placeholder="e.g. Hard technical problems"
               onChange={(event) => energising.setDraft(event.currentTarget.value)}
               onBlur={energising.flush}
-              className={FIELD}
+              className={PROFILE_FIELD}
             />
           </div>
 
@@ -277,7 +279,7 @@ export function ProfileForm({
               placeholder="e.g. Status meetings"
               onChange={(event) => draining.setDraft(event.currentTarget.value)}
               onBlur={draining.flush}
-              className={FIELD}
+              className={PROFILE_FIELD}
             />
           </div>
         </div>
@@ -359,7 +361,7 @@ function LanguageRow({ index, language, onChange, onRemove }: LanguageRowProps) 
           placeholder="e.g. French"
           onChange={(event) => name.setDraft(event.currentTarget.value)}
           onBlur={name.flush}
-          className={FIELD}
+          className={PROFILE_FIELD}
         />
       </div>
       <div className="min-w-0 flex-1">
@@ -373,7 +375,7 @@ function LanguageRow({ index, language, onChange, onRemove }: LanguageRowProps) 
           placeholder="e.g. Conversational"
           onChange={(event) => level.setDraft(event.currentTarget.value)}
           onBlur={level.flush}
-          className={FIELD}
+          className={PROFILE_FIELD}
         />
       </div>
       <button
@@ -466,7 +468,7 @@ function StarField({ index, part, label, rows, value, onCommit }: StarFieldProps
         value={field.draft}
         onChange={(event) => field.setDraft(event.currentTarget.value)}
         onBlur={field.flush}
-        className={FIELD}
+        className={PROFILE_FIELD}
       />
     </div>
   );

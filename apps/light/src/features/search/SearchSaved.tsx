@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { FIELD } from '../../app/fields';
 import { LiveStatus } from '../../app/LiveStatus';
 import { Icon } from '../../ui';
 
@@ -151,7 +152,7 @@ export function SearchSaved({
               onKeyDown={onKeyDown}
               aria-invalid={problem === null ? undefined : true}
               aria-describedby={problem === null ? undefined : 'saved-search-problem'}
-              className="mt-1 w-64 max-w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+              className={`${FIELD} mt-1 w-64 max-w-full`}
             />
           </div>
           <button type="submit" data-testid="saved-search-confirm" className={SECONDARY_BUTTON}>

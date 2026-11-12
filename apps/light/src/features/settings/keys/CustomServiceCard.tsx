@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type ModelInfo } from '@cviper/ai-providers';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
+import { FIELD, FIELD_INVALID } from '../../../app/fields';
 import { cardClasses, ErrorBox, StatusPill } from '../../../ui';
 import { type KeyState } from '../../../status/environment';
 import {
@@ -235,9 +236,7 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
             setAddress(event.currentTarget.value);
             setAddressError(null);
           }}
-          className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
-            addressError === null ? 'border-field-line' : 'border-danger'
-          }`}
+          className={`${addressError === null ? FIELD : FIELD_INVALID} mt-1 w-full`}
         />
         <p className="mt-1 text-xs text-ink-faint">
           The base address its documentation gives for OpenAI-compatible use. It usually ends in
@@ -293,9 +292,7 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
             setKey(event.currentTarget.value);
             setKeyError(null);
           }}
-          className={`mt-1 w-full rounded-control border bg-card px-2.5 py-1.5 text-ink ${
-            keyError === null ? 'border-field-line' : 'border-danger'
-          }`}
+          className={`${keyError === null ? FIELD : FIELD_INVALID} mt-1 w-full`}
         />
         <p className="mt-1 text-xs text-ink-faint">
           Kept with the address in this computer’s credential store, so it can only be sent there.
@@ -406,7 +403,7 @@ function CustomModelPicker({
             data-testid="custom-service-model-select"
             value={model !== null && models.some((entry) => entry.id === model) ? model : ''}
             onChange={(event) => void use(event.currentTarget.value)}
-            className="mt-2 w-full rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+            className={`${FIELD} mt-2 w-full`}
           >
             <option value="" disabled>
               Choose a model from the service’s list
@@ -444,7 +441,7 @@ function CustomModelPicker({
             setTyped(event.currentTarget.value);
             setTypedError(null);
           }}
-          className="min-w-0 flex-1 rounded-control border border-field-line bg-card px-2.5 py-1.5 text-ink"
+          className={`${FIELD} min-w-0 flex-1`}
         />
         <button
           type="button"
