@@ -109,3 +109,30 @@ describe('stalenessDescription — the edge is never the only telling', () => {
     expect(stalenessDescription(null)).toBe('Last change unknown');
   });
 });
+
+describe('the words on the card (L-318)', () => {
+  it('says how many days since the last change, number first', () => {
+    expect(stalenessDescription(12)).toBe('12 days since last change');
+  });
+
+  it('boundary: 0 days says "Changed today", and 1 day is singular', () => {
+    expect(stalenessDescription(0)).toBe('Changed today');
+    expect(stalenessDescription(1)).toBe('1 day since last change');
+  });
+
+  it('boundary: each side of every band edge says its own number', () => {
+    for (const days of [6, 7, 20, 21, 44, 45]) {
+      expect(stalenessDescription(days)).toBe(`${days} days since last change`);
+    }
+  });
+
+  it('negative: a future date or a missing one never shows a minus sign or NaN', () => {
+    for (const days of [-3, null, Number.NaN]) {
+      const words = stalenessDescription(days);
+      expect(words).not.toContain('-');
+      expect(words).not.toContain('NaN');
+    }
+    expect(stalenessDescription(-3)).toBe('Changed today');
+    expect(stalenessDescription(null)).toBe('Last change unknown');
+  });
+});

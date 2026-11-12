@@ -375,7 +375,7 @@ describe('the staleness edge', () => {
     await renderBoard([entry('a', { updated_at: daysAgo(30) })]);
 
     expect(screen.getByTestId('tracker-card-a').getAttribute('aria-label')).toContain(
-      'Last changed 30 days ago',
+      '30 days since last change',
     );
   });
 

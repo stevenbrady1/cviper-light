@@ -10,10 +10,11 @@ import { type TrackerEntry } from './model';
 import { STALENESS_BANDS, stalenessBand, stalenessDescription } from './staleness';
 
 /**
- * One application, as three lines.
+ * One application, as four lines.
  *
  *   title                          Inter 500 — the thing you scan for
  *   company · location             Inter 400, muted — context, not headline
+ *   12 days since last change      the left edge's age in words (L-318)
  *   Reply by Friday · due in 2 days  the next action, when there is one: the
  *                                  user's words, then how close it is, coloured
  *                                  by urgency. One line; the words clip with an
@@ -67,6 +68,7 @@ export function TrackerCard({
 
   const days = daysSinceTimestamp(application.updated_at, now);
   const band = stalenessBand(days);
+  const age = stalenessDescription(days);
   const urgency = nextActionUrgency(application.next_action_date, today);
   const line = nextActionLine(application.next_action, application.next_action_date, today);
   const dueDescription = nextActionDescription(
@@ -91,7 +93,7 @@ export function TrackerCard({
         job.title,
         where,
         substage === null ? null : `Stage: ${substage}`,
-        stalenessDescription(days),
+        age,
         dueDescription,
       ]
         .filter((part) => part !== null && part !== '')
@@ -122,6 +124,13 @@ export function TrackerCard({
           {substage}
         </p>
       )}
+
+      <p
+        data-testid={`tracker-card-age-${application.id}`}
+        className="mt-1 truncate text-[11px] text-ink-muted"
+      >
+        {age}
+      </p>
 
       {line === null || urgency === 'none' ? null : (
         <p
