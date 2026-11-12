@@ -84,6 +84,13 @@ export const JSON_RESUME_HINT =
   'A standard file format for CVs, used by some CV builders and job sites. Most people never ' +
   'need it: a PDF or Word file works just as well.';
 
+/** Beside "Save as JSON Resume" when it is greyed out for a PDF or Word CV (L-387). */
+export const SAVE_JSON_RESUME_HINT = 'Only a CV that arrived as a JSON Resume can be saved as one.';
+
+/** "Applied so far" on the Tracker's funnel strip: its counts add up (L-175, L-387). */
+export const FUNNEL_SO_FAR_HINT =
+  'Every application that got this far, including the ones that moved on';
+
 export const RAIL_HINT = {
   dots: 'Green: ready to use. Amber: needs attention in Settings. A service that is not set up is not listed.',
   requests:

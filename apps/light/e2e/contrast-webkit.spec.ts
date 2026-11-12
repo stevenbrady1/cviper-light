@@ -355,7 +355,68 @@ describe('the Tracker funnel strip fits a phone (L-383)', () => {
     assert.ok(report.length > 0, 'the widened label was not flagged');
     await page.context().close();
   });
+
+  // L-387: the strip's one hint "i", on "Applied so far", is at least 24×24 and
+  // takes no extra row: the strip is no taller than with the "i" taken out.
+  for (const width of [375, 1264]) {
+    it(`its one hint "i" is at least 24×24 and adds no row, at ${String(width)}px`, async () => {
+      const page = await openTrackerAt(width);
+      const report = await funnelHintReport(page);
+      console.log(`funnel hint at ${String(width)}px: ${JSON.stringify(report)}`);
+      assert.equal(report.count, 1, `${String(report.count)} "i" on the strip, not 1`);
+      assert.ok(report.width >= 24 && report.height >= 24, `"i" is ${JSON.stringify(report)}`);
+      assert.equal(report.withIt, report.without, 'the "i" gave the strip another row');
+      assert.deepEqual(await funnelOverflow(page), []);
+      await page.context().close();
+    });
+  }
+
+  it('the check can fail: an "i" too wide for its row is reported as another row', async () => {
+    const page = await openTrackerAt(375);
+    await page.evaluate(() => {
+      const button = document.querySelector<HTMLElement>(
+        '[data-testid="tracker-funnel"] [data-testid="hint-info"]',
+      );
+      if (button !== null) button.style.minWidth = '260px';
+    });
+    const report = await funnelHintReport(page);
+    assert.ok(
+      report.withIt > report.without,
+      `the extra row was not seen: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
 });
+
+async function openTrackerAt(width: number): Promise<Page> {
+  const page = await open('?seen=1&entries=1', { width, height: 700 });
+  await goTo(page, 'tracker');
+  await page.waitForSelector('[data-testid="tracker-funnel"]');
+  return page;
+}
+
+/** The strip's "i" count and size, and the strip's height with and without the first "i". */
+async function funnelHintReport(page: Page): Promise<{
+  count: number;
+  width: number;
+  height: number;
+  withIt: number;
+  without: number;
+}> {
+  return page.evaluate(() => {
+    const strip = document.querySelector('[data-testid="tracker-funnel"]');
+    if (strip === null) throw new Error('no funnel strip');
+    const buttons = [...strip.querySelectorAll<HTMLElement>('[data-testid="hint-info"]')];
+    const button = buttons[0];
+    if (button === undefined) return { count: 0, width: 0, height: 0, withIt: 0, without: 0 };
+    const box = button.getBoundingClientRect();
+    const withIt = strip.getBoundingClientRect().height;
+    button.style.display = 'none';
+    const without = strip.getBoundingClientRect().height;
+    button.style.display = '';
+    return { count: buttons.length, width: box.width, height: box.height, withIt, without };
+  });
+}
 
 /**
  * The shared content column (L-341) never makes a screen scroll sideways.

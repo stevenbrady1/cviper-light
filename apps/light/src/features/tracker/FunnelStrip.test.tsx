@@ -8,7 +8,8 @@
  * been applied for a rate to mean something (L-317).
  */
 import { type Application, type ApplicationStatus, type Job } from '@cviper/core-types';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { FunnelStrip } from './FunnelStrip';
@@ -162,7 +163,8 @@ describe('the strip says it counts flow, not columns (L-175)', () => {
   it('explains that each figure counts everything that got that far', () => {
     render(<FunnelStrip entries={board('applied', 'offer')} />);
 
-    expect(screen.getByTestId('tracker-funnel').getAttribute('title')).toBe(
+    // Changed on purpose (L-387): the words moved from a hover-only `title` to a Hint.
+    expect(soFarTip().textContent).toBe(
       'Every application that got this far, including the ones that moved on',
     );
   });
@@ -173,6 +175,69 @@ describe('the strip says it counts flow, not columns (L-175)', () => {
     const strip = screen.getByTestId('tracker-funnel');
     expect(within(strip).queryByText('Interviewing')).toBeNull();
     expect(within(strip).queryByText('Sent')).toBeNull();
+  });
+});
+
+/** The tip the strip's one "i" describes itself with. */
+function soFarTip(): HTMLElement {
+  const button = within(screen.getByTestId('tracker-funnel')).getByRole('button', {
+    name: 'What this means',
+  });
+  const tip = document.getElementById(button.getAttribute('aria-describedby') ?? '');
+  if (tip === null) throw new Error('the "i" describes nothing');
+  return tip;
+}
+
+describe('the "so far" explanation reaches keyboard and touch (L-387)', () => {
+  const WORDS = 'Every application that got this far, including the ones that moved on';
+
+  it('happy: Tab reaches the one "i", it is named, and the explanation shows', async () => {
+    const user = userEvent.setup();
+    render(<FunnelStrip entries={board('applied', 'interviewing')} />);
+
+    await user.tab();
+    const button = screen.getByRole('button', { name: 'What this means' });
+    expect(document.activeElement).toBe(button);
+    expect(soFarTip().hidden).toBe(false);
+    expect(soFarTip().textContent).toBe(WORDS);
+  });
+
+  it('happy: a tap on the "i" opens the explanation and a second tap closes it', () => {
+    render(<FunnelStrip entries={board('applied')} />);
+    const button = screen.getByRole('button', { name: 'What this means' });
+
+    expect(soFarTip().hidden).toBe(true);
+    fireEvent.click(button);
+    expect(soFarTip().hidden).toBe(false);
+    fireEvent.click(button);
+    expect(soFarTip().hidden).toBe(true);
+  });
+
+  it('sits on the "Applied so far" label, and the strip has exactly one "i"', () => {
+    render(<FunnelStrip entries={board('applied', 'interviewing')} />);
+
+    const strip = screen.getByTestId('tracker-funnel');
+    expect(within(strip).getAllByRole('button', { name: 'What this means' })).toHaveLength(1);
+    const dt = screen.getByTestId('tracker-funnel-count-sent').parentElement?.querySelector('dt');
+    expect(dt?.querySelector('button')).toBe(within(strip).getByRole('button'));
+  });
+
+  it('negative: the strip and nothing in it carries a hover-only title', () => {
+    render(<FunnelStrip entries={board('applied', 'offer')} />);
+
+    const strip = screen.getByTestId('tracker-funnel');
+    expect(strip.hasAttribute('title')).toBe(false);
+    expect(strip.querySelectorAll('[title]')).toHaveLength(0);
+  });
+
+  it('boundary: an empty board still renders the "i" and every label', () => {
+    render(<FunnelStrip entries={[]} />);
+
+    expect(soFarTip().textContent).toBe(WORDS);
+    const labels = [...screen.getByTestId('tracker-funnel').querySelectorAll('dt')].map(
+      (dt) => dt.textContent,
+    );
+    expect(labels).toEqual(['Saved', 'Applied so far', 'Interviewed so far', 'Offers', 'Rejected']);
   });
 });
 
