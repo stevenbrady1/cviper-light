@@ -22,20 +22,24 @@
  *   interviewRate = interviewing / sent
  *   offerRate     = offers / sent
  *
- * Both rates are `null` when nothing has been sent. Zero of zero is not 0%:
- * a user who has saved six adverts and applied to none has no interview rate
- * yet, and "0%" would be the app inventing bad news. `null` is also never
- * `NaN` — a NaN reaches the screen as the literal word and the strip has to
- * know the difference between "no data" and "no interviews".
+ * Both rates are `null` until `MIN_SENT_FOR_RATE` (5) applications have been
+ * sent (L-317). Zero of zero is not 0%, and neither is zero of one: a user who
+ * has applied once and heard nothing yet has no interview rate, and "0%" would
+ * be the app inventing bad news from data that says nothing. `null` is also
+ * never `NaN` — a NaN reaches the screen as the literal word and the strip has
+ * to know the difference between "not enough yet" and "no interviews".
  *
  * ============================================================================
  * PURE, AND TESTED AT THE BOUNDARIES
  * ============================================================================
- * No React. The empty board, the only-saved board and the first sent card are
- * the edges where a divide-by-zero or a "0%" for missing data would hide, and
+ * No React. The empty board, the only-saved board, and four and five sent are
+ * the edges where a divide-by-zero or a "0%" for too little data would hide, and
  * `funnel.test.ts` asserts each of them by name.
  */
 import { type TrackerEntry } from './model';
+
+/** Fewer applications than this and a rate is noise, so there is none (L-317). */
+export const MIN_SENT_FOR_RATE = 5;
 
 export interface Funnel {
   readonly saved: number;
@@ -43,9 +47,9 @@ export interface Funnel {
   readonly interviewing: number;
   readonly offers: number;
   readonly rejected: number;
-  /** `interviewing / sent`, or `null` when `sent` is 0. */
+  /** `interviewing / sent`, or `null` while `sent` is under `MIN_SENT_FOR_RATE`. */
   readonly interviewRate: number | null;
-  /** `offers / sent`, or `null` when `sent` is 0. */
+  /** `offers / sent`, or `null` while `sent` is under `MIN_SENT_FOR_RATE`. */
   readonly offerRate: number | null;
 }
 
@@ -86,13 +90,13 @@ export function funnelFrom(entries: readonly TrackerEntry[]): Funnel {
     interviewing,
     offers,
     rejected,
-    interviewRate: sent === 0 ? null : interviewing / sent,
-    offerRate: sent === 0 ? null : offers / sent,
+    interviewRate: sent < MIN_SENT_FOR_RATE ? null : interviewing / sent,
+    offerRate: sent < MIN_SENT_FOR_RATE ? null : offers / sent,
   };
 }
 
 /**
- * A rate as the user reads it: a whole percentage, or a dash for "no data".
+ * A rate as the user reads it: a whole percentage, or a dash for "not yet".
  *
  * Whole numbers only. "33.3%" on a board of three applications is precision
  * the data does not have. Half rounds UP (`Math.round` on a non-negative

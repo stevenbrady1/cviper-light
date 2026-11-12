@@ -958,10 +958,13 @@ describe('the funnel strip', () => {
 
     const strip = screen.getByTestId('tracker-funnel');
     expect(within(strip).getByTestId('tracker-funnel-count-sent').textContent).toBe('2');
+    // Two applied is under five, so no rate yet (L-317).
     expect(screen.getByTestId('tracker-funnel-interview-rate').textContent).toBe(
-      'Interview rate 50%',
+      'Interview rate — after 5 applied',
     );
-    expect(screen.getByTestId('tracker-funnel-offer-rate').textContent).toBe('Offer rate 50%');
+    expect(screen.getByTestId('tracker-funnel-offer-rate').textContent).toBe(
+      'Offer rate — after 5 applied',
+    );
   });
 });
 

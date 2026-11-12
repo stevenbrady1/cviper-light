@@ -1,4 +1,4 @@
-import { formatRate, funnelFrom } from './funnel';
+import { formatRate, funnelFrom, MIN_SENT_FOR_RATE } from './funnel';
 import { type TrackerEntry } from './model';
 
 /**
@@ -16,11 +16,13 @@ import { type TrackerEntry } from './model';
  * screen. So: a single row, bordered like the error strip above it, eyebrow
  * labels in the same mono style every section heading in the app uses, and
  * the figures in tabular mono so a 9 becoming a 10 does not shove the row
- * sideways. Nothing here is clickable and nothing is coloured except the two
- * rates, which go teal — present, moving — when there is a rate to show.
+ * sideways. Nothing here is clickable and nothing is coloured. The rates are
+ * plain ink, never teal: teal means "ready" in this app, and "Interview rate
+ * 0%" in teal read as good news (L-317). Until five have been applied a rate
+ * is a dash and says when it will appear: "Interview rate — after 5 applied".
  *
  * The arithmetic lives in `funnel.ts`, including WHY "sent" is not a column
- * and why a rate with nothing sent is a dash rather than 0%.
+ * and why a rate from too few applications is a dash rather than 0%.
  *
  * ============================================================================
  * FLOW WORDS, NOT COLUMN WORDS (L-175)
@@ -87,7 +89,7 @@ export function FunnelStrip({ entries }: FunnelStripProps) {
   );
 }
 
-/** "Interview rate 33%" — teal when there is a figure, faint when there is not. */
+/** "Interview rate 33%" in plain ink, or "Interview rate — after 5 applied" until then. */
 function Rate({
   testId,
   label,
@@ -100,11 +102,12 @@ function Rate({
   return (
     <p data-testid={testId}>
       {label}{' '}
-      <span
-        className={`font-mono tabular-nums ${rate === null ? 'text-ink-faint' : 'text-teal-ink'}`}
-      >
+      <span className={`font-mono tabular-nums ${rate === null ? 'text-ink-faint' : 'text-ink'}`}>
         {formatRate(rate)}
       </span>
+      {rate === null && (
+        <span className="text-ink-muted">{` after ${MIN_SENT_FOR_RATE} applied`}</span>
+      )}
     </p>
   );
 }
