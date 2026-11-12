@@ -150,7 +150,7 @@
  * deeper is cheaper to test in Vitest, and is.
  */
 import assert from 'node:assert/strict';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -178,7 +178,14 @@ import {
   startedJobWorkflowValues,
 } from './demoStartedJob.ts';
 import { createSessionWhenWindowReady } from './smoke-session.ts';
-import { diagnose } from './smokeDiag.ts';
+import {
+  HOVERED_INTERACTIVE,
+  POINTER_PARK,
+  SETTLE_PROBE,
+  moveOsPointerArgs,
+  waitForStill,
+  type StillProbe,
+} from './smokeSettle.ts';
 import {
   CHECK_ATS_TABLE,
   CHECK_CARD_PROGRESS,
@@ -657,6 +664,17 @@ const SMOKE_BACKUP_FILE = join(tmpdir(), `cviper-smoke-${String(process.pid)}`, 
  */
 const SCREENSHOT_DIR =
   process.env['SMOKE_SCREENSHOT_DIR'] ?? join(tmpdir(), 'cviper-smoke-screenshots');
+
+/**
+ * How long a picture may wait for the screen to stand still (L-375), and how
+ * often it looks. A still screen costs two frames and one interval; a screen
+ * that is still moving after this long fails the run, naming what moved.
+ */
+const SETTLE_TIMEOUT = 15_000;
+const SETTLE_INTERVAL = 150;
+
+/** How long the page stays hidden, and then shown, for the fresh paint. */
+const REPAINT_PAUSE = 150;
 
 /** Type into a field the way a person does: click it, then keys. */
 async function typeInto(selector: string, text: string): Promise<void> {
@@ -1173,19 +1191,83 @@ describe('the built CViper Light binary', () => {
     }
   }
 
-  async function shot(name: string): Promise<void> {
-    // A beat for fonts and layout to settle after a view change.
-    await session().sleep(600);
-    // No focus ring in a picture: the app moves focus to each screen's
-    // heading (WCAG 2.4.3), and WebDriver's clicks do not count as a
-    // mouse, so the ring a pointer user never sees is drawn here.
+  /**
+   * Put the REAL Windows cursor somewhere that hovers nothing (L-375).
+   *
+   * Before this, it sat where Windows leaves it on the runner — the centre of
+   * a 1024x768 screen, which is (504, 353) in the page — and whatever was
+   * there was photographed hovered: a tracker card's dark border in pictures
+   * 1, 2 and 6, a hint mark in 4. Whether the web view had noticed the cursor
+   * yet depended on timing, so the same code gave pictures with and without
+   * the hover (Smoke #663). WebDriver cannot fix this: the app's server sends
+   * pointer actions as JavaScript events, and those never change `:hover`.
+   *
+   * Moved there through PowerShell, the one thing on the runner that moves
+   * the real cursor. Then checked: whatever the page says is hovered must be nothing that
+   * draws a hover — never a button, link, field or hint.
+   */
+  async function parkPointer(name: string): Promise<void> {
+    if (process.platform !== 'win32') return;
+    const at = execFileSync('powershell', moveOsPointerArgs(POINTER_PARK.x, POINTER_PARK.y), {
+      encoding: 'utf8',
+      timeout: 30_000,
+    }).trim();
+    const hovered = await session().executeScript<string>(HOVERED_INTERACTIVE);
+    assert.equal(
+      hovered,
+      '',
+      `${name}.png was NOT saved, because the cursor (at ${at}) hovers ${hovered}.`,
+    );
+  }
+
+  /**
+   * Make the screen still, and return the picture of it (L-375).
+   *
+   * 1. The cursor is parked and the focus dropped (see `parkPointer`). No focus
+   *    ring in a picture: the app moves focus to each screen's heading
+   *    (WCAG 2.4.3), and WebDriver's clicks do not count as a mouse, so the
+   *    ring a pointer user never sees would be drawn here.
+   * 2. The whole page is painted afresh: hidden for a moment, then shown. The
+   *    web view here draws with Windows' software graphics device, and how it
+   *    draws a curved edge — the Search icon's circle (picture 6, Smoke #664
+   *    and #665), a button's rounded corner (picture 2, Smoke #656) — depended
+   *    on which parts of the screen had been redrawn, and when, on the way to
+   *    it. A diagnostic run showed every picture already steady for 2.4
+   *    seconds after it was taken, and a one-pixel resize then changed the
+   *    edges of five of them for good. Painting everything at once makes the
+   *    edges depend on what is on the screen, not on how it got there.
+   * 3. `waitForStill`: no animation, fonts loaded, two identical frames in a
+   *    row — the picture saved is the second of them.
+   */
+  async function stillPicture(name: string): Promise<string> {
+    await parkPointer(name);
     await session().executeScript(
       'if (document.activeElement instanceof HTMLElement) document.activeElement.blur();',
     );
-    const png = await session().takeScreenshot();
+    await session().executeScript("document.body.style.visibility = 'hidden';");
+    await session().sleep(REPAINT_PAUSE);
+    await session().executeScript("document.body.style.visibility = '';");
+    await session().sleep(REPAINT_PAUSE);
+    try {
+      const still = await waitForStill({
+        probe: () => session().executeScript<StillProbe>(SETTLE_PROBE),
+        frame: () => session().takeScreenshot(),
+        timeoutMs: SETTLE_TIMEOUT,
+        intervalMs: SETTLE_INTERVAL,
+      });
+      console.log(
+        `smoke: still    = ${name} after ${String(still.waitedMs)}ms, ${String(still.frames)} frames`,
+      );
+      return still.png;
+    } catch (error) {
+      throw new Error(`${name}.png was NOT saved. ${String(error)}`, { cause: error });
+    }
+  }
+
+  async function shot(name: string): Promise<void> {
+    const png = await stillPicture(name);
     writeFileSync(join(SCREENSHOT_DIR, `${name}.png`), Buffer.from(png, 'base64'));
     console.log(`smoke: screenshot = ${name}.png`);
-    await diagnose(session(), SCREENSHOT_DIR, name);
   }
 
   /** Import whatever `SMOKE_BACKUP_FILE` holds, through Settings, and say what it said. */
@@ -1369,21 +1451,16 @@ return 'installed';
 
   /**
    * `shot`, with the screen checked twice: once before the settle, and again
-   * just before the picture, so a scroll still moving (Tailor's is smooth)
-   * cannot slip a cropped picture through.
+   * after it, on the still screen the picture is of, so a scroll still moving
+   * (Tailor's is smooth) cannot slip a cropped picture through.
    */
   async function checkedShot(name: string, check: string, args: readonly unknown[]): Promise<void> {
     await untilShown(name, check, args);
-    await session().sleep(600);
-    await session().executeScript(
-      'if (document.activeElement instanceof HTMLElement) document.activeElement.blur();',
-    );
+    const png = await stillPicture(name);
     const problem = await session().executeScript<string>(check, ...args);
     assert.equal(problem, '', `${name}.png was NOT saved, because ${problem}.`);
-    const png = await session().takeScreenshot();
     writeFileSync(join(SCREENSHOT_DIR, `${name}.png`), Buffer.from(png, 'base64'));
     console.log(`smoke: screenshot = ${name}.png`);
-    await diagnose(session(), SCREENSHOT_DIR, name);
   }
 
   it(
