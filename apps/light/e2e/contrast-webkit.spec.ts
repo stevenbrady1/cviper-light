@@ -2509,3 +2509,119 @@ describe('a suggestion priority label stays on one line, inside its card (L-378)
     await page.context().close();
   });
 });
+
+/**
+ * Page titles: one line, in the serif, and the header no taller (L-382).
+ *
+ * The page title grew from 18px on a 28px line to 24px on a 32px line, set in
+ * Newsreader at regular weight, and the header bar's padding shrank by the same
+ * 4px. The header must not grow: the Search form fits the 1000×700 minimum
+ * window by only 2px (the L-342 checks above), and the Smoke pictures need the
+ * step bar and the ATS table fully on screen. On main before L-382 every
+ * screen's header measured 85px at 1000×700 in this harness; that is the cap.
+ *
+ * One line is measured, not written down: the title's height must be its own
+ * line height. jsdom does no layout and loads no fonts, so only a real engine
+ * can say either.
+ */
+const HEADER_CAP_PX = 85;
+const TITLE_WINDOWS = {
+  smallest: { width: 1000, height: 700 },
+  phone: { width: 375, height: 800 },
+} as const;
+
+async function titleProblems(
+  page: Page,
+  view: string,
+  headerCap: number | null,
+): Promise<string[]> {
+  return page.evaluate(
+    ({ view, headerCap }) => {
+      const title = document.querySelector<HTMLElement>(`[data-testid="view-${view}"] h1`);
+      const header = title?.closest('header');
+      if (title === null || title === undefined || header === null || header === undefined) {
+        return [`${view}: no title in a header`];
+      }
+      const problems: string[] = [];
+      const line = parseFloat(getComputedStyle(title).lineHeight);
+      const height = title.getBoundingClientRect().height;
+      if (height > line + 0.5) {
+        problems.push(`${view}: title is ${String(height)}px tall, one line is ${String(line)}px`);
+      }
+      if (title.scrollWidth > title.clientWidth + 0.5) {
+        problems.push(`${view}: title is clipped`);
+      }
+      const tall = header.getBoundingClientRect().height;
+      if (headerCap !== null && tall > headerCap + 0.5) {
+        problems.push(
+          `${view}: header is ${String(tall)}px tall, the cap is ${String(headerCap)}px`,
+        );
+      }
+      return problems;
+    },
+    { view, headerCap },
+  );
+}
+
+async function everyTitle(
+  viewport: { width: number; height: number },
+  headerCap: number | null,
+): Promise<string[]> {
+  const page = await open('?seen=1', viewport);
+  const problems: string[] = [];
+  for (const view of VIEWS) {
+    await goTo(page, view);
+    problems.push(...(await titleProblems(page, view, headerCap)));
+  }
+  await page.context().close();
+  return problems;
+}
+
+describe('page titles stay on one line in the serif, and the header does not grow (L-382)', () => {
+  it(`every screen's title is one line and the header is no taller than ${String(HEADER_CAP_PX)}px at 1000×700`, async () => {
+    assert.deepEqual(await everyTitle(TITLE_WINDOWS.smallest, HEADER_CAP_PX), []);
+  });
+
+  it("every screen's title is one line at 375×800", async () => {
+    assert.deepEqual(await everyTitle(TITLE_WINDOWS.phone, null), []);
+  });
+
+  it("the title's computed font family is Newsreader at weight 400, and the face loaded", async () => {
+    const page = await open('?seen=1', TITLE_WINDOWS.smallest);
+    await goTo(page, 'settings');
+    const seen = await page.evaluate(() => {
+      const title = document.querySelector('[data-testid="view-settings"] h1');
+      const style = title === null ? null : getComputedStyle(title);
+      return {
+        family: style?.fontFamily.split(',')[0]?.trim().replaceAll(/['"]/g, '') ?? '',
+        weight: style?.fontWeight ?? '',
+        size: style?.fontSize ?? '',
+        // A family name in the computed style proves nothing if the file never
+        // arrived: the browser would draw the Georgia fallback under that name.
+        loaded: document.fonts.check('400 24px Newsreader'),
+      };
+    });
+    assert.deepEqual(seen, { family: 'Newsreader', weight: '400', size: '24px', loaded: true });
+    await page.context().close();
+  });
+
+  // NEGATIVE — a title too long for its row wraps, and is caught.
+  it('the check can fail: a long title is reported', async () => {
+    const page = await open('?seen=1', TITLE_WINDOWS.smallest);
+    await goTo(page, 'settings');
+    await page.evaluate(() => {
+      const title = document.querySelector('[data-testid="view-settings"] h1');
+      if (title !== null) title.textContent = 'Settings '.repeat(20).trim();
+    });
+    const problems = await titleProblems(page, 'settings', HEADER_CAP_PX);
+    assert.ok(
+      problems.some((line) => line.startsWith('settings: title is')),
+      `the wrapped title was not flagged: ${JSON.stringify(problems)}`,
+    );
+    assert.ok(
+      problems.some((line) => line.startsWith('settings: header is')),
+      `the taller header was not flagged: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+});
