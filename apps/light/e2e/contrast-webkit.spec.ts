@@ -2192,7 +2192,11 @@ describe('a tracker card’s Continue fits its card (L-319)', () => {
  *     words wrap the same way in both and only the height is compared: on a
  *     phone a cell may wrap onto one more line for the "i"'s width, and that is
  *     shown in the 375px picture rather than hidden by this check;
- *   - the ATS table, with about fifteen of them, still fits a 375px window;
+ *   - in the ATS table only the labels carry an "i" — the heading, the two
+ *     column headers, the five row labels and the line under the table: nine
+ *     on the sheet. The result cells (status, change, band) open their hint on
+ *     hover and tap with no "i" (owner decision, 12 Nov 2026). The table still
+ *     fits a 375px window;
  *   - a REAL tap opens the tip and leaves it open. A tap is followed by the
  *     mouse events a touch screen makes up, so the tip used to open on the
  *     made-up hover and shut on the click straight after it. Waits are on the
@@ -2332,8 +2336,9 @@ describe('hints show a small "i" button (L-384)', () => {
       const page = await openHintSheet(viewport);
       const report = await hintButtonProblems(page);
       console.log(`hint buttons (${name}): ${JSON.stringify(report)}`);
-      // The ATS table alone draws about fifteen; the card's dots draw none.
-      assert.ok(report.count >= 15, `only ${String(report.count)} hint buttons on the sheet`);
+      // ATS score, Before, After, five row labels, Fabrication check: the
+      // result cells, the step bar's buttons and the card's dots draw none.
+      assert.equal(report.count, 9, `${String(report.count)} hint buttons on the sheet, not 9`);
       assert.deepEqual(report.problems, []);
       await page.context().close();
     });
@@ -2341,19 +2346,26 @@ describe('hints show a small "i" button (L-384)', () => {
 
   it('the ATS table does not scroll sideways at 375px with its hint buttons', async () => {
     const page = await openHintSheet(HINT_WINDOWS['phone 375px']);
-    assert.ok((await page.locator(`[data-testid="tailor-ats"] ${HINT_BUTTON}`).count()) >= 15);
+    assert.equal(await page.locator(`[data-testid="tailor-ats"] ${HINT_BUTTON}`).count(), 9);
+    assert.equal(
+      await page.locator(`[data-testid="tailor-ats"] tbody td ${HINT_BUTTON}`).count(),
+      0,
+    );
     assert.equal(await atsTableOverflow(page), 0, 'the ATS table is wider than its card');
     await page.context().close();
   });
 
-  // NEGATIVE — the zero-width space before each "i" is what lets it wrap in a
-  // cell whose words may not ("✓ OK"). Without it the table overflows.
-  it('the check can fail: without the place to wrap before the "i", the table is too wide', async () => {
-    const page = await openHintSheet(HINT_WINDOWS['phone 375px']);
-    await page.addStyleTag({
-      content: `:has(> ${HINT_BUTTON})::before { content: none !important; }`,
-    });
-    assert.ok((await atsTableOverflow(page)) > 0, 'the table still fit without the wrap point');
+  it("a real tap on a status cell's words opens its tip and it stays open", async () => {
+    const page = await openHintSheet(HINT_WINDOWS['phone 375px'], true);
+    const words = page
+      .locator('[data-testid="tailor-ats-check-section_headers"] td .cursor-help')
+      .first();
+    assert.equal(await words.locator('button').count(), 0, 'a status cell has a button');
+    assert.equal(await tipShowing(page, 'Missing'), false, 'the tip showed before any tap');
+    await tapAndSettle(page, words);
+    assert.equal(await tipShowing(page, 'Missing'), true, 'one tap did not leave the tip open');
+    await tapAndSettle(page, page.locator('[data-testid="tailor-ats"] p').first());
+    assert.equal(await tipShowing(page, 'Missing'), false, 'a tap elsewhere left it open');
     await page.context().close();
   });
 

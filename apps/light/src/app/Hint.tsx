@@ -176,21 +176,15 @@ export function Hint({ text, children, className, label, focusable = true }: Hin
       >
         {children}
         {focusable ? (
-          // A place to wrap before the "i", even where the words may not wrap
-          // (`whitespace-nowrap` keeps "✓ OK" together): a zero-width space,
-          // drawn by CSS so it adds nothing to the words' text. Without it the
-          // ATS table is wider than a 375px phone (L-384).
-          <span className="whitespace-normal before:content-['\200b']">
-            <button
-              type="button"
-              data-testid="hint-info"
-              aria-label="What this means"
-              aria-describedby={id}
-              className="-my-1.5 ml-0.5 inline-flex min-h-6 min-w-6 cursor-help items-center justify-center rounded-pill align-middle"
-            >
-              <Icon name="info" size={14} monochrome />
-            </button>
-          </span>
+          <button
+            type="button"
+            data-testid="hint-info"
+            aria-label="What this means"
+            aria-describedby={id}
+            className="-my-1.5 ml-0.5 inline-flex min-h-6 min-w-6 cursor-help items-center justify-center rounded-pill align-middle"
+          >
+            <Icon name="info" size={14} monochrome />
+          </button>
         ) : null}
       </span>
       {tooltip}

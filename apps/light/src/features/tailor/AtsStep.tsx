@@ -54,20 +54,22 @@ const STATUS_TONE: Readonly<Record<CheckStatus, string>> = {
 };
 
 // Every mark below carries a hint (L-215): what the tick, warning and cross,
-// the up and down arrows, and — mean, in words, on hover, on focus and to a
-// screen reader. See `app/hints.ts`.
+// the up and down arrows, and — mean, in words, on hover, on a tap and to a
+// screen reader. See `app/hints.ts`. A result cell's hint draws no "i" and is
+// no Tab stop (`focusable={false}`): the "i" is on the row and column labels,
+// so the table is not an icon in every cell (L-384, owner decision).
 
 function Delta({ value }: { readonly value: number | null }) {
   if (value === null) {
     return (
-      <Hint text={ATS_HINT.noScore} className="text-ink-faint">
+      <Hint text={ATS_HINT.noScore} className="text-ink-faint" focusable={false}>
         —
       </Hint>
     );
   }
   if (value === 0) {
     return (
-      <Hint text={ATS_HINT.noChange} className="whitespace-nowrap text-ink-faint">
+      <Hint text={ATS_HINT.noChange} className="whitespace-nowrap text-ink-faint" focusable={false}>
         no change
       </Hint>
     );
@@ -75,6 +77,7 @@ function Delta({ value }: { readonly value: number | null }) {
   return (
     <Hint
       text={changeHint(value)}
+      focusable={false}
       className={`whitespace-nowrap ${value > 0 ? 'text-teal-ink' : 'text-gold-ink'}`}
     >
       <StateMark name={value > 0 ? 'up' : 'down'} /> {value > 0 ? `+${value}` : value}
@@ -84,7 +87,7 @@ function Delta({ value }: { readonly value: number | null }) {
 
 function Score({ value }: { readonly value: number | null }) {
   return value === null ? (
-    <Hint text={ATS_HINT.noScore} className="text-ink-faint">
+    <Hint text={ATS_HINT.noScore} className="text-ink-faint" focusable={false}>
       —
     </Hint>
   ) : (
@@ -149,7 +152,9 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
                   data-testid="tailor-ats-band"
                   className={`ml-2 text-xs ${ATS_BAND_TONE[afterBand]}`}
                 >
-                  <Hint text={ATS_BAND_HINT[afterBand]}>{ATS_BAND_WORD[afterBand]}</Hint>
+                  <Hint text={ATS_BAND_HINT[afterBand]} focusable={false}>
+                    {ATS_BAND_WORD[afterBand]}
+                  </Hint>
                 </span>
               )}
             </td>
@@ -185,12 +190,12 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
                 <Hint text={ATS_CHECK_HINT[check.id]}>{check.label}</Hint>
               </th>
               <td className={`py-1 pr-3 text-xs ${STATUS_TONE[check.before]}`}>
-                <Hint text={ATS_STATUS_HINT[check.before]}>
+                <Hint text={ATS_STATUS_HINT[check.before]} focusable={false}>
                   <StateMark name={STATUS_MARK[check.before]} /> {STATUS_WORD[check.before]}
                 </Hint>
               </td>
               <td className={`py-1 pr-3 text-xs ${STATUS_TONE[check.after]}`}>
-                <Hint text={ATS_STATUS_HINT[check.after]}>
+                <Hint text={ATS_STATUS_HINT[check.after]} focusable={false}>
                   <StateMark name={STATUS_MARK[check.after]} /> {STATUS_WORD[check.after]}
                 </Hint>
               </td>
