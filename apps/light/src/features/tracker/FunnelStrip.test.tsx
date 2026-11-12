@@ -4,8 +4,8 @@
  *
  * The arithmetic is `funnel.ts`'s and is tested there at every boundary. What
  * this file pins is the strip's PROMISE to the user: five figures in pipeline
- * order, two rates, and a dash — not "0%" and not "NaN%" — where there is no
- * rate to show.
+ * order, two rates, and a dash — not "0%" and not "NaN%" — until enough has
+ * been applied for a rate to mean something (L-317).
  */
 import { type Application, type ApplicationStatus, type Job } from '@cviper/core-types';
 import { cleanup, render, screen, within } from '@testing-library/react';
@@ -79,47 +79,81 @@ describe('FunnelStrip', () => {
   });
 
   it('renders both rates as whole percentages', () => {
-    render(<FunnelStrip entries={board('applied', 'interviewing', 'offer')} />);
+    render(
+      <FunnelStrip
+        entries={board('applied', 'applied', 'applied', 'interviewing', 'interviewing', 'offer')}
+      />,
+    );
 
     expect(screen.getByTestId('tracker-funnel-interview-rate').textContent).toBe(
-      'Interview rate 67%',
+      'Interview rate 50%',
     );
-    expect(screen.getByTestId('tracker-funnel-offer-rate').textContent).toBe('Offer rate 33%');
+    expect(screen.getByTestId('tracker-funnel-offer-rate').textContent).toBe('Offer rate 17%');
   });
 
-  it('boundary: renders a dash for a rate with no data, never 0% or NaN', () => {
+  it('negative: renders a dash for a rate with no data, never 0% or NaN', () => {
     render(<FunnelStrip entries={board('saved', 'saved')} />);
 
     const interview = screen.getByTestId('tracker-funnel-interview-rate');
     const offer = screen.getByTestId('tracker-funnel-offer-rate');
-    expect(interview.textContent).toBe('Interview rate —');
-    expect(offer.textContent).toBe('Offer rate —');
+    expect(interview.textContent).toBe('Interview rate — after 5 applied');
+    expect(offer.textContent).toBe('Offer rate — after 5 applied');
     expect(screen.getByTestId('tracker-funnel').textContent).not.toMatch(/NaN|0%/);
   });
 
-  it('boundary: one sent application with no interview is a real 0%, not a dash', () => {
-    render(<FunnelStrip entries={board('applied')} />);
+  it('boundary: 4 applied is still a dash, with the words saying when a rate comes (L-317)', () => {
+    render(<FunnelStrip entries={board('applied', 'applied', 'applied', 'interviewing')} />);
+
+    const interview = screen.getByTestId('tracker-funnel-interview-rate');
+    expect(interview.textContent).toBe('Interview rate — after 5 applied');
+    expect(screen.getByTestId('tracker-funnel-offer-rate').textContent).toBe(
+      'Offer rate — after 5 applied',
+    );
+    expect(within(interview).getByText('after 5 applied').className).toContain('text-ink-muted');
+  });
+
+  it('boundary: 5 applied with no interview is a real 0%, and the waiting words go', () => {
+    render(<FunnelStrip entries={board('applied', 'applied', 'applied', 'applied', 'rejected')} />);
 
     expect(screen.getByTestId('tracker-funnel-interview-rate').textContent).toBe(
       'Interview rate 0%',
     );
+    expect(screen.getByTestId('tracker-funnel').textContent).not.toContain('after 5 applied');
   });
 
-  it('colours a rate teal when it exists and faint when it does not', () => {
-    render(<FunnelStrip entries={board('applied', 'interviewing')} />);
+  it('never colours a rate teal — teal reads as good news (L-317)', () => {
+    const boards = [
+      board('saved'),
+      board('applied', 'applied', 'applied', 'applied'),
+      board('applied', 'applied', 'applied', 'applied', 'applied'),
+      board('applied', 'applied', 'applied', 'interviewing', 'interviewing', 'offer'),
+    ];
+    for (const entries of boards) {
+      render(<FunnelStrip entries={entries} />);
+      for (const testId of ['tracker-funnel-interview-rate', 'tracker-funnel-offer-rate']) {
+        for (const span of screen.getByTestId(testId).querySelectorAll('span')) {
+          expect(span.className, `${entries.length} cards, ${testId}`).not.toMatch(/teal/);
+        }
+      }
+      cleanup();
+    }
+  });
 
-    const interview = screen.getByTestId('tracker-funnel-interview-rate');
-    const offer = screen.getByTestId('tracker-funnel-offer-rate');
-    // 1/2 interviewed: a figure. 0/2 offers: still a figure (0%), so teal.
-    expect(within(interview).getByText('50%').className).toContain('text-teal');
-    expect(within(offer).getByText('0%').className).toContain('text-teal');
+  it('shows a real rate in plain ink and the dash in faint ink', () => {
+    render(
+      <FunnelStrip
+        entries={board('applied', 'applied', 'applied', 'interviewing', 'interviewing', 'offer')}
+      />,
+    );
+
+    const rate = within(screen.getByTestId('tracker-funnel-interview-rate')).getByText('50%');
+    expect(rate.className.split(' ')).toContain('text-ink');
 
     cleanup();
     render(<FunnelStrip entries={board('saved')} />);
 
     const dash = within(screen.getByTestId('tracker-funnel-offer-rate')).getByText('—');
     expect(dash.className).toContain('text-ink-faint');
-    expect(dash.className).not.toContain('text-teal');
   });
 });
 

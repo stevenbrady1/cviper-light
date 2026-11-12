@@ -88,11 +88,12 @@ export function stalenessBand(days: number | null): StalenessBand {
  *
  * The colour is a second telling, never the only one: on a greyscale display,
  * or for the roughly one man in twelve with a colour vision deficiency, the
- * edge alone says nothing. This string goes on the card's accessible label.
+ * edge alone says nothing. This string is shown on the card, read in the
+ * card's accessible label, and shown in the detail pane. The number comes
+ * first so a truncated card line still keeps it (L-318).
  */
 export function stalenessDescription(days: number | null): string {
-  if (days === null) return 'Last change unknown';
-  if (days <= 0) return 'Last changed today';
-  if (days === 1) return 'Last changed 1 day ago';
-  return `Last changed ${days} days ago`;
+  if (days === null || Number.isNaN(days)) return 'Last change unknown';
+  if (days <= 0) return 'Changed today';
+  return `${days} ${days === 1 ? 'day' : 'days'} since last change`;
 }

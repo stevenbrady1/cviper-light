@@ -1,7 +1,7 @@
 import { type Application, type ApplicationStatus, type Job } from '@cviper/core-types';
 import { describe, expect, it } from 'vitest';
 
-import { formatRate, funnelFrom } from './funnel';
+import { formatRate, funnelFrom, MIN_SENT_FOR_RATE } from './funnel';
 import { type TrackerEntry } from './model';
 
 function entry(id: string, status: ApplicationStatus): TrackerEntry {
@@ -64,12 +64,46 @@ describe('funnelFrom — the counts', () => {
     expect(funnel.offerRate).toBeNull();
   });
 
-  it('boundary: the first sent application turns the rates on, at 0%', () => {
+  it('negative: nothing sent is no rate, never NaN', () => {
+    const funnel = funnelFrom(board('saved'));
+
+    expect(funnel.sent).toBe(0);
+    expect(funnel.interviewRate).toBeNull();
+    expect(funnel.offerRate).toBeNull();
+  });
+
+  it('boundary: one sent application is too few for a rate (L-317)', () => {
+    // One application with no reply read as "Interview rate 0%" in teal: bad
+    // news, coloured as good news, from data that says nothing yet.
     const funnel = funnelFrom(board('saved', 'applied'));
 
     expect(funnel.sent).toBe(1);
+    expect(funnel.interviewRate).toBeNull();
+    expect(funnel.offerRate).toBeNull();
+  });
+
+  it('boundary: four sent is still too few for a rate', () => {
+    const funnel = funnelFrom(board('applied', 'applied', 'interviewing', 'offer'));
+
+    expect(funnel.sent).toBe(4);
+    expect(funnel.interviewRate).toBeNull();
+    expect(funnel.offerRate).toBeNull();
+  });
+
+  it('boundary: the fifth sent application turns the rates on, at a real 0%', () => {
+    const funnel = funnelFrom(board('applied', 'applied', 'applied', 'applied', 'rejected'));
+
+    expect(funnel.sent).toBe(5);
+    expect(MIN_SENT_FOR_RATE).toBe(5);
     expect(funnel.interviewRate).toBe(0);
     expect(funnel.offerRate).toBe(0);
+  });
+
+  it('five sent, three interviewed, is a 60% interview rate', () => {
+    const funnel = funnelFrom(board('applied', 'applied', 'interviewing', 'interviewing', 'offer'));
+
+    expect(funnel.interviewRate).toBeCloseTo(0.6);
+    expect(funnel.offerRate).toBeCloseTo(0.2);
   });
 
   it('counts sent as everything that has left "saved"', () => {
@@ -95,14 +129,14 @@ describe('funnelFrom — the counts', () => {
   });
 
   it('computes both rates against sent, not against the whole board', () => {
-    // Six cards, two still saved: the denominator is the four that went out.
+    // Seven cards, two still saved: the denominator is the five that went out.
     const funnel = funnelFrom(
-      board('saved', 'saved', 'applied', 'interviewing', 'offer', 'rejected'),
+      board('saved', 'saved', 'applied', 'applied', 'interviewing', 'offer', 'rejected'),
     );
 
-    expect(funnel.sent).toBe(4);
-    expect(funnel.interviewRate).toBeCloseTo(2 / 4);
-    expect(funnel.offerRate).toBeCloseTo(1 / 4);
+    expect(funnel.sent).toBe(5);
+    expect(funnel.interviewRate).toBeCloseTo(2 / 5);
+    expect(funnel.offerRate).toBeCloseTo(1 / 5);
   });
 
   it('never produces NaN', () => {

@@ -78,10 +78,10 @@ const ALLOWED: readonly { file: string; classes: string; reason: string }[] = [
   },
   {
     file: 'apps/light/src/features/tracker/FunnelStrip.tsx',
-    classes: "font-mono tabular-nums ${rate === null ? 'text-ink-faint' : 'text-teal-ink'}",
+    classes: "font-mono tabular-nums ${rate === null ? 'text-ink-faint' : 'text-ink'}",
     reason:
-      'The tone of the dash shown when there is no rate yet. The dash itself says "none"; a ' +
-      'real rate is teal.',
+      'The tone of the dash shown when there is no rate yet. The dash itself says "none", and ' +
+      'the muted words after it say when a rate will appear (L-317).',
   },
   {
     file: 'apps/light/src/features/tracker/nextAction.ts',

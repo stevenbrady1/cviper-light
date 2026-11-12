@@ -28,6 +28,8 @@ export interface PageHeaderProps {
   readonly variant?: 'bar' | 'hero';
   /** Above the title in `hero`: the brand row. */
   readonly eyebrow?: ReactNode;
+  /** `bar`: caps and centres the title row, to line up with the content below (L-326). */
+  readonly column?: string;
 }
 
 export function PageHeader({
@@ -38,6 +40,7 @@ export function PageHeader({
   glyph,
   variant = 'bar',
   eyebrow = null,
+  column = '',
 }: PageHeaderProps) {
   const actionsBox =
     actions === null ? null : (
@@ -60,19 +63,23 @@ export function PageHeader({
   }
 
   return (
-    <header className="flex flex-col gap-3 border-b border-line bg-card px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-4 md:px-6 md:py-4">
-      <div className="flex min-w-0 items-center gap-3">
-        {glyph !== undefined ? (
-          <IconTile glyph={glyph} />
-        ) : icon !== undefined ? (
-          <IconTile icon={icon} />
-        ) : null}
-        <div className="min-w-0">
-          <h1 className="text-lg font-semibold text-ink">{title}</h1>
-          <p className="text-ink-muted">{subtitle}</p>
+    <header className="border-b border-line bg-card px-4 py-3 md:px-6 md:py-4">
+      <div
+        className={`flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4 ${column}`}
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          {glyph !== undefined ? (
+            <IconTile glyph={glyph} />
+          ) : icon !== undefined ? (
+            <IconTile icon={icon} />
+          ) : null}
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold text-ink">{title}</h1>
+            <p className="text-ink-muted">{subtitle}</p>
+          </div>
         </div>
+        {actionsBox}
       </div>
-      {actionsBox}
     </header>
   );
 }
