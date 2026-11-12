@@ -1751,3 +1751,207 @@ describe('a long unbroken word in an error message wraps (L-374)', () => {
     await panel.context().close();
   });
 });
+
+/**
+ * Drawn marks sit at a readable size beside their words (L-370).
+ *
+ * The marks were redrawn to fill more of their 1em box and given a heavier
+ * line. `src/ui/StateMark.size.test.tsx` holds the drawing's size from its own
+ * numbers, but jsdom does no layout, so whether a row grew for it — a taller
+ * ATS row, a taller step button — is only knowable here.
+ *
+ * The harness's `?marks=1` page draws the three real components that put a
+ * mark beside words, in states that show all nine marks. Each row is measured
+ * against a NO-MARK TWIN: the same row cloned beside it with its marks taken
+ * out, laid out in the same table, list or card. No height is written down
+ * here, so a change of font or padding cannot make the check stale; only the
+ * mark can make a row differ from its twin.
+ *
+ * At the narrowest window (375px) and at 150% zoom (a 1280px window is 853
+ * CSS px wide at 150%) every mark must also sit inside its cell or button, and
+ * the page must not scroll sideways.
+ */
+const MARK_WINDOWS = {
+  desktop: { viewport: { width: 1280, height: 800 }, scale: 1 },
+  'zoom 150%': { viewport: { width: 853, height: 533 }, scale: 1.5 },
+  'phone 375px': { viewport: { width: 375, height: 800 }, scale: 1 },
+} as const;
+
+type MarkWindow = (typeof MARK_WINDOWS)[keyof typeof MARK_WINDOWS];
+
+/** Every mark there is: the sheet must draw them all, or it tested less than it says. */
+const ALL_MARKS = ['back', 'cross', 'dot', 'down', 'ring', 'skipped', 'tick', 'up', 'warning'];
+
+async function openMarks(markWindow: MarkWindow): Promise<Page> {
+  const context = await browser.newContext({
+    viewport: markWindow.viewport,
+    deviceScaleFactor: markWindow.scale,
+    colorScheme: 'light',
+  });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`${origin}/?marks=1`);
+  await page.waitForSelector('[data-testid="marks-sheet"] [data-mark]');
+  await page.evaluate(() => document.fonts.ready);
+  assert.deepEqual(errors, [], 'the sheet threw while drawing');
+  // Unstyled, every row would be the same height with or without anything. The
+  // card's border is a token-driven style; WebKit snaps its width to the
+  // screen's pixels (1px is 0.67 CSS px at 150%), so only its presence counts.
+  const border = await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="tailor-ats"]');
+    if (card === null) return 'no ATS card';
+    const style = getComputedStyle(card);
+    return `${style.borderTopStyle} ${String(parseFloat(style.borderTopWidth) > 0)}`;
+  });
+  assert.equal(border, 'solid true', 'the ATS card has no border: the stylesheet did not load');
+  return page;
+}
+
+interface MarkReport {
+  /** The mark names drawn on the sheet. */
+  readonly drawn: readonly string[];
+  /** How many rows and lines were compared with their no-mark twin. */
+  readonly compared: number;
+  readonly problems: readonly string[];
+}
+
+/** Every row, button and line that is taller with its mark, and every mark outside its box. */
+async function markProblems(page: Page): Promise<MarkReport> {
+  return page.evaluate(() => {
+    const sheet = document.querySelector('[data-testid="marks-sheet"]');
+    if (sheet === null) return { drawn: [], compared: 0, problems: ['no sheet'] };
+    const problems: string[] = [];
+    let compared = 0;
+    const height = (element: Element): number => element.getBoundingClientRect().height;
+    const nameOf = (element: Element): string =>
+      element.getAttribute('data-testid') ??
+      element.closest('[data-testid]')?.getAttribute('data-testid') ??
+      element.tagName.toLowerCase();
+
+    // The same row, beside itself, without its marks.
+    const againstTwin = (row: Element, what: string): void => {
+      const twin = row.cloneNode(true) as Element;
+      for (const mark of twin.querySelectorAll('[data-mark]')) mark.remove();
+      row.after(twin);
+      const withMark = height(row);
+      const without = height(twin);
+      twin.remove();
+      compared += 1;
+      if (Math.abs(withMark - without) > 0.01) {
+        problems.push(`${what}: ${String(withMark)}px with its mark, ${String(without)}px without`);
+      }
+    };
+
+    const marked = (selector: string): Element[] =>
+      [...sheet.querySelectorAll(selector)].filter((row) => row.querySelector('[data-mark]'));
+    for (const row of marked('[data-testid="tailor-ats"] tbody tr')) {
+      againstTwin(row, `ATS row ${nameOf(row)}`);
+    }
+    for (const button of marked('[data-testid="job-steps"] button')) {
+      againstTwin(button, `step button ${nameOf(button)}`);
+    }
+    for (const row of marked('[data-testid^="tracker-card-progress-"] > div')) {
+      againstTwin(row, 'card dots row');
+    }
+
+    // One line of 13px text and one of 16px, with each kind of mark, against
+    // the same words alone.
+    const kinds = new Map<string, Element>();
+    for (const mark of sheet.querySelectorAll('[data-mark]')) {
+      const name = mark.getAttribute('data-mark') ?? '?';
+      if (!kinds.has(name)) kinds.set(name, mark);
+    }
+    for (const [size, className] of [
+      ['13px', 'text-xs'],
+      ['16px', ''],
+    ] as const) {
+      for (const [name, mark] of kinds) {
+        const line = document.createElement('p');
+        line.className = className;
+        line.append(mark.cloneNode(true), ' Missing');
+        sheet.append(line);
+        const actual = getComputedStyle(line).fontSize;
+        if (actual !== size) problems.push(`the ${size} line is ${actual}`);
+        againstTwin(line, `${size} line with ${name}`);
+        line.remove();
+      }
+    }
+
+    // Every mark inside the cell, button or card row that holds it, and on screen.
+    for (const mark of sheet.querySelectorAll('[data-mark]')) {
+      const holder = mark.closest('td, button, [data-testid^="tracker-card-progress-"]');
+      const box = mark.getBoundingClientRect();
+      const name = mark.getAttribute('data-mark') ?? '?';
+      if (holder === null) {
+        problems.push(`${name}: not in a cell, button or card`);
+        continue;
+      }
+      const room = holder.getBoundingClientRect();
+      const inside =
+        box.left >= room.left - 0.5 &&
+        box.right <= room.right + 0.5 &&
+        box.top >= room.top - 0.5 &&
+        box.bottom <= room.bottom + 0.5;
+      if (!inside) problems.push(`${name} in ${nameOf(holder)}: outside its ${holder.tagName}`);
+      if (box.right > window.innerWidth + 0.5 || box.left < -0.5) {
+        problems.push(`${name}: off the side of the window`);
+      }
+    }
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      problems.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    return { drawn: [...kinds.keys()].sort(), compared, problems };
+  });
+}
+
+describe('drawn marks sit at a readable size beside their words (L-370)', () => {
+  for (const [name, markWindow] of Object.entries(MARK_WINDOWS)) {
+    it(`no row is taller for its mark, and every mark sits inside its cell, ${name}`, async () => {
+      const page = await openMarks(markWindow);
+      const report = await markProblems(page);
+      console.log(`marks (${name}): ${JSON.stringify(report)}`);
+      assert.deepEqual(report.drawn, ALL_MARKS, 'the sheet did not draw every mark');
+      // 5 ATS rows, 6 step buttons, the dots row, and 9 marks × 2 line sizes.
+      assert.ok(report.compared >= 30, `only ${String(report.compared)} rows compared`);
+      assert.deepEqual(report.problems, []);
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check. A mark twice the
+  // height of its text makes its rows taller, and is caught.
+  it('the check can fail: a mark drawn too big makes its rows taller, and is reported', async () => {
+    const page = await openMarks(MARK_WINDOWS.desktop);
+    await page.evaluate(() => {
+      for (const svg of document.querySelectorAll('[data-mark] svg')) {
+        svg.setAttribute('width', '2em');
+        svg.setAttribute('height', '2em');
+      }
+    });
+    const report = await markProblems(page);
+    for (const kind of ['ATS row', 'step button', '13px line', '16px line']) {
+      assert.ok(
+        report.problems.some((line) => line.startsWith(kind)),
+        `a taller ${kind} went unnoticed: ${JSON.stringify(report.problems)}`,
+      );
+    }
+    await page.context().close();
+  });
+
+  it('the check can fail: a mark pushed out of its button is reported', async () => {
+    const page = await openMarks(MARK_WINDOWS['phone 375px']);
+    await page.evaluate(() => {
+      const mark = document.querySelector<HTMLElement>('[data-testid="job-steps"] [data-mark]');
+      if (mark === null) throw new Error('no mark in the step bar');
+      mark.style.transform = 'translateX(-60px)';
+    });
+    const report = await markProblems(page);
+    assert.ok(
+      report.problems.some((line) => line.includes('outside its BUTTON')),
+      `the pushed mark was not flagged: ${JSON.stringify(report.problems)}`,
+    );
+    await page.context().close();
+  });
+});
