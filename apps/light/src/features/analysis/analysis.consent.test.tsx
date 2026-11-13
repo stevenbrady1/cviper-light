@@ -226,3 +226,62 @@ describe('withdrawing consent', () => {
     expect(await screen.findByTestId('analysis-consent-gate')).toBeTruthy();
   });
 });
+
+/**
+ * L-399. The rows were drawn from a hand-typed `['anthropic', 'openai']`, so a
+ * consent given to any provider added later could never be taken back here.
+ * Typed out again on purpose: a test that read the app's own list would agree
+ * with whatever that list happened to say.
+ */
+const EVERY_KIND = [
+  'anthropic',
+  'openai',
+  'google',
+  'mistral',
+  'grok',
+  'openrouter',
+  'custom',
+] as const;
+
+describe('withdrawing consent, for every provider a consent can be given to (L-399)', () => {
+  it.each(EVERY_KIND)(
+    'happy: a consent given to %s shows a row, and Withdraw takes it back',
+    async (kind) => {
+      const consentPort = createFakeConsentPort({ [kind]: true });
+      const { user } = await renderReady(consentPort);
+
+      await screen.findByTestId(`analysis-consent-status-${kind}`);
+      await user.click(screen.getByTestId(`analysis-consent-withdraw-${kind}`));
+
+      await vi.waitFor(() => expect(consentPort.state()[kind]).toBe(false));
+      expect(screen.queryByTestId(`analysis-consent-status-${kind}`)).toBeNull();
+    },
+  );
+
+  it('negative: a provider never agreed to has no row and no Withdraw', async () => {
+    await renderReady(createFakeConsentPort({ google: true }));
+
+    await screen.findByTestId('analysis-consent-status-google');
+    for (const kind of EVERY_KIND.filter((each) => each !== 'google')) {
+      expect(screen.queryByTestId(`analysis-consent-status-${kind}`)).toBeNull();
+      expect(screen.queryByTestId(`analysis-consent-withdraw-${kind}`)).toBeNull();
+    }
+  });
+
+  it('boundary: none agreed draws no list at all', async () => {
+    await renderReady(createFakeConsentPort());
+
+    expect(screen.queryByTestId('analysis-consent-status')).toBeNull();
+  });
+
+  it('boundary: all seven agreed draws seven rows, each with its own Withdraw', async () => {
+    const all = Object.fromEntries(EVERY_KIND.map((kind) => [kind, true]));
+    await renderReady(createFakeConsentPort(all));
+
+    const list = await screen.findByTestId('analysis-consent-status');
+    await vi.waitFor(() => expect(list.querySelectorAll('li')).toHaveLength(7));
+    for (const kind of EVERY_KIND) {
+      expect(screen.getByTestId(`analysis-consent-withdraw-${kind}`)).toBeTruthy();
+    }
+  });
+});

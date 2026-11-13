@@ -77,6 +77,13 @@ export const NO_CONSENT: ConsentState = {
   custom: false,
 };
 
+/**
+ * Every kind a consent can be held for — so every kind that can be withdrawn.
+ * Built from the flags above: the screens once typed their own two-name list,
+ * and five providers added later could be agreed to but never taken back (L-399).
+ */
+export const CONSENT_KINDS = Object.keys(NO_CONSENT) as readonly ConsentProviderKind[];
+
 /** The file, in the app's own data directory. Exported so tests name the real one. */
 export const CONSENT_STORE_FILE = 'ai-provider-consent.json';
 
