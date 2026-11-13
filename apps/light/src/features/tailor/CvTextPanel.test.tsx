@@ -46,7 +46,7 @@ describe('reading (L-218)', () => {
     expect(classes).not.toContain('border');
     expect(document.querySelector('textarea')).toBeNull();
     expect(screen.getByTestId('tailor-cv-source').textContent).toBe(
-      'Read from CV.pdf. The AI works from exactly this text.',
+      'The AI works from exactly this text.',
     );
     expect(screen.queryByTestId('tailor-cv-restore')).toBeNull();
     expect(screen.queryByTestId('tailor-cv-changes')).toBeNull();
@@ -151,7 +151,7 @@ describe('a corrected CV (L-218)', () => {
   it('says it was corrected, and shows what changed against the file', async () => {
     const { user } = setUp(FIXED);
     expect(screen.getByTestId('tailor-cv-source').textContent).toBe(
-      'Read from CV.pdf, then corrected by you. The AI works from exactly this text.',
+      'Corrected by you. The AI works from exactly this text.',
     );
     const changes = screen.getByTestId('tailor-cv-changes');
     await user.click(within(changes).getByText('What you changed'));
@@ -187,6 +187,28 @@ describe('a corrected CV (L-218)', () => {
     await user.type(screen.getByLabelText('Correct your CV text'), ', Excel');
     await user.click(screen.getByTestId('tailor-cv-edit-save'));
     expect(saved[0]?.original_text).toBe(CV.extracted_text);
+  });
+});
+
+describe('less small print (L-404)', () => {
+  it('corrected: the line says "Corrected by you." and the line under the box still says "corrected"', () => {
+    setUp({ ...CV, extracted_text: 'Analyst, Barclays', original_text: CV.extracted_text });
+    expect(screen.getByTestId('tailor-cv-source').textContent).toBe(
+      'Corrected by you. The AI works from exactly this text.',
+    );
+    expect(screen.getByTestId('tailor-cv-preview-meta').textContent).toBe(
+      'CV.pdf · 2 words · corrected',
+    );
+  });
+
+  it('not corrected: the line is exactly the promise, and the file name is still under the box', () => {
+    setUp();
+    expect(screen.getByTestId('tailor-cv-source').textContent).toBe(
+      'The AI works from exactly this text.',
+    );
+    const meta = screen.getByTestId('tailor-cv-preview-meta').textContent;
+    expect(meta).toContain('CV.pdf');
+    expect(meta).not.toContain('corrected');
   });
 });
 

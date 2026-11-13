@@ -108,7 +108,7 @@ describe('correcting the CV on Tailor (L-218)', () => {
 
     expect(port.storedCvs()[0]).toMatchObject({ extracted_text: FIXED, original_text: MISREAD });
     expect(screen.getByTestId('tailor-cv-preview-text').textContent).toBe(FIXED);
-    expect(screen.getByTestId('tailor-cv-source').textContent).toContain('corrected by you');
+    expect(screen.getByTestId('tailor-cv-source').textContent).toContain('Corrected by you');
 
     await user.type(screen.getByTestId('tailor-job-text'), 'Credit risk analyst. Python, SQL.');
     await user.click(screen.getByTestId('tailor-run'));
