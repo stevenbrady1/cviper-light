@@ -99,8 +99,10 @@ describe('ATS Score hints (L-215)', () => {
 
   it('each column and each row says what it measures', () => {
     render(<AtsStep comparison={BASE} fabrication={{ clean: true, flagged: 0 }} />);
-    expect(hintOn('Before')).toBe(ATS_HINT.before);
-    expect(hintOn('After')).toBe(ATS_HINT.after);
+    // The column headers: "Before" and "After" also label the bars, as plain words (L-396).
+    const table = screen.getByRole('table');
+    expect(hintOn('Before', table)).toBe(ATS_HINT.before);
+    expect(hintOn('After', table)).toBe(ATS_HINT.after);
     expect(hintOn('Keyword coverage')).toBe(ATS_HINT.keyword);
     expect(hintOn('Bullet strength')).toBe(ATS_HINT.bullets);
     expect(hintOn('Structure & sections')).toBe(ATS_CHECK_HINT.section_headers);
