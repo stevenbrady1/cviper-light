@@ -21,9 +21,8 @@ export function AnalysisSample({ sample, aiAvailable, onHide }: AnalysisSamplePr
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="text-ink-muted">
-          <span className="font-medium text-ink">A sample check.</span> A made-up data
-          analyst&rsquo;s CV against a made-up advert, using the basic match. Nothing was saved. Add
-          your own CV above to check it for real.
+          <span className="font-medium text-ink">A sample check</span> with a made-up CV and advert.
+          Nothing was saved. Add your own CV above to check it for real.
         </p>
         <button
           type="button"

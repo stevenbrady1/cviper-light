@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ok, type Cv } from '@cviper/core-types';
 
-import { JSON_RESUME_HINT } from '../../app/hints';
+import { JSON_RESUME_HINT, SAVE_JSON_RESUME_HINT } from '../../app/hints';
 
 const tauri = vi.hoisted(() => ({
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
@@ -241,5 +241,27 @@ describe('what "JSON Resume" means (L-241)', () => {
     const marks = screen.getAllByTestId('json-resume-hint');
     expect(marks).toHaveLength(1);
     for (const mark of marks) expect(describedText(mark)).not.toBe('');
+  });
+});
+
+describe('less small print under the CV picker (L-395)', () => {
+  it('negative: the note under the CV picker no longer explains saving back out', async () => {
+    await renderWith([PDF_CV]);
+    const note = screen.getByTestId('analysis-cv-note').textContent ?? '';
+    expect(note).not.toMatch(/saved back out|take anywhere|reads the format/);
+    // The privacy wording stays, word for word.
+    expect(note).toContain(
+      'The file is read on this computer. Its text only goes to an AI you choose, and only when you ask it to read your CV.',
+    );
+  });
+
+  it('the greyed-out Save button’s "i" still says only a JSON Resume can be saved as one', async () => {
+    await renderWith([PDF_CV]);
+    expect(saveButton().disabled).toBe(true);
+    const id = saveButton().closest('[aria-describedby]')?.getAttribute('aria-describedby') ?? '';
+    expect(document.getElementById(id)?.textContent).toBe(SAVE_JSON_RESUME_HINT);
+    expect(SAVE_JSON_RESUME_HINT).toBe(
+      'Only a CV that arrived as a JSON Resume can be saved as one.',
+    );
   });
 });

@@ -101,14 +101,13 @@ export function AnalysisCvPicker({
         )}
       </div>
 
-      <p className="mt-1 text-xs text-ink-faint">
+      <p data-testid="analysis-cv-note" className="mt-1 text-xs text-ink-faint">
         PDF, Word (.docx) or{' '}
         <Hint text={JSON_RESUME_HINT}>
           <span data-testid="json-resume-hint">JSON Resume</span>
         </Hint>{' '}
         (.json). The file is read on this computer. Its text only goes to an AI you choose, and only
-        when you ask it to read your CV. A CV that arrived as a JSON Resume can be saved back out as
-        one, unchanged, to take anywhere that reads the format.
+        when you ask it to read your CV.
       </p>
 
       <LiveStatus text={exportMessage} />
