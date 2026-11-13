@@ -309,7 +309,8 @@ export function Tracker({
         loadSubstages={loadSubstages}
       />
 
-      <div className="flex min-h-0 flex-1">
+      {/* `relative`: the pane floats over this row, below the header and the strip (L-401). */}
+      <div className="relative flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden p-2 md:p-4">
           {loading ? (
             <p className="text-ink-muted">Reading your applications…</p>
@@ -344,6 +345,9 @@ export function Tracker({
         </div>
 
         <TrackerSidePane
+          // Over the board only when it has cards: on an empty board the form
+          // stays beside the invitation, which it would half cover (L-401).
+          over={boardIsReady && !boardIsEmpty}
           pane={pane}
           setPane={setPane}
           onOpenSettings={onOpenSettings}

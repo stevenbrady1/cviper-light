@@ -51,7 +51,8 @@ const TRAP_CALL = /(?<!function\s+)\buseFocusTrap\s*\(/;
 /** Files that may call the trap without being a pop-up, each with the reason. */
 const TRAP_ALLOWED: Readonly<Record<string, string>> = {
   'apps/light/src/app/DetailPane.tsx':
-    'On a phone the detail pane covers the screen and keeps Tab inside, but it is a panel, ' +
+    'On a phone, and over the Tracker board on a desktop, the detail pane covers what is behind ' +
+    'it and keeps Tab inside, but it is a panel, ' +
     'not a pop-up: it carries no dialog markers, so a pop-up can open over it and win Tab.',
 };
 

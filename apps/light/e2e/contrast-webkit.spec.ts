@@ -487,10 +487,11 @@ describe('the match score is the hero, the keyword check a plain row below (L-39
 /**
  * Tracker column headings whose content is wider than the heading (L-311).
  *
- * With an application open the board's columns shrink to their minimum, and
- * the Interviewing heading — its name, "Edit stages" and the count — was wider
- * than that: the count ran into the next column's name ("1OFFER"). jsdom does
- * no layout, so only a real engine can see this.
+ * With an application open the board's columns used to shrink to their
+ * minimum (the pane sat beside the board until L-401; it now floats over it),
+ * and the Interviewing heading — its name, "Edit stages" and the count — was
+ * wider than that: the count ran into the next column's name ("1OFFER"). jsdom
+ * does no layout, so only a real engine can see this.
  */
 async function overflowingColumnHeadings(page: Page): Promise<string[]> {
   return page.evaluate(() =>
@@ -800,6 +801,359 @@ describe('richer Tracker cards fit their column (L-393)', () => {
     assert.ok(
       fit.problems.some((line) => line.startsWith('long:')),
       `the unbreakable title was not flagged: ${JSON.stringify(fit.problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
+ * The detail pane floats over the board on a desktop (L-401).
+ *
+ * Beside the board it took 380px from it, and the columns squeezed and the
+ * board scrolled sideways while a card was open. Over it, the board keeps its
+ * full width: every column is as wide with a card open as with none, the pane's
+ * left edge lies over the board, and nothing above or beside the board (the
+ * side menu, the page header, the funnel strip) is covered. It keeps focus
+ * while it covers the board. Cards are opened with the keyboard: WebKit does
+ * not focus a button on a mouse click, so a click would leave nothing for the
+ * pane to hand focus back to. Column widths are compared, never pinned, so the
+ * checks hold whatever the columns' minimum width is.
+ */
+const PANE_WINDOWS = [
+  { width: 1000, height: 700 },
+  { width: 1264, height: 800 },
+  { width: 1440, height: 900 },
+] as const;
+
+interface Edges {
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
+interface PaneLayout {
+  /** Each column's width, by status. */
+  readonly columns: Record<string, number>;
+  /** How far the board scrolls sideways. */
+  readonly boardScroll: number;
+  /** How far the page scrolls sideways. */
+  readonly pageScroll: number;
+  readonly board: Edges;
+  readonly pane: Edges | null;
+  readonly menu: Edges | null;
+  readonly header: Edges | null;
+  readonly strip: Edges | null;
+  /** How many columns' width can be seen left of the pane, to one decimal. */
+  readonly visibleColumns: number;
+}
+
+async function paneLayout(page: Page): Promise<PaneLayout> {
+  return page.evaluate(() => {
+    const edges = (element: Element | null | undefined) => {
+      if (element === null || element === undefined) return null;
+      const { left, right, top, bottom } = element.getBoundingClientRect();
+      return { left, right, top, bottom };
+    };
+    const board = document.querySelector('[data-testid="tracker-board"]');
+    if (board === null) throw new Error('no board');
+    const pane = edges(document.querySelector('[data-testid="detail-pane"]'));
+    const shown = board.getBoundingClientRect();
+    const cutAt = Math.min(shown.right, pane?.left ?? Infinity);
+    const columns: Record<string, number> = {};
+    let visibleColumns = 0;
+    for (const column of board.querySelectorAll('[data-testid^="tracker-column-"]')) {
+      const box = column.getBoundingClientRect();
+      columns[(column.getAttribute('data-testid') ?? '').replace('tracker-column-', '')] =
+        box.width;
+      const seen = Math.min(box.right, cutAt) - Math.max(box.left, shown.left);
+      visibleColumns += Math.max(0, seen) / box.width;
+    }
+    const root = document.documentElement;
+    return {
+      columns,
+      boardScroll: board.scrollWidth - board.clientWidth,
+      pageScroll: root.scrollWidth - root.clientWidth,
+      board: { left: shown.left, right: shown.right, top: shown.top, bottom: shown.bottom },
+      pane,
+      menu: edges(document.querySelector('[data-testid="sidebar"]')),
+      header: edges(document.querySelector('[data-testid="view-tracker"] > header')),
+      strip: edges(document.querySelector('[data-testid="tracker-funnel"]')),
+      visibleColumns: Math.round(visibleColumns * 10) / 10,
+    };
+  });
+}
+
+/** Columns whose width changed when the card opened. */
+function columnChanges(closed: PaneLayout, opened: PaneLayout): string[] {
+  return Object.entries(closed.columns).flatMap(([status, width]) => {
+    const now = opened.columns[status];
+    return now !== undefined && Math.abs(now - width) <= 0.5
+      ? []
+      : [`${status}: ${String(width)}px closed, ${String(now)}px open`];
+  });
+}
+
+/** Whether the pane lies over the board, and adds no sideways scroll. */
+function notOverBoard(closed: PaneLayout, opened: PaneLayout): string[] {
+  const { pane, board } = opened;
+  if (pane === null) return ['no pane'];
+  const problems: string[] = [];
+  if (pane.left <= board.left + 0.5 || pane.left >= board.right - 0.5) {
+    problems.push(
+      `pane's left edge at ${String(pane.left)}px, board from ${String(board.left)} to ${String(board.right)}px`,
+    );
+  }
+  if (opened.boardScroll > closed.boardScroll + 0.5) {
+    problems.push(
+      `board scrolls ${String(opened.boardScroll)}px open, ${String(closed.boardScroll)}px closed`,
+    );
+  }
+  if (opened.pageScroll > 0) problems.push(`page: ${String(opened.pageScroll)}px too wide`);
+  return problems;
+}
+
+/** Anything the pane covers that it must not. */
+function paneCovers(opened: PaneLayout): string[] {
+  const { pane, menu, header, strip } = opened;
+  if (pane === null || menu === null || header === null || strip === null) {
+    return ['no pane, side menu, page header or funnel strip'];
+  }
+  const problems: string[] = [];
+  if (pane.left < menu.right - 0.5) {
+    problems.push(`covers the side menu by ${String(menu.right - pane.left)}px`);
+  }
+  if (pane.top < header.bottom - 0.5) {
+    problems.push(`covers the page header by ${String(header.bottom - pane.top)}px`);
+  }
+  if (pane.top < strip.bottom - 0.5) {
+    problems.push(`covers the funnel strip by ${String(strip.bottom - pane.top)}px`);
+  }
+  return problems;
+}
+
+async function trackerWithCards(viewport: { width: number; height: number }): Promise<Page> {
+  const page = await open('?seen=1&entries=1', viewport);
+  await goTo(page, 'tracker');
+  await page.waitForSelector('[data-testid="tracker-card-c"]');
+  return page;
+}
+
+/** Open card c the way a keyboard user does, and let focus settle. */
+async function openCardByKeyboard(page: Page): Promise<void> {
+  await page.focus('[data-testid="tracker-card-c"]');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('[data-testid="detail-pane"]');
+  await page.evaluate(async () => {
+    await new Promise((done) => requestAnimationFrame(done));
+    await new Promise((done) => requestAnimationFrame(done));
+  });
+}
+
+async function focusedTestId(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const focused = document.activeElement;
+    return focused?.getAttribute('data-testid') ?? focused?.tagName ?? '?';
+  });
+}
+
+describe('the detail pane floats over the Tracker board (L-401)', () => {
+  for (const viewport of PANE_WINDOWS) {
+    const size = `${String(viewport.width)}×${String(viewport.height)}`;
+
+    it(`at ${size} every column is the same width with a card open as closed`, async () => {
+      const page = await trackerWithCards(viewport);
+      const closed = await paneLayout(page);
+      await openCardByKeyboard(page);
+      const opened = await paneLayout(page);
+      console.log(
+        `pane over the board at ${size}: columns closed ${JSON.stringify(closed.columns)}, ` +
+          `open ${JSON.stringify(opened.columns)}; ${String(opened.visibleColumns)} columns ` +
+          `visible beside the pane (${String(closed.visibleColumns)} with it shut)`,
+      );
+      assert.equal(Object.keys(closed.columns).length, 5, 'not five columns');
+      assert.deepEqual(columnChanges(closed, opened), []);
+      await page.context().close();
+    });
+
+    it(`at ${size} the pane's left edge lies over the board and the board does not scroll sideways because of it`, async () => {
+      const page = await trackerWithCards(viewport);
+      const closed = await paneLayout(page);
+      await openCardByKeyboard(page);
+      assert.deepEqual(notOverBoard(closed, await paneLayout(page)), []);
+      await page.context().close();
+    });
+
+    it(`at ${size} the pane never covers the side menu, the page header or the funnel strip`, async () => {
+      const page = await trackerWithCards(viewport);
+      await openCardByKeyboard(page);
+      assert.deepEqual(paneCovers(await paneLayout(page)), []);
+      await page.context().close();
+    });
+
+    it(`at ${size} a real Tab from the pane's last control lands on its first (Close)`, async () => {
+      const page = await trackerWithCards(viewport);
+      await openCardByKeyboard(page);
+      const last = await page.evaluate(() => {
+        const pane = document.querySelector('[data-testid="detail-pane"]');
+        const controls = [
+          ...(pane?.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ) ?? []),
+        ];
+        const control = controls.at(-1);
+        control?.focus();
+        return control === undefined
+          ? null
+          : (control.getAttribute('data-testid') ?? control.tagName);
+      });
+      assert.ok(last !== null, 'the pane has no controls');
+      assert.equal(await focusedTestId(page), last, `could not focus the last control, ${last}`);
+      await page.keyboard.press('Tab');
+      assert.equal(await focusedTestId(page), 'detail-pane-close');
+      await page.context().close();
+    });
+
+    it(`at ${size} Escape closes it and focus is back on the card`, async () => {
+      const page = await trackerWithCards(viewport);
+      await openCardByKeyboard(page);
+      assert.equal(await focusedTestId(page), 'detail-pane-close', 'focus did not move in');
+      await page.keyboard.press('Escape');
+      await page.waitForSelector('[data-testid="detail-pane"]', { state: 'detached' });
+      assert.equal(await focusedTestId(page), 'tracker-card-c');
+      await page.context().close();
+    });
+  }
+
+  it('at 375×812 the pane covers the screen, as before', async () => {
+    const page = await trackerWithCards(PHONE);
+    await page.click('[data-testid="tracker-card-c"]');
+    await page.waitForSelector('[data-testid="detail-pane"]');
+    const problems = await page.evaluate(() => {
+      const pane = document.querySelector('[data-testid="detail-pane"]');
+      if (pane === null) return ['no pane'];
+      const box = pane.getBoundingClientRect();
+      const { innerWidth: width, innerHeight: height } = window;
+      const edges = [box.left, box.top, width - box.right, height - box.bottom];
+      const found = edges.some((edge) => Math.abs(edge) > 0.5)
+        ? [`pane is ${JSON.stringify(edges)} short of the window's edges`]
+        : [];
+      for (const [x, y] of [
+        [2, 2],
+        [width - 2, height / 2],
+        [2, height - 2],
+      ] as const) {
+        const top = document.elementFromPoint(x, y);
+        if (top === null || !pane.contains(top)) {
+          found.push(`(${String(x)}, ${String(y)}) is not the pane`);
+        }
+      }
+      return found;
+    });
+    assert.deepEqual(problems, []);
+    await page.context().close();
+  });
+
+  it('with cards on the board, "Bring it in" still puts the cursor in the link box, over the board and on a phone', async () => {
+    for (const [viewport, covers] of [
+      [SMALLEST_WINDOW, false],
+      [PHONE, true],
+    ] as const) {
+      const page = await open('?seen=1&entries=1', viewport);
+      await goTo(page, 'search');
+      await page.click('[data-testid="search-bring-in"]');
+      await page.locator('[data-testid="nav-tracker"][aria-current="page"]:visible').waitFor();
+      await page.waitForSelector('[data-testid="paste-job-form"]');
+      await page.waitForSelector('[data-testid="tracker-board"]');
+      const at = `${String(viewport.width)}px`;
+      assert.deepEqual(await arrivalProblems(page, covers), [], at);
+      if (!covers) {
+        assert.deepEqual(paneCovers(await paneLayout(page)), [], at);
+        const position = await page.evaluate(() => {
+          const pane = document.querySelector('[data-testid="detail-pane"]');
+          return pane === null ? 'no pane' : getComputedStyle(pane).position;
+        });
+        assert.equal(position, 'absolute', `${at}: the paste pane is not over the board`);
+      }
+      await page.context().close();
+    }
+  });
+
+  it('a delete confirm opened in the pane, and a hint, both paint above it', async () => {
+    const page = await trackerWithCards({ width: 1264, height: 800 });
+    await openCardByKeyboard(page);
+    // Nothing in the pane has an "i" today. A hint is drawn into the body, so
+    // open the strip's "i", move its tip over the pane, and ask what is on top.
+    await page.focus('[data-testid="tracker-funnel"] [data-testid="hint-info"]');
+    const hintOnTop = await page.evaluate(() => {
+      const pane = document.querySelector('[data-testid="detail-pane"]')?.getBoundingClientRect();
+      const trigger = document.querySelector(
+        '[data-testid="tracker-funnel"] [data-testid="hint-info"]',
+      );
+      const tip = document.getElementById(trigger?.getAttribute('aria-describedby') ?? '');
+      if (pane === undefined || tip === null || tip.hidden) return 'no pane or no open hint';
+      tip.style.left = `${String(pane.left + 40)}px`;
+      tip.style.top = `${String(pane.top + 120)}px`;
+      tip.style.pointerEvents = 'auto';
+      const box = tip.getBoundingClientRect();
+      const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      return top !== null && tip.contains(top) ? '' : `the pane's ${top?.tagName ?? '?'} is on top`;
+    });
+    assert.equal(hintOnTop, '');
+    await page.focus('[data-testid="detail-delete"]');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('[data-testid="confirm-delete-confirm"]');
+    const dialogOnTop = await page.evaluate(() => {
+      const problems: string[] = [];
+      const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+      const backdrop = dialog?.parentElement;
+      if (dialog === null || backdrop === null || backdrop === undefined) return ['no dialog'];
+      const box = dialog.getBoundingClientRect();
+      const centre = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      if (centre === null || !dialog.contains(centre)) problems.push('the dialog is covered');
+      for (const [name, selector] of [
+        ['side menu', '[data-testid="sidebar"]'],
+        ['page header', '[data-testid="view-tracker"] > header'],
+        ['pane', '[data-testid="detail-pane"] > header'],
+      ] as const) {
+        const under = document.querySelector(selector)?.getBoundingClientRect();
+        if (under === undefined) {
+          problems.push(`no ${name}`);
+          continue;
+        }
+        const top = document.elementFromPoint(under.left + 4, under.top + 4);
+        if (top !== backdrop) problems.push(`the ${name} is not behind the dialog's backdrop`);
+      }
+      return problems;
+    });
+    assert.deepEqual(dialogOnTop, []);
+    await page.context().close();
+  });
+
+  it('colour contrast with the pane open over the board', async () => {
+    const page = await trackerWithCards({ width: 1264, height: 800 });
+    await openCardByKeyboard(page);
+    judge('pane over the board', await contrast(page));
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a pane forced back beside the board changes the columns, and is reported', async () => {
+    const page = await trackerWithCards({ width: 1264, height: 800 });
+    const closed = await paneLayout(page);
+    await openCardByKeyboard(page);
+    await page.evaluate(async () => {
+      const pane = document.querySelector<HTMLElement>('[data-testid="detail-pane"]');
+      if (pane !== null) pane.style.position = 'static';
+      await new Promise((done) => requestAnimationFrame(done));
+    });
+    const opened = await paneLayout(page);
+    const changes = columnChanges(closed, opened);
+    console.log(`pane forced beside at 1264×800: ${JSON.stringify(changes)}`);
+    assert.ok(changes.length > 0, 'the squeezed columns were not reported');
+    assert.ok(
+      notOverBoard(closed, opened).some((line) => line.startsWith("pane's left edge")),
+      'a pane beside the board was not reported as off the board',
     );
     await page.context().close();
   });

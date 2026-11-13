@@ -69,6 +69,19 @@ import { useViewportClass } from './viewport';
  * `styles/prose-clipping.contract.test.ts` holds the clip off this slot. It
  * checks the CLASS, not the width — no test in a jsdom process can measure a
  * rendered pixel.
+ *
+ * ============================================================================
+ * `over`: FLOATING OVER THE VIEW ON A DESKTOP (L-401)
+ * ============================================================================
+ * Beside the view, the pane takes 380px from it, and the Tracker's columns
+ * squeezed and scrolled sideways whenever a card was open. With `over`, the
+ * pane floats over the right edge of its positioned parent instead, so the
+ * view keeps its full width. It then covers what is behind it, so it keeps
+ * focus as it does on a phone. It is still a pane, not a pop-up: no dialog
+ * markers and no backdrop, so the board stays clickable and another card
+ * swaps the contents. `z-10` is enough to clear the board; hints are drawn
+ * into the body at `z-50`, and a confirm opened inside the pane is drawn
+ * inside the pane's own layer, which is the top of the page.
  */
 
 interface DetailPaneProps {
@@ -77,14 +90,23 @@ interface DetailPaneProps {
   /** A sentence under the heading, or `null`. Wraps; see the note above. */
   readonly subtitle?: string | null;
   readonly onClose: () => void;
+  /** On a desktop, float over the right edge of the view instead of sitting beside it. */
+  readonly over?: boolean;
   readonly children: ReactNode;
 }
 
-export function DetailPane({ title, subtitle = null, onClose, children }: DetailPaneProps) {
-  // On a phone the pane covers the whole screen, so it behaves like a modal
-  // for focus (L-236): focus moves in, Tab stays in, and closing hands focus
-  // back. On a desktop it sits beside the view, and Tab may leave it.
-  const covers = useViewportClass() === 'narrow';
+export function DetailPane({
+  title,
+  subtitle = null,
+  onClose,
+  over = false,
+  children,
+}: DetailPaneProps) {
+  // On a phone, and over the view on a desktop, the pane covers what is behind
+  // it, so it behaves like a modal for focus (L-236): focus moves in, Tab stays
+  // in, and closing hands focus back. Beside the view, Tab may leave it.
+  const narrow = useViewportClass() === 'narrow';
+  const covers = over || narrow;
   const paneRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   useFocusTrap(paneRef, covers);
@@ -122,8 +144,10 @@ export function DetailPane({ title, subtitle = null, onClose, children }: Detail
         // Phone: over everything, edge to edge, above the bottom bar. Close is
         // in the header, always rendered, so there is always a way back.
         'fixed inset-0 z-40 w-full pt-safe pb-safe',
-        // Desktop: the pane it always was, beside the view.
-        'md:static md:inset-auto md:z-auto md:w-[380px] md:border-l md:pt-0 md:pb-0',
+        // Desktop: beside the view, or floating over its right edge (L-401).
+        over
+          ? 'md:absolute md:inset-y-0 md:right-0 md:left-auto md:z-10 md:w-[380px] md:border-l md:pt-0 md:pb-0 md:shadow-overlay'
+          : 'md:static md:inset-auto md:z-auto md:w-[380px] md:border-l md:pt-0 md:pb-0',
       ].join(' ')}
     >
       <header className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
