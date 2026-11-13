@@ -478,3 +478,63 @@ describe('the wizard never claims a primary action', () => {
     expect(document.querySelectorAll('[data-primary="true"]')).toHaveLength(0);
   });
 });
+
+/** L-390: each board is a short row that opens on click. */
+describe('the job boards are short rows (L-390)', () => {
+  function row(id: 'adzuna' | 'reed'): HTMLDetailsElement {
+    return screen.getByTestId(`key-row-${id}`) as HTMLDetailsElement;
+  }
+
+  function title(id: 'adzuna' | 'reed'): HTMLElement {
+    const summary = row(id).querySelector('summary');
+    if (summary === null) throw new Error(`the ${id} row has no title`);
+    return summary;
+  }
+
+  it('both boards are closed rows with the name and the pill in the title', async () => {
+    renderKeys();
+    await screen.findByTestId('key-card-reed');
+
+    for (const [id, name] of [
+      ['adzuna', 'Adzuna'],
+      ['reed', 'Reed'],
+    ] as const) {
+      expect(row(id).tagName, id).toBe('DETAILS');
+      expect(row(id).open, id).toBe(false);
+      expect(screen.getByTestId(`key-card-${id}`).contains(row(id)), id).toBe(true);
+      expect(title(id).querySelector('h3')?.textContent, id).toBe(name);
+      expect(title(id).contains(screen.getByTestId(`key-state-${id}`)), id).toBe(true);
+      expect(title(id).contains(screen.getByTestId(`key-signup-${id}`)), id).toBe(false);
+    }
+  });
+
+  it('"Half set up" shows in the closed title, and the row stays closed', async () => {
+    renderKeys(createFakeKeyPort({ adzuna_app_id: 'id' }));
+    const pill = await screen.findByTestId('key-state-adzuna');
+    await screen.findByTestId('key-missing-adzuna');
+
+    expect(pill.textContent).toBe('Half set up');
+    expect(title('adzuna').contains(pill)).toBe(true);
+    expect(row('adzuna').open).toBe(false);
+    // The sentence saying which box is missing is inside the row.
+    expect(title('adzuna').contains(screen.getByTestId('key-missing-adzuna'))).toBe(false);
+  });
+
+  it('asked to focus Reed, only the Reed row opens', async () => {
+    render(
+      <KeySetup port={createFakeKeyPort()} browser={createFakeBrowserPort()} focused="reed" />,
+    );
+    await screen.findByTestId('key-card-reed');
+
+    expect(row('reed').open).toBe(true);
+    expect(row('adzuna').open).toBe(false);
+  });
+
+  it('negative: not asked to focus anything, no row opens', async () => {
+    renderKeys();
+    await screen.findByTestId('key-card-reed');
+
+    expect(row('reed').open).toBe(false);
+    expect(row('adzuna').open).toBe(false);
+  });
+});

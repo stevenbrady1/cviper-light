@@ -130,7 +130,8 @@ describe('setting it up', () => {
     expect(screen.getByTestId('custom-service-saved').textContent).toContain(
       'https://api.example.com/v1',
     );
-    expect(screen.getByTestId('custom-service-state').textContent).toBe('Saved');
+    // L-390: saved, but no model chosen yet, so it is offered nowhere.
+    expect(screen.getByTestId('custom-service-state').textContent).toBe('Choose a model');
     // The key leaves the DOM once it is safely stored, and is never drawn.
     expect((screen.getByTestId('custom-service-key') as HTMLInputElement).value).toBe('');
     expect(document.body.innerHTML).not.toContain(SENTINEL_KEY);
@@ -380,5 +381,94 @@ describe('"No service saved" beside the disabled Remove button (L-251)', () => {
     );
     await screen.findByTestId('custom-service-saved');
     expect(screen.queryByTestId('custom-service-none')).toBeNull();
+  });
+});
+
+/**
+ * L-390: the card is a short row that opens on click, and its closed title
+ * must say when the service needs something. Until a model is chosen it is
+ * offered nowhere, so "Saved" alone would be a false all-clear.
+ */
+describe('the closed row says what the service needs (L-390)', () => {
+  const SAVED: CustomServiceInput = {
+    address: 'https://api.example.com/v1',
+    ownNetwork: false,
+    key: SENTINEL_KEY,
+  };
+
+  function row(): HTMLDetailsElement {
+    return screen.getByTestId('custom-service-row') as HTMLDetailsElement;
+  }
+
+  function title(): HTMLElement {
+    const summary = row().querySelector('summary');
+    if (summary === null) throw new Error('the row has no title');
+    return summary;
+  }
+
+  it('is a closed row with the name and the pill in its title', async () => {
+    render(<CustomServiceCard port={fakePort()} />);
+    await waitFor(() =>
+      expect(screen.getByTestId('custom-service-state').textContent).toBe('Not set up'),
+    );
+    expect(row().open).toBe(false);
+    expect(title().textContent).toContain('Your own AI service');
+    expect(title().contains(screen.getByTestId('custom-service-state'))).toBe(true);
+    expect(title().contains(screen.getByTestId('custom-service-address'))).toBe(false);
+  });
+
+  it('saved with no model: a gold "Choose a model" in the closed title', async () => {
+    render(<CustomServiceCard port={fakePort(SAVED)} />);
+    const pill = screen.getByTestId('custom-service-state');
+    await waitFor(() => expect(pill.textContent).toBe('Choose a model'));
+
+    expect(pill.getAttribute('data-tone')).toBe('attention');
+    expect(title().contains(pill)).toBe(true);
+    expect(row().open).toBe(false);
+  });
+
+  it('negative: saved with a model, the title says "Saved" and names the model', async () => {
+    storeModelRaw('qwen2.5-7b-instruct');
+    render(<CustomServiceCard port={fakePort(SAVED)} />);
+    const pill = screen.getByTestId('custom-service-state');
+    await waitFor(() => expect(pill.textContent).toBe('Saved'));
+
+    expect(pill.getAttribute('data-tone')).toBe('ready');
+    expect(title().textContent).toContain('qwen2.5-7b-instruct');
+  });
+
+  it('choosing a model inside turns "Choose a model" into "Saved"', async () => {
+    const user = userEvent.setup();
+    render(<CustomServiceCard port={fakePort(SAVED)} />);
+    const pill = screen.getByTestId('custom-service-state');
+    await waitFor(() => expect(pill.textContent).toBe('Choose a model'));
+
+    const select = await screen.findByTestId('custom-service-model-select');
+    await waitFor(() => expect(select.querySelectorAll('option').length).toBeGreaterThan(1));
+    await user.selectOptions(select, 'qwen2.5-7b-instruct');
+
+    expect(pill.textContent).toBe('Saved');
+    expect(title().textContent).toContain('qwen2.5-7b-instruct');
+  });
+
+  it('boundary: removing the service goes back to "Not set up", with no model in the title', async () => {
+    const user = userEvent.setup();
+    storeModelRaw('qwen2.5-7b-instruct');
+    render(<CustomServiceCard port={fakePort(SAVED)} />);
+    const pill = screen.getByTestId('custom-service-state');
+    await waitFor(() => expect(pill.textContent).toBe('Saved'));
+
+    await user.click(title());
+    await user.click(screen.getByTestId('custom-service-remove'));
+
+    await waitFor(() => expect(pill.textContent).toBe('Not set up'));
+    expect(title().textContent).not.toContain('qwen2.5-7b-instruct');
+  });
+
+  it('the model choice inside is called "AI model"', async () => {
+    render(<CustomServiceCard port={fakePort(SAVED)} />);
+    await screen.findByTestId('custom-service-model');
+
+    expect(screen.getByText('AI model')).toBeTruthy();
   });
 });
