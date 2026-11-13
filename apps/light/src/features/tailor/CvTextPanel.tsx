@@ -36,6 +36,13 @@ export interface CvTextPanelProps {
   readonly onSave: (next: Cv) => Promise<string | null>;
 }
 
+/**
+ * How many lines fit in the collapsed text (L-322): `max-h-72` is 288px, less
+ * `py-3` (24px), at the body's 24px line — 11. One more and the text is
+ * clipped behind "Show all"; never a box that scrolls inside the page.
+ */
+export const COLLAPSED_LINES = 11;
+
 const PROBLEM = {
   empty: 'The CV text cannot be empty. Undo with Cancel if you did not mean to clear it.',
   too_long: `The CV text can be at most ${MAX_CV_TEXT_CHARS.toLocaleString('en-GB')} characters.`,
@@ -48,6 +55,10 @@ export function CvTextPanel({ cv, disabled, onSave }: CvTextPanelProps) {
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  // shortcut: "long" counts lines, so a CV with few line breaks but very long wrapped paragraphs shows in full instead of clipped; measure with a ResizeObserver if that ever matters
+  const long = text.trimEnd().split('\n').length > COLLAPSED_LINES;
+  const clipped = long && !expanded;
 
   async function save(next: Cv): Promise<boolean> {
     setBusy(true);
@@ -140,11 +151,10 @@ export function CvTextPanel({ cv, disabled, onSave }: CvTextPanelProps) {
               ? `Read from ${cv.name}, then corrected by you. The AI works from exactly this text.`
               : `Read from ${cv.name}. The AI works from exactly this text.`}
           </p>
-          {/* Focusable, so a keyboard alone can scroll a long CV. */}
           <pre
+            id="tailor-cv-preview-text"
             data-testid="tailor-cv-preview-text"
-            tabIndex={0}
-            className="max-h-72 overflow-y-auto rounded-card bg-sunken px-4 py-3 font-sans text-ink whitespace-pre-wrap"
+            className={`${clipped ? 'max-h-72 overflow-hidden ' : ''}rounded-card bg-sunken px-4 py-3 font-sans text-ink whitespace-pre-wrap`}
           >
             {text}
           </pre>
@@ -157,6 +167,18 @@ export function CvTextPanel({ cv, disabled, onSave }: CvTextPanelProps) {
       )}
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
+        {long ? (
+          <button
+            type="button"
+            data-testid="tailor-cv-show-all"
+            aria-expanded={expanded}
+            aria-controls="tailor-cv-preview-text"
+            onClick={() => setExpanded(!expanded)}
+            className={QUIET_BUTTON}
+          >
+            {expanded ? 'Show less' : 'Show all'}
+          </button>
+        ) : null}
         <button
           type="button"
           data-testid="tailor-cv-correct"
