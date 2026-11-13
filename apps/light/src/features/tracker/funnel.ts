@@ -13,9 +13,12 @@
  *   saved         status `saved`. Still on the desk; nothing has gone out.
  *   sent          every application that is NOT `saved` — applied,
  *                 interviewing, offer, rejected. It left the building.
- *   interviewing  status `interviewing` OR `offer`. An offer implies an
+ *   interviewing  status `interviewing` OR `offer`, NOW. An offer implies an
  *                 interview happened, whether or not the card ever paused in
- *                 that column.
+ *                 that column. A card interviewed and then rejected counts
+ *                 only under `rejected`: nothing stored says it was ever
+ *                 interviewed. So the strip calls this "Interview or offer",
+ *                 never "so far" (L-388).
  *   offers        status `offer`.
  *   rejected      status `rejected`.
  *
