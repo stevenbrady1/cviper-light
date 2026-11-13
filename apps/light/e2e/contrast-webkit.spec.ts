@@ -727,9 +727,10 @@ async function funnelHintReport(page: Page): Promise<{
 /**
  * Richer cards (L-393): the title may take three lines and company · location
  * two, an undated next action shows as one muted line, and an overdue one adds
- * a red dot beside the title. `?entries=long` stretches every part of a card:
- * a 200-letter word for a title, a long company, long action words. jsdom does
- * no layout, so only a real engine can say the card still fits its column.
+ * a red dot in the card's corner (L-409). `?entries=long` stretches every part
+ * of a card: a 200-letter word for a title, a long company, long action words.
+ * jsdom does no layout, so only a real engine can say the card still fits its
+ * column.
  */
 async function openLongBoard(width: number, height: number): Promise<Page> {
   const page = await open('?seen=1&entries=long', { width, height });
@@ -936,7 +937,7 @@ async function openBoard(query: string, width: number, height: number): Promise<
   return page;
 }
 
-/** The dated action line on a card: how much of the user's words survive beside the due. */
+/** The dated action line on a card: how much of the user's words survive above the due. */
 async function dueLine(page: Page): Promise<{ action: string; shown: number; full: number }[]> {
   return page.evaluate(() =>
     [...document.querySelectorAll<HTMLElement>('[data-testid^="tracker-card-due-action-"]')].map(
@@ -1375,6 +1376,192 @@ describe('the detail pane floats over the Tracker board (L-401)', () => {
     assert.ok(
       notOverBoard(closed, opened).some((line) => line.startsWith("pane's left edge")),
       'a pane beside the board was not reported as off the board',
+    );
+    await page.context().close();
+  });
+});
+
+/**
+ * A dated next action keeps its words (L-409).
+ *
+ * The words and the due shared one row, and the due never shrank, so in a
+ * 139px column the words were all that went: "Chase … · 2 days overdue", or
+ * nothing but "· 2 days overdue". Now the words have a line of their own, as
+ * wide as the card's content, and the due sits on the line below. The overdue
+ * dot left the title's row for the card's corner, so the overdue card's title
+ * is as wide as any other and its text never runs under the dot.
+ */
+interface ActionLayout {
+  /** 'Reply by Friday' cut short on the `soon` card. */
+  readonly clipped: string[];
+  /** Words narrower than the card's content, or a due that starts beside them. */
+  readonly lines: string[];
+  /** The overdue card's title narrower than the other's, or running under the dot. */
+  readonly title: string[];
+  readonly cards: {
+    id: string;
+    height: number;
+    content: number;
+    shown: number;
+    full: number;
+    title: number;
+  }[];
+}
+
+async function actionLayout(page: Page): Promise<ActionLayout> {
+  return page.evaluate(() => {
+    const clipped: string[] = [];
+    const lines: string[] = [];
+    const title: string[] = [];
+    const cards: ActionLayout['cards'] = [];
+    const titles = new Map<string, DOMRect>();
+    // The title's content box: where its text may go.
+    const contentBox = (element: HTMLElement): DOMRect => {
+      const box = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const left = box.left + parseFloat(style.paddingLeft) + parseFloat(style.borderLeftWidth);
+      const right = box.right - parseFloat(style.paddingRight) - parseFloat(style.borderRightWidth);
+      return new DOMRect(left, box.top, right - left, box.height);
+    };
+    for (const id of ['late', 'soon']) {
+      const card = document.querySelector<HTMLElement>(`[data-testid="tracker-card-${id}"]`);
+      const words = document.querySelector<HTMLElement>(
+        `[data-testid="tracker-card-due-action-${id}"]`,
+      );
+      const when = document.querySelector<HTMLElement>(
+        `[data-testid="tracker-card-due-when-${id}"]`,
+      );
+      const heading = card?.querySelector<HTMLElement>('.line-clamp-3');
+      if (card === null || words === null || when === null || heading == null) {
+        lines.push(`${id}: card, words, due or title not drawn`);
+        continue;
+      }
+      const style = getComputedStyle(card);
+      const content =
+        card.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const wordsBox = words.getBoundingClientRect();
+      const dueBox = when.getBoundingClientRect();
+      const titleBox = contentBox(heading);
+      titles.set(id, titleBox);
+      cards.push({
+        id,
+        height: Math.round(card.getBoundingClientRect().height),
+        content: Math.round(content * 10) / 10,
+        shown: words.clientWidth,
+        full: words.scrollWidth,
+        title: Math.round(titleBox.width * 10) / 10,
+      });
+      if (Math.abs(wordsBox.width - content) > 0.5) {
+        lines.push(
+          `${id}: the words are ${String(wordsBox.width)}px of the card's ${String(content)}px`,
+        );
+      }
+      if (dueBox.top < wordsBox.bottom - 0.5) {
+        lines.push(
+          `${id}: the due starts at ${String(dueBox.top)}px, above the words' bottom ${String(wordsBox.bottom)}px`,
+        );
+      }
+      if (id === 'soon' && words.scrollWidth > words.clientWidth) {
+        clipped.push(
+          `soon: "${words.textContent ?? ''}" is clipped (${String(words.clientWidth)} of ${String(words.scrollWidth)}px)`,
+        );
+      }
+      const dot = card.querySelector('[data-testid^="tracker-card-overdue-"]');
+      if (dot !== null && dot.getBoundingClientRect().left < titleBox.right - 0.5) {
+        title.push(
+          `${id}: the dot's left edge ${String(dot.getBoundingClientRect().left)}px is left of the title's right edge ${String(titleBox.right)}px`,
+        );
+      }
+    }
+    const late = titles.get('late');
+    const soon = titles.get('soon');
+    if (late !== undefined && soon !== undefined && Math.abs(late.width - soon.width) > 0.5) {
+      title.push(
+        `late: the title is ${String(late.width)}px, the other card's ${String(soon.width)}px`,
+      );
+    }
+    return { clipped, lines, title, cards };
+  });
+}
+
+describe('a dated next action keeps its words (L-409)', () => {
+  for (const [width, height] of [
+    [1000, 700],
+    [1264, 720],
+    [1440, 900],
+    [375, 812],
+  ] as const) {
+    it(`at ${String(width)}px the short action 'Reply by Friday' is not clipped at all`, async () => {
+      const page = await openLongBoard(width, height);
+      const layout = await actionLayout(page);
+      console.log(`action lines at ${String(width)}px: ${JSON.stringify(layout.cards)}`);
+      assert.equal(layout.cards.length, 2, 'the late and soon cards were not both measured');
+      assert.deepEqual(layout.clipped, []);
+      await page.context().close();
+    });
+
+    it(`at ${String(width)}px on both cards the words are as wide as the card's content and the due starts at or below the bottom of the words`, async () => {
+      const page = await openLongBoard(width, height);
+      const layout = await actionLayout(page);
+      assert.equal(layout.cards.length, 2, 'the late and soon cards were not both measured');
+      assert.deepEqual(layout.lines, []);
+      await page.context().close();
+    });
+
+    it(`at ${String(width)}px the overdue card's title is as wide as the other card's, and the dot is at or right of the title's right edge`, async () => {
+      const page = await openLongBoard(width, height);
+      const layout = await actionLayout(page);
+      assert.equal(layout.cards.length, 2, 'the late and soon cards were not both measured');
+      assert.deepEqual(layout.title, []);
+      await page.context().close();
+    });
+
+    it(`at ${String(width)}px the overdue dot is still at least 8×8 and inside the card`, async () => {
+      const page = await openLongBoard(width, height);
+      const dot = await overdueDot(page);
+      assert.equal(dot.count, 1, `${String(dot.count)} overdue dots on the card, not 1`);
+      assert.ok(dot.width >= 8 && dot.height >= 8, `the dot is ${JSON.stringify(dot)}`);
+      assert.ok(dot.inside, 'the dot is not wholly inside the card');
+      await page.context().close();
+    });
+  }
+
+  it("at 1000px a due forced to '123 days overdue' stays wholly inside the card", async () => {
+    const page = await openLongBoard(1000, 700);
+    await page.evaluate(() => {
+      const when = document.querySelector('[data-testid="tracker-card-due-when-late"]');
+      if (when === null) throw new Error('no due on the late card');
+      when.textContent = '123 days overdue';
+    });
+    const fit = await cardFit(page);
+    console.log(`'123 days overdue' at 1000px: ${JSON.stringify(fit.cards)}`);
+    assert.deepEqual(fit.problems, []);
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: words squeezed to nothing and a title kept off the right edge are both reported', async () => {
+    const page = await openLongBoard(1264, 720);
+    await page.evaluate(() => {
+      const words = document.querySelector<HTMLElement>(
+        '[data-testid="tracker-card-due-action-late"]',
+      );
+      const title = document.querySelector<HTMLElement>(
+        '[data-testid="tracker-card-late"] .line-clamp-3',
+      );
+      if (words === null || title === null) throw new Error('no words or title on the late card');
+      words.style.maxWidth = '0';
+      title.style.paddingRight = '16px';
+    });
+    const layout = await actionLayout(page);
+    console.log(`squeezed at 1264px: ${JSON.stringify(layout)}`);
+    assert.ok(
+      layout.lines.some((line) => line.startsWith('late: the words are')),
+      'the squeezed words were not reported',
+    );
+    assert.ok(
+      layout.title.some((line) => line.startsWith('late: the title is')),
+      'the narrowed title was not reported',
     );
     await page.context().close();
   });
