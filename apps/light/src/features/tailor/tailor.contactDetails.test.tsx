@@ -33,6 +33,8 @@ import {
   type ProviderHttpResponse,
 } from '@cviper/ai-providers';
 
+import { openMoreFormats } from './test/moreFormats';
+
 const tauri = vi.hoisted(() => ({
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
 }));
@@ -264,6 +266,7 @@ describe('the first Save CV asks for the details (happy)', () => {
   it('opens "Check your details" with what the CV says, in the approved words', async () => {
     const { user, filePort } = await tailored();
 
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
 
     const dialog = await screen.findByRole('dialog');
@@ -287,6 +290,7 @@ describe('the first Save CV asks for the details (happy)', () => {
     const { user, filePort } = await tailored();
 
     filePort.nextSavePath('C:\\Users\\jane\\Documents\\Tailored CV.txt');
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
@@ -302,6 +306,7 @@ describe('the first Save CV asks for the details (happy)', () => {
     );
 
     filePort.nextSavePath('C:\\Users\\jane\\Documents\\Tailored CV.docx');
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-docx-cv'));
     await vi.waitFor(() => expect(filePort.writtenBytes()).toHaveLength(1));
     expect(screen.queryByTestId('tailor-contact-dialog')).toBeNull();
@@ -323,6 +328,7 @@ describe('E2E: the files a user gets', () => {
     await vi.waitFor(() => expect(filePort.writtenBytes()).toHaveLength(1));
 
     filePort.nextSavePath('C:\\Users\\jane\\Documents\\Tailored CV.docx');
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-docx-cv'));
     await vi.waitFor(() => expect(filePort.writtenBytes()).toHaveLength(2));
 
@@ -341,6 +347,7 @@ describe('E2E: the files a user gets', () => {
     expect(screen.getByTestId('tailor-ats-check-contact_info').getAttribute('data-after')).toBe(
       'warn',
     );
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
@@ -353,6 +360,7 @@ describe('E2E: the files a user gets', () => {
 
   it('the details are restored after a restart, and saving does not ask again', async () => {
     const first = await tailored();
+    await openMoreFormats(first.user);
     await first.user.click(screen.getByTestId('tailor-save-text'));
     await first.user.click(await screen.findByTestId('tailor-contact-confirm'));
     await screen.findByTestId('tailor-contact-line');
@@ -373,6 +381,7 @@ describe('E2E: the files a user gets', () => {
       'Jane Smith | jane@x.com | 07700 900 123',
     );
     again.filePort.nextSavePath('C:\\Users\\jane\\Documents\\Tailored CV.txt');
+    await openMoreFormats(again.user);
     await again.user.click(screen.getByTestId('tailor-save-text'));
     await screen.findByTestId('tailor-save-message');
     expect(screen.queryByTestId('tailor-contact-dialog')).toBeNull();
@@ -381,6 +390,7 @@ describe('E2E: the files a user gets', () => {
 
   it('switching CV asks again, with the other CV’s details', async () => {
     const { user } = await tailored([FAITHFUL, FAITHFUL], [CV, OTHER_CV]);
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await user.click(await screen.findByTestId('tailor-contact-confirm'));
     await screen.findByTestId('tailor-contact-line');
@@ -390,11 +400,79 @@ describe('E2E: the files a user gets', () => {
     await screen.findByTestId('tailor-result');
     expect(screen.queryByTestId('tailor-contact-line')).toBeNull();
 
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await screen.findByTestId('tailor-contact-dialog');
     expect(field('name').value).toBe('Jamie Lewis');
     expect(field('email').value).toBe('jamie@example.com');
     expect(field('phone').value).toBe('+44 7700 900456');
+  });
+});
+
+/**
+ * L-400: the tailored CV on screen is drawn from the same blocks as the files,
+ * with the name and line from the same helper. So what the page shows at the
+ * top is, line for line, what the saved file says — and before the user has
+ * confirmed anything, neither has a name.
+ */
+describe('the page on screen and the saved file agree (L-400)', () => {
+  /** The name and contact line drawn at the top of the page, if any. */
+  function pageTop(): string[] {
+    const sheet = screen.getByTestId('tailor-cv');
+    const first = [...sheet.querySelectorAll('[data-block]')];
+    const heading = first.findIndex((element) => element.getAttribute('data-block') === 'heading');
+    // No heading means the page drew no blocks at all: that is not "no name".
+    if (heading === -1) throw new Error('the page drew no section heading');
+    return first.slice(0, heading).map((element) => element.textContent ?? '');
+  }
+
+  it('negative: before the details are confirmed, the page has no name and no contact line', async () => {
+    const { user } = await tailored();
+    expect(pageTop()).toEqual([]);
+
+    // Asking is not confirming: "Not now" leaves the page as it was.
+    await user.click(screen.getByTestId('tailor-save-pdf-cv'));
+    await screen.findByTestId('tailor-contact-dialog');
+    expect(pageTop()).toEqual([]);
+    await user.click(screen.getByTestId('tailor-contact-cancel'));
+    expect(pageTop()).toEqual([]);
+  });
+
+  it('same input, same top: edited details with spaces and a cleared field, on the page and in the Word file', async () => {
+    const { user, filePort } = await tailored();
+
+    filePort.nextSavePath('C:\\Users\\jane\\Documents\\Tailored CV.docx');
+    await openMoreFormats(user);
+    await user.click(screen.getByTestId('tailor-save-docx-cv'));
+    await screen.findByTestId('tailor-contact-dialog');
+    await user.clear(field('name'));
+    await user.type(field('name'), '  Jane Q Smith  ');
+    await user.clear(field('email'));
+    await user.click(screen.getByTestId('tailor-contact-confirm'));
+    await vi.waitFor(() => expect(filePort.writtenBytes()).toHaveLength(1));
+
+    const fromWord = (await docxText(filePort.writtenBytes()[0]?.bytes ?? new Uint8Array()))
+      .split('\n')
+      .filter((line) => line.trim() !== '');
+    expect(pageTop()).toEqual(['Jane Q Smith', '07700 900 123']);
+    expect(fromWord.slice(0, 2)).toEqual(pageTop());
+  });
+
+  it('boundary: every field cleared — no name and no line, on the page and in the PDF', async () => {
+    const { user, filePort } = await tailored();
+
+    filePort.nextSavePath('C:\\Users\\jane\\Documents\\Tailored CV.pdf');
+    await user.click(screen.getByTestId('tailor-save-pdf-cv'));
+    await screen.findByTestId('tailor-contact-dialog');
+    await user.clear(field('name'));
+    await user.clear(field('email'));
+    await user.clear(field('phone'));
+    await user.click(screen.getByTestId('tailor-contact-confirm'));
+    await vi.waitFor(() => expect(filePort.writtenBytes()).toHaveLength(1));
+
+    expect(pageTop()).toEqual([]);
+    const fromPdf = await pdfText(filePort.writtenBytes()[0]?.bytes ?? new Uint8Array());
+    expect(fromPdf.startsWith('PROFESSIONAL SUMMARY')).toBe(true);
   });
 });
 
@@ -417,6 +495,7 @@ describe('what "Not now", a cleared field and all blank do', () => {
   it('negative: Escape is "Not now"', async () => {
     const { user, filePort } = await tailored();
 
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await screen.findByTestId('tailor-contact-dialog');
     await user.keyboard('{Escape}');
@@ -428,6 +507,7 @@ describe('what "Not now", a cleared field and all blank do', () => {
   it('focus starts in the first field and Tab stays inside the dialog', async () => {
     const { user } = await tailored();
 
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await screen.findByTestId('tailor-contact-dialog');
     expect(document.activeElement).toBe(field('name'));
@@ -439,6 +519,7 @@ describe('what "Not now", a cleared field and all blank do', () => {
     const { user, filePort } = await tailored();
 
     filePort.nextSavePath('C:\\Users\\jane\\Documents\\Tailored CV.txt');
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await screen.findByTestId('tailor-contact-dialog');
     await user.clear(field('email'));
@@ -462,6 +543,7 @@ describe('what "Not now", a cleared field and all blank do', () => {
     const { user, filePort, sessions } = await tailored();
 
     filePort.nextSavePath('C:\\Users\\jane\\Documents\\Tailored CV.txt');
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await screen.findByTestId('tailor-contact-dialog');
     await user.clear(field('name'));
@@ -478,6 +560,7 @@ describe('what "Not now", a cleared field and all blank do', () => {
   it('Change updates what is used without saving a file', async () => {
     const { user, filePort } = await tailored();
 
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await user.click(await screen.findByTestId('tailor-contact-confirm'));
     await screen.findByTestId('tailor-contact-line');
@@ -496,6 +579,7 @@ describe('what "Not now", a cleared field and all blank do', () => {
     const noPhone: Cv = { ...CV, extracted_text: `Jane Smith\njane@x.com\n${BODY}` };
     const { user } = await tailored([FAITHFUL], [noPhone]);
 
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await screen.findByTestId('tailor-contact-dialog');
 
@@ -540,6 +624,7 @@ describe('a name the PDF cannot draw (edge)', () => {
   it('negative: a Word save shows no PDF warning, whatever the letters', async () => {
     const cv: Cv = { ...CV, extracted_text: `Иван Петров\nivan@example.com\n${BODY}` };
     const { user } = await tailored([FAITHFUL], [cv]);
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-docx-cv'));
     await screen.findByTestId('tailor-contact-dialog');
     expect(field('name').value).toBe('Иван Петров');
@@ -568,6 +653,7 @@ describe('the details never borrow another CV’s (negative)', () => {
     const { user } = await renderReady([], { cvs: [OTHER_CV], sessions });
     await screen.findByTestId('tailor-result');
 
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await screen.findByTestId('tailor-contact-dialog');
     expect(field('name').value).toBe('');
@@ -581,11 +667,13 @@ describe('the details never borrow another CV’s (negative)', () => {
     await user.click(screen.getByTestId('tailor-run'));
     await screen.findByTestId('tailor-result');
 
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await user.click(await screen.findByTestId('tailor-contact-confirm'));
     await vi.waitFor(() => expect(filePort.calls.saveText).toBe(1));
     expect(sessions.session(null).contact).toEqual({ 'cv-1': JANE });
 
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await vi.waitFor(() => expect(filePort.calls.saveText).toBe(2));
     expect(screen.queryByTestId('tailor-contact-dialog')).toBeNull();
@@ -599,6 +687,7 @@ describe('regression: what goes to the AI, and what the draft is, do not change'
     const { user, sent, sessions } = await tailored([FAITHFUL, REVIEW, LETTER, FAITHFUL]);
     const before = sessions.session('job-1').result;
 
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await screen.findByTestId('tailor-contact-dialog');
     await user.clear(field('name'));
@@ -626,6 +715,7 @@ describe('regression: what goes to the AI, and what the draft is, do not change'
   it('"Save to an application" keeps the draft without the details', async () => {
     const { user, port } = await tailored();
 
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await user.click(await screen.findByTestId('tailor-contact-confirm'));
     await screen.findByTestId('tailor-contact-line');

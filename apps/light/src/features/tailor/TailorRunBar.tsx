@@ -16,6 +16,8 @@ export interface TailorRunBarProps {
   readonly elapsed: number;
   readonly choosingFile: boolean;
   readonly saveMessage: string | null;
+  /** This job has a draft: the button is grey and reads "Tailor again" (L-400). */
+  readonly hasDraft: boolean;
 }
 
 /**
@@ -31,20 +33,22 @@ export function TailorRunBar({
   elapsed,
   choosingFile,
   saveMessage,
+  hasDraft,
 }: TailorRunBarProps) {
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
+        {/* Once there is a draft, Save as PDF is the one blue button (L-400). */}
         <button
           type="button"
           data-testid="tailor-run"
-          data-primary="true"
+          data-primary={hasDraft ? undefined : 'true'}
           disabled={disabledReason !== null}
           aria-describedby={disabledReason === null ? undefined : 'tailor-run-reason'}
           onClick={onRun}
-          className={PRIMARY_BUTTON}
+          className={hasDraft ? SECONDARY_BUTTON : PRIMARY_BUTTON}
         >
-          {phase === 'tailoring' ? 'Tailoring…' : 'Tailor CV'}
+          {phase === 'tailoring' ? 'Tailoring…' : hasDraft ? 'Tailor again' : 'Tailor CV'}
         </button>
 
         {disabledReason === null ? null : (

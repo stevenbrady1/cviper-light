@@ -5,7 +5,7 @@ import { type Application, type Cv, type Job } from '@cviper/core-types';
 import { type FilePort } from '../../platform/files';
 import { type SavedProgress } from '../flow/progress';
 
-import { contactLine, savedCvText, type CvContact } from './cvContact';
+import { cvHeader, savedCvText, type CvContact } from './cvContact';
 import { type LetterResult, type TailorResult } from './jobSessions';
 import {
   documentTitle,
@@ -232,9 +232,9 @@ export function useTailorSaving({
   const saveDocument = useCallback(
     async (kind: 'cv' | 'cover_letter', format: 'docx' | 'pdf', contact: CvContact | null) => {
       // The name and contact line are the ones the USER confirmed (L-346);
-      // the app never asks the model for them (see `renderTailoredCv`).
-      const name = contact === null || contact.name.trim() === '' ? null : contact.name.trim();
-      const line = contact === null ? null : contactLine(contact);
+      // the app never asks the model for them (see `renderTailoredCv`). The
+      // page on screen draws them through the same helper (L-400).
+      const { name, line } = cvHeader(contact);
       const build = async (): Promise<{ bytes: Uint8Array; missing: readonly string[] }> => {
         // The Word builder (`docx` + `jszip`, ~400 kB) is loaded on the first
         // Word export, not at launch: `word-code-loads-on-demand.contract.test.ts`.
@@ -283,7 +283,7 @@ export function useTailorSaving({
           ? `Saved to ${saved.value}.`
           : `Saved to ${saved.value}. The PDF's built-in font cannot show ` +
               `${built.missing.join(' ')}, so they appear as ? or a plain letter. ` +
-              'Save as Word to keep them exactly.',
+              'Save as Word (under More formats) to keep them exactly.',
       );
     },
     [files, jobTitle, letter, result, setError, setSaveMessage],

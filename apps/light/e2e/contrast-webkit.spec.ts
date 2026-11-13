@@ -3910,6 +3910,253 @@ describe('the ATS Score numbers are drawn as bars (L-396)', () => {
 });
 
 /**
+ * The tailored CV as a page, with one main save button (L-400).
+ *
+ * The draft is drawn as a white sheet, at most 768px (`max-w-3xl`) and centred
+ * in the column, and the save row is a blue "Save as PDF…" with the other
+ * formats in the shared "More formats" menu. jsdom cannot say whether the sheet
+ * scrolls inside itself (the L-322 rule above), runs past the window, or where
+ * the menu opens; this can. The `?draft=` switch opens Tailor on a finished
+ * draft, the way a restart brings one back.
+ */
+const SHEET_WINDOWS = {
+  'desktop 1000x700': { width: 1000, height: 700 },
+  'phone 375x812': { width: 375, height: 812 },
+} as const;
+const SHEET_MAX_PX = 768;
+const SAVE_ROW = [
+  'tailor-save-pdf-cv',
+  'tailor-save-more',
+  'tailor-review-run',
+  'tailor-letter-run',
+];
+
+/** Tailor on the harness's draft; with `contact`, the confirmed details are on top. */
+async function tailorWithDraft(
+  viewport: { width: number; height: number },
+  draft: '1' | 'contact' = '1',
+): Promise<Page> {
+  const page = await open(`?seen=1&draft=${draft}`, viewport);
+  await goTo(page, 'tailor');
+  await page.waitForSelector('[data-testid="tailor-cv"] [data-block="heading"]');
+  return page;
+}
+
+interface SheetReport {
+  readonly width: number;
+  /** Sheet centre minus column centre, in px. */
+  readonly offCentre: number;
+  /** How many lines the save row's four buttons take. */
+  readonly rowLines: number;
+  readonly problems: readonly string[];
+}
+
+/** The sheet against its column, anything poking out of it, and the save row's lines. */
+async function sheetReport(page: Page): Promise<SheetReport> {
+  return page.evaluate((row) => {
+    const problems: string[] = [];
+    const sheet = document.querySelector('[data-testid="tailor-cv"]');
+    const column = document.querySelector('[data-content-column]');
+    if (sheet === null || column === null) {
+      return { width: 0, offCentre: 0, rowLines: 0, problems: ['no sheet or no column'] };
+    }
+    const box = sheet.getBoundingClientRect();
+    const room = column.getBoundingClientRect();
+    if (box.left < room.left - 0.5 || box.right > room.right + 0.5) {
+      problems.push(`sheet ${String(box.left)}–${String(box.right)} is outside its column`);
+    }
+    if (sheet.scrollWidth > sheet.clientWidth) problems.push('sheet: scrolls sideways');
+    for (const part of sheet.querySelectorAll('[data-block]')) {
+      if (part.getBoundingClientRect().right > box.right + 0.5) {
+        problems.push(`"${(part.textContent ?? '').slice(0, 20)}" runs past the sheet`);
+      }
+    }
+    // A button starts a new line when it sits wholly below the one before it.
+    // (A bordered button is 2px taller than the blue one, so tops alone differ.)
+    let rowLines = 0;
+    let lineBottom = -Infinity;
+    for (const id of row) {
+      const button = document.querySelector(`[data-testid="${id}"]`);
+      if (button === null) {
+        problems.push(`no ${id}`);
+        continue;
+      }
+      const { top, bottom } = button.getBoundingClientRect();
+      if (top >= lineBottom) {
+        rowLines += 1;
+        lineBottom = bottom;
+      } else {
+        lineBottom = Math.max(lineBottom, bottom);
+      }
+    }
+    return {
+      width: box.width,
+      offCentre: (box.left + box.right) / 2 - (room.left + room.right) / 2,
+      rowLines,
+      problems,
+    };
+  }, SAVE_ROW);
+}
+
+/** Scroll Tailor's own area so `selector` is wholly in view, top first when it is taller. */
+async function scrollTailorTo(page: Page, selector: string): Promise<void> {
+  await page.evaluate((target) => {
+    const area = document.querySelector('[data-testid="tailor-scroll"]');
+    const element = document.querySelector(target);
+    if (area === null || element === null) throw new Error(`no scroll area or ${target}`);
+    const seen = area.getBoundingClientRect();
+    const box = element.getBoundingClientRect();
+    if (box.bottom > seen.bottom && box.height < seen.height) {
+      area.scrollTop += box.bottom - seen.bottom + 8;
+    } else if (box.top < seen.top || box.height >= seen.height) {
+      area.scrollTop += box.top - seen.top - 8;
+    }
+  }, selector);
+  await scrollingSettled(page);
+}
+
+/** The open "More formats" list against the window and the scroll area; covered or cut-off items. */
+async function formatsMenuProblems(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const problems: string[] = [];
+    const trigger = document.querySelector('[data-testid="tailor-save-more"]');
+    const list = trigger?.nextElementSibling;
+    const area = document.querySelector('[data-testid="tailor-scroll"]');
+    if (
+      trigger?.getAttribute('aria-expanded') !== 'true' ||
+      list === null ||
+      list === undefined ||
+      area === null
+    ) {
+      return ['the menu is not open'];
+    }
+    const box = list.getBoundingClientRect();
+    const seen = area.getBoundingClientRect();
+    if (box.left < 0 || box.right > window.innerWidth) {
+      problems.push(`list ${String(box.left)}–${String(box.right)} runs past the window`);
+    }
+    if (box.top < seen.top || box.bottom > seen.bottom) {
+      problems.push(`list ${String(box.top)}–${String(box.bottom)} is outside the scroll area`);
+    }
+    const items = [...list.querySelectorAll('button')];
+    if (items.length !== 2) problems.push(`${String(items.length)} items, not 2`);
+    for (const item of items) {
+      const part = item.getBoundingClientRect();
+      const onTop = document.elementFromPoint(
+        part.left + part.width / 2,
+        part.top + part.height / 2,
+      );
+      if (onTop === null || !item.contains(onTop)) {
+        problems.push(`"${item.textContent ?? ''}" is covered or cut off`);
+      }
+    }
+    return problems;
+  });
+}
+
+describe('the tailored CV is a page, with one main save button (L-400)', () => {
+  for (const [name, viewport] of Object.entries(SHEET_WINDOWS)) {
+    it(`nothing inside the sheet scrolls on its own, and nothing scrolls sideways (${name})`, async () => {
+      const page = await tailorWithDraft(viewport, 'contact');
+      const report = await sheetReport(page);
+      console.log(`sheet (${name}): ${JSON.stringify(report)}`);
+      assert.deepEqual(report.problems, []);
+      assert.deepEqual(await innerScrollers(page), []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      assert.ok(report.width <= SHEET_MAX_PX + 0.5, `the sheet is ${String(report.width)}px wide`);
+      // One blue button on screen, and it is Save as PDF.
+      const primary = await page.evaluate(() =>
+        [...document.querySelectorAll('[data-primary="true"]')].map((button) =>
+          button.getAttribute('data-testid'),
+        ),
+      );
+      assert.deepEqual(primary, ['tailor-save-pdf-cv']);
+      await page.context().close();
+    });
+
+    it(`a real click opens More formats, it stays open, and it is wholly inside the window (${name})`, async () => {
+      const page = await tailorWithDraft(viewport);
+      await scrollTailorTo(page, '[data-testid="tailor-save-more"]');
+      await page.click('[data-testid="tailor-save-more"]');
+      await page.waitForSelector('[data-testid="tailor-save-more"][aria-expanded="true"]');
+      await scrollTailorTo(page, '[data-testid="tailor-save-more"] + div');
+      const problems = await formatsMenuProblems(page);
+      console.log(`More formats open (${name}): ${JSON.stringify(problems)}`);
+      assert.deepEqual(problems, []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      assert.equal(
+        await page.locator('[data-testid="tailor-save-docx-cv"]').textContent(),
+        'Save as Word…',
+      );
+      assert.equal(
+        await page.getAttribute('[data-testid="tailor-save-more"]', 'aria-expanded'),
+        'true',
+        'the menu closed by itself',
+      );
+      await page.context().close();
+    });
+  }
+
+  it('the sheet is never wider than about 768px and is centred at 1264', async () => {
+    const page = await tailorWithDraft({ width: 1264, height: 720 });
+    const report = await sheetReport(page);
+    console.log(`sheet (1264x720): ${JSON.stringify(report)}`);
+    assert.deepEqual(report.problems, []);
+    assert.ok(report.width <= SHEET_MAX_PX + 0.5, `the sheet is ${String(report.width)}px wide`);
+    assert.ok(report.width >= SHEET_MAX_PX - 0.5, 'the column is too narrow to show the cap');
+    assert.ok(
+      Math.abs(report.offCentre) <= 1,
+      `the sheet is ${String(report.offCentre)}px off centre`,
+    );
+    await page.context().close();
+  });
+
+  for (const [name, viewport] of Object.entries(SHEET_WINDOWS)) {
+    it(`colour contrast on the sheet, top and bottom (${name})`, async () => {
+      const page = await tailorWithDraft(viewport, 'contact');
+      // axe measures only text on screen, so the sheet is brought into view.
+      await scrollTailorTo(page, '[data-testid="tailor-cv"]');
+      judge(`tailored CV, top (${name})`, await contrast(page));
+      await page.evaluate(() => {
+        const area = document.querySelector('[data-testid="tailor-scroll"]');
+        const sheet = document.querySelector('[data-testid="tailor-cv"]');
+        if (area === null || sheet === null) throw new Error('no scroll area or sheet');
+        const bottom = sheet.getBoundingClientRect().bottom;
+        area.scrollTop += bottom - area.getBoundingClientRect().bottom + 8;
+      });
+      await scrollingSettled(page);
+      judge(`tailored CV, bottom (${name})`, await contrast(page));
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a sheet that scrolls inside itself, and one too wide, are reported', async () => {
+    const page = await tailorWithDraft(SHEET_WINDOWS['phone 375x812']);
+    await page.evaluate(() => {
+      const sheet = document.querySelector<HTMLElement>('[data-testid="tailor-cv"]');
+      if (sheet === null) throw new Error('no sheet');
+      sheet.style.maxHeight = '120px';
+      sheet.style.overflowY = 'auto';
+      sheet.style.maxWidth = 'none';
+      sheet.style.width = '900px';
+    });
+    const inner = await innerScrollers(page);
+    assert.ok(
+      inner.some((line) => line.startsWith('tailor-cv: ')),
+      `the scrolling sheet went unreported: ${JSON.stringify(inner)}`,
+    );
+    const report = await sheetReport(page);
+    assert.ok(
+      report.problems.some((line) => line.includes('outside its column')),
+      `the too-wide sheet went unreported: ${JSON.stringify(report.problems)}`,
+    );
+    assert.ok((await sidewaysOverflow(page)).length > 0, 'the sideways check missed the sheet');
+    await page.context().close();
+  });
+});
+
+/**
  * A box that holds more than one block (L-377).
  *
  * Settings' notice (two paragraphs) and Erase everything's failure (a paragraph

@@ -15,7 +15,7 @@
  * Neither changes a single class name or colour. What the spec measures —
  * which text colour lands on which painted background — is the app's own.
  *
- * The page reads seven switches from the address:
+ * The page reads eight switches from the address:
  *   - `?seen=1` skips the first-run welcome, as a returning user sees the app;
  *   - `?entries=1` puts three applications on the board, and gives Tailor
  *     their jobs, so a card's "Tailor" opens the real screen with its step
@@ -32,6 +32,8 @@
  *     that scrolls inside the page);
  *   - `?marks=1` draws, instead of the app, the three components that put a
  *     drawn mark beside words (L-370: is any row taller for its mark).
+ *   - `?draft=1` opens Tailor's job on a finished tailored CV, and
+ *     `?draft=contact` with confirmed details on top (L-400: the CV as a page).
  *
  * And it puts five helpers on `window`, each drawing real app components into
  * an element the spec has placed:
@@ -56,9 +58,15 @@ import ReactDOM from 'react-dom/client';
 
 const params = new URLSearchParams(window.location.search);
 
+/** `?draft=` (below): a local model is running, as it was when the draft was written. */
+const DRAFT_MODELS = JSON.stringify({
+  models: [{ model: 'llama3.2:3b', name: 'llama3.2:3b', details: { parameter_size: '3.2B' } }],
+});
+
 (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
   invoke: (command: string): Promise<unknown> => {
-    if (command === 'ollama_probe') return Promise.resolve(null);
+    if (command === 'ollama_probe')
+      return Promise.resolve(params.has('draft') ? DRAFT_MODELS : null);
     if (command === 'secret_status') return Promise.resolve(params.get('results') === '1');
     return Promise.reject(new Error(`not available in the contrast harness: ${command}`));
   },
@@ -207,6 +215,92 @@ const cvs =
           created_at: NOW.toISOString(),
         },
       ];
+
+/**
+ * `?draft=1` (L-400): Tailor opens on a finished draft — a job, its CV, a local
+ * model, and the tailored CV the last run left, brought back the way a restart
+ * brings it (`workflowPort`). `?draft=contact` also has the user's confirmed
+ * name and contact details, so the page has them on top.
+ */
+const draft = params.get('draft');
+async function draftWork() {
+  if (draft === null) return null;
+  const { renderTailoredCv, ok } = await import('@cviper/core-types');
+  const { EMPTY_TAILOR_JOB } = await import('../../src/features/tailor/jobSessions');
+  const { toRow } = await import('../../src/features/tailor/persistence');
+  const job: Job = {
+    ...application('draft', 'saved').job,
+    title: 'Insight Analyst',
+    company: 'Larkspur Water Services',
+    description: 'Build SQL and Python reporting on customer data. Present findings to leaders.',
+  };
+  const role = (title: string, company: string, dates: string, bullets: string[]) => ({
+    title,
+    company,
+    location: 'Sheffield',
+    dates,
+    bullets,
+  });
+  const cv = {
+    summary:
+      'Data analyst with six years turning customer and operational data into decisions, ' +
+      'in SQL, Python and Power BI, for utilities and retail.',
+    key_skills: ['SQL', 'Python', 'Power BI', 'Stakeholder reporting', 'A/B testing'],
+    experience: [
+      role('Senior Data Analyst', 'Bramble Retail Group', 'Mar 2022 – Present', [
+        'Built the weekly trading dashboard in Power BI used by 40 store managers.',
+        'Rewrote the churn model in Python, cutting its run from 3 hours to 20 minutes.',
+        'Presented monthly findings to the board.',
+      ]),
+      role('Data Analyst', 'Kestrel Health Partners', 'Jun 2019 – Feb 2022', [
+        'Wrote the SQL behind the patient-wait reports.',
+        'Ran A/B tests on appointment reminders.',
+      ]),
+    ],
+    education: ['BSc Mathematics, University of Sheffield, 2019'],
+    certifications: ['Microsoft Certified: Power BI Data Analyst Associate'],
+  };
+  const extracted = renderTailoredCv(cv, null);
+  const state = {
+    ...EMPTY_TAILOR_JOB,
+    cvId: 'cv-draft',
+    optionKey: 'ollama:llama3.2:3b',
+    advert: job.description ?? '',
+    result: {
+      cv,
+      cvId: 'cv-draft',
+      text: extracted,
+      report: { clean: true, flagged: [] },
+      provider: 'ollama' as const,
+      model: 'llama3.2:3b',
+      retried: false,
+      userMetrics: [],
+    },
+    contact:
+      draft === 'contact'
+        ? { 'cv-draft': { name: 'Sam Taylor', email: 'sam@example.com', phone: '07700 900 123' } }
+        : {},
+  };
+  const row = toRow(job.id, state, NOW.toISOString());
+  return {
+    job,
+    cv: {
+      id: 'cv-draft',
+      name: 'CV.docx',
+      file_path: null,
+      extracted_text: `Sam Taylor\n${extracted}`,
+      json_resume: null,
+      created_at: NOW.toISOString(),
+    },
+    workflowPort: {
+      load: () => Promise.resolve(ok([row])),
+      save: () => Promise.resolve(ok(undefined)),
+      readLastJob: () => Promise.resolve(job.id),
+      writeLastJob: () => Promise.resolve(),
+    },
+  };
+}
+const drafted = await draftWork();
 
 /** A load that fails the way the database does, with the message from the address. */
 function failsToLoad(message: string | null) {
@@ -558,10 +652,14 @@ ReactDOM.createRoot(root).render(
           profileLoad === undefined ? profilePort : { ...profilePort, load: profileLoad }
         }
         tailorPort={createFakeTailorPort({
-          cvs,
-          jobs: entries.map((tracked) => tracked.job),
+          cvs: drafted === null ? cvs : [...cvs, drafted.cv],
+          jobs: [
+            ...entries.map((tracked) => tracked.job),
+            ...(drafted === null ? [] : [drafted.job]),
+          ],
           applications: entries.map((tracked) => tracked.application),
         })}
+        {...(drafted === null ? {} : { workflowPort: drafted.workflowPort })}
         {...(searchPort === undefined ? {} : { searchPort })}
         now={NOW}
       />
