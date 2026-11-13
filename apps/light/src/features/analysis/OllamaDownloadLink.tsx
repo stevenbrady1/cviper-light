@@ -12,6 +12,8 @@ import { OLLAMA_DOWNLOAD_URL } from './providers';
  * Drawn only where the hint already speaks (Ollama running with no chat model
  * — `ollamaNeedsChatModel`), never on a machine without Ollama: an "install
  * Ollama" link on every launch is the advert `providers.ts` decided against.
+ * One exception, chosen by the owner (L-406): Settings' "On this PC" box shows
+ * it with no Ollama too. Settings is opened on purpose; it is not a launch.
  *
  * A browser that will not open is said out loud, not swallowed: a link that
  * silently does nothing is a dead end.

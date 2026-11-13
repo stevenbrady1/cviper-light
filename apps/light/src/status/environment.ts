@@ -32,9 +32,11 @@
  * `secret_status` returns a bool and NEVER the value — see the module comment in
  * `src-tauri/src/secrets.rs`. Nothing in this file can see a key.
  */
+import { type ModelInfo } from '@cviper/ai-providers';
 import { invoke } from '@tauri-apps/api/core';
 
 import { probeOllama } from '../ai/transport';
+import { ollamaChatModels } from '../features/analysis/availability';
 
 import { requestsToday } from './requestLog';
 import {
@@ -121,6 +123,11 @@ export type OllamaState = 'running' | 'absent';
 
 export interface EnvironmentStatus {
   readonly ollama: OllamaState;
+  /**
+   * The chat-capable models in the probe's answer (L-406), for Settings' "On
+   * this PC" box. Present only when there are some, so "none" reads as before.
+   */
+  readonly ollamaModels?: readonly ModelInfo[];
   readonly adzuna: KeyState;
   readonly reed: KeyState;
   /** Each cloud AI provider's key (L-182). */
@@ -204,8 +211,12 @@ export async function readEnvironmentStatus(now: Date = new Date()): Promise<Env
     ai[provider.id] = combineKeyState([aiAnswers[index] ?? null]);
   });
 
+  // The same answer, read once more: no second request (L-406).
+  const models = tags === null ? [] : await ollamaChatModels(tags);
+
   return {
     ollama: tags === null ? 'absent' : 'running',
+    ...(models.length > 0 ? { ollamaModels: models } : {}),
     adzuna: combineKeyState([adzunaAppId, adzunaAppKey]),
     reed: combineKeyState([reedApiKey]),
     ai,

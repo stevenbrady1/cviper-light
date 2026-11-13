@@ -27,6 +27,7 @@ import { detectMobileOs, type MobileOs } from '../../platform/os';
 
 import { About } from './about/About';
 import { EraseEverything } from './erase/EraseEverything';
+import { OnThisPc, type LocalAi } from './OnThisPc';
 import { type ErasePort } from './erase/port';
 import { AiKeySetup } from './keys/AiKeySetup';
 // LOAD-BEARING, top-level `import type` (I3, coordinator review of PR #96) —
@@ -108,6 +109,12 @@ export interface SettingsProps {
   /** Injected by tests: the real one reads and writes the board-choices file. */
   readonly boardsPort?: BoardPreferencesPort | undefined;
   /**
+   * What the shell's own check found about AI on this computer, for the "On
+   * this PC" box (L-406). Owned by the shell, which already asks for the rail;
+   * `null` until it has answered, and absent in a test that renders Settings alone.
+   */
+  readonly localAi?: LocalAi | null | undefined;
+  /**
    * Open at a place rather than the top: Search's "Manage job boards" (L-310),
    * or its "Get a free Reed key", which unfolds the job-board keys (L-338).
    */
@@ -165,6 +172,7 @@ export function Settings({
   aiKeyPorts,
   browser,
   boardsPort,
+  localAi,
   updatePort,
   mobileOs = detectMobileOs(),
   distribution = distributionChannel(),
@@ -378,6 +386,7 @@ export function Settings({
             The tracker, the basic CV match and job search work with no key. Add one only when you
             want an AI to read or rewrite your CV.
           </p>
+          <OnThisPc browser={browserPort} localAi={localAi} />
           <AiKeySetup ports={aiKeyPorts} browser={browserPort} />
 
           <section>

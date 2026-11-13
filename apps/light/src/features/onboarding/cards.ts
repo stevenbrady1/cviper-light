@@ -98,6 +98,9 @@ export const AI_COST_LINE =
   'bills your own account at its published rates, and prices can change. A model running on ' +
   'your own PC is free. CViper takes no cut.';
 
+/** Said while the probe below has not answered yet: no claim either way. */
+export const LOOKING_FOR_LOCAL_AI = 'Looking for free AI on this PC…';
+
 /**
  * What this machine can do for a CV check, in one line, read live.
  *
