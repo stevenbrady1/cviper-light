@@ -63,10 +63,25 @@ const DRAFT_MODELS = JSON.stringify({
   models: [{ model: 'llama3.2:3b', name: 'llama3.2:3b', details: { parameter_size: '3.2B' } }],
 });
 
+/**
+ * `?ollama=ready|empty|long` (L-406): what the probe answers, for the three
+ * states of Settings' "On this PC" box. `long` is a name with nowhere to break.
+ */
+const LONG_MODEL = `${'verylongmodelname'.repeat(8)}:latest`;
+const OLLAMA_ANSWERS: Readonly<Record<string, string>> = {
+  ready: DRAFT_MODELS,
+  empty: JSON.stringify({ models: [] }),
+  long: JSON.stringify({
+    models: [{ model: LONG_MODEL, name: LONG_MODEL, details: { parameter_size: '7B' } }],
+  }),
+};
+
 (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
   invoke: (command: string): Promise<unknown> => {
     if (command === 'ollama_probe')
-      return Promise.resolve(params.has('draft') ? DRAFT_MODELS : null);
+      return Promise.resolve(
+        OLLAMA_ANSWERS[params.get('ollama') ?? ''] ?? (params.has('draft') ? DRAFT_MODELS : null),
+      );
     if (command === 'secret_status') return Promise.resolve(params.get('results') === '1');
     return Promise.reject(new Error(`not available in the contrast harness: ${command}`));
   },

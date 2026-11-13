@@ -16,6 +16,7 @@ import { viewById } from '../../app/views';
 import { cardClasses, ErrorBox, SectionHeading } from '../../ui';
 import { BoardSettings } from '../boards/BoardSettings';
 import { type BoardPreferencesPort } from '../boards/port';
+import { type Availability } from '../analysis/providers';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
 import {
@@ -27,6 +28,7 @@ import { detectMobileOs, type MobileOs } from '../../platform/os';
 
 import { About } from './about/About';
 import { EraseEverything } from './erase/EraseEverything';
+import { OnThisPc } from './OnThisPc';
 import { type ErasePort } from './erase/port';
 import { AiKeySetup } from './keys/AiKeySetup';
 // LOAD-BEARING, top-level `import type` (I3, coordinator review of PR #96) —
@@ -107,6 +109,8 @@ export interface SettingsProps {
   readonly browser?: BrowserPort | undefined;
   /** Injected by tests: the real one reads and writes the board-choices file. */
   readonly boardsPort?: BoardPreferencesPort | undefined;
+  /** Injected by tests: what the "On this PC" box finds (L-406). Defaults to the real probe. */
+  readonly detectAvailability?: (() => Promise<Availability>) | undefined;
   /**
    * Open at a place rather than the top: Search's "Manage job boards" (L-310),
    * or its "Get a free Reed key", which unfolds the job-board keys (L-338).
@@ -165,6 +169,7 @@ export function Settings({
   aiKeyPorts,
   browser,
   boardsPort,
+  detectAvailability,
   updatePort,
   mobileOs = detectMobileOs(),
   distribution = distributionChannel(),
@@ -378,6 +383,7 @@ export function Settings({
             The tracker, the basic CV match and job search work with no key. Add one only when you
             want an AI to read or rewrite your CV.
           </p>
+          <OnThisPc browser={browserPort} detect={detectAvailability} />
           <AiKeySetup ports={aiKeyPorts} browser={browserPort} />
 
           <section>
