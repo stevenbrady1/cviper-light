@@ -12,8 +12,9 @@ import { VIEWS, type ViewDefinition, type ViewId } from './views';
  * every keyboard path that drives the rail drives this too. The shell mounts
  * exactly one of the two, decided by `useViewportClass`.
  *
- * Settings sits last rather than apart: a bottom bar has no "pinned to the
- * bottom", so the workflow order runs left to right and Settings closes it.
+ * The rail's order runs left to right: the four steps, then Profile and
+ * Settings (L-402). The rail's "You" label is not drawn: there is no room for
+ * one in a bar, and six names read left to right need none.
  *
  * ============================================================================
  * 44 PIXELS, AND THE HOME INDICATOR

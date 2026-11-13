@@ -3,35 +3,47 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  DEFAULT_VIEW,
-  PINNED_VIEWS,
-  SEQUENCE_VIEWS,
-  VIEWS,
-  viewById,
-  viewForShortcut,
-} from './views';
+import { DEFAULT_VIEW, SEQUENCE_VIEWS, VIEWS, YOU_VIEWS, viewById, viewForShortcut } from './views';
 
 describe('the view registry', () => {
-  it('lists the five steps in workflow order', () => {
-    // Profile, then Search, then Tracker, then Analysis, then Tailor — who
-    // you are, then the order a job hunt happens in. A reorder here changes
-    // what the rail teaches, so it should have to be deliberate.
-    expect(SEQUENCE_VIEWS.map((view) => view.id)).toEqual([
-      'profile',
-      'search',
+  it('the menu order is Tracker, Search, Analysis, Tailor, then Profile, Settings (L-402)', () => {
+    // The order the owner approved on 13 November 2026. It was Profile first
+    // (L-154). A reorder changes what the menu teaches and where every
+    // shortcut lands, so it should have to be deliberate.
+    expect(VIEWS.map((view) => view.id)).toEqual([
       'tracker',
+      'search',
+      'analysis',
+      'tailor',
+      'profile',
+      'settings',
+    ]);
+    expect(SEQUENCE_VIEWS.map((view) => view.id)).toEqual([
+      'tracker',
+      'search',
       'analysis',
       'tailor',
     ]);
   });
 
-  it('pins Settings to the bottom, outside the sequence', () => {
-    expect(PINNED_VIEWS.map((view) => view.id)).toEqual(['settings']);
+  it('negative: no view was renamed, added or dropped — the six ids and labels are unchanged', () => {
+    // The menu names are the owner's (D7). L-402 moves them; it renames none.
+    expect(Object.fromEntries(VIEWS.map((view) => [view.id, view.label]))).toEqual({
+      analysis: 'Analysis',
+      profile: 'Profile',
+      search: 'Search',
+      settings: 'Settings',
+      tailor: 'Tailor',
+      tracker: 'Tracker',
+    });
+  });
+
+  it('boundary: Profile and Settings are the only two in the "You" group', () => {
+    expect(YOU_VIEWS.map((view) => view.id)).toEqual(['profile', 'settings']);
   });
 
   it('accounts for every view exactly once', () => {
-    expect([...SEQUENCE_VIEWS, ...PINNED_VIEWS]).toHaveLength(VIEWS.length);
+    expect([...SEQUENCE_VIEWS, ...YOU_VIEWS]).toHaveLength(VIEWS.length);
     expect(new Set(VIEWS.map((view) => view.id)).size).toBe(VIEWS.length);
   });
 
@@ -51,12 +63,24 @@ describe('the view registry', () => {
 });
 
 describe('keyboard shortcuts', () => {
-  it('binds Ctrl+1 to Ctrl+5 to the five steps, in order', () => {
-    expect(viewForShortcut(1)).toBe('profile');
+  it('binds Ctrl+1 to Ctrl+5 to the first five views in the menu, in order (L-402)', () => {
+    expect(viewForShortcut(1)).toBe('tracker');
     expect(viewForShortcut(2)).toBe('search');
-    expect(viewForShortcut(3)).toBe('tracker');
-    expect(viewForShortcut(4)).toBe('analysis');
-    expect(viewForShortcut(5)).toBe('tailor');
+    expect(viewForShortcut(3)).toBe('analysis');
+    expect(viewForShortcut(4)).toBe('tailor');
+    expect(viewForShortcut(5)).toBe('profile');
+  });
+
+  it('negative: the numbering from before L-402 is gone', () => {
+    // Ctrl+1 was Profile, Ctrl+3 Tracker, Ctrl+4 Analysis, Ctrl+5 Tailor.
+    expect(viewForShortcut(1)).not.toBe('profile');
+    expect(viewForShortcut(3)).not.toBe('tracker');
+    expect(viewForShortcut(4)).not.toBe('analysis');
+    expect(viewForShortcut(5)).not.toBe('tailor');
+  });
+
+  it('boundary: the digit of each of the first five views is its place in the menu', () => {
+    expect(VIEWS.map((view) => view.shortcut)).toEqual([1, 2, 3, 4, 5, null]);
   });
 
   it('never binds two views to the same digit', () => {

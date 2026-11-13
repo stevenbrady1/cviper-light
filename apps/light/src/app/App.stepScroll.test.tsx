@@ -315,7 +315,8 @@ describe('every other way of moving (L-216 regression sweep)', () => {
   it('each rail item and each Ctrl+number shortcut opens its screen and moves nothing else', async () => {
     const { user } = await renderApp();
     await tailorWithJob(user);
-    const views = ['profile', 'search', 'tracker', 'analysis', 'tailor'] as const;
+    // In the rail's order, so each view's place is its Ctrl+number (L-402).
+    const views = ['tracker', 'search', 'analysis', 'tailor', 'profile'] as const;
     for (const [index, id] of views.entries()) {
       await user.keyboard(`{Control>}${index + 1}{/Control}`);
       await screen.findByTestId(`view-${id}`);

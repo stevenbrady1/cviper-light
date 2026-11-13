@@ -50,7 +50,7 @@ const DIST = join(HERE, 'contrast', 'dist');
 const AXE_SOURCE = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
 
 /** The screens behind the nav, by their `nav-<id>` test id. */
-const VIEWS = ['profile', 'search', 'tracker', 'analysis', 'tailor', 'settings'] as const;
+const VIEWS = ['tracker', 'search', 'analysis', 'tailor', 'profile', 'settings'] as const;
 
 const VIEWPORTS = {
   desktop: { width: 1280, height: 800 },
@@ -5035,11 +5035,12 @@ describe('a suggestion priority label stays on one line, inside its card (L-378)
 });
 
 /**
- * Page titles: one line, in the serif, and the header no taller (L-382).
+ * Page titles: one line, in Inter, and the header no taller (L-382, L-405).
  *
- * The page title grew from 18px on a 28px line to 24px on a 32px line, set in
- * Newsreader at regular weight, and the header bar's padding shrank by the same
- * 4px. The header must not grow: the Search form fits the 1000×700 minimum
+ * The page title grew from 18px on a 28px line to 24px on a 32px line (L-382),
+ * and the header bar's padding shrank by the same 4px. It was set in the serif
+ * then; since L-405 it is Inter at semibold, which is wider, so "one line" is
+ * measured again here at both windows. The header must not grow: the Search form fits the 1000×700 minimum
  * window by only 2px (the L-342 checks above), and the Smoke pictures need the
  * step bar and the ATS table fully on screen. On main before L-382 every
  * screen's header measured 85px at 1000×700 in this harness; that is the cap.
@@ -5101,7 +5102,7 @@ async function everyTitle(
   return problems;
 }
 
-describe('page titles stay on one line in the serif, and the header does not grow (L-382)', () => {
+describe('page titles stay on one line in Inter, and the header does not grow (L-382, L-405)', () => {
   it(`every screen's title is one line and the header is no taller than ${String(HEADER_CAP_PX)}px at 1000×700`, async () => {
     assert.deepEqual(await everyTitle(TITLE_WINDOWS.smallest, HEADER_CAP_PX), []);
   });
@@ -5110,7 +5111,7 @@ describe('page titles stay on one line in the serif, and the header does not gro
     assert.deepEqual(await everyTitle(TITLE_WINDOWS.phone, null), []);
   });
 
-  it("the title's computed font family is Newsreader at weight 400, and the face loaded", async () => {
+  it("the title's computed font family is Inter at weight 600, and the face loaded", async () => {
     const page = await open('?seen=1', TITLE_WINDOWS.smallest);
     await goTo(page, 'settings');
     const seen = await page.evaluate(() => {
@@ -5121,11 +5122,11 @@ describe('page titles stay on one line in the serif, and the header does not gro
         weight: style?.fontWeight ?? '',
         size: style?.fontSize ?? '',
         // A family name in the computed style proves nothing if the file never
-        // arrived: the browser would draw the Georgia fallback under that name.
-        loaded: document.fonts.check('400 24px Newsreader'),
+        // arrived: the browser would draw a system fallback under that name.
+        loaded: document.fonts.check('600 24px Inter'),
       };
     });
-    assert.deepEqual(seen, { family: 'Newsreader', weight: '400', size: '24px', loaded: true });
+    assert.deepEqual(seen, { family: 'Inter', weight: '600', size: '24px', loaded: true });
     await page.context().close();
   });
 
@@ -5560,6 +5561,121 @@ describe('Settings key rows (L-390)', () => {
     assert.ok(
       problems.includes('ai-key-row-grok: open'),
       `the open row was not flagged: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
+ * The menu order and its "You" label (L-402). jsdom lays nothing out, so
+ * `App.test.tsx` pins the order in the DOM and not where anything lands. This
+ * measures the rail WebKit draws at the smallest window: the label sits
+ * between Tailor and Profile, and the rail, one row taller than before, still
+ * ends inside the window with every key saved (the tallest status strip the
+ * harness draws). The colour of the label on navy is measured with it.
+ */
+const MENU_ORDER = [
+  'nav-tracker',
+  'nav-search',
+  'nav-analysis',
+  'nav-tailor',
+  'nav-profile',
+  'nav-settings',
+];
+
+async function railFit(page: Page): Promise<{ order: string[]; problems: string[] }> {
+  return page.evaluate(() => {
+    const rail = document.querySelector('[data-testid="sidebar"]');
+    if (rail === null) return { order: [], problems: ['no rail'] };
+    const problems: string[] = [];
+    const order = [...rail.querySelectorAll('[data-testid^="nav-"]')].map(
+      (item) => item.getAttribute('data-testid') ?? '',
+    );
+    const label = rail.querySelector('#nav-you-label');
+    const tailor = rail.querySelector('[data-testid="nav-tailor"]');
+    const profile = rail.querySelector('[data-testid="nav-profile"]');
+    if (label === null || tailor === null || profile === null) {
+      problems.push('label, Tailor or Profile is missing');
+    } else {
+      const box = label.getBoundingClientRect();
+      if (label.textContent !== 'You') problems.push(`label reads "${label.textContent ?? ''}"`);
+      if (box.height < 1 || box.width < 1) problems.push('label is not drawn');
+      if (box.top < tailor.getBoundingClientRect().bottom) problems.push('label overlaps Tailor');
+      if (box.bottom > profile.getBoundingClientRect().top) problems.push('label overlaps Profile');
+    }
+    // Nothing cut off: every part of the rail ends inside the rail and the window.
+    const frame = rail.getBoundingClientRect();
+    const floor = Math.min(frame.bottom, window.innerHeight) + 0.5;
+    for (const part of rail.children) {
+      const box = part.getBoundingClientRect();
+      if (box.bottom > floor) {
+        const name = part.getAttribute('data-testid') ?? part.tagName.toLowerCase();
+        problems.push(`${name}: ends ${String(Math.round(box.bottom - floor))}px below the rail`);
+      }
+    }
+    if (rail.scrollHeight > rail.clientHeight + 1) {
+      problems.push(`rail holds ${String(rail.scrollHeight)}px in ${String(rail.clientHeight)}px`);
+    }
+    return { order, problems };
+  });
+}
+
+describe('the menu order and its "You" label (L-402)', () => {
+  for (const query of ['?seen=1', '?seen=1&results=1']) {
+    it(`at 1000×700 (${query}) the rail reads Tracker, Search, Analysis, Tailor, You: Profile, Settings, and nothing is cut off`, async () => {
+      const page = await open(query, { width: 1000, height: 700 });
+      const fit = await railFit(page);
+      console.log(`rail at 1000×700 (${query}): ${JSON.stringify(fit)}`);
+      assert.deepEqual(fit.order, MENU_ORDER);
+      assert.deepEqual(fit.problems, []);
+      judge(`rail with "You" (1000×700, ${query})`, await contrast(page));
+      await page.context().close();
+    });
+  }
+
+  it('at 375px the bottom bar shows the six in the same order, each inside the window, and no label', async () => {
+    const page = await open('?seen=1', { width: 375, height: 667 });
+    const bar = await page.evaluate(() => {
+      const items = [...document.querySelectorAll('[data-testid="bottom-nav"] > *')];
+      return {
+        order: items.map((item) => item.getAttribute('data-testid') ?? ''),
+        outside: items
+          .filter((item) => {
+            const box = item.getBoundingClientRect();
+            return box.left < 0 || box.right > window.innerWidth + 0.5 || box.width < 44;
+          })
+          .map((item) => item.getAttribute('data-testid') ?? ''),
+        clipped: items
+          .filter((item) => item.scrollWidth > item.clientWidth)
+          .map((item) => item.getAttribute('data-testid') ?? ''),
+        label: document.querySelector('#nav-you-label') !== null,
+        rail: document.querySelector('[data-testid="sidebar"]') !== null,
+      };
+    });
+    console.log(`bottom bar at 375px: ${JSON.stringify(bar)}`);
+    assert.deepEqual(bar, {
+      order: MENU_ORDER,
+      outside: [],
+      clipped: [],
+      label: false,
+      rail: false,
+    });
+    judge('bottom bar (375px)', await contrast(page));
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a rail too tall for the window is reported', async () => {
+    const page = await open('?seen=1', { width: 1000, height: 700 });
+    await page.evaluate(() => {
+      const spacer = document.createElement('li');
+      spacer.style.cssText = 'display:block;height:600px;flex-shrink:0';
+      document.querySelector('#nav-you-label + ul')?.append(spacer);
+    });
+    const fit = await railFit(page);
+    assert.ok(
+      fit.problems.some((line) => / below the rail$| in \d+px$/.test(line)),
+      `the tall rail was not flagged: ${JSON.stringify(fit.problems)}`,
     );
     await page.context().close();
   });

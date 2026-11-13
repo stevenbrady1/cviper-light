@@ -19,16 +19,15 @@ import { type NavIconProps } from './NavIcons';
  */
 
 /*
- * The title ladder (L-382): the display serif at regular weight, 24px page
- * titles, 20px section titles, 30px (36px from md) on the welcome page.
- * Newsreader ships one weight, 400, so `font-normal` is said outright: a bold
- * parent would otherwise make the browser fake a bold serif. `lining-nums`
- * because its default figures wobble on the baseline.
- * `heading-ladder.contract.test.ts` holds all of this.
+ * The title ladder: 24px page titles, 20px section titles, 30px (36px from md)
+ * on the welcome page (sizes from L-382). Since L-405 they are in the app's one
+ * typeface, not the serif: no font family is named, so they draw in the body's
+ * Inter, semibold and slightly tight. `heading-ladder.contract.test.ts` holds
+ * the sizes and forbids the serif.
  */
-export const PAGE_TITLE = 'font-display text-2xl font-normal text-ink lining-nums';
-export const SECTION_TITLE = 'font-display text-xl font-normal text-ink lining-nums';
-export const HERO_TITLE = 'font-display text-3xl font-normal text-ink lining-nums md:text-4xl';
+export const PAGE_TITLE = 'text-2xl font-semibold tracking-tight text-ink';
+export const SECTION_TITLE = 'text-xl font-semibold tracking-tight text-ink';
+export const HERO_TITLE = 'text-3xl font-semibold tracking-tight text-ink md:text-4xl';
 
 export interface PageHeaderProps {
   readonly title: string;

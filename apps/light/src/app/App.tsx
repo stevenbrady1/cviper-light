@@ -65,7 +65,8 @@ import { LiveStatus } from './LiveStatus';
  * ============================================================================
  * KEYBOARD
  * ============================================================================
- * `Ctrl+1` to `Ctrl+5` switch between the five workflow views. Bound on
+ * `Ctrl+1` to `Ctrl+5` open the first five views in the rail, in the rail's
+ * order (L-402: Tracker, Search, Analysis, Tailor, Profile). Bound on
  * `document` so they work wherever focus happens to be, and `preventDefault()`ed
  * so they do not also trigger a WebView2 default.
  *
