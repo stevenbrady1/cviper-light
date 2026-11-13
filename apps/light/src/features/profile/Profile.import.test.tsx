@@ -52,6 +52,14 @@ describe('the section', () => {
     expect(screen.queryByTestId('profile-import-problem')).toBeNull();
   });
 
+  it('the intro reads the new text (L-320)', async () => {
+    await renderProfile();
+    const intro = screen.getByTestId('profile-import').firstElementChild?.nextElementSibling;
+    expect(intro?.textContent).toBe(
+      'Already keep a profile in an ai-job-search folder? Read it in and add it to what is here.',
+    );
+  });
+
   it('a cancelled folder dialog shows nothing and saves nothing', async () => {
     const { port, files } = await renderProfile();
     files.nextWorkspace(null);

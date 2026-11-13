@@ -655,6 +655,157 @@ async function funnelHintReport(page: Page): Promise<{
 }
 
 /**
+ * Richer cards (L-393): the title may take three lines and company · location
+ * two, an undated next action shows as one muted line, and an overdue one adds
+ * a red dot beside the title. `?entries=long` stretches every part of a card:
+ * a 200-letter word for a title, a long company, long action words. jsdom does
+ * no layout, so only a real engine can say the card still fits its column.
+ */
+async function openLongBoard(width: number, height: number): Promise<Page> {
+  const page = await open('?seen=1&entries=long', { width, height });
+  await goTo(page, 'tracker');
+  await page.waitForSelector('[data-testid="tracker-card-late"]');
+  return page;
+}
+
+interface CardFit {
+  readonly problems: string[];
+  readonly cards: { id: string; width: number; height: number; column: number }[];
+}
+
+async function cardFit(page: Page): Promise<CardFit> {
+  return page.evaluate(() => {
+    const problems: string[] = [];
+    const cards: { id: string; width: number; height: number; column: number }[] = [];
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      problems.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    const found = document.querySelectorAll<HTMLElement>(
+      'button[data-testid^="tracker-card-"][data-status]',
+    );
+    if (found.length === 0) problems.push('no tracker cards drawn');
+    for (const card of found) {
+      const id = (card.getAttribute('data-testid') ?? '').replace('tracker-card-', '');
+      const box = card.getBoundingClientRect();
+      const column = card.closest('[data-testid^="tracker-column-"]')?.getBoundingClientRect();
+      cards.push({
+        id,
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+        column: Math.round(column?.width ?? 0),
+      });
+      if (column === undefined) problems.push(`${id}: not in a column`);
+      else if (box.width > column.width + 0.5) {
+        problems.push(`${id}: card ${String(box.width)}px in a ${String(column.width)}px column`);
+      }
+      if (card.scrollWidth > card.clientWidth) {
+        problems.push(`${id}: ${String(card.scrollWidth - card.clientWidth)}px spills sideways`);
+      }
+      // The lines that wrap must break a long word, never run past the card.
+      for (const line of card.querySelectorAll<HTMLElement>('.break-words')) {
+        if (line.scrollWidth > line.clientWidth) {
+          problems.push(
+            `${id}: "${(line.textContent ?? '').slice(0, 20)}…" runs ${String(line.scrollWidth - line.clientWidth)}px past its line`,
+          );
+        }
+      }
+      const when = card.querySelector(`[data-testid="tracker-card-due-when-${id}"]`);
+      if (when !== null) {
+        const due = when.getBoundingClientRect();
+        if (
+          due.width === 0 ||
+          due.left < box.left ||
+          due.right > box.right ||
+          due.top < box.top ||
+          due.bottom > box.bottom
+        ) {
+          problems.push(`${id}: "${when.textContent ?? ''}" is not wholly inside the card`);
+        }
+      }
+    }
+    return { problems, cards };
+  });
+}
+
+async function overdueDot(
+  page: Page,
+): Promise<{ count: number; width: number; height: number; inside: boolean }> {
+  return page.evaluate(() => {
+    const card = document.querySelector('[data-testid="tracker-card-late"]');
+    const dots = card?.querySelectorAll('[data-testid="tracker-card-overdue-late"]') ?? [];
+    const dot = dots[0];
+    if (card === null || dot === undefined) return { count: 0, width: 0, height: 0, inside: false };
+    const box = dot.getBoundingClientRect();
+    const outer = card.getBoundingClientRect();
+    return {
+      count: dots.length,
+      width: box.width,
+      height: box.height,
+      inside:
+        box.left >= outer.left &&
+        box.right <= outer.right &&
+        box.top >= outer.top &&
+        box.bottom <= outer.bottom,
+    };
+  });
+}
+
+describe('richer Tracker cards fit their column (L-393)', () => {
+  for (const [width, height] of [
+    [1000, 700],
+    [1264, 720],
+    [1440, 900],
+    [375, 812],
+  ] as const) {
+    it(`at ${String(width)}px no card is wider than its column, the due words sit inside the card, and the page does not scroll sideways`, async () => {
+      const page = await openLongBoard(width, height);
+      const fit = await cardFit(page);
+      console.log(`cards at ${String(width)}px: ${JSON.stringify(fit.cards)}`);
+      assert.ok(fit.cards.length >= 3, `only ${String(fit.cards.length)} cards measured`);
+      assert.deepEqual(fit.problems, []);
+      await page.context().close();
+    });
+
+    it(`at ${String(width)}px the overdue dot is at least 8×8 and inside its card`, async () => {
+      const page = await openLongBoard(width, height);
+      const dot = await overdueDot(page);
+      console.log(`overdue dot at ${String(width)}px: ${JSON.stringify(dot)}`);
+      assert.equal(dot.count, 1, `${String(dot.count)} overdue dots on the card, not 1`);
+      assert.ok(dot.width >= 8 && dot.height >= 8, `the dot is ${JSON.stringify(dot)}`);
+      assert.ok(dot.inside, 'the dot is not wholly inside the card');
+      await page.context().close();
+    });
+  }
+
+  // `?entries=1` cards have no next action, so the board pass above never sees
+  // the new muted line, the gold "due" or the red "overdue" words. This does.
+  it('the stretched board passes colour contrast, the new action lines included', async () => {
+    const page = await openLongBoard(1264, 720);
+    await page.waitForSelector('[data-testid="tracker-card-next-long"]');
+    judge('stretched board', await contrast(page));
+    await page.context().close();
+  });
+
+  it('the check can fail: a 400-letter title with breaking turned off is reported', async () => {
+    const page = await openLongBoard(1264, 720);
+    await page.evaluate(() => {
+      const title = document.querySelector('[data-testid="tracker-card-long"] .break-words');
+      if (!(title instanceof HTMLElement)) throw new Error('no wrapping title line');
+      title.textContent = 'W'.repeat(400);
+      title.style.overflowWrap = 'normal';
+      title.style.wordBreak = 'normal';
+    });
+    const fit = await cardFit(page);
+    assert.ok(
+      fit.problems.some((line) => line.startsWith('long:')),
+      `the unbreakable title was not flagged: ${JSON.stringify(fit.problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
  * The shared content column (L-341) never makes a screen scroll sideways.
  *
  * jsdom does no layout, so `contentColumn.contract.test.tsx` can only read the
@@ -1300,6 +1451,142 @@ describe('the Search button stays on screen on short windows (L-342)', () => {
     assert.deepEqual(report.overlaps, [], 'the row covered a result at these scroll positions');
     assert.ok(report.rowBottom < report.areaTop, 'the row did not scroll away');
     await page.context().close();
+  });
+});
+
+/**
+ * "Found one? Bring it in" on Search (L-324).
+ *
+ * One quiet line under "Also open" shows Tracker with the paste pane open and
+ * the cursor in "Link to the advert". jsdom will focus an element a real
+ * browser would not, and it does no layout, so whether the pane covers a
+ * phone's window and the cursor is really in the box is only knowable here.
+ */
+const PHONE = { width: 375, height: 812 };
+
+/** Search, then the new button, then wait for Tracker's paste pane. */
+async function bringJobIn(viewport: { width: number; height: number }): Promise<Page> {
+  const page = await open('?seen=1', viewport);
+  await goTo(page, 'search');
+  await page.click('[data-testid="search-bring-in"]');
+  await page.locator('[data-testid="nav-tracker"][aria-current="page"]:visible').waitFor();
+  await page.waitForSelector('[data-testid="paste-job-form"]');
+  return page;
+}
+
+/** What is wrong with the pane on arrival. Empty means all is well. */
+async function arrivalProblems(page: Page, covers: boolean): Promise<string[]> {
+  return page.evaluate(async (mustCover) => {
+    // Let any later focus move (the page title's, the pane's own) happen first.
+    await new Promise((done) => requestAnimationFrame(done));
+    await new Promise((done) => requestAnimationFrame(done));
+    const problems: string[] = [];
+    const pane = document.querySelector('[data-testid="detail-pane"]');
+    const link = document.querySelector('[data-testid="paste-job-url"]');
+    if (pane === null || link === null) return ['no pane or no link box'];
+    const focused = document.activeElement;
+    if (focused !== link) {
+      problems.push(
+        `focus is on ${focused?.getAttribute('data-testid') ?? focused?.tagName ?? '?'}`,
+      );
+    }
+    const box = pane.getBoundingClientRect();
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    if (mustCover) {
+      const edges = [box.left, box.top, width - box.right, height - box.bottom];
+      if (edges.some((edge) => Math.abs(edge) > 0.5)) {
+        problems.push(`pane is ${JSON.stringify(edges)} short of the window's edges`);
+      }
+      const points = [
+        [2, 2],
+        [width - 2, 2],
+        [width / 2, height / 2],
+        [2, height - 2],
+        [width - 2, height - 2],
+      ] as const;
+      for (const [x, y] of points) {
+        const top = document.elementFromPoint(x, y);
+        if (top === null || !pane.contains(top))
+          problems.push(`(${String(x)}, ${String(y)}) is not the pane`);
+      }
+    }
+    const linkBox = link.getBoundingClientRect();
+    if (linkBox.top < 0 || linkBox.bottom > height || linkBox.left < 0 || linkBox.right > width) {
+      problems.push('the link box is off screen');
+    }
+    return problems;
+  }, covers);
+}
+
+/** The new button's height, and anything that scrolls sideways. */
+async function bringInProblems(page: Page, minHeight: number): Promise<string[]> {
+  const height = await page.evaluate(
+    () =>
+      document.querySelector('[data-testid="search-bring-in"]')?.getBoundingClientRect().height ??
+      0,
+  );
+  const short = height < minHeight ? [`the button is ${String(height)}px tall`] : [];
+  return [...short, ...(await sidewaysOverflow(page))];
+}
+
+describe('"Found one? Bring it in" opens the paste pane, cursor in the link box (L-324)', () => {
+  it("at 375px, after 'Found one? Bring it in', the paste pane covers the window and the link box has focus", async () => {
+    const page = await bringJobIn(PHONE);
+    assert.deepEqual(await arrivalProblems(page, true), []);
+    await page.context().close();
+  });
+
+  it('at 1000×700 the pane opens beside the board and the link box has focus', async () => {
+    const page = await bringJobIn(SMALLEST_WINDOW);
+    assert.deepEqual(await arrivalProblems(page, false), []);
+    await page.context().close();
+  });
+
+  it('the new line adds no sideways scroll at 1000×700, and the button is at least 44px tall at 375px', async () => {
+    for (const [viewport, minHeight] of [
+      [SMALLEST_WINDOW, 0],
+      [PHONE, 44],
+    ] as const) {
+      const page = await open('?seen=1', viewport);
+      await goTo(page, 'search');
+      await page.waitForSelector('[data-testid="search-bring-in"]');
+      assert.deepEqual(await bringInProblems(page, minHeight), [], `${String(viewport.width)}px`);
+      await page.context().close();
+    }
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a pane short of the window, focus elsewhere and a short button are reported', async () => {
+    const page = await bringJobIn(PHONE);
+    await page.evaluate(() => {
+      const pane = document.querySelector<HTMLElement>('[data-testid="detail-pane"]');
+      if (pane !== null) pane.style.width = '200px';
+      document.querySelector<HTMLElement>('[data-testid="detail-pane-close"]')?.focus();
+    });
+    const report = await arrivalProblems(page, true);
+    assert.ok(
+      report.some((line) => line.startsWith('focus is on detail-pane-close')),
+      `focus away from the link box was not flagged: ${JSON.stringify(report)}`,
+    );
+    assert.ok(
+      report.some((line) => line.startsWith('pane is')),
+      `a pane short of the window was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+
+    const search = await open('?seen=1', PHONE);
+    await goTo(search, 'search');
+    await search.evaluate(() => {
+      const button = document.querySelector<HTMLElement>('[data-testid="search-bring-in"]');
+      if (button !== null) button.style.minHeight = '0';
+    });
+    const short = await bringInProblems(search, 44);
+    assert.ok(
+      short.some((line) => line.startsWith('the button is')),
+      `a short button was not flagged: ${JSON.stringify(short)}`,
+    );
+    await search.context().close();
   });
 });
 

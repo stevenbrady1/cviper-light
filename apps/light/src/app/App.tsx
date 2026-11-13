@@ -189,6 +189,8 @@ export default function App({
     setSettingsOpenAt(place);
     setActiveView('settings');
   };
+  /** Tracker opens at the paste pane once, from Search's "Bring it in" (L-324). */
+  const [trackerOpensPaste, setTrackerOpensPaste] = useState(false);
 
   // Focus follows the view (WCAG 2.4.3). Switching view unmounts whatever had
   // focus, which dropped it to <body>: a keyboard or screen-reader user heard
@@ -204,11 +206,12 @@ export default function App({
     // Settings opened at a section puts focus there itself (L-310). Child
     // effects run first, so taking it back here would undo that.
     if (activeView === 'settings' && settingsOpenAt !== null) return;
+    if (activeView === 'tracker' && trackerOpensPaste) return; // the link box, likewise (L-324)
     const heading = mainRef.current?.querySelector('h1');
     if (!(heading instanceof HTMLElement)) return;
     if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
     heading.focus({ preventScroll: true });
-  }, [activeView, settingsOpenAt]);
+  }, [activeView, settingsOpenAt, trackerOpensPaste]);
   const [status, setStatus] = useState<EnvironmentStatus | null>(null);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !hasSeenWelcome());
   const [incomingCv, setIncomingCv] = useState<Result<PickedCv, FileError> | null>(null);
@@ -477,6 +480,10 @@ export default function App({
               // Settings → Job boards (L-310) or the Reed key (L-338): same hand-back.
               onOpenJobBoards: () => openSettingsAt('job-boards'),
               onOpenReedKey: () => openSettingsAt('reed-key'),
+              onBringJobIn: () => {
+                setTrackerOpensPaste(true);
+                setActiveView('tracker');
+              },
               onAnalyse: onAnalyseJob,
             },
             tracker: {
@@ -493,6 +500,8 @@ export default function App({
               tailoredJob,
               // "Continue" under a started card goes where the step bar would.
               onContinue: (job: Job, step: StepId) => onJobStep(step, job),
+              openPaste: trackerOpensPaste,
+              onOpened: () => setTrackerOpensPaste(false),
             },
             analysis: {
               port: analysisPort,

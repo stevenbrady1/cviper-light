@@ -180,8 +180,7 @@ export function AnalysisSaveToTracker({
       ) : (
         <div data-testid="analysis-tracker-form" className="space-y-3">
           <p data-testid="analysis-tracker-hint" className="text-ink-muted">
-            Add the job title and company so you can spot it on the board. The advert you pasted is
-            saved with it.
+            The advert you pasted is saved with it.
           </p>
           {field('title', 'Job title', title, setTitle)}
           {field('company', 'Company', company, setCompany)}
