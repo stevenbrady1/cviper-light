@@ -1117,6 +1117,142 @@ describe('the Search button stays on screen on short windows (L-342)', () => {
 });
 
 /**
+ * "Found one? Bring it in" on Search (L-324).
+ *
+ * One quiet line under "Also open" shows Tracker with the paste pane open and
+ * the cursor in "Link to the advert". jsdom will focus an element a real
+ * browser would not, and it does no layout, so whether the pane covers a
+ * phone's window and the cursor is really in the box is only knowable here.
+ */
+const PHONE = { width: 375, height: 812 };
+
+/** Search, then the new button, then wait for Tracker's paste pane. */
+async function bringJobIn(viewport: { width: number; height: number }): Promise<Page> {
+  const page = await open('?seen=1', viewport);
+  await goTo(page, 'search');
+  await page.click('[data-testid="search-bring-in"]');
+  await page.locator('[data-testid="nav-tracker"][aria-current="page"]:visible').waitFor();
+  await page.waitForSelector('[data-testid="paste-job-form"]');
+  return page;
+}
+
+/** What is wrong with the pane on arrival. Empty means all is well. */
+async function arrivalProblems(page: Page, covers: boolean): Promise<string[]> {
+  return page.evaluate(async (mustCover) => {
+    // Let any later focus move (the page title's, the pane's own) happen first.
+    await new Promise((done) => requestAnimationFrame(done));
+    await new Promise((done) => requestAnimationFrame(done));
+    const problems: string[] = [];
+    const pane = document.querySelector('[data-testid="detail-pane"]');
+    const link = document.querySelector('[data-testid="paste-job-url"]');
+    if (pane === null || link === null) return ['no pane or no link box'];
+    const focused = document.activeElement;
+    if (focused !== link) {
+      problems.push(
+        `focus is on ${focused?.getAttribute('data-testid') ?? focused?.tagName ?? '?'}`,
+      );
+    }
+    const box = pane.getBoundingClientRect();
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    if (mustCover) {
+      const edges = [box.left, box.top, width - box.right, height - box.bottom];
+      if (edges.some((edge) => Math.abs(edge) > 0.5)) {
+        problems.push(`pane is ${JSON.stringify(edges)} short of the window's edges`);
+      }
+      const points = [
+        [2, 2],
+        [width - 2, 2],
+        [width / 2, height / 2],
+        [2, height - 2],
+        [width - 2, height - 2],
+      ] as const;
+      for (const [x, y] of points) {
+        const top = document.elementFromPoint(x, y);
+        if (top === null || !pane.contains(top))
+          problems.push(`(${String(x)}, ${String(y)}) is not the pane`);
+      }
+    }
+    const linkBox = link.getBoundingClientRect();
+    if (linkBox.top < 0 || linkBox.bottom > height || linkBox.left < 0 || linkBox.right > width) {
+      problems.push('the link box is off screen');
+    }
+    return problems;
+  }, covers);
+}
+
+/** The new button's height, and anything that scrolls sideways. */
+async function bringInProblems(page: Page, minHeight: number): Promise<string[]> {
+  const height = await page.evaluate(
+    () =>
+      document.querySelector('[data-testid="search-bring-in"]')?.getBoundingClientRect().height ??
+      0,
+  );
+  const short = height < minHeight ? [`the button is ${String(height)}px tall`] : [];
+  return [...short, ...(await sidewaysOverflow(page))];
+}
+
+describe('"Found one? Bring it in" opens the paste pane, cursor in the link box (L-324)', () => {
+  it("at 375px, after 'Found one? Bring it in', the paste pane covers the window and the link box has focus", async () => {
+    const page = await bringJobIn(PHONE);
+    assert.deepEqual(await arrivalProblems(page, true), []);
+    await page.context().close();
+  });
+
+  it('at 1000×700 the pane opens beside the board and the link box has focus', async () => {
+    const page = await bringJobIn(SMALLEST_WINDOW);
+    assert.deepEqual(await arrivalProblems(page, false), []);
+    await page.context().close();
+  });
+
+  it('the new line adds no sideways scroll at 1000×700, and the button is at least 44px tall at 375px', async () => {
+    for (const [viewport, minHeight] of [
+      [SMALLEST_WINDOW, 0],
+      [PHONE, 44],
+    ] as const) {
+      const page = await open('?seen=1', viewport);
+      await goTo(page, 'search');
+      await page.waitForSelector('[data-testid="search-bring-in"]');
+      assert.deepEqual(await bringInProblems(page, minHeight), [], `${String(viewport.width)}px`);
+      await page.context().close();
+    }
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a pane short of the window, focus elsewhere and a short button are reported', async () => {
+    const page = await bringJobIn(PHONE);
+    await page.evaluate(() => {
+      const pane = document.querySelector<HTMLElement>('[data-testid="detail-pane"]');
+      if (pane !== null) pane.style.width = '200px';
+      document.querySelector<HTMLElement>('[data-testid="detail-pane-close"]')?.focus();
+    });
+    const report = await arrivalProblems(page, true);
+    assert.ok(
+      report.some((line) => line.startsWith('focus is on detail-pane-close')),
+      `focus away from the link box was not flagged: ${JSON.stringify(report)}`,
+    );
+    assert.ok(
+      report.some((line) => line.startsWith('pane is')),
+      `a pane short of the window was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+
+    const search = await open('?seen=1', PHONE);
+    await goTo(search, 'search');
+    await search.evaluate(() => {
+      const button = document.querySelector<HTMLElement>('[data-testid="search-bring-in"]');
+      if (button !== null) button.style.minHeight = '0';
+    });
+    const short = await bringInProblems(search, 44);
+    assert.ok(
+      short.some((line) => line.startsWith('the button is')),
+      `a short button was not flagged: ${JSON.stringify(short)}`,
+    );
+    await search.context().close();
+  });
+});
+
+/**
  * Every screen opens at the top of its scroll areas (L-353).
  *
  * Tailor scrolls to its current step when it opens, and `scrollWithin`
