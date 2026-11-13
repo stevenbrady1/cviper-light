@@ -5884,3 +5884,224 @@ describe('the menu order and its "You" label (L-402)', () => {
     await page.context().close();
   });
 });
+
+/**
+ * Rename and Delete for a saved CV (L-408). jsdom lays nothing out, so
+ * `Profile.cvManage.test.tsx` proves what is stored and said, and not where
+ * anything lands. This draws Profile's real "Your CV" section (the harness's
+ * `__mountYourCv`) in the real Profile column, with one name as long as a name
+ * may be (100 characters, no spaces), and measures three states at the
+ * smallest window and on a phone: the rows at rest, the name box with its
+ * error, and the delete question. The colours of each are measured with it.
+ */
+const SAVED_CV_WINDOWS = [
+  { name: '1280×800', width: 1280, height: 800, button: 24 },
+  { name: '1000×700', width: 1000, height: 700, button: 24 },
+  // A phone: every button is a thumb target, 44px (L-81).
+  { name: '375×812', width: 375, height: 812, button: 44 },
+] as const;
+const YOUR_CV = '[data-testid="l408-your-cv"]';
+
+/** Profile, with the real "Your CV" section holding two CVs in place of the empty one. */
+async function profileWithCvs(
+  viewport: { width: number; height: number },
+  checks = 3,
+): Promise<Page> {
+  const page = await open('?seen=1', viewport);
+  await goTo(page, 'profile');
+  await page.waitForSelector('[data-testid="profile-cv"]');
+  await page.evaluate(async (count) => {
+    const empty = document.querySelector<HTMLElement>('[data-testid="profile-cv"]');
+    const into = document.createElement('div');
+    into.setAttribute('data-testid', 'l408-your-cv');
+    empty?.before(into);
+    if (empty === null || !into.isConnected) throw new Error('nowhere to draw "Your CV"');
+    // The harness profile has no CVs; the section drawn here stands in its place.
+    empty.hidden = true;
+    await (
+      window as unknown as {
+        __mountYourCv: (into: Element, props: { checks: number }) => Promise<void>;
+      }
+    ).__mountYourCv(into, { checks: count });
+  }, checks);
+  await page.waitForSelector(`${YOUR_CV} [data-testid="profile-cv-list"]`);
+  await page.locator(`${YOUR_CV} [data-testid="profile-cv-list"]`).scrollIntoViewIfNeeded();
+  return page;
+}
+
+/** Every drawn control and line of the section: inside it, and each button tall enough. */
+async function cvSectionProblems(page: Page, minButton: number): Promise<string[]> {
+  return page.evaluate(
+    ({ root, min }) => {
+      const section = document.querySelector(`${root} [data-testid="profile-cv"]`);
+      if (section === null) return ['no "Your CV" section'];
+      const frame = section.getBoundingClientRect();
+      const problems: string[] = [];
+      const parts = section.querySelectorAll(
+        'button, input, label, [role="alert"], [data-testid="profile-cv-name"], [data-testid="profile-cv-facts"]',
+      );
+      if (parts.length < 4) problems.push(`only ${String(parts.length)} parts drawn`);
+      for (const part of parts) {
+        if (part.closest('[role="dialog"]') !== null) continue;
+        const box = part.getBoundingClientRect();
+        // A file input kept off screen for the upload button is not drawn.
+        if (box.width < 1 || box.height < 1) continue;
+        const name = part.getAttribute('data-testid') ?? part.tagName.toLowerCase();
+        if (box.left < frame.left - 0.5 || box.right > frame.right + 0.5) {
+          problems.push(`${name}: outside the section`);
+        }
+        if (part.tagName === 'BUTTON' && box.height < min - 0.5) {
+          problems.push(`${name}: ${String(Math.round(box.height))}px tall, under ${String(min)}`);
+        }
+      }
+      return problems;
+    },
+    { root: YOUR_CV, min: minButton },
+  );
+}
+
+/** The delete question: wholly inside the window, its heading and buttons inside it. */
+async function cvQuestionProblems(page: Page, minButton: number): Promise<string[]> {
+  return page.evaluate((min) => {
+    const dialog = document.querySelector('[data-testid="profile-cv-delete-dialog"]');
+    if (dialog === null) return ['no question'];
+    const problems: string[] = [];
+    const box = dialog.getBoundingClientRect();
+    if (
+      box.left < 0 ||
+      box.top < 0 ||
+      box.right > window.innerWidth + 0.5 ||
+      box.bottom > window.innerHeight + 0.5
+    ) {
+      problems.push('the question is not wholly inside the window');
+    }
+    for (const id of ['profile-cv-delete-title', 'profile-cv-delete-body']) {
+      const text = dialog.querySelector(`#${id}`);
+      if (text === null) problems.push(`${id}: missing`);
+      else if (text.scrollWidth > text.clientWidth + 1) problems.push(`${id}: runs off its line`);
+    }
+    for (const id of ['profile-cv-delete-cancel', 'profile-cv-delete-confirm']) {
+      const button = dialog.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect();
+      if (button === undefined) {
+        problems.push(`${id}: missing`);
+        continue;
+      }
+      if (
+        button.left < box.left - 0.5 ||
+        button.right > box.right + 0.5 ||
+        button.bottom > box.bottom + 0.5
+      ) {
+        problems.push(`${id}: outside the question`);
+      }
+      if (button.height < min - 0.5) {
+        problems.push(`${id}: ${String(Math.round(button.height))}px tall, under ${String(min)}`);
+      }
+    }
+    if (document.activeElement?.getAttribute('data-testid') !== 'profile-cv-delete-cancel') {
+      problems.push('focus did not open on Cancel');
+    }
+    return problems;
+  }, minButton);
+}
+
+describe('Rename and Delete for a saved CV (L-408)', () => {
+  for (const size of SAVED_CV_WINDOWS) {
+    it(`at ${size.name} each row shows its name, facts, Rename and Delete inside the section`, async () => {
+      const page = await profileWithCvs(size);
+      const problems = await cvSectionProblems(page, size.button);
+      console.log(`CV rows at ${size.name}: ${JSON.stringify(problems)}`);
+      assert.deepEqual(problems, []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      assert.equal(
+        await page.locator(`${YOUR_CV} [data-testid^="profile-cv-rename-"]`).count(),
+        2,
+        'one Rename per CV',
+      );
+      assert.equal(
+        await page.locator(`${YOUR_CV} [data-testid^="profile-cv-delete-"]`).count(),
+        2,
+        'one Delete per CV',
+      );
+      judge(`CV rows (${size.name})`, await contrast(page));
+      await page.context().close();
+    });
+
+    it(`at ${size.name} the name box, its error, Save and Cancel sit inside the section`, async () => {
+      const page = await profileWithCvs(size);
+      await page.click('[data-testid="profile-cv-rename-cv-2"]');
+      await page.fill('[data-testid="profile-cv-name-input-cv-2"]', '');
+      await page.click('[data-testid="profile-cv-name-save-cv-2"]');
+      const error = page.locator('[data-testid="profile-cv-name-error-cv-2"]');
+      await error.waitFor();
+      assert.equal(await error.textContent(), 'Give the CV a name.');
+
+      const problems = await cvSectionProblems(page, size.button);
+      console.log(`CV name box at ${size.name}: ${JSON.stringify(problems)}`);
+      assert.deepEqual(problems, []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      judge(`CV name box with its error (${size.name})`, await contrast(page));
+      await page.context().close();
+    });
+
+    for (const [id, says] of [
+      ['cv-1', 'This also deletes 3 saved checks made with this CV.'],
+      // The 100-character name: the heading must wrap, not run off the question.
+      ['cv-2', 'No saved checks use this CV.'],
+    ] as const) {
+      it(`at ${size.name} the delete question for ${id} is inside the window, opens on Cancel and says what goes`, async () => {
+        const page = await profileWithCvs(size);
+        await page.click(`[data-testid="profile-cv-delete-${id}"]`);
+        const body = page.locator('[data-testid="profile-cv-delete-body"]');
+        await body.waitFor();
+        assert.ok((await body.textContent())?.startsWith(says), `the question says: ${says}`);
+
+        const problems = await cvQuestionProblems(page, size.button);
+        console.log(`CV delete question (${id}) at ${size.name}: ${JSON.stringify(problems)}`);
+        assert.deepEqual(problems, []);
+        judge(`CV delete question, ${id} (${size.name})`, await contrast(page));
+
+        // Escape answers "no": the question goes and both CVs are still listed.
+        await page.keyboard.press('Escape');
+        await page.waitForSelector('[data-testid="profile-cv-delete-dialog"]', {
+          state: 'detached',
+        });
+        assert.equal(await page.locator(`${YOUR_CV} [data-testid="profile-cv-name"]`).count(), 2);
+        await page.context().close();
+      });
+    }
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a button pushed out of the section is reported', async () => {
+    const page = await profileWithCvs(SAVED_CV_WINDOWS[2]);
+    await page.evaluate(() => {
+      const button = document.querySelector<HTMLElement>('[data-testid="profile-cv-delete-cv-1"]');
+      if (button !== null) button.style.cssText = 'min-width:900px;min-height:0;height:20px';
+    });
+    const problems = await cvSectionProblems(page, SAVED_CV_WINDOWS[2].button);
+    assert.ok(
+      problems.includes('profile-cv-delete-cv-1: outside the section') &&
+        problems.some((line) => line.startsWith('profile-cv-delete-cv-1: 20px tall')),
+      `the pushed-out button was not flagged: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+
+  it('the check can fail: a question wider than the window is reported', async () => {
+    const page = await profileWithCvs(SAVED_CV_WINDOWS[2]);
+    await page.click('[data-testid="profile-cv-delete-cv-2"]');
+    await page.waitForSelector('[data-testid="profile-cv-delete-dialog"]');
+    await page.evaluate(() => {
+      const dialog = document.querySelector<HTMLElement>(
+        '[data-testid="profile-cv-delete-dialog"]',
+      );
+      if (dialog !== null) dialog.style.cssText = 'min-width:900px';
+    });
+    const problems = await cvQuestionProblems(page, SAVED_CV_WINDOWS[2].button);
+    assert.ok(
+      problems.includes('the question is not wholly inside the window'),
+      `the wide question was not flagged: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+});

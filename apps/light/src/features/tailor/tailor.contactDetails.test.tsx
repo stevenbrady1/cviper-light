@@ -725,3 +725,40 @@ describe('regression: what goes to the AI, and what the draft is, do not change'
     expect(port.storedDocuments()[0]?.text).toBe(renderTailoredCv(FAITHFUL, null));
   });
 });
+
+describe('a job whose CV was deleted on Profile (L-408)', () => {
+  // `'cv-gone'`: deleted while the app runs, so Tailor still remembers the id.
+  // `null`: the next start, when the database has cleared `job_workflow.cv_id`
+  // (`ON DELETE SET NULL`, proved in `db/cvDelete.sqlite.test.ts`).
+  it.each([['cv-gone'], [null]])(
+    'still opens with its advert and draft, on the newest CV that is left (remembered: %s)',
+    async (remembered) => {
+      const sessions = createJobSessions();
+      sessions.open('job-1', () => ({
+        advert: JOB.description ?? '',
+        cvId: remembered,
+        result: {
+          cv: FAITHFUL,
+          cvId: remembered,
+          text: renderTailoredCv(FAITHFUL, null),
+          report: { clean: true, flagged: [] },
+          provider: 'ollama',
+          model: 'llama3.2:3b',
+          retried: false,
+          userMetrics: [],
+        },
+      }));
+
+      // Newest first, as the store lists them.
+      await renderReady([], { cvs: [OTHER_CV, CV], sessions });
+
+      await screen.findByTestId('tailor-result');
+      const picker = screen.getByTestId<HTMLSelectElement>('tailor-cv-pick');
+      expect(picker.value).toBe('cv-2');
+      expect([...picker.options].map((option) => option.value)).toEqual(['cv-2', 'cv-1']);
+      expect(screen.getByTestId<HTMLTextAreaElement>('tailor-job-text').value).toBe(
+        JOB.description ?? '',
+      );
+    },
+  );
+});
