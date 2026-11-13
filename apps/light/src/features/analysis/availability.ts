@@ -62,6 +62,15 @@ function replayTransport(body: string): ChatTransport {
   };
 }
 
+/**
+ * The chat-capable models in a probe's answer. Empty when it will not parse.
+ * Exported for the rail's status read (L-406), so both read one answer one way.
+ */
+export async function ollamaChatModels(tags: string): Promise<readonly ModelInfo[]> {
+  const listed = await createOllamaProvider(replayTransport(tags)).listModels();
+  return listed.ok ? listed.value : [];
+}
+
 /** Whether the daemon answered, and the chat-capable models it reported. */
 async function ollamaState(): Promise<{
   readonly running: boolean;
@@ -76,8 +85,7 @@ async function ollamaState(): Promise<{
   // its answer parsed is a separate question, and the empty list already says
   // "nothing usable" — conflating the two would make a proxy's login page look
   // like an uninstalled Ollama and lose the one hint worth showing.
-  const listed = await createOllamaProvider(replayTransport(tags)).listModels();
-  return { running: true, models: listed.ok ? listed.value : [] };
+  return { running: true, models: await ollamaChatModels(tags) };
 }
 
 /** Is this key saved? Anything other than a plain `true` counts as no. */

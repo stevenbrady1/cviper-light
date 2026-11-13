@@ -4,19 +4,23 @@
  *
  * Settings listed seven AI companies and never mentioned the AI that runs on
  * the user's own computer — the one option that sends a CV nowhere. This box
- * reads the same live answer the welcome card reads and says it in the same
- * words (`localModelLine`), so the two cannot disagree.
+ * says what the shell's own check found, in the welcome card's own words
+ * (`localModelLine`), so the two screens cannot disagree.
  *
  * The assertions that matter are the negative ones: no "Ready" before the
- * probe has answered, none when it failed, and none when Ollama is running
- * with nothing that can chat.
+ * check has answered, none when nothing was found, and none when Ollama is
+ * running with nothing that can chat.
+ *
+ * The box asks nothing itself. `status/environment.test.ts` covers what the
+ * check finds, and `app/App.onThisPc.test.tsx` that the shell hands it down.
  */
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BrowserPort } from '../../platform/browser';
-import type { Availability } from '../analysis/providers';
+
+import type { LocalAi } from './OnThisPc';
 
 const tauri = vi.hoisted(() => ({
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
@@ -32,23 +36,25 @@ const { OLLAMA_DOWNLOAD_URL } = await import('../analysis/providers');
 const { LOOKING_FOR_LOCAL_AI, localModelLine } = await import('../onboarding/cards');
 const { OUTBOUND_HOSTS } = await import('../../lib/outbound-hosts');
 
-const NOTHING: Availability = {
-  ollamaRunning: false,
-  ollamaModels: [],
-  anthropicKey: false,
-  openaiKey: false,
-};
-
-const ONE_MODEL: Availability = {
-  ...NOTHING,
-  ollamaRunning: true,
+const NOTHING: LocalAi = { ollama: 'absent' };
+const NO_CHAT_MODEL: LocalAi = { ollama: 'running' };
+const ONE_MODEL: LocalAi = {
+  ollama: 'running',
   ollamaModels: [{ id: 'llama3.2:3b', label: 'llama3.2:3b (3.2B)' }],
 };
 
-const NO_CHAT_MODEL: Availability = { ...NOTHING, ollamaRunning: true };
-
 const NOTHING_FOUND_LINE = 'No AI is running on this PC. The basic CV match works without one.';
 const LINK_NAME = 'Open Ollama’s download page';
+
+/** The welcome card's sentence for the same machine: one source for both screens. */
+function welcomeLine(localAi: LocalAi): string {
+  return localModelLine({
+    ollamaRunning: localAi.ollama === 'running',
+    ollamaModels: localAi.ollamaModels ?? [],
+    anthropicKey: false,
+    openaiKey: false,
+  });
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -63,29 +69,23 @@ afterEach(() => {
   cleanup();
 });
 
-function open(detect: () => Promise<Availability>, browser?: BrowserPort) {
+/** Settings with what the shell found; `undefined` is Settings drawn alone. */
+function open(localAi: LocalAi | null | undefined, browser?: BrowserPort) {
   render(
     <Settings
       port={createFakeBackupPort()}
       updatePort={createFakeUpdatePort()}
       mobileOs={null}
       browser={browser ?? createFakeBrowserPort()}
-      detectAvailability={detect}
+      {...(localAi === undefined ? {} : { localAi })}
     />,
   );
   return screen.getByTestId('settings-on-this-pc');
 }
 
-/** The box once the probe has answered and the box has said so. */
-async function answered(availability: Availability, browser?: BrowserPort) {
-  const box = open(() => Promise.resolve(availability), browser);
-  await vi.waitFor(() => expect(box.textContent).not.toContain(LOOKING_FOR_LOCAL_AI));
-  return box;
-}
-
 describe('where the box is', () => {
-  it('sits between the "works with no key" line and the AI provider keys, under its own heading', async () => {
-    const box = await answered(ONE_MODEL);
+  it('sits between the "works with no key" line and the AI provider keys, under its own heading', () => {
+    const box = open(ONE_MODEL);
     const note = screen.getByTestId('settings-free-note');
     const keys = screen.getByTestId('ai-key-setup');
 
@@ -93,13 +93,21 @@ describe('where the box is', () => {
     expect(note.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(box.compareDocumentPosition(keys) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it('asks nothing itself: opening Settings makes no Ollama probe of its own', () => {
+    open(ONE_MODEL);
+
+    // A box that asked for itself would grow after Settings had scrolled to a
+    // section, and slide it down the screen (L-364).
+    expect(tauri.invoke.mock.calls.filter(([command]) => command === 'ollama_probe')).toEqual([]);
+  });
 });
 
 describe('a chat model was found', () => {
-  it('happy: the box says so in the welcome card’s own sentence, and says Ready', async () => {
-    const box = await answered(ONE_MODEL);
+  it('happy: the box says so in the welcome card’s own sentence, and says Ready', () => {
+    const box = open(ONE_MODEL);
 
-    expect(screen.getByTestId('on-this-pc-line').textContent).toBe(localModelLine(ONE_MODEL));
+    expect(screen.getByTestId('on-this-pc-line').textContent).toBe(welcomeLine(ONE_MODEL));
     expect(box.textContent).toContain('llama3.2:3b');
     expect(box.textContent).toContain('Nothing you check will leave your PC.');
 
@@ -109,46 +117,45 @@ describe('a chat model was found', () => {
     expect(pill.getAttribute('data-tone')).toBe('ready');
   });
 
-  it('negative: it never says "In use", and holds nothing to press', async () => {
-    const box = await answered(ONE_MODEL);
+  it('negative: it never says "In use", and holds nothing to press', () => {
+    const box = open(ONE_MODEL);
 
     // Which AI reads a CV is chosen on each check, so "In use" could be untrue.
     expect(box.textContent).not.toContain('In use');
     expect(within(box).queryAllByRole('button')).toHaveLength(0);
-    expect(within(box).queryByRole('button', { name: LINK_NAME })).toBeNull();
   });
 
-  it('boundary: two models found names the first, the one Analysis starts on', async () => {
-    const two: Availability = {
-      ...ONE_MODEL,
+  it('boundary: two models found names the first, the one Analysis starts on', () => {
+    const box = open({
+      ollama: 'running',
       ollamaModels: [
         { id: 'qwen2.5:7b', label: 'qwen2.5:7b (7.6B)' },
         { id: 'llama3.2:3b', label: 'llama3.2:3b (3.2B)' },
       ],
-    };
-    const box = await answered(two);
+    });
 
     expect(box.textContent).toContain('running qwen2.5:7b.');
     expect(box.textContent).not.toContain('llama3.2:3b');
   });
 
-  it('boundary: a very long model name is shown whole and allowed to wrap', async () => {
+  it('boundary: a very long model name is shown whole and allowed to wrap', () => {
     const id = `${'verylongmodelname'.repeat(8)}:latest`;
-    const box = await answered({ ...ONE_MODEL, ollamaModels: [{ id, label: id }] });
+    const box = open({ ollama: 'running', ollamaModels: [{ id, label: id }] });
 
     const line = screen.getByTestId('on-this-pc-line');
     expect(line.textContent).toContain(id);
     // Unbroken text this long needs leave to break, or it pushes the box wide.
+    // WebKit measures the real thing in `e2e/contrast-webkit.spec.ts`.
     expect(line.className).toContain('break-words');
     expect(box.contains(screen.getByTestId('on-this-pc-status'))).toBe(true);
   });
 });
 
 describe('Ollama is running with no model that can chat', () => {
-  it('says what to do in the existing sentence, with the label and the link', async () => {
-    const box = await answered(NO_CHAT_MODEL);
+  it('says what to do in the existing sentence, with the label and the link', () => {
+    const box = open(NO_CHAT_MODEL);
 
-    expect(screen.getByTestId('on-this-pc-line').textContent).toBe(localModelLine(NO_CHAT_MODEL));
+    expect(screen.getByTestId('on-this-pc-line').textContent).toBe(welcomeLine(NO_CHAT_MODEL));
     expect(box.textContent).toContain('add a chat model in it');
 
     const pill = screen.getByTestId('on-this-pc-status');
@@ -157,8 +164,14 @@ describe('Ollama is running with no model that can chat', () => {
     expect(within(box).getByRole('button', { name: LINK_NAME })).toBeTruthy();
   });
 
-  it('negative: it is not "Ready"', async () => {
-    const box = await answered(NO_CHAT_MODEL);
+  it('boundary: an empty model list reads the same as none', () => {
+    open({ ollama: 'running', ollamaModels: [] });
+
+    expect(screen.getByTestId('on-this-pc-status').textContent).toBe('Needs a chat model');
+  });
+
+  it('negative: it is not "Ready"', () => {
+    const box = open(NO_CHAT_MODEL);
 
     expect(box.textContent).not.toContain('Ready');
     expect(box.textContent).not.toContain('Nothing you check will leave your PC.');
@@ -166,8 +179,8 @@ describe('Ollama is running with no model that can chat', () => {
 });
 
 describe('no AI was found on this PC', () => {
-  it('the box stays, with the one quiet line and the link — and no label', async () => {
-    const box = await answered(NOTHING);
+  it('the box stays, with the one quiet line and the link — and no label', () => {
+    const box = open(NOTHING);
 
     expect(within(box).getByRole('heading', { name: 'On this PC' })).toBeTruthy();
     expect(screen.getByTestId('on-this-pc-line').textContent).toBe(NOTHING_FOUND_LINE);
@@ -175,36 +188,29 @@ describe('no AI was found on this PC', () => {
     expect(screen.queryByTestId('on-this-pc-status')).toBeNull();
   });
 
-  it('negative: nothing is wrong, so nothing is drawn in a warning colour', async () => {
-    const box = await answered(NOTHING);
+  it('negative: nothing is wrong, so nothing is drawn in a warning colour', () => {
+    const box = open(NOTHING);
 
     expect(box.innerHTML).not.toMatch(/gold|danger/);
     expect(box.textContent).not.toContain('Ready');
   });
 
-  it('negative: a saved AI key does not change what this PC has', async () => {
-    // `localModelLine` goes on to talk about saved keys. This box is about the
-    // computer, so a key must not turn "no AI on this PC" into something else.
-    const box = await answered({ ...NOTHING, anthropicKey: true, openaiKey: true });
+  it('negative: a model list with no Ollama running is still "nothing found", never Ready', () => {
+    // Cannot come from the real check; a stale or malformed answer must not claim Ready.
+    const box = open({ ollama: 'absent', ollamaModels: [{ id: 'ghost', label: 'ghost' }] });
 
     expect(screen.getByTestId('on-this-pc-line').textContent).toBe(NOTHING_FOUND_LINE);
-    expect(box.textContent).not.toContain('key');
-  });
-
-  it('negative: a probe that fails reads as nothing found, never as Ready', async () => {
-    const box = open(() => Promise.reject(new Error('the probe broke')));
-
-    await vi.waitFor(() =>
-      expect(screen.getByTestId('on-this-pc-line').textContent).toBe(NOTHING_FOUND_LINE),
-    );
     expect(box.textContent).not.toContain('Ready');
-    expect(screen.queryByTestId('on-this-pc-status')).toBeNull();
+    expect(box.textContent).not.toContain('ghost');
   });
 });
 
-describe('before the probe has answered', () => {
-  it('says it is looking — neither "Ready" nor "No AI"', () => {
-    const box = open(() => new Promise<Availability>(() => undefined));
+describe('before the check has answered', () => {
+  it.each([
+    ['the shell has no answer yet', null],
+    ['Settings is drawn alone', undefined],
+  ])('says it is looking — neither "Ready" nor "No AI": %s', (_name, localAi) => {
+    const box = open(localAi);
 
     expect(within(box).getByRole('heading', { name: 'On this PC' })).toBeTruthy();
     expect(screen.getByTestId('on-this-pc-line').textContent).toBe(LOOKING_FOR_LOCAL_AI);
@@ -219,7 +225,7 @@ describe('the link to Ollama’s download page', () => {
   it('hands the one allow-listed address to the browser port, and nothing else', async () => {
     const user = userEvent.setup();
     const browser = createFakeBrowserPort();
-    const box = await answered(NOTHING, browser);
+    const box = open(NOTHING, browser);
 
     await user.click(within(box).getByRole('button', { name: LINK_NAME }));
 
@@ -232,7 +238,7 @@ describe('the link to Ollama’s download page', () => {
     const user = userEvent.setup();
     const browser = createFakeBrowserPort();
     browser.failNext();
-    const box = await answered(NOTHING, browser);
+    const box = open(NOTHING, browser);
 
     await user.click(within(box).getByRole('button', { name: LINK_NAME }));
 
@@ -246,8 +252,8 @@ describe('Settings keeps no blue button at rest (L-321)', () => {
     ['ready', ONE_MODEL],
     ['no chat model', NO_CHAT_MODEL],
     ['nothing found', NOTHING],
-  ])('the box adds none: %s', async (_name, availability) => {
-    const box = await answered(availability);
+  ])('the box adds none: %s', (_name, localAi) => {
+    const box = open(localAi);
 
     expect(box.innerHTML).not.toMatch(/bg-blue|border-blue|text-blue/);
   });

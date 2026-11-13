@@ -546,6 +546,7 @@ export default function App({
               keyPort,
               browser,
               boardsPort,
+              localAi: status,
               updatePort: updatePortInstance,
               onShowWelcome,
               onErased,
