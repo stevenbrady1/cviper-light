@@ -113,7 +113,7 @@ function Body({ state }: { readonly state: PanelState }) {
   if (source.cvText === null) {
     return (
       <Empty>
-        Upload a CV on the Analysis screen to see what these adverts ask for that it does not
+        Upload your CV at the top of this page to see what these adverts ask for that it does not
         mention.
       </Empty>
     );

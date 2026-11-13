@@ -64,7 +64,7 @@ export const VIEWS: readonly ViewDefinition[] = [
   {
     id: 'profile',
     label: 'Profile',
-    summary: 'Who you are, what you want, and what you will not take.',
+    summary: 'Who you are and what you want. Saved as you type.',
     shortcut: 1,
     placement: 'sequence',
   },

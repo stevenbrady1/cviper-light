@@ -172,6 +172,70 @@ describe('Your CV, on Profile', () => {
     expect(screen.queryByTestId('profile-upload-problem')).toBeNull();
   });
 
+  describe('which CV the other screens start on (L-320)', () => {
+    /** CVs as the store lists them: newest first. */
+    const cvsNamed = (...names: string[]): Cv[] =>
+      names.map((name, index) => ({
+        ...SAVED_CV,
+        id: `cv-${index}`,
+        name,
+        created_at: `2026-08-${String(20 - index).padStart(2, '0')}T09:00:00.000Z`,
+      }));
+
+    async function currentLine(): Promise<string | null> {
+      await vi.waitFor(() =>
+        expect(screen.getByTestId('profile-cv-current').textContent).not.toBe('Reading your CVs…'),
+      );
+      return screen.getByTestId('profile-cv-current').textContent;
+    }
+
+    it("three CVs: 'Used by default: <newest>, the newest of your 3 CVs.'", async () => {
+      await renderView({
+        cvPort: createFakeAnalysisPort({ cvs: cvsNamed('Newest.pdf', 'Middle.pdf', 'Oldest.pdf') }),
+      });
+
+      expect(await currentLine()).toBe('Used by default: Newest.pdf, the newest of your 3 CVs.');
+    });
+
+    it("two CVs: 'the newest of your 2 CVs'", async () => {
+      await renderView({ cvPort: createFakeAnalysisPort({ cvs: cvsNamed('B.pdf', 'A.pdf') }) });
+
+      expect(await currentLine()).toBe('Used by default: B.pdf, the newest of your 2 CVs.');
+    });
+
+    it("boundary: one CV: 'Used by default: <name>.' with no count", async () => {
+      await renderView({ cvPort: createFakeAnalysisPort({ cvs: [SAVED_CV] }) });
+
+      expect(await currentLine()).toBe('Used by default: Jordan Lewis CV.pdf.');
+    });
+
+    it("negative: no CV: says 'No CV uploaded yet' and never 'Used by default'", async () => {
+      await renderView();
+
+      const line = await currentLine();
+      expect(line).toContain('No CV uploaded yet');
+      expect(screen.getByTestId('profile-cv').textContent).not.toContain('Used by default');
+    });
+
+    it('edge: an upload here becomes the default and the count goes up by one', async () => {
+      const user = userEvent.setup();
+      const { files } = await renderView({
+        cvPort: createFakeAnalysisPort({ cvs: cvsNamed('B.pdf', 'A.pdf') }),
+      });
+      expect(await currentLine()).toBe('Used by default: B.pdf, the newest of your 2 CVs.');
+
+      files.nextCv({ name: 'New CV.docx', path: 'C:\\New CV.docx', bytes: new Uint8Array([1]) });
+      parsing.extractText.mockResolvedValue(ok({ text: CV_TEXT, pageCount: null, warnings: [] }));
+      await user.click(screen.getByTestId('profile-upload'));
+
+      await vi.waitFor(() =>
+        expect(screen.getByTestId('profile-cv-current').textContent).toBe(
+          'Used by default: New CV.docx, the newest of your 3 CVs.',
+        ),
+      );
+    });
+  });
+
   it('negative: a CV list that cannot be read says so, and the upload still works', async () => {
     const cvPort = createFakeAnalysisPort();
     cvPort.failNext('loadCvs');
