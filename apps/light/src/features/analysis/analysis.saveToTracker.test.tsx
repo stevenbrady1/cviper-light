@@ -157,8 +157,9 @@ describe('saving a pasted advert to the tracker (L-325)', () => {
     const button = screen.getByTestId('analysis-save-to-tracker');
     expect(button.textContent).toBe('Save this job to the tracker');
     await user.click(button);
+    // Changed on purpose (L-395): the boxes are labelled, so only the advert sentence is left.
     expect(screen.getByTestId('analysis-tracker-hint').textContent).toBe(
-      'Add the job title and company so you can spot it on the board. The advert you pasted is saved with it.',
+      'The advert you pasted is saved with it.',
     );
     expect(screen.getByLabelText('Job title')).toBe(screen.getByTestId('analysis-tracker-title'));
     expect(screen.getByLabelText('Company')).toBe(screen.getByTestId('analysis-tracker-company'));

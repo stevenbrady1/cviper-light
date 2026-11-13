@@ -377,8 +377,7 @@ export function AnalysisResult({
       <div>
         <Eyebrow>Words a screening system looks for</Eyebrow>
         <p className="mt-1 text-ink-muted">
-          These are wording gaps, not skill gaps. Where you have done the work, use the
-          advert&rsquo;s own word for it.
+          Use the advert&rsquo;s word for work you have really done.
         </p>
         <TermChips
           terms={analysis.keyword_gaps}

@@ -215,6 +215,37 @@ describe('the sections', () => {
     expect(screen.getByTestId('analysis-ats-notes-empty')).toBeTruthy();
   });
 
+  it('the screening-words block says "Use the advert’s word for work you have really done." (L-395)', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable={false}
+      />,
+    );
+
+    const line = screen.getByTestId('analysis-keyword-gaps').previousElementSibling;
+    expect(line?.textContent).toBe('Use the advert’s word for work you have really done.');
+  });
+
+  it('boundary: with no wording gaps, the line still shows above "Your CV already uses the advert’s wording." (L-395)', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis({ keyword_gaps: [] })}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable={false}
+      />,
+    );
+
+    const empty = screen.getByTestId('analysis-keyword-gaps-empty');
+    expect(empty.textContent).toBe('Your CV already uses the advert’s wording.');
+    expect(empty.previousElementSibling?.textContent).toBe(
+      'Use the advert’s word for work you have really done.',
+    );
+  });
+
   it('boundary: a score of 0 renders as a real result, not as an absent one', () => {
     render(
       <AnalysisResult

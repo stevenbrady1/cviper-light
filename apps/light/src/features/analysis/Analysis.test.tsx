@@ -142,6 +142,19 @@ describe('try it with a sample (L-277)', () => {
     expect(sample.textContent ?? '').toMatch(/nothing was saved/i);
   });
 
+  it('the sample’s intro is one line: made-up, nothing saved, add your own (L-395)', async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId('analysis-try-sample'));
+
+    const intro = (await screen.findByTestId('analysis-sample')).querySelector('p');
+    expect(intro?.textContent).toBe(
+      'A sample check with a made-up CV and advert. Nothing was saved. Add your own CV above to check it for real.',
+    );
+    // The opening words stay picked out in bold, as before.
+    expect(intro?.querySelector('span.font-medium')?.textContent).toBe('A sample check');
+  });
+
   // L-290 — through the real screen: the sample's matched skills come with the
   // lines of the sample CV that show them.
   it('shows where the sample CV says each matched skill', async () => {
