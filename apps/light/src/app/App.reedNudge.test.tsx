@@ -85,6 +85,18 @@ describe('Get a free Reed key, from Search to Settings', () => {
     expect(card.contains(document.activeElement)).toBe(true);
   });
 
+  it('from Search, the Reed row is open and its button focused (L-390)', async () => {
+    const { user } = await renderApp();
+    await pressGetReedKey(user);
+
+    const signup = await screen.findByTestId('key-signup-reed');
+    await vi.waitFor(() => expect(document.activeElement).toBe(signup));
+    const reed = screen.getByTestId('key-row-reed') as HTMLDetailsElement;
+    expect(reed.open).toBe(true);
+    expect(reed.contains(signup)).toBe(true);
+    expect((screen.getByTestId('key-row-adzuna') as HTMLDetailsElement).open).toBe(false);
+  });
+
   it('negative: the next ordinary visit to Settings opens at the top, keys folded', async () => {
     const { user } = await renderApp();
     await pressGetReedKey(user);

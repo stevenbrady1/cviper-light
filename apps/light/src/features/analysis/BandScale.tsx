@@ -143,11 +143,12 @@ export function BandScale({ score, verdict }: BandScaleProps) {
           serif defaults to OLD-STYLE figures that sit above and below the
           baseline, which would make a 71 and a 100 rock against each other.
 
-          `font-normal`, not medium: the face ships one weight.
+          `font-normal`, not medium: the face ships one weight. 60px on a phone,
+          72px from md: up, so it is the hero of the result (L-391).
         */}
         <span
           data-testid="band-scale-score"
-          className={`font-display text-5xl leading-none font-normal lining-nums tabular-nums ${VERDICT_INK[verdict]}`}
+          className={`font-display text-6xl leading-none font-normal lining-nums tabular-nums md:text-7xl ${VERDICT_INK[verdict]}`}
         >
           {value}
         </span>

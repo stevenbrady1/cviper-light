@@ -380,6 +380,154 @@ describe('the ATS keyword number (L-196)', () => {
 });
 
 /**
+ * L-391 — the match score is the hero; the keyword check is a plain row below.
+ *
+ * Two numbers out of 100 sat one under the other, both in the serif, and the
+ * keyword one had the white card — so the eye landed on the wrong number first.
+ */
+describe('the hero (L-391)', () => {
+  it('the match score and the verdict are inside the hero', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        atsKeywordScore={54}
+      />,
+    );
+    const hero = screen.getByTestId('analysis-hero');
+    expect(within(hero).getByTestId('band-scale-score').textContent).toBe('62');
+    expect(within(hero).getByTestId('analysis-verdict').textContent).toBe('Possible match');
+  });
+
+  it('the confidence line sits inside the hero, under the score', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        cvText="Data analyst, five years. SQL and Excel for the trading team."
+        advertText={'Data Analyst\nBristol.\n\nEssential:\n- SQL\n- Excel'}
+      />,
+    );
+    const hero = screen.getByTestId('analysis-hero');
+    expect(within(hero).getByTestId('analysis-confidence')).toBeTruthy();
+  });
+
+  // NEGATIVE — the two numbers are never one block.
+  it('the keyword number is NOT inside the hero, and comes after it', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        atsKeywordScore={54}
+      />,
+    );
+    const hero = screen.getByTestId('analysis-hero');
+    const ats = screen.getByTestId('analysis-ats-score');
+    expect(hero.contains(ats)).toBe(false);
+    expect(ats.contains(hero)).toBe(false);
+    expect(hero.compareDocumentPosition(ats) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  // NEGATIVE — it must not look like a second score.
+  it('the keyword number is not set in the serif and is no bigger than body text', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        atsKeywordScore={54}
+      />,
+    );
+    const value = screen.getByTestId('analysis-ats-score-value');
+    expect(value.className).not.toMatch(/\bfont-display\b/);
+    // Body text is 16px; any size class from text-lg up is bigger than it.
+    expect(value.className).not.toMatch(/\btext-(lg|xl|\dxl|\[)/);
+    expect(value.className).toMatch(/\bfont-mono\b/);
+    expect(value.className).toMatch(/\btabular-nums\b/);
+    // A plain row, not a card that outranks the hero.
+    const ats = screen.getByTestId('analysis-ats-score');
+    expect(ats.className).not.toMatch(/\b(bg-card|shadow-raised|rounded-card)\b/);
+  });
+
+  // BOUNDARY — the widest and the narrowest numeral.
+  it.each([
+    [100, 'strong', 'Strong match'],
+    [0, 'weak', 'Weak match'],
+  ] as const)('a score of %i draws in the hero', (score, verdict, word) => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis({ match_score: score, verdict })}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable
+        atsKeywordScore={54}
+      />,
+    );
+    const hero = screen.getByTestId('analysis-hero');
+    expect(within(hero).getByTestId('band-scale-score').textContent).toBe(String(score));
+    expect(within(hero).getByTestId('analysis-verdict').textContent).toBe(word);
+  });
+
+  // EDGE — an older result with no keyword number.
+  it('an old result with no keyword number draws the hero and no empty row', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v2"
+        aiAvailable
+      />,
+    );
+    const hero = screen.getByTestId('analysis-hero');
+    expect(screen.queryByTestId('analysis-ats-score')).toBeNull();
+    // Straight from the hero to the summary: nothing empty drawn between.
+    expect(hero.nextElementSibling).toBe(screen.getByTestId('analysis-summary'));
+  });
+
+  // EDGE — one component draws both engines.
+  it('the AI path draws the same hero', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis({ match_score: 81, verdict: 'strong' })}
+        provider="anthropic"
+        model="m"
+        aiAvailable
+        atsKeywordScore={83}
+      />,
+    );
+    const hero = screen.getByTestId('analysis-hero');
+    expect(within(hero).getByTestId('band-scale-score').textContent).toBe('81');
+    expect(within(hero).getByTestId('analysis-verdict').textContent).toBe('Strong match');
+    expect(hero.contains(screen.getByTestId('analysis-ats-score'))).toBe(false);
+  });
+
+  // NO KEY — the honest label is still read before the number.
+  it('the gold Basic-match strip comes before the hero', () => {
+    render(
+      <AnalysisResult
+        analysis={keywordAnalysis()}
+        provider="keyword"
+        model="keyword-v3"
+        aiAvailable={false}
+        atsKeywordScore={54}
+      />,
+    );
+    const strip = screen.getByTestId('analysis-provenance');
+    const hero = screen.getByTestId('analysis-hero');
+    expect(strip.textContent).toContain('Basic match — add an AI key for a full analysis.');
+    expect(hero.contains(strip)).toBe(false);
+    expect(strip.compareDocumentPosition(hero) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+/**
  * L-290 — the proof behind each matched skill.
  *
  * A user can check a match against their own words instead of trusting it.
