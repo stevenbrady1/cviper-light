@@ -10,7 +10,12 @@
  * `load`. Same shape as `boards/port.test.ts`, which this consent store
  * deliberately matches.
  */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { stripComments } from '../../lib/repo-scan';
 
 import { type ProviderKind } from './providers';
 
@@ -60,6 +65,7 @@ const plugin = vi.hoisted(() => {
 vi.mock('@tauri-apps/plugin-store', () => ({ load: plugin.load }));
 
 const {
+  CONSENT_KINDS,
   CONSENT_STORE_FILE,
   CONSENT_STORE_KEY,
   NO_CONSENT,
@@ -323,5 +329,57 @@ describe('readStoredConsent — the check the app actually runs', () => {
 
     // No snapshot anywhere: the second call opens the store again.
     await expect(readStoredConsent('openai')).resolves.toBe(false);
+  });
+});
+
+/**
+ * L-399. Analysis and Tailor each kept a hand-typed `['anthropic', 'openai']`
+ * list of the consents that can be withdrawn. Five providers were added after
+ * it was written and never joined it, so a consent given to Google could not
+ * be taken back anywhere in the app — with `revoke` working for all seven the
+ * whole time.
+ */
+describe('CONSENT_KINDS — the one list of consents that can be withdrawn', () => {
+  it('is exactly the flags of NO_CONSENT, so a new flag cannot be left off a screen', () => {
+    expect([...CONSENT_KINDS]).toEqual(Object.keys(NO_CONSENT));
+  });
+
+  it('every kind on it is granted and revoked through the real store', async () => {
+    const port = createTauriConsentPort();
+
+    for (const kind of CONSENT_KINDS) {
+      await port.grant(kind);
+      await expect(readStoredConsent(kind)).resolves.toBe(true);
+
+      await port.revoke(kind);
+      await expect(readStoredConsent(kind)).resolves.toBe(false);
+    }
+  });
+
+  /** Two provider names side by side in an array: a second copy of the list. */
+  const NAME = `['"\`](?:${Object.keys(NO_CONSENT).join('|')})['"\`]`;
+  const HAND_TYPED_KINDS = new RegExp(`\\[\\s*${NAME}\\s*,\\s*${NAME}`);
+
+  function shipped(file: string): string {
+    return stripComments(readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8'));
+  }
+
+  it.each(['./Analysis.tsx', '../tailor/Tailor.tsx'])(
+    'guard: %s draws its rows from CONSENT_KINDS, not from a list typed by hand',
+    (file) => {
+      const source = shipped(file);
+
+      expect(HAND_TYPED_KINDS.test(source)).toBe(false);
+      expect(source).toContain('CONSENT_KINDS.filter(');
+    },
+  );
+
+  it('the guard sees the list this replaced, and is not fooled by a comment', () => {
+    const before = "const granted = (['anthropic', 'openai'] as const).filter((k) => consent[k]);";
+
+    expect(HAND_TYPED_KINDS.test(stripComments(before))).toBe(true);
+    expect(HAND_TYPED_KINDS.test(stripComments('["google",\n  "mistral"]'))).toBe(true);
+    expect(HAND_TYPED_KINDS.test(stripComments("// was ['anthropic', 'openai']"))).toBe(false);
+    expect(HAND_TYPED_KINDS.test(stripComments("/* ['anthropic', 'openai'] */"))).toBe(false);
   });
 });
