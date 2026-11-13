@@ -250,6 +250,54 @@ describe('colour contrast on the rendered app (WCAG 2.1 AA)', () => {
 });
 
 /**
+ * Placeholder text (L-316). axe's colour-contrast rule does not measure the
+ * example text in an empty box, so read the colour WebKit paints it in. Before
+ * the theme rule it was the text colour at 50%, about 3.4:1.
+ */
+const INK_FAINT = 'rgb(95, 107, 128)'; // --color-ink-faint, #5f6b80
+
+async function placeholderColours(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('[placeholder]')].map(
+      (box) =>
+        `${box.getAttribute('data-testid') ?? box.tagName}: ${getComputedStyle(box, '::placeholder').color}`,
+    ),
+  );
+}
+
+describe('placeholder text is painted in ink-faint (L-316)', () => {
+  for (const view of ['profile', 'search'] as const) {
+    it(`every placeholder on ${view} computes to the ink-faint colour`, async () => {
+      const page = await open('?seen=1', VIEWPORTS.desktop);
+      await goTo(page, view);
+      const found = await placeholderColours(page);
+      assert.ok(found.length >= 4, `${view}: only ${String(found.length)} placeholders found`);
+      assert.deepEqual(
+        found.filter((line) => !line.endsWith(`: ${INK_FAINT}`)),
+        [],
+        `${view}: placeholders not in ink-faint`,
+      );
+      await page.context().close();
+    });
+  }
+
+  // The rule sits in `@layer base`, so a box's own `placeholder:` class (layer
+  // utilities) must still win. SubstageEditor ships `placeholder:text-ink-muted`.
+  it("a box's own placeholder: class still beats the theme rule", async () => {
+    const page = await open('?seen=1', VIEWPORTS.desktop);
+    const colour = await page.evaluate(() => {
+      const box = document.createElement('input');
+      box.placeholder = 'probe';
+      box.className = 'placeholder:text-ink-muted';
+      document.querySelector('main')?.prepend(box);
+      return getComputedStyle(box, '::placeholder').color;
+    });
+    assert.equal(colour, 'rgb(70, 83, 106)', 'the per-box ink-muted placeholder lost to the theme');
+    await page.context().close();
+  });
+});
+
+/**
  * Tracker column headings whose content is wider than the heading (L-311).
  *
  * With an application open the board's columns shrink to their minimum, and
