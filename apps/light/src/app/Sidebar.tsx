@@ -7,7 +7,7 @@ import { NavIcon } from './NavIcon';
 import { StatusStrip } from './StatusStrip';
 import { APP_VERSION } from '../features/settings/backup';
 
-import { PINNED_VIEWS, SEQUENCE_VIEWS, type ViewDefinition, type ViewId } from './views';
+import { SEQUENCE_VIEWS, YOU_VIEWS, type ViewDefinition, type ViewId } from './views';
 
 /**
  * The rail: fixed 240px, navy, always open — on a desktop window.
@@ -113,7 +113,7 @@ export function Sidebar({ activeView, onSelect, status }: SidebarProps) {
         </div>
       </div>
 
-      <ul className="flex-1 space-y-0.5 px-2">
+      <ul className="space-y-0.5 px-2">
         {SEQUENCE_VIEWS.map((view) => (
           <li key={view.id}>
             <NavButton view={view} active={view.id === activeView} onSelect={onSelect} />
@@ -121,8 +121,17 @@ export function Sidebar({ activeView, onSelect, status }: SidebarProps) {
         ))}
       </ul>
 
-      <ul className="space-y-0.5 px-2 pb-3">
-        {PINNED_VIEWS.map((view) => (
+      {/*
+        "You" (L-402): Profile and Settings, straight under the steps. Words,
+        not a control; it names its list, so a screen reader says "You, list,
+        2 items". This list takes the spare height, which keeps the version
+        line and the status strip at the bottom.
+      */}
+      <p id="nav-you-label" className="px-4 pt-4 pb-1 text-xs text-ink-inverse-muted">
+        You
+      </p>
+      <ul aria-labelledby="nav-you-label" className="flex-1 space-y-0.5 px-2 pb-3">
+        {YOU_VIEWS.map((view) => (
           <li key={view.id}>
             <NavButton view={view} active={view.id === activeView} onSelect={onSelect} />
           </li>

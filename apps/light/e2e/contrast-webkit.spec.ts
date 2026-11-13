@@ -50,7 +50,7 @@ const DIST = join(HERE, 'contrast', 'dist');
 const AXE_SOURCE = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
 
 /** The screens behind the nav, by their `nav-<id>` test id. */
-const VIEWS = ['profile', 'search', 'tracker', 'analysis', 'tailor', 'settings'] as const;
+const VIEWS = ['tracker', 'search', 'analysis', 'tailor', 'profile', 'settings'] as const;
 
 const VIEWPORTS = {
   desktop: { width: 1280, height: 800 },
@@ -5512,6 +5512,121 @@ describe('Settings key rows (L-390)', () => {
     assert.ok(
       problems.includes('ai-key-row-grok: open'),
       `the open row was not flagged: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
+ * The menu order and its "You" label (L-402). jsdom lays nothing out, so
+ * `App.test.tsx` pins the order in the DOM and not where anything lands. This
+ * measures the rail WebKit draws at the smallest window: the label sits
+ * between Tailor and Profile, and the rail, one row taller than before, still
+ * ends inside the window with every key saved (the tallest status strip the
+ * harness draws). The colour of the label on navy is measured with it.
+ */
+const MENU_ORDER = [
+  'nav-tracker',
+  'nav-search',
+  'nav-analysis',
+  'nav-tailor',
+  'nav-profile',
+  'nav-settings',
+];
+
+async function railFit(page: Page): Promise<{ order: string[]; problems: string[] }> {
+  return page.evaluate(() => {
+    const rail = document.querySelector('[data-testid="sidebar"]');
+    if (rail === null) return { order: [], problems: ['no rail'] };
+    const problems: string[] = [];
+    const order = [...rail.querySelectorAll('[data-testid^="nav-"]')].map(
+      (item) => item.getAttribute('data-testid') ?? '',
+    );
+    const label = rail.querySelector('#nav-you-label');
+    const tailor = rail.querySelector('[data-testid="nav-tailor"]');
+    const profile = rail.querySelector('[data-testid="nav-profile"]');
+    if (label === null || tailor === null || profile === null) {
+      problems.push('label, Tailor or Profile is missing');
+    } else {
+      const box = label.getBoundingClientRect();
+      if (label.textContent !== 'You') problems.push(`label reads "${label.textContent ?? ''}"`);
+      if (box.height < 1 || box.width < 1) problems.push('label is not drawn');
+      if (box.top < tailor.getBoundingClientRect().bottom) problems.push('label overlaps Tailor');
+      if (box.bottom > profile.getBoundingClientRect().top) problems.push('label overlaps Profile');
+    }
+    // Nothing cut off: every part of the rail ends inside the rail and the window.
+    const frame = rail.getBoundingClientRect();
+    const floor = Math.min(frame.bottom, window.innerHeight) + 0.5;
+    for (const part of rail.children) {
+      const box = part.getBoundingClientRect();
+      if (box.bottom > floor) {
+        const name = part.getAttribute('data-testid') ?? part.tagName.toLowerCase();
+        problems.push(`${name}: ends ${String(Math.round(box.bottom - floor))}px below the rail`);
+      }
+    }
+    if (rail.scrollHeight > rail.clientHeight + 1) {
+      problems.push(`rail holds ${String(rail.scrollHeight)}px in ${String(rail.clientHeight)}px`);
+    }
+    return { order, problems };
+  });
+}
+
+describe('the menu order and its "You" label (L-402)', () => {
+  for (const query of ['?seen=1', '?seen=1&results=1']) {
+    it(`at 1000×700 (${query}) the rail reads Tracker, Search, Analysis, Tailor, You: Profile, Settings, and nothing is cut off`, async () => {
+      const page = await open(query, { width: 1000, height: 700 });
+      const fit = await railFit(page);
+      console.log(`rail at 1000×700 (${query}): ${JSON.stringify(fit)}`);
+      assert.deepEqual(fit.order, MENU_ORDER);
+      assert.deepEqual(fit.problems, []);
+      judge(`rail with "You" (1000×700, ${query})`, await contrast(page));
+      await page.context().close();
+    });
+  }
+
+  it('at 375px the bottom bar shows the six in the same order, each inside the window, and no label', async () => {
+    const page = await open('?seen=1', { width: 375, height: 667 });
+    const bar = await page.evaluate(() => {
+      const items = [...document.querySelectorAll('[data-testid="bottom-nav"] > *')];
+      return {
+        order: items.map((item) => item.getAttribute('data-testid') ?? ''),
+        outside: items
+          .filter((item) => {
+            const box = item.getBoundingClientRect();
+            return box.left < 0 || box.right > window.innerWidth + 0.5 || box.width < 44;
+          })
+          .map((item) => item.getAttribute('data-testid') ?? ''),
+        clipped: items
+          .filter((item) => item.scrollWidth > item.clientWidth)
+          .map((item) => item.getAttribute('data-testid') ?? ''),
+        label: document.querySelector('#nav-you-label') !== null,
+        rail: document.querySelector('[data-testid="sidebar"]') !== null,
+      };
+    });
+    console.log(`bottom bar at 375px: ${JSON.stringify(bar)}`);
+    assert.deepEqual(bar, {
+      order: MENU_ORDER,
+      outside: [],
+      clipped: [],
+      label: false,
+      rail: false,
+    });
+    judge('bottom bar (375px)', await contrast(page));
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a rail too tall for the window is reported', async () => {
+    const page = await open('?seen=1', { width: 1000, height: 700 });
+    await page.evaluate(() => {
+      const spacer = document.createElement('li');
+      spacer.style.cssText = 'display:block;height:600px;flex-shrink:0';
+      document.querySelector('#nav-you-label + ul')?.append(spacer);
+    });
+    const fit = await railFit(page);
+    assert.ok(
+      fit.problems.some((line) => / below the rail$| in \d+px$/.test(line)),
+      `the tall rail was not flagged: ${JSON.stringify(fit.problems)}`,
     );
     await page.context().close();
   });

@@ -141,7 +141,7 @@ describe('the shell at 375px', () => {
     expect(screen.getByTestId('view-settings')).toBeTruthy();
   });
 
-  it('keeps Ctrl+1/2/3/4 working with a keyboard attached', async () => {
+  it('keeps Ctrl+1/2/3/4/5 working with a keyboard attached', async () => {
     installMatchMedia(375);
     await renderApp();
 
@@ -149,6 +149,42 @@ describe('the shell at 375px', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: '2', ctrlKey: true }));
     });
     expect(screen.getByTestId('view-search')).toBeTruthy();
+
+    // The same numbering as the rail (L-402): Ctrl+5 is Profile, Ctrl+1 the Tracker.
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: '5', ctrlKey: true }));
+    });
+    expect(screen.getByTestId('view-profile')).toBeTruthy();
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', ctrlKey: true }));
+    });
+    expect(screen.getByTestId('view-tracker')).toBeTruthy();
+  });
+
+  it('shows the six in the same order as the rail, and no group label (L-402)', async () => {
+    installMatchMedia(375);
+    await renderApp();
+    const bar = screen.getByTestId('bottom-nav');
+
+    // No room for a "You" label on a phone, and none is drawn: six buttons,
+    // each showing its own name and nothing else.
+    expect([...bar.children].map((item) => item.getAttribute('data-testid'))).toEqual([
+      'nav-tracker',
+      'nav-search',
+      'nav-analysis',
+      'nav-tailor',
+      'nav-profile',
+      'nav-settings',
+    ]);
+    expect([...bar.children].map((item) => item.textContent)).toEqual([
+      'Tracker',
+      'Search',
+      'Analysis',
+      'Tailor',
+      'Profile',
+      'Settings',
+    ]);
+    expect(screen.queryByText('You')).toBeNull();
   });
 });
 
