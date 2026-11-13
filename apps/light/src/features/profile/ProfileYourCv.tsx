@@ -1,18 +1,38 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { type Cv } from '@cviper/core-types';
+import { wordCount, type Cv } from '@cviper/core-types';
 
+import { toLocalIsoDate } from '../../lib/dates';
 import { cardClasses, ErrorBox, SectionHeading } from '../../ui';
 import { type FilePort } from '../../platform/files';
 
 import { CvUpload } from '../cv/CvUpload';
 import { type CvStorePort } from '../cv/ingestCv';
+import { formatPolicyDate } from '../settings/privacy/policyDocument';
 
 // --- Your CV (L-240) --------------------------------------------------------
 //
 // Which CV the app has, and the same upload as Analysis and Tailor. Its own
 // load, separate from the profile's: a CV list that will not read must not
 // stop the profile form from opening, and the reverse.
+
+/**
+ * "540 words. Added 3 November 2026." (L-403). Each half is left out when it
+ * would be untrue: no "0 words" for a CV whose text was never read, no date
+ * for a timestamp that will not read. `''` when neither can be said.
+ */
+function cvFacts(cv: Cv): string {
+  // The text and the counter Tailor uses, so the two screens cannot disagree.
+  const words = wordCount(cv.extracted_text ?? '');
+  // The user's own calendar day. The formatter takes four-digit years only.
+  const day = toLocalIsoDate(new Date(cv.created_at));
+  return [
+    words === 0 ? '' : `${words.toLocaleString('en-GB')} ${words === 1 ? 'word' : 'words'}.`,
+    day === null || !/^\d{4}-/.test(day) ? '' : `Added ${formatPolicyDate(day)}.`,
+  ]
+    .filter((part) => part !== '')
+    .join(' ');
+}
 
 interface YourCvProps {
   readonly store: CvStorePort;
@@ -71,6 +91,29 @@ export function YourCv({ store, files, now }: YourCvProps) {
           </>
         )}
       </p>
+
+      {cvs.length === 0 ? null : (
+        <ul data-testid="profile-cv-list" className="mt-2 space-y-2">
+          {cvs.map((cv) => {
+            const facts = cvFacts(cv);
+            return (
+              <li key={cv.id}>
+                <span
+                  data-testid="profile-cv-name"
+                  className="block font-medium break-words text-ink"
+                >
+                  {cv.name}
+                </span>
+                {facts === '' ? null : (
+                  <span data-testid="profile-cv-facts" className="block text-ink-muted">
+                    {facts}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       {cvError === null ? null : (
         <ErrorBox variant="box" gapAbove="mt-2" testId="profile-cv-error">
