@@ -248,8 +248,11 @@ fn query_pairs(provider: JobProvider, params: &JobSearchParams) -> Vec<(&'static
             if let Some(salary) = params.salary_min {
                 pairs.push(("salary_min", salary.to_string()));
             }
-            if let Some(distance) = params.distance_miles {
-                pairs.push(("distance", distance.to_string()));
+            if let Some(miles) = params.distance_miles {
+                // Adzuna's `distance` is whole KILOMETRES; Reed's is miles.
+                // Nearest km, in u64 so no mileage can overflow (L-394).
+                let kilometres = (u64::from(miles) * 1_609_344 + 500_000) / 1_000_000;
+                pairs.push(("distance", kilometres.to_string()));
             }
             // Adzuna's native filters, so the results arrive filtered rather
             // than being discarded after we have already paid for them.
@@ -794,13 +797,44 @@ mod tests {
         filtered.salary_min = Some(60_000);
         filtered.distance_miles = Some(25);
 
+        // The user's 25 is MILES. Adzuna's `distance` is kilometres and Reed's
+        // `distanceFromLocation` is miles, so the same search sends two
+        // different numbers (L-394: this once asserted "25" for both, which
+        // pinned the pass-through and not either site's contract).
         let adzuna = query_pairs(JobProvider::Adzuna, &filtered);
         assert_eq!(value_of(&adzuna, "salary_min"), Some("60000"));
-        assert_eq!(value_of(&adzuna, "distance"), Some("25"));
+        assert_eq!(value_of(&adzuna, "distance"), Some("40"));
 
         let reed = query_pairs(JobProvider::Reed, &filtered);
         assert_eq!(value_of(&reed, "minimumSalary"), Some("60000"));
         assert_eq!(value_of(&reed, "distanceFromLocation"), Some("25"));
+    }
+
+    #[test]
+    fn adzuna_gets_whole_kilometres_and_reed_gets_the_miles_unchanged() {
+        // Nearest whole kilometre: Adzuna's `distance` is an integer.
+        for (miles, kilometres) in [
+            (0, "0"),
+            (1, "2"),
+            (5, "8"),
+            (100, "161"),
+            // No overflow at the top of the type JavaScript can send.
+            (u32::MAX, "6912079846"),
+        ] {
+            let mut search = params();
+            search.distance_miles = Some(miles);
+
+            assert_eq!(
+                value_of(&query_pairs(JobProvider::Adzuna, &search), "distance"),
+                Some(kilometres),
+                "{miles} miles reached Adzuna as the wrong number of kilometres"
+            );
+            assert_eq!(
+                value_of(&query_pairs(JobProvider::Reed, &search), "distanceFromLocation"),
+                Some(miles.to_string().as_str()),
+                "Reed's unit is miles: {miles} must arrive unchanged"
+            );
+        }
     }
 
     #[test]
