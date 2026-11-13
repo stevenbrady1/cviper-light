@@ -113,7 +113,8 @@ describe('analysing a preview from a search', () => {
     const { user } = renderSearch(port, onAnalyse);
     await searchFor(user);
 
-    await user.click(await screen.findByTestId('result-analyse-job-day-rate'));
+    await user.click(await screen.findByTestId('result-more-job-day-rate'));
+    await user.click(screen.getByTestId('result-analyse-job-day-rate'));
 
     await vi.waitFor(() => expect(onAnalyse).toHaveBeenCalledTimes(1));
     const handoff = onAnalyse.mock.calls[0]?.[0];
@@ -140,11 +141,13 @@ describe('analysing a preview from a search', () => {
     const { user } = renderSearch(port, onAnalyse);
     await searchFor(user);
 
-    await user.click(await screen.findByTestId('result-analyse-job-day-rate'));
+    await user.click(await screen.findByTestId('result-more-job-day-rate'));
+    await user.click(screen.getByTestId('result-analyse-job-day-rate'));
 
     expect((await screen.findByTestId('result-note-job-day-rate')).textContent).toContain(
       'Reading the full advert',
     );
+    await user.click(screen.getByTestId('result-more-job-day-rate'));
     expect(screen.getByTestId<HTMLButtonElement>('result-analyse-job-day-rate').disabled).toBe(
       true,
     );
@@ -162,7 +165,8 @@ describe('analysing a preview from a search', () => {
     const { user } = renderSearch(port, onAnalyse);
     await searchFor(user);
 
-    await user.click(await screen.findByTestId('result-analyse-job-day-rate'));
+    await user.click(await screen.findByTestId('result-more-job-day-rate'));
+    await user.click(screen.getByTestId('result-analyse-job-day-rate'));
 
     await vi.waitFor(() => expect(onAnalyse).toHaveBeenCalledTimes(1));
     expect(onAnalyse.mock.calls[0]?.[0].note).toBe(PREVIEW_SITE_BLOCKS_NOTE);
@@ -180,10 +184,11 @@ describe('analysing a preview from a search', () => {
     await searchFor(user);
 
     // Already tracked: Save is disabled, and Analyse is still offered.
-    const analyse = await screen.findByTestId<HTMLButtonElement>('result-analyse-job-day-rate');
     await vi.waitFor(() =>
       expect(screen.getByTestId<HTMLButtonElement>('result-save-job-day-rate').disabled).toBe(true),
     );
+    await user.click(screen.getByTestId('result-more-job-day-rate'));
+    const analyse = screen.getByTestId<HTMLButtonElement>('result-analyse-job-day-rate');
     expect(analyse.disabled).toBe(false);
     await user.click(analyse);
 
@@ -206,7 +211,8 @@ describe('analysing a preview from a search', () => {
     const { user } = renderSearch(port, onAnalyse);
     await searchFor(user);
 
-    await user.click(await screen.findByTestId('result-analyse-job-arbeitnow'));
+    await user.click(await screen.findByTestId('result-more-job-arbeitnow'));
+    await user.click(screen.getByTestId('result-analyse-job-arbeitnow'));
 
     await vi.waitFor(() => expect(onAnalyse).toHaveBeenCalledTimes(1));
     expect(onAnalyse.mock.calls[0]?.[0].note).toBeNull();
@@ -221,13 +227,15 @@ describe('analysing a preview from a search', () => {
     await searchFor(user);
 
     port.failNext('saveToTracker');
-    await user.click(await screen.findByTestId('result-analyse-job-day-rate'));
+    await user.click(await screen.findByTestId('result-more-job-day-rate'));
+    await user.click(screen.getByTestId('result-analyse-job-day-rate'));
 
     expect((await screen.findByTestId('result-problem-job-day-rate')).textContent).toContain(
       'could not be saved',
     );
     expect(onAnalyse).not.toHaveBeenCalled();
     expect(port.calls.readFullAdvert).toBe(0);
+    await user.click(screen.getByTestId('result-more-job-day-rate'));
     expect(screen.getByTestId<HTMLButtonElement>('result-analyse-job-day-rate').disabled).toBe(
       false,
     );
@@ -239,7 +247,8 @@ describe('analysing a preview from a search', () => {
     const { user } = renderSearch(port);
     await searchFor(user);
 
-    await screen.findByTestId('result-save-job-day-rate');
+    await user.click(await screen.findByTestId('result-more-job-day-rate'));
+    expect(screen.getByTestId('result-open-job-day-rate')).toBeTruthy();
     expect(screen.queryByTestId('result-analyse-job-day-rate')).toBeNull();
   });
 
@@ -260,6 +269,7 @@ describe('analysing a preview from a search', () => {
     port.nextOutcome(outcomeOf([REED_DAY_RATE], emptyQuota(TODAY)));
     const { user } = renderSearch(port, vi.fn());
     await searchFor(user);
+    await user.click(await screen.findByTestId('result-more-job-day-rate'));
     await screen.findByTestId('result-analyse-job-day-rate');
 
     expect(document.querySelectorAll('[data-primary="true"]').length).toBeLessThanOrEqual(1);
@@ -284,6 +294,7 @@ describe('the card on its own', () => {
         {...(overrides.onAnalyse === undefined ? {} : { onAnalyse: overrides.onAnalyse })}
       />,
     );
+    fireEvent.click(screen.getByTestId('result-more-job-day-rate'));
     return screen.getByTestId<HTMLButtonElement>('result-analyse-job-day-rate');
   }
 
