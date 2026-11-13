@@ -1,29 +1,35 @@
 /**
- * L-382 — the title ladder, set in the serif at regular weight.
- *
- * The owner chose (12 Nov 2026) three title sizes, all in the display serif
- * (Newsreader) at regular weight:
+ * The title ladder: three sizes, never in the serif (L-382, then L-405).
  *
  *   page title     24px   PAGE_TITLE, every screen's header and the crash screens
  *   section title  20px   SECTION_TITLE, `SectionHeading`
  *   welcome title  30px, 36px from `md:`   HERO_TITLE
  *
- * Card titles, dialog and pane titles, body and small text stay as they were.
+ * The owner chose the sizes on 12 Nov 2026 (L-382), set in the display serif.
+ * On 13 Nov 2026 the owner dropped the serif from the whole app (L-405 is the
+ * titles; the score numbers follow in their own change). So the rule on titles
+ * turned over:
  *
+ *   before (L-382)  the three titles ARE the serif, at regular weight
+ *   now    (L-405)  no title names the serif, and no heading tag does either
+ *
+ * The sizes did not change: page title > section title > body, or the ladder
+ * is not a ladder.
+ *
+ * The serif is still in the app until the score numbers leave it, and
  * Newsreader ships ONE weight, 400 (`fonts.css`). Ask a browser for a heavier
- * weight of a face it only has at 400 and it draws a faked, smeared bold. So:
+ * weight of a face it only has at 400 and it draws a faked, smeared bold. So
+ * while any serif text is left:
  *
  *   - nothing set in the serif asks for a weight above regular, and every class
  *     list that names the serif says `font-normal` out loud, so a bold parent
  *     cannot leak its weight in;
- *   - fonts.css declares no Newsreader face other than 400 (a second weight
- *     would be a download, and a reason to start using it);
- *   - page title > section title > body, or the ladder is not a ladder.
+ *   - fonts.css declares no Newsreader face other than 400.
  *
- * FORBID-LIST (LESSON-033): the scan finds every class list that names the
- * serif, wherever it is, and reports the ones that ask for too much. It reads
- * source with comments stripped, so the comment explaining the rule can neither
- * trip it nor satisfy it.
+ * FORBID-LIST (LESSON-033): the scans find every class list and every heading
+ * tag that names the serif, wherever it is. They read source with comments
+ * stripped, so the comment explaining the rule can neither trip it nor
+ * satisfy it.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -61,6 +67,25 @@ export function serifWeightProblems(source: string): string[] {
   });
 }
 
+/** The names of the title styles that name the serif. Titles are never the serif (L-405). */
+export function serifTitles(titles: Readonly<Record<string, string>>): string[] {
+  return Object.entries(titles)
+    .filter(([, classes]) => SERIF.test(classes))
+    .map(([name]) => name);
+}
+
+/**
+ * Every heading tag whose own attributes name the serif: a title that went
+ * round the three shared styles.
+ * shortcut: stops at the first `>`, so a serif class after an arrow function in
+ * the same tag is missed; parse the JSX if a heading ever carries a handler.
+ */
+export function serifHeadings(source: string): string[] {
+  return [
+    ...stripComments(source).matchAll(/<h[1-6]\b[^>]*?(?<![\w-])font-display(?![\w-])[^>]*>/g),
+  ].map((match) => match[0].replaceAll(/\s+/g, ' '));
+}
+
 /** The weight of every Newsreader face in a stylesheet that is not 400. */
 export function extraSerifWeights(css: string): string[] {
   return [...stripComments(css).matchAll(/@font-face\s*\{([^}]*)\}/g)]
@@ -96,15 +121,37 @@ function bodyPx(css: string): number {
   return size[2] === 'rem' ? Number(size[1]) * 16 : Number(size[1]);
 }
 
-describe('the title ladder (L-382)', () => {
-  it('no element set in the display serif asks for a weight above regular', () => {
-    const files = [join(REPO_ROOT, 'apps/light/src'), join(REPO_ROOT, 'packages/ui/src')].flatMap(
-      (directory) => walk(directory, { extensions: ['.ts', '.tsx'] }),
+/** Every shipped source file the two scans read. */
+function sourceFiles(): string[] {
+  const files = [join(REPO_ROOT, 'apps/light/src'), join(REPO_ROOT, 'packages/ui/src')].flatMap(
+    (directory) => walk(directory, { extensions: ['.ts', '.tsx'] }),
+  );
+  expect(files.length).toBeGreaterThan(50);
+  return files;
+}
+
+describe('the title ladder (L-382, L-405)', () => {
+  it('no title style names the serif', () => {
+    expect(serifTitles({ PAGE_TITLE, SECTION_TITLE, HERO_TITLE })).toEqual([]);
+  });
+
+  it('no heading tag anywhere names the serif', () => {
+    const files = sourceFiles();
+    // Proof the scan read real headings: every screen has some.
+    expect(files.filter((file) => /<h[1-6]\b/.test(shippedText(file))).length).toBeGreaterThan(10);
+    const offences = files.flatMap((file) =>
+      serifHeadings(shippedText(file)).map((tag) => `${displayPath(file)}: ${tag}`),
     );
-    expect(files.length).toBeGreaterThan(50);
+    expect(offences).toEqual([]);
+  });
+
+  it('no element set in the display serif asks for a weight above regular', () => {
+    const files = sourceFiles();
     const lists = files.flatMap((file) => serifClassLists(shippedText(file)));
-    // Proof the scan looked at real serif text: the score, the band, the titles.
-    expect(lists.length).toBeGreaterThanOrEqual(5); // was 6; lowered in L-391: the keyword number left the serif
+    // Proof the scan looked at real serif text: the match score and the welcome
+    // card's example score. Was 6; 5 after L-391 (the keyword number left the
+    // serif); 2 after L-405 (the three titles left it).
+    expect(lists.length).toBeGreaterThanOrEqual(2);
     const offences = files.flatMap((file) =>
       serifWeightProblems(shippedText(file)).map((line) => `${displayPath(file)}: ${line}`),
     );
@@ -123,17 +170,32 @@ describe('the title ladder (L-382)', () => {
     expect(page).toBeGreaterThan(section);
     expect(section).toBeGreaterThan(body);
   });
-
-  it('the three titles are the serif, with lining numerals', () => {
-    // Newsreader draws old-style figures by default: a "2" sits low, a "7" hangs.
-    for (const title of [PAGE_TITLE, SECTION_TITLE, HERO_TITLE]) {
-      expect(String(title)).toMatch(SERIF);
-      expect(String(title)).toMatch(/(?<![\w-])lining-nums(?![\w-])/);
-    }
-  });
 });
 
 describe('the check can fail', () => {
+  it('a title style that names the serif is reported by name', () => {
+    expect(
+      serifTitles({
+        PAGE_TITLE: 'font-display text-2xl font-normal text-ink lining-nums',
+        SECTION_TITLE: 'text-xl font-semibold text-ink',
+      }),
+    ).toEqual(['PAGE_TITLE']);
+  });
+
+  it('a heading tag that names the serif is reported, on one line or several', () => {
+    expect(serifHeadings('<h1 className="font-display text-2xl font-normal">Tracker</h1>')).toEqual(
+      ['<h1 className="font-display text-2xl font-normal">'],
+    );
+    expect(serifHeadings('<h3\n  id="a"\n  className={`font-display ${tone}`}\n>')).toHaveLength(1);
+  });
+
+  it('negative: a sans heading, serif text that is no heading, and a comment are not reported', () => {
+    expect(serifHeadings('<h2 className="text-xl font-semibold text-ink">Skills</h2>')).toEqual([]);
+    expect(serifHeadings('<p className="font-display text-6xl font-normal">72</p>')).toEqual([]);
+    expect(serifHeadings('<header className="font-display">')).toEqual([]);
+    expect(serifHeadings('{/* <h1 className="font-display"> was the old title */}')).toEqual([]);
+  });
+
   it('a bold serif heading is reported', () => {
     expect(
       serifWeightProblems('<h2 className="font-display text-xl font-semibold text-ink">'),

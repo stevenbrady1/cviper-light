@@ -4987,11 +4987,12 @@ describe('a suggestion priority label stays on one line, inside its card (L-378)
 });
 
 /**
- * Page titles: one line, in the serif, and the header no taller (L-382).
+ * Page titles: one line, in Inter, and the header no taller (L-382, L-405).
  *
- * The page title grew from 18px on a 28px line to 24px on a 32px line, set in
- * Newsreader at regular weight, and the header bar's padding shrank by the same
- * 4px. The header must not grow: the Search form fits the 1000×700 minimum
+ * The page title grew from 18px on a 28px line to 24px on a 32px line (L-382),
+ * and the header bar's padding shrank by the same 4px. It was set in the serif
+ * then; since L-405 it is Inter at semibold, which is wider, so "one line" is
+ * measured again here at both windows. The header must not grow: the Search form fits the 1000×700 minimum
  * window by only 2px (the L-342 checks above), and the Smoke pictures need the
  * step bar and the ATS table fully on screen. On main before L-382 every
  * screen's header measured 85px at 1000×700 in this harness; that is the cap.
@@ -5053,7 +5054,7 @@ async function everyTitle(
   return problems;
 }
 
-describe('page titles stay on one line in the serif, and the header does not grow (L-382)', () => {
+describe('page titles stay on one line in Inter, and the header does not grow (L-382, L-405)', () => {
   it(`every screen's title is one line and the header is no taller than ${String(HEADER_CAP_PX)}px at 1000×700`, async () => {
     assert.deepEqual(await everyTitle(TITLE_WINDOWS.smallest, HEADER_CAP_PX), []);
   });
@@ -5062,7 +5063,7 @@ describe('page titles stay on one line in the serif, and the header does not gro
     assert.deepEqual(await everyTitle(TITLE_WINDOWS.phone, null), []);
   });
 
-  it("the title's computed font family is Newsreader at weight 400, and the face loaded", async () => {
+  it("the title's computed font family is Inter at weight 600, and the face loaded", async () => {
     const page = await open('?seen=1', TITLE_WINDOWS.smallest);
     await goTo(page, 'settings');
     const seen = await page.evaluate(() => {
@@ -5073,11 +5074,11 @@ describe('page titles stay on one line in the serif, and the header does not gro
         weight: style?.fontWeight ?? '',
         size: style?.fontSize ?? '',
         // A family name in the computed style proves nothing if the file never
-        // arrived: the browser would draw the Georgia fallback under that name.
-        loaded: document.fonts.check('400 24px Newsreader'),
+        // arrived: the browser would draw a system fallback under that name.
+        loaded: document.fonts.check('600 24px Inter'),
       };
     });
-    assert.deepEqual(seen, { family: 'Newsreader', weight: '400', size: '24px', loaded: true });
+    assert.deepEqual(seen, { family: 'Inter', weight: '600', size: '24px', loaded: true });
     await page.context().close();
   });
 

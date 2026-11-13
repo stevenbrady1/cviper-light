@@ -252,37 +252,33 @@ describe('PageHeader', () => {
 });
 
 /**
- * The title ladder (L-382). The serif ships at weight 400 only, so a serif
- * title must say `font-normal` itself: a bold parent would otherwise make the
- * browser fake a bold serif. Lining numerals, because Newsreader's default
- * figures wobble on the baseline.
+ * The title ladder: the sizes the owner chose in L-382, in the app's one
+ * typeface since L-405. A title carries its own weight (semibold) and names no
+ * font family, so it draws in the body's Inter and no parent can thin it.
  */
-const HEAVIER = /\bfont-(medium|semibold|bold|extrabold|black)\b/;
-
-function expectSerifRegular(className: string): void {
-  expect(className).toContain('font-display');
-  expect(className).toContain('font-normal');
-  expect(className).toContain('lining-nums');
-  expect(className).not.toMatch(HEAVIER);
+function expectSansSemibold(className: string): void {
+  expect(className).not.toMatch(/\bfont-(display|mono)\b/);
+  expect(className).toMatch(/(^|\s)font-semibold(\s|$)/);
+  expect(className).not.toMatch(/\bfont-(light|normal|medium|bold|extrabold|black)\b/);
 }
 
-describe('title ladder (L-382)', () => {
-  it('PageHeader title is serif, regular weight, 24px', () => {
+describe('title ladder (L-382, L-405)', () => {
+  it('PageHeader title is the sans face, semibold, 24px', () => {
     render(<PageHeader title="Tracker" subtitle="Every application." />);
     const title = screen.getByRole('heading', { level: 1 }).className;
-    expectSerifRegular(title);
+    expectSansSemibold(title);
     expect(title).toMatch(/(^|\s)text-2xl(\s|$)/);
   });
 
-  it('the welcome hero title is serif, regular weight, 30px then 36px', () => {
+  it('the welcome hero title is the sans face, semibold, 30px then 36px', () => {
     render(<PageHeader variant="hero" title="CViper Light" subtitle="Your job hunt." />);
     const title = screen.getByRole('heading', { level: 1 }).className;
-    expectSerifRegular(title);
+    expectSansSemibold(title);
     expect(title).toMatch(/(^|\s)text-3xl(\s|$)/);
     expect(title).toContain('md:text-4xl');
   });
 
-  it('SectionHeading is serif, regular weight, 20px, at either level', () => {
+  it('SectionHeading is the sans face, semibold, 20px, at either level', () => {
     render(
       <>
         <SectionHeading title="Your CVs" />
@@ -291,7 +287,7 @@ describe('title ladder (L-382)', () => {
     );
     for (const level of [2, 3]) {
       const title = screen.getByRole('heading', { level }).className;
-      expectSerifRegular(title);
+      expectSansSemibold(title);
       expect(title).toMatch(/(^|\s)text-xl(\s|$)/);
     }
   });
