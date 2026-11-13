@@ -376,7 +376,8 @@ describe('the results', () => {
     await screen.findByTestId('search-empty');
 
     await search(user);
-    await user.click(await screen.findByTestId('result-open-job-day-rate'));
+    await user.click(await screen.findByTestId('result-more-job-day-rate'));
+    await user.click(screen.getByTestId('result-open-job-day-rate'));
 
     // Byte for byte. No utm_source, no affiliate tag, nothing added.
     expect(browser.opened()).toEqual(['https://www.reed.co.uk/jobs/99900001']);
@@ -423,7 +424,9 @@ describe('cross-posted adverts are flagged, never merged', () => {
 
     // And both apply links still work. A wrong merge would have destroyed one
     // of these with no error, and a local app has no undo.
+    await user.click(screen.getByTestId('result-more-job-a'));
     await user.click(screen.getByTestId('result-open-job-a'));
+    await user.click(screen.getByTestId('result-more-job-b'));
     await user.click(screen.getByTestId('result-open-job-b'));
 
     expect(browser.opened()).toEqual([

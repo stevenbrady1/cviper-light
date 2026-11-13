@@ -1,7 +1,8 @@
 import { type Verdict } from '@cviper/core-types';
 import { SOURCE_LABEL, type SearchResultJob } from '@cviper/job-apis';
 
-import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { SECONDARY_BUTTON } from '../../app/buttons';
+import { MoreMenu } from '../../app/MoreMenu';
 import { cardClasses, StatusPill, type PillTone } from '../../ui';
 
 import { describeCluster, postedLabel } from './model';
@@ -92,8 +93,8 @@ interface ResultCardProps {
   readonly onOpen: () => void;
   /**
    * "Analyse this job" (L-190): save it, read the full advert if this is a
-   * preview, and go to Analysis with it. Left undefined, no button is drawn —
-   * a button that goes nowhere is worse than none.
+   * preview, and go to Analysis with it. Left undefined, the menu has no such
+   * item — a button that goes nowhere is worse than none.
    */
   readonly onAnalyse?: (() => void) | undefined;
   /**
@@ -225,7 +226,7 @@ export function ResultCard({
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
           data-testid={`result-save-${job.id}`}
@@ -242,32 +243,34 @@ export function ResultCard({
         </button>
 
         {/*
-          Secondary, like Save, and NOT disabled once the advert is tracked:
+          The card's one bordered button is Save; the rest wait behind "…"
+          (L-392). Analyse is NOT disabled once the advert is tracked:
           analysing a job already on the board is the common case, and it
           reuses that record rather than adding another. Disabled only while
           this card is busy, so one press cannot become two saves.
         */}
-        {onAnalyse === undefined ? null : (
-          <button
-            type="button"
-            data-testid={`result-analyse-${job.id}`}
-            disabled={busy}
-            onClick={onAnalyse}
-            className={SECONDARY_BUTTON}
-          >
-            Analyse this job
-          </button>
-        )}
-
-        <button
-          type="button"
-          data-testid={`result-open-${job.id}`}
-          disabled={job.url === null}
-          onClick={onOpen}
-          className={QUIET_BUTTON}
-        >
-          Open original →
-        </button>
+        <MoreMenu
+          label={`More actions: ${job.title}`}
+          testId={`result-more-${job.id}`}
+          items={[
+            ...(onAnalyse === undefined
+              ? []
+              : [
+                  {
+                    label: 'Analyse this job',
+                    onSelect: onAnalyse,
+                    disabled: busy,
+                    testId: `result-analyse-${job.id}`,
+                  },
+                ]),
+            {
+              label: 'Open original →',
+              onSelect: onOpen,
+              disabled: job.url === null,
+              testId: `result-open-${job.id}`,
+            },
+          ]}
+        />
       </div>
 
       <LiveStatus text={note} />
