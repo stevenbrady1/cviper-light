@@ -1322,3 +1322,128 @@ describe('the field reader follows imports and names what it cannot read — L-3
     expect(controlProblems(dateBox!)).toEqual([]);
   });
 });
+
+// ── Placeholder text (L-316) ────────────────────────────────────────────────
+
+/**
+ * The colour theme.css gives every `::placeholder`, as a token name, or why it
+ * cannot be read. Comments are stripped first, so a comment that mentions the
+ * rule cannot stand in for it. The rule must sit in `@layer base`: after
+ * Tailwind's reset, which paints placeholders at half the text colour, and
+ * under `@layer utilities`, so a box's own `placeholder:text-*` still wins.
+ */
+function placeholderRule(themeCss: string): { token: string } | { problem: string } {
+  const text = stripCssComments(themeCss);
+  const blocks: string[] = [];
+  let statement = '';
+  let found: { blocks: string[]; body: string } | null = null;
+  let bodyStart = -1;
+  for (let i = 0; i < text.length && found === null; i += 1) {
+    const c = text[i]!;
+    if (c === '{') {
+      blocks.push(statement.trim().replace(/\s+/g, ' '));
+      if (blocks.at(-1) === '::placeholder') bodyStart = i + 1;
+      statement = '';
+    } else if (c === '}') {
+      if (blocks.pop() === '::placeholder') {
+        found = { blocks: [...blocks], body: text.slice(bodyStart, i) };
+      }
+      statement = '';
+    } else if (c === ';') statement = '';
+    else statement += c;
+  }
+  if (found === null) {
+    return {
+      problem:
+        "theme.css has no ::placeholder rule, so placeholders keep Tailwind's half-strength text colour",
+    };
+  }
+  if (found.blocks.join(' > ') !== '@layer base') {
+    const where = found.blocks.length === 0 ? 'outside every block' : found.blocks.join(' > ');
+    return {
+      problem: `the ::placeholder rule is ${where}, not in @layer base, so it would not sit between Tailwind's reset and a box's own placeholder: class`,
+    };
+  }
+  const value = /(?:^|;)\s*color\s*:\s*([^;]+)/.exec(found.body)?.[1]?.trim();
+  if (value === undefined) return { problem: 'the ::placeholder rule sets no color' };
+  const token = /^var\(--color-([a-z-]+)\)$/.exec(value)?.[1];
+  if (token === undefined) {
+    return {
+      problem: `the ::placeholder color \`${value}\` is not var(--color-name), so it cannot be measured`,
+    };
+  }
+  return { token };
+}
+
+/** Every surface on which the theme's placeholder colour falls under 4.5:1, or why it cannot be judged. */
+function placeholderProblems(themeCss: string, palette: Map<string, Rgb> = tokens): string[] {
+  const rule = placeholderRule(themeCss);
+  if ('problem' in rule) return [rule.problem];
+  const ink = palette.get(rule.token);
+  if (ink === undefined)
+    return [`the ::placeholder color --color-${rule.token} is not a theme token`];
+  return CONTROL_SURFACES.flatMap((surfaceName) => {
+    const ratio = contrast(ink, get(surfaceName, palette));
+    return ratio < AA_TEXT
+      ? [`placeholder ${rule.token} on ${surfaceName} = ${ratio.toFixed(2)}:1`]
+      : [];
+  });
+}
+
+describe('placeholder text (L-316)', () => {
+  const layered = (value: string): string => `@layer base { ::placeholder { color: ${value}; } }`;
+
+  it('theme.css sets a ::placeholder colour from a colour token', () => {
+    expect(placeholderRule(css)).toEqual({ token: expect.any(String) });
+  });
+
+  it('that colour is at least 4.5:1 on card, canvas and sunken', () => {
+    expect(placeholderProblems(css)).toEqual([]);
+  });
+
+  describe('the checker can actually fail', () => {
+    it('no rule at all is reported', () => {
+      expect(placeholderProblems('@layer base { body { color: var(--color-ink); } }')).toEqual([
+        expect.stringContaining('no ::placeholder rule'),
+      ]);
+    });
+
+    it('a rule that is only in a comment is reported as no rule', () => {
+      const commented = `/* ${layered('var(--color-ink-faint)')} */`;
+      expect(placeholderProblems(commented)).toEqual([
+        expect.stringContaining('no ::placeholder rule'),
+      ]);
+    });
+
+    it('a placeholder in field-line (#7a869b, about 3.7:1) is reported', () => {
+      const problems = placeholderProblems(layered('var(--color-field-line)'));
+      expect(problems).toHaveLength(CONTROL_SURFACES.length);
+      expect(problems.every((p) => p.startsWith('placeholder field-line on'))).toBe(true);
+    });
+
+    it('a colour the reader cannot turn into a token (color-mix, a raw hex) is reported by name', () => {
+      const mix = 'color-mix(in oklab, currentcolor 50%, transparent)';
+      expect(placeholderProblems(layered(mix))).toEqual([expect.stringContaining(mix)]);
+      expect(placeholderProblems(layered('#5f6b80'))).toEqual([expect.stringContaining('#5f6b80')]);
+    });
+
+    it('a rule outside @layer base is reported: unlayered it would beat every placeholder: class', () => {
+      expect(placeholderProblems('::placeholder { color: var(--color-ink-faint); }')).toEqual([
+        expect.stringContaining('outside every block'),
+      ]);
+    });
+
+    it('a token the theme does not declare is reported by name', () => {
+      expect(placeholderProblems(layered('var(--color-ink-ghost)'))).toEqual([
+        expect.stringContaining('--color-ink-ghost'),
+      ]);
+    });
+  });
+
+  it('boundary: ink-faint on sunken (about 4.7:1) passes', () => {
+    const ratio = contrast(get('ink-faint'), get('sunken'));
+    expect(ratio).toBeGreaterThanOrEqual(AA_TEXT);
+    expect(ratio).toBeLessThan(4.8);
+    expect(placeholderProblems(layered('var(--color-ink-faint)'))).toEqual([]);
+  });
+});
