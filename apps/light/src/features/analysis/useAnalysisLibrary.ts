@@ -88,10 +88,17 @@ export function useAnalysisLibrary({
       }
       setCvs(loaded.value);
       // Only when nothing is selected: coming back to this view (L-187) keeps
-      // the CV the user was working on.
-      session.update((current) => ({
-        selectedCvId: current.selectedCvId ?? loaded.value[0]?.id ?? null,
-      }));
+      // the CV the user was working on — unless it has since been deleted on
+      // Profile (L-408), when the newest that is left takes its place.
+      session.update((current) => {
+        if (loaded.value.some((cv) => cv.id === current.selectedCvId)) return {};
+        const selectedCvId = loaded.value[0]?.id ?? null;
+        // A result is one CV's: it goes with a deleted CV, as it does when the
+        // user picks another (the CV picker's own handler).
+        return current.selectedCvId === null
+          ? { selectedCvId }
+          : { selectedCvId, result: null, runError: null, warnings: [] };
+      });
     });
 
     void analysisPort.loadJobs().then((loaded) => {

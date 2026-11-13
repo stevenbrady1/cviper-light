@@ -27,10 +27,14 @@ import { createDbGapsPort, type GapsPort } from './gapsPort';
 import { ImportAiJobSearch } from './ImportAiJobSearchPanel';
 import { detectMobileOs } from '../../platform/os';
 import { mergeImportedProfile, type ImportedProfile } from './importAiJobSearch';
-import { createDbProfileCvPort, createDbProfilePort, type ProfilePort } from './port';
+import {
+  createDbProfileCvPort,
+  createDbProfilePort,
+  type ProfileCvPort,
+  type ProfilePort,
+} from './port';
 import { ProfileForm, type Loaded } from './ProfileForm';
 import { YourCv } from './ProfileYourCv';
-import { type CvStorePort } from '../cv/ingestCv';
 
 /**
  * The candidate profile: who you are, what you want, what you will not take.
@@ -94,13 +98,15 @@ export interface ProfileProps {
    * SQLite-backed one — unless `port` was injected, when a test that faked the
    * data layer gets an empty list rather than real reads behind it.
    */
-  readonly cvPort?: CvStorePort | undefined;
+  readonly cvPort?: ProfileCvPort | undefined;
 }
 
 /** What a test that faked `port` but not `cvPort` gets: no CVs, and nowhere real to write. */
-const NO_CV_STORE: CvStorePort = {
+const NO_CV_STORE: ProfileCvPort = {
   loadCvs: async () => ok([]),
   saveCv: async () => ok(undefined),
+  loadHistory: async () => ok([]),
+  deleteCv: async () => ok(undefined),
 };
 
 export function Profile({ port, now, gapsPort, filePort, cvPort }: ProfileProps) {
