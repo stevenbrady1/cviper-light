@@ -160,9 +160,9 @@ export function SearchResults({
             {searchBlocked
               ? noFreeFeedHere
                 ? 'A free Reed key, set up in Settings, shows UK adverts here.'
-                : 'Tick a free feed above to see the newest adverts here — it needs no key.'
+                : 'Tick a free feed in “Where to look” to see the newest adverts here — it needs no key.'
               : 'Type a job title and press Search to see the newest adverts from the free feed.'}{' '}
-            Or open the same search on a whole job board with the buttons above.
+            Or tick job boards in “Where to look” and press “Also open”.
           </p>
         </div>
       ) : (
@@ -212,8 +212,7 @@ export function SearchResults({
           */}
           {results.jobs.length === 0 && !explained && fewText === null ? (
             <p data-testid="search-no-results" className="text-ink-muted">
-              No adverts matched that. Try broader keywords, a wider radius, or send the same words
-              to your browser with the buttons above.
+              No adverts matched that. Try broader keywords or a wider radius.
             </p>
           ) : null}
 

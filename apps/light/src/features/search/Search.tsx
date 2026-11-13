@@ -32,6 +32,7 @@ import {
   readBoardChoice,
   tickedBoards,
   toggleBoard,
+  whereToLookSummary,
 } from './boardChoice';
 import {
   chosenFeeds,
@@ -622,6 +623,7 @@ export function Search({
               ticked={ticked}
               onToggleBoard={onToggleBoard}
               onOpenJobBoards={onOpenJobBoards}
+              summary={whereToLookSummary(usableChosen, keylessWanted, boardsToOpen.length)}
             />
 
             {/* The blue button, and why it is grey right beside it (L-335). */}

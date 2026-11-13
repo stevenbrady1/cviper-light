@@ -274,6 +274,27 @@ describe('colour contrast on the rendered app (WCAG 2.1 AA)', () => {
       });
     }
   }
+
+  /*
+    L-398: "Where to look" is a closed fold now, so the plain Search visit
+    above no longer measures its text. This opens it and measures its top and
+    its foot in view, with and without a key saved (the keyed boards row).
+  */
+  for (const [width, viewport] of Object.entries(VIEWPORTS)) {
+    for (const query of ['?seen=1', '?seen=1&results=1']) {
+      it(`Search with Where to look open, ${width}, ${query}`, async () => {
+        const page = await open(query, viewport);
+        await goTo(page, 'search');
+        await page.click('[data-testid="search-where-fold"] > summary');
+        await page.locator('[data-testid="keyless-bar"]:visible').waitFor();
+        await page.locator('[data-testid="keyless-feeds"]').scrollIntoViewIfNeeded();
+        judge(`search, where open, top (${width}, ${query})`, await contrast(page));
+        await page.locator('[data-testid="keyless-bar"]').scrollIntoViewIfNeeded();
+        judge(`search, where open, foot (${width}, ${query})`, await contrast(page));
+        await page.context().close();
+      });
+    }
+  }
 });
 
 /**
@@ -1116,8 +1137,17 @@ const SUBMIT_ROW = '[data-testid="search-submit-row"]';
 const SMALLEST_WINDOW = { width: 1000, height: 700 };
 const NARROWEST_STICKY = { width: 768, height: 700 };
 
-/** Search with the owner's typing: a grey button, its reason, and the Reed fix. */
-async function openTypedSearch(
+/** "Where to look", a fold since L-398. */
+const WHERE_FOLD = '[data-testid="search-where-fold"]';
+
+/** Open "Where to look" as a person would: a click on its summary line. */
+async function openWhereToLook(page: Page): Promise<void> {
+  await page.click(`${WHERE_FOLD} > summary`);
+  await page.waitForSelector(`${WHERE_FOLD}[open]`);
+}
+
+/** Search with the owner's typing: a grey button, its reason, and the Reed fix. Still folded. */
+async function openTypedSearchFolded(
   viewport: { width: number; height: number },
   query = '?seen=1',
 ): Promise<Page> {
@@ -1126,6 +1156,19 @@ async function openTypedSearch(
   await page.fill('[data-testid="search-keywords"]', 'Project Coordinator');
   await page.fill('[data-testid="search-location"]', 'London');
   if (query === '?seen=1') await page.waitForSelector('[data-testid="search-get-reed-key"]');
+  return page;
+}
+
+/**
+ * The same, with "Where to look" opened (L-398). The tests below are about
+ * the TALLEST form; with the box folded they would pass on a short one.
+ */
+async function openTypedSearch(
+  viewport: { width: number; height: number },
+  query = '?seen=1',
+): Promise<Page> {
+  const page = await openTypedSearchFolded(viewport, query);
+  await openWhereToLook(page);
   return page;
 }
 
@@ -1740,6 +1783,186 @@ describe('"Found one? Bring it in" opens the paste pane, cursor in the link box 
 });
 
 /**
+ * "Where to look" folds (L-398).
+ *
+ * Closed, the box is one summary line, so at the smallest window the fields,
+ * Search with its reason and fix, and the top of the results area fit without
+ * a scroll, and the pinned row (L-342) has nothing to do. jsdom draws a closed
+ * fold's content and lets it be focused, clicked and tabbed into, so whether
+ * the fold really keeps its content out of reach is only knowable here.
+ */
+
+/** What of the results area's top is not on screen. Empty means all is well. */
+async function resultsTopProblems(page: Page): Promise<string[]> {
+  return page.evaluate((areaSelector) => {
+    const area = document.querySelector(areaSelector);
+    const header = document.querySelector('[data-testid="search-results-header"]');
+    const empty = document.querySelector('[data-testid="search-empty"]');
+    if (area === null || header === null || empty === null) return ['nothing to measure'];
+    const seen = area.getBoundingClientRect();
+    const top = header.getBoundingClientRect();
+    const box = empty.getBoundingClientRect();
+    // The results header whole, and the top edge of the box the results go in.
+    return top.top >= seen.top && top.bottom <= seen.bottom && box.top + 8 <= seen.bottom
+      ? []
+      : [
+          `the results area starts at ${String(top.top)}, its box at ${String(box.top)}, ` +
+            `the scroll area ends at ${String(seen.bottom)}`,
+        ];
+  }, SEARCH_AREA);
+}
+
+/** The summary line's height. */
+async function summaryHeight(page: Page): Promise<number> {
+  return page.evaluate(
+    (fold) => document.querySelector(`${fold} > summary`)?.getBoundingClientRect().height ?? 0,
+    WHERE_FOLD,
+  );
+}
+
+/** Every element Tab lands on, from the first field until focus leaves the form. */
+async function tabStops(page: Page): Promise<{ inside: string[]; summary: boolean }> {
+  await page.focus('[data-testid="search-keywords"]');
+  const inside: string[] = [];
+  let summary = false;
+  for (let presses = 0; presses < 60; presses += 1) {
+    await page.keyboard.press('Tab');
+    const stop = await page.evaluate((fold) => {
+      const active = document.activeElement;
+      const where = document.querySelector(fold);
+      return {
+        inForm: active?.closest('[data-testid="search-form"]') !== null,
+        isSummary: active === where?.querySelector(':scope > summary'),
+        insideFold: where !== null && active !== null && where.contains(active),
+        name: active?.getAttribute('data-testid') ?? active?.tagName ?? '?',
+      };
+    }, WHERE_FOLD);
+    if (!stop.inForm) break;
+    if (stop.isSummary) summary = true;
+    else if (stop.insideFold) inside.push(stop.name);
+  }
+  return { inside, summary };
+}
+
+describe('"Where to look" folds, and the form fits the smallest window (L-398)', () => {
+  it('at 1000×700, folded: Search, its reason and the fix, and the top of the results area are on screen unscrolled', async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    const seen = await page.evaluate(
+      ({ areaSelector, fold }) => ({
+        scrollTop: document.querySelector(areaSelector)?.scrollTop ?? -1,
+        open: (document.querySelector(fold) as HTMLDetailsElement | null)?.open ?? null,
+        resultsTop: document.querySelector('[data-testid="search-empty"]')?.getBoundingClientRect()
+          .top,
+      }),
+      { areaSelector: SEARCH_AREA, fold: WHERE_FOLD },
+    );
+    console.log(`folded at 1000×700: ${JSON.stringify(seen)}`);
+    assert.equal(seen.scrollTop, 0, 'the area was scrolled before measuring');
+    assert.equal(seen.open, false, 'the fold was not closed on arrival');
+    assert.deepEqual(await submitRowProblems(page), []);
+    assert.deepEqual(await resultsTopProblems(page), []);
+    await page.context().close();
+  });
+
+  it('folded at 1000×700, the button sits in its natural place (the pin is not needed)', async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    const { top, inFlow } = await rowAgainstFlow(page);
+    console.log(`row, folded at 1000×700: at ${String(top)}, in flow ${String(inFlow)}`);
+    assert.equal(top, inFlow);
+    await page.context().close();
+  });
+
+  it('the summary line is at least 44px tall, in whole pixels, at 375px and at 1000×700', async () => {
+    for (const viewport of [PHONE, SMALLEST_WINDOW]) {
+      const page = await openTypedSearchFolded(viewport);
+      const height = await summaryHeight(page);
+      console.log(`summary line at ${String(viewport.width)}px: ${String(height)}px`);
+      assert.ok(height >= 44, `${String(viewport.width)}px: ${String(height)}px tall`);
+      assert.ok(Number.isInteger(height), `${String(viewport.width)}px: ${String(height)}px`);
+      await page.context().close();
+    }
+  });
+
+  it('at 375px, with everything ticked, the summary wraps and adds no sideways scroll', async () => {
+    const page = await openTypedSearchFolded(PHONE, '?seen=1&results=1');
+    await openWhereToLook(page);
+    await page.click('[data-testid="keyless-more"]');
+    const unticked = page.locator(`${WHERE_FOLD} input:not(:checked)`);
+    while ((await unticked.count()) > 0) await unticked.first().check();
+    await page.click(`${WHERE_FOLD} > summary`);
+    await page.waitForSelector(`${WHERE_FOLD}:not([open])`);
+    const text = await page.locator('[data-testid="search-where-summary"]').textContent();
+    const height = await summaryHeight(page);
+    console.log(`summary line, all ticked at 375px: ${String(height)}px — ${String(text)}`);
+    assert.match(text ?? '', /^Adzuna · Reed · Arbeitnow · \d+ job boards ticked$/);
+    assert.ok(height >= 44, `${String(height)}px tall`);
+    assert.ok(height <= 68, `${String(height)}px tall: more than two lines`);
+    assert.deepEqual(await sidewaysOverflow(page), []);
+    await page.context().close();
+  });
+
+  it('a click on the summary opens it, and Space and Enter work; the first tick inside is then visible', async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    const firstTick = page.locator(`${WHERE_FOLD} input`).first();
+    const isOpen = (): Promise<boolean> =>
+      page.evaluate(
+        (fold) => (document.querySelector(fold) as HTMLDetailsElement | null)?.open ?? false,
+        WHERE_FOLD,
+      );
+    assert.equal(await firstTick.isVisible(), false, 'a tick shows while the fold is closed');
+
+    await page.click(`${WHERE_FOLD} > summary`);
+    await page.locator(`${WHERE_FOLD} input:visible`).first().waitFor();
+    assert.equal(await isOpen(), true);
+    await page.click(`${WHERE_FOLD} > summary`);
+    await firstTick.waitFor({ state: 'hidden' });
+
+    await page.focus(`${WHERE_FOLD} > summary`);
+    await page.keyboard.press(' ');
+    await page.locator(`${WHERE_FOLD} input:visible`).first().waitFor();
+    assert.equal(await isOpen(), true, 'Space did not open it');
+    await page.keyboard.press(' ');
+    await firstTick.waitFor({ state: 'hidden' });
+
+    await page.keyboard.press('Enter');
+    await page.locator(`${WHERE_FOLD} input:visible`).first().waitFor();
+    assert.equal(await isOpen(), true, 'Enter did not open it');
+    await page.context().close();
+  });
+
+  it('closed, nothing inside the fold can be reached by Tab; open, its ticks can', async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    const closed = await tabStops(page);
+    console.log(`Tab stops, closed: ${JSON.stringify(closed)}`);
+    assert.deepEqual(closed, { inside: [], summary: true });
+
+    // The same walk with the fold open does land inside: the walk can see ticks.
+    await openWhereToLook(page);
+    const opened = await tabStops(page);
+    assert.ok(opened.inside.includes('keyless-source-arbeitnow'), JSON.stringify(opened));
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a tall block pushed into the form is flagged', async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    await page.evaluate((row) => {
+      const block = document.createElement('div');
+      block.style.height = '400px';
+      document.querySelector(row)?.before(block);
+    }, SUBMIT_ROW);
+    const report = await resultsTopProblems(page);
+    assert.ok(
+      report.some((line) => line.startsWith('the results area starts at')),
+      `the pushed-down results area was not flagged: ${JSON.stringify(report)}`,
+    );
+    const { top, inFlow } = await rowAgainstFlow(page);
+    assert.notEqual(top, inFlow, 'the pin was not needed even with a tall block in the form');
+    await page.context().close();
+  });
+});
+
+/**
  * Every screen opens at the top of its scroll areas (L-353).
  *
  * Tailor scrolls to its current step when it opens, and `scrollWithin`
@@ -1898,6 +2121,7 @@ describe('every screen opens at the top of its scroll areas (L-353)', () => {
       const page = await open('?seen=1', viewport);
       await goTo(page, 'search');
       await recordScrollRequests(page, '[data-testid="boards-settings"]');
+      await openWhereToLook(page);
       await page.click('[data-testid="keyless-manage"]');
       await page.locator('[data-testid="nav-settings"][aria-current="page"]:visible').waitFor();
       await page.locator('[data-testid="boards-settings"]:focus').waitFor();
@@ -2123,6 +2347,7 @@ describe('the mono font cannot move Settings after a jump (L-364)', () => {
     it(`Settings opened at Job boards stops the padding below the top, ${width}`, async () => {
       const app = await openWithMonoStandIn(viewport);
       await goTo(app.page, 'search');
+      await openWhereToLook(app.page);
       await app.page.click('[data-testid="keyless-manage"]');
       await app.page.locator('[data-testid="nav-settings"][aria-current="page"]:visible').waitFor();
       await app.page.locator('[data-testid="boards-settings"]:focus').waitFor();
