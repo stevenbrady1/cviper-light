@@ -216,6 +216,39 @@ describe('when there is nothing to show', () => {
   });
 });
 
+describe('less small print (L-404)', () => {
+  it('negative: the CV picker has no line listing where CVs come from', async () => {
+    await renderWith([cv('cv-1', 'Risk CV.docx', RISK_TEXT)]);
+    await vi.waitFor(() => expect(previewText()).toBeTruthy());
+
+    const screenText = screen.getByTestId('view-tailor').textContent;
+    expect(screenText).not.toContain('The CVs you have uploaded here');
+    expect(screenText).not.toContain('on Analysis or on Profile');
+    expect(screenText).not.toContain('The rewrite uses only what is written');
+  });
+
+  it('boundary: the promise is still on screen — in the header and in the open preview', async () => {
+    const user = await renderWith([cv('cv-1', 'Risk CV.docx', RISK_TEXT)]);
+    await vi.waitFor(() => expect(previewText()).toBeTruthy());
+
+    // The header is drawn by Tailor itself (`ViewHeader`, text from app/views.ts).
+    expect(screen.getByTestId('view-tailor').textContent).toContain('from your own facts only');
+    await user.click(toggle());
+    expect(screen.getByTestId('tailor-cv-preview').hidden).toBe(false);
+    expect(screen.getByTestId('tailor-cv-source').textContent).toBe(
+      'The AI works from exactly this text.',
+    );
+  });
+
+  it('a CV with no text says only that, and the button under it offers to type it in', async () => {
+    await renderWith([cv('cv-1', 'Scan.pdf', null)]);
+
+    const empty = await screen.findByTestId('tailor-cv-preview-empty');
+    expect(empty.textContent).toBe('No text could be read from this CV.');
+    expect(screen.getByTestId('tailor-cv-correct').textContent).toBe('Type or paste your CV text');
+  });
+});
+
 describe('the word count’s wording (L-343)', () => {
   // Exact matches on purpose: "1 words" contains "1 word", so `toContain` could not fail.
   it.each([

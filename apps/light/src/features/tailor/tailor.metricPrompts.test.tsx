@@ -443,13 +443,20 @@ describe('collapsible, accessible boxes (D1-D7)', () => {
       'Add a number or result for your gaps (optional, 0 of 2 added)',
     );
     expect(
-      within(list()).getByText(
-        'Optional: if you have a real number or result for any of these, add it. Skip the rest.',
-      ),
+      within(list()).getByText('Add a real number or result where you have one. Skip the rest.'),
     ).toBeTruthy();
     expect(list().querySelector('textarea')).toBeNull();
     expect(box('Power BI').textContent).toContain('Power BI');
     expect(box('Power BI').textContent).not.toContain('We found a keyword/skill gap');
+  });
+
+  it('L-404: the intro line is short; the title already says "optional"', async () => {
+    await renderWith(HANDOFF);
+    const intro = details().querySelector('summary + p');
+    expect(intro?.textContent).toBe(
+      'Add a real number or result where you have one. Skip the rest.',
+    );
+    expect(details().querySelector('summary')?.textContent).toContain('optional');
   });
 
   it('D5: expanding shows the exact sentence; approving updates the count; skipping collapses to a line', async () => {
