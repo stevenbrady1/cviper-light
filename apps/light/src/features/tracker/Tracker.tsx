@@ -120,6 +120,10 @@ export interface TrackerProps {
   readonly tailoredJob?: ((jobId: string) => boolean) | undefined;
   /** "Continue" under a started job's card: the shell takes the user to that step. */
   readonly onContinue?: ((job: Job, step: StepId) => void) | undefined;
+  /** Open with the paste pane up and the cursor in its link box (L-324). Read at first draw. */
+  readonly openPaste?: boolean | undefined;
+  /** Told once the paste pane has been opened that way, so the shell can forget it. */
+  readonly onOpened?: (() => void) | undefined;
 }
 
 export function Tracker({
@@ -136,6 +140,8 @@ export function Tracker({
   boardProgressPort,
   tailoredJob,
   onContinue,
+  openPaste,
+  onOpened,
 }: TrackerProps) {
   // Created once. A new port object every render would restart the load effect
   // on every keystroke.
@@ -152,7 +158,16 @@ export function Tracker({
 
   const progressFor = useBoardProgress({ boardProgressPort, port, entries, tailoredJob });
   const [searchQuery, setSearchQuery] = useState('');
-  const [pane, setPane] = useState<Pane>({ kind: 'closed' });
+  const [pane, setPane] = useState<Pane>({ kind: openPaste === true ? 'paste' : 'closed' });
+  // Into the link box on arrival from Search (L-324). This runs after the
+  // pane's own effect (it is a child) and before the shell's page-title focus.
+  const arrivedToPaste = useRef(openPaste === true);
+  useEffect(() => {
+    if (!arrivedToPaste.current) return;
+    arrivedToPaste.current = false;
+    document.getElementById('paste-job-url')?.focus({ preventScroll: true });
+    onOpened?.();
+  }, [onOpened]);
   /**
    * What this machine can offer the detail pane's AI panels. `null` until the
    * first card is opened: the probe (Ollama's port, the credential store) is

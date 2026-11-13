@@ -142,6 +142,8 @@ export interface SearchProps {
   readonly onOpenJobBoards?: (() => void) | undefined;
   /** Take the user to Settings → the Reed key (L-338). Owned by the shell, likewise. */
   readonly onOpenReedKey?: (() => void) | undefined;
+  /** Take the user to Tracker with the paste pane open (L-324). Owned by the shell, likewise. */
+  readonly onBringJobIn?: (() => void) | undefined;
   /**
    * Take a saved job to the Analysis screen (L-190). The shell owns which view
    * is showing, so the job goes back to it. Left undefined, the cards draw no
@@ -160,6 +162,7 @@ export function Search({
   onOpenSettings,
   onOpenJobBoards,
   onOpenReedKey,
+  onBringJobIn,
   onAnalyse,
 }: SearchProps = {}) {
   // Built once. A new port every render would restart the load effects on every
@@ -639,6 +642,7 @@ export function Search({
               onOpenTicked={onOpenTicked}
               boardsToOpen={boardsToOpen}
               boardsProblem={boardsProblem}
+              onBringJobIn={onBringJobIn}
             />
           </form>
 

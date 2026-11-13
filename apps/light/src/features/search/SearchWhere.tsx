@@ -1,6 +1,6 @@
 import { type JobProviderId, type KeylessSourceId } from '@cviper/job-apis';
 
-import { SECONDARY_BUTTON } from '../../app/buttons';
+import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { type Board } from '../boards/model';
 import { type KeyState } from '../../status/environment';
 import { ErrorBox } from '../../ui';
@@ -111,6 +111,8 @@ export interface OpenBoardsRowProps {
   readonly boardsToOpen: readonly Board[];
   /** Boards that would not open on the last press. */
   readonly boardsProblem: readonly string[];
+  /** Tracker with the paste pane open (L-324). Left undefined, nothing is drawn. */
+  readonly onBringJobIn?: (() => void) | undefined;
 }
 
 /** "Also open in N boards", its reason, and the boards that did not open. */
@@ -120,6 +122,7 @@ export function OpenBoardsRow({
   onOpenTicked,
   boardsToOpen,
   boardsProblem,
+  onBringJobIn,
 }: OpenBoardsRowProps) {
   return (
     <>
@@ -145,6 +148,23 @@ export function OpenBoardsRow({
         <ErrorBox variant="box" gapAbove="mt-2" testId="search-boards-problem">
           {`${boardsProblem.join(', ')} did not open in your browser. Check that a default browser is set, then try again.`}
         </ErrorBox>
+      )}
+
+      {/*
+        The way back for a job found on a board in the browser (L-324). Always
+        enabled: boards also open from saved searches and the few-results panel.
+      */}
+      {onBringJobIn === undefined ? null : (
+        <div className="mt-2">
+          <button
+            type="button"
+            data-testid="search-bring-in"
+            onClick={onBringJobIn}
+            className={QUIET_BUTTON}
+          >
+            Found one? Bring it in
+          </button>
+        </div>
       )}
     </>
   );
