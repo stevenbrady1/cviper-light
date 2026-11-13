@@ -112,8 +112,11 @@ return lacking(bar, ['tick', 'dot', 'ring'], 'the step bar') || onScreen(bar, 't
 `;
 
 /**
- * `8-ats-table`: the ATS Score table, on the ATS Score step, every row there
- * and every mark it can draw — tick, warning, cross, up and down.
+ * `8-ats-table`: the ATS Score section, on the ATS Score step, every row there
+ * and every mark it can draw — tick, warning, cross, up and down. Since L-396
+ * the keyword and bullet rows are bars above the table, so those two rows (and
+ * the up and down marks) are looked for anywhere in the section; the three
+ * checks must still be in its table. All five rows wholly on screen.
  *
  * arguments[0]: the job's title.
  */
@@ -133,8 +136,13 @@ const table = section.querySelector('table');
 if (table === null) return 'the ATS Score section has no table';
 const rows = ['tailor-ats-keyword', 'tailor-ats-bullets', 'tailor-ats-check-section_headers',
   'tailor-ats-check-contact_info', 'tailor-ats-check-cv_length'];
-const absent = rows.filter(function (id) { return table.querySelector('[data-testid="' + id + '"]') === null; });
-if (absent.length > 0) return 'the ATS table has no ' + absent.join(', ') + ' row';
-return lacking(table, ['tick', 'warning', 'cross', 'up', 'down'], 'the ATS table') ||
+function row(id) { return section.querySelector('[data-testid="' + id + '"]'); }
+const absent = rows.filter(function (id) { return row(id) === null; });
+if (absent.length > 0) return 'the ATS Score section has no ' + absent.join(', ') + ' row';
+const outside = rows.slice(2).filter(function (id) { return !table.contains(row(id)); });
+if (outside.length > 0) return 'the ATS table has no ' + outside.join(', ') + ' row';
+return lacking(section, ['tick', 'warning', 'cross', 'up', 'down'], 'the ATS Score section') ||
+  onScreen(row('tailor-ats-keyword'), 'the keyword row') ||
+  onScreen(row('tailor-ats-bullets'), 'the bullet row') ||
   onScreen(table, 'the ATS table');
 `;

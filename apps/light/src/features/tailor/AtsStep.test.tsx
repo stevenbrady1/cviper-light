@@ -7,6 +7,8 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { ATS_HINT } from '../../app/hints';
+
 import { AtsStep } from './AtsStep';
 import { type AtsComparison } from './atsComparison';
 
@@ -297,7 +299,8 @@ describe('the "i" is on the labels, not the results (L-384)', () => {
     const step = screen.getByTestId('tailor-ats');
     const labelled = [
       step.querySelector('#tailor-ats-heading')!,
-      ...step.querySelectorAll('thead th:not(:first-child):not(:last-child)'),
+      ...step.querySelectorAll('thead th:not(:first-child)'),
+      ...step.querySelectorAll('[data-testid="tailor-ats-bars"] > li > :first-child'),
       ...step.querySelectorAll('tbody th'),
       screen.getByTestId('tailor-ats-missing'),
       screen.getByTestId('tailor-ats-fabrication'),
@@ -320,11 +323,14 @@ describe('the "i" is on the labels, not the results (L-384)', () => {
 
   it('negative: no result cell — status, change, band — holds a button', () => {
     renderStep({ ...BASE, checks: BASE.checks.map((check) => ({ ...check, before: 'fail' })) });
+    // The table's six status cells; each bar line (word, bar, number, band
+    // word) and each change, beside the bars.
     const cells = [
       ...screen.getByTestId('tailor-ats').querySelectorAll('tbody td'),
+      ...screen.getByTestId('tailor-ats-bars').querySelectorAll('li > :not(:first-child)'),
       screen.getByTestId('tailor-ats-band'),
     ];
-    expect(cells.length).toBeGreaterThanOrEqual(14);
+    expect(cells.length).toBeGreaterThanOrEqual(13);
     for (const cell of cells) expect(cell.querySelector('button')).toBeNull();
   });
 
@@ -334,10 +340,10 @@ describe('the "i" is on the labels, not the results (L-384)', () => {
       keyword: { before: null, after: null, delta: null, beforeReason: 'x', afterReason: 'y' },
       bullets: { ...BASE.bullets, after: 41, delta: 0 },
     });
-    const body = screen.getByTestId('tailor-ats').querySelector('tbody')!;
-    expect(within(body as HTMLElement).getAllByText('—').length).toBeGreaterThanOrEqual(3);
-    expect(within(body as HTMLElement).getByText('no change')).toBeTruthy();
-    expect(body.querySelectorAll('td button')).toHaveLength(0);
+    const bars = screen.getByTestId('tailor-ats-bars');
+    expect(within(bars).getAllByText('—').length).toBeGreaterThanOrEqual(3);
+    expect(within(bars).getByText('no change')).toBeTruthy();
+    expect(bars.querySelectorAll('li > :not(:first-child) button')).toHaveLength(0);
   });
 
   it("a click on a status cell's words opens its tip, and a second click closes it", () => {
@@ -362,5 +368,179 @@ describe('the "i" is on the labels, not the results (L-384)', () => {
       fireEvent.mouseLeave(element);
       expect(tipOf(element).hidden).toBe(true);
     }
+  });
+});
+
+/**
+ * L-396: the two number rows — Keyword coverage and Bullet strength — are drawn
+ * as a Before bar and an After bar above the table, each as wide as its number.
+ * A bar is decoration: hidden from a screen reader, which hears the words and
+ * numbers beside it, in the order a sighted person reads them.
+ */
+describe('the bars (L-396)', () => {
+  const LINES = ['keyword-before', 'keyword-after', 'bullets-before', 'bullets-after'] as const;
+  const line = (id: string) => screen.getByTestId(`tailor-ats-${id}`);
+  const track = (id: string) => screen.queryByTestId(`tailor-ats-${id}-track`);
+  const bar = (id: string) => screen.queryByTestId(`tailor-ats-${id}-bar`);
+
+  /** What a screen reader reads, in order: no hidden parts, no tips, no "i" buttons. */
+  function spoken(node: Node): string {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
+    if (!(node instanceof Element)) return '';
+    if (node.getAttribute('aria-hidden') === 'true') return '';
+    if (node.getAttribute('role') === 'tooltip' || node.tagName === 'BUTTON') return '';
+    return [...node.childNodes].map(spoken).join(' ');
+  }
+  const said = (element: Element) => spoken(element).replace(/\s+/g, ' ').trim();
+
+  it('happy: each number row draws a Before bar and an After bar, each as wide as its number', () => {
+    renderStep();
+    expect(LINES.map((id) => bar(id)?.style.width)).toEqual(['54%', '81%', '41%', '63%']);
+    for (const id of LINES) {
+      expect(track(id)!.contains(bar(id))).toBe(true);
+      expect(line(id).contains(track(id))).toBe(true);
+    }
+    expect(within(line('keyword-before')).getByText('Before')).toBeTruthy();
+    expect(within(line('keyword-before')).getByText('54')).toBeTruthy();
+    expect(within(line('keyword-after')).getByText('After')).toBeTruthy();
+    expect(within(line('keyword-after')).getByText('81')).toBeTruthy();
+    expect(within(line('keyword-after')).getByTestId('tailor-ats-band').textContent).toBe(
+      'Reads well',
+    );
+    expect(within(line('bullets-before')).getByText('41')).toBeTruthy();
+    expect(within(line('bullets-after')).getByText('63')).toBeTruthy();
+  });
+
+  it('happy: a rise draws a teal After bar, a fall a gold one, no change a muted one', () => {
+    renderStep({ ...BASE, bullets: { ...BASE.bullets, after: 38, delta: -3 } });
+    const tones = () => LINES.map((id) => bar(id)!.className.match(/\bbg-[\w-]+/g));
+    expect(tones()).toEqual([['bg-ink-muted'], ['bg-teal'], ['bg-ink-muted'], ['bg-gold']]);
+    cleanup();
+
+    renderStep({
+      ...BASE,
+      keyword: { ...BASE.keyword, after: 54, delta: 0 },
+      bullets: { ...BASE.bullets, after: 41, delta: 0 },
+    });
+    expect(tones()).toEqual([
+      ['bg-ink-muted'],
+      ['bg-ink-muted'],
+      ['bg-ink-muted'],
+      ['bg-ink-muted'],
+    ]);
+    // Nothing red, nothing blue, on any bar or track.
+    for (const id of LINES) {
+      expect(`${track(id)!.className} ${bar(id)!.className}`).not.toMatch(/red|blue|navy|danger/);
+    }
+  });
+
+  it('negative: a score that could not be measured draws no bar, only the dash', () => {
+    renderStep({
+      ...BASE,
+      keyword: { before: null, after: null, delta: null, beforeReason: 'x', afterReason: 'y' },
+    });
+    for (const id of ['keyword-before', 'keyword-after']) {
+      // No track at all: an empty one would read as a 0.
+      expect(track(id)).toBeNull();
+      expect(bar(id)).toBeNull();
+      const dash = within(line(id)).getByText('—');
+      const tip = document.getElementById(dash.getAttribute('aria-describedby') ?? '');
+      expect(tip?.textContent).toBe(ATS_HINT.noScore);
+    }
+    expect(screen.queryByTestId('tailor-ats-band')).toBeNull();
+    // The other row still draws its bars.
+    expect(bar('bullets-before')?.style.width).toBe('41%');
+  });
+
+  it('negative: no bar is read by a screen reader', () => {
+    renderStep();
+    for (const id of LINES) {
+      expect(track(id)!.closest('[aria-hidden="true"]')).not.toBeNull();
+      expect(track(id)!.textContent).toBe('');
+      expect(track(id)!.querySelector('[tabindex], button')).toBeNull();
+    }
+    // The words and numbers, in reading order: label, Before, After, change.
+    expect(said(screen.getByTestId('tailor-ats-keyword'))).toBe(
+      'Keyword coverage Before 54 After 81 Reads well +27',
+    );
+    expect(said(screen.getByTestId('tailor-ats-bullets'))).toBe(
+      'Bullet strength Before 41 After 63 +22',
+    );
+    // "Before" and "After" on the bar lines are plain words: no hint, no "i".
+    for (const id of LINES) {
+      const word = line(id).firstElementChild!;
+      expect(word.textContent).toMatch(/^(Before|After)$/);
+      expect(word.closest('[aria-describedby]')).toBeNull();
+      expect(word.querySelector('[aria-describedby], button')).toBeNull();
+    }
+  });
+
+  it('boundary: 0 draws an empty track and the number 0', () => {
+    renderStep({
+      ...BASE,
+      keyword: { ...BASE.keyword, before: 0, delta: 81 },
+      bullets: { ...BASE.bullets, before: 0, delta: 63 },
+    });
+    for (const id of ['keyword-before', 'bullets-before']) {
+      expect(track(id)).not.toBeNull();
+      expect(bar(id)?.style.width).toBe('0%');
+      expect(within(line(id)).getByText('0')).toBeTruthy();
+      expect(within(line(id)).queryByText('—')).toBeNull();
+    }
+  });
+
+  it('boundary: 100 fills the track and does not spill out', () => {
+    renderStep({
+      ...BASE,
+      keyword: { ...BASE.keyword, after: 100, delta: 46 },
+      bullets: { ...BASE.bullets, after: 100, delta: 59 },
+    });
+    for (const id of ['keyword-after', 'bullets-after']) {
+      expect(bar(id)?.style.width).toBe('100%');
+      // The track clips what it holds, and holds only the bar.
+      expect(track(id)!.className).toMatch(/\boverflow-hidden\b/);
+      expect([...track(id)!.children]).toEqual([bar(id)]);
+      expect(within(line(id)).getByText('100')).toBeTruthy();
+    }
+  });
+
+  it('edge: a draft with no bullets: Bullet strength shows the dash and the no-bullets line', () => {
+    renderStep({
+      ...BASE,
+      bullets: { before: 41, after: 0, delta: -41, totalBefore: 4, totalAfter: 0 },
+    });
+    expect(track('bullets-after')).toBeNull();
+    expect(within(line('bullets-after')).getByText('—')).toBeTruthy();
+    expect(within(line('bullets-after')).queryByText('0')).toBeNull();
+    expect(screen.getByTestId('tailor-ats-bullets-delta').textContent).toBe('—');
+    expect(screen.getByTestId('tailor-ats-no-bullets')).toBeTruthy();
+    // The original CV had bullets: its bar is still drawn.
+    expect(bar('bullets-before')?.style.width).toBe('41%');
+  });
+
+  it('the table holds only the three checks, in three columns', () => {
+    renderStep();
+    const table = screen.getByRole('table', { name: 'ATS readiness before and after tailoring' });
+    expect([...table.querySelectorAll('thead th')].map((th) => th.textContent)).toEqual([
+      'Check',
+      'Before',
+      'After',
+    ]);
+    const rows = [...table.querySelectorAll('tbody tr')];
+    expect(rows.map((row) => row.getAttribute('data-testid'))).toEqual([
+      'tailor-ats-check-section_headers',
+      'tailor-ats-check-contact_info',
+      'tailor-ats-check-cv_length',
+    ]);
+    for (const row of rows) {
+      expect(row.children).toHaveLength(3);
+      expect(row.querySelectorAll('th')).toHaveLength(1);
+    }
+    // The number rows are above the table, not in it; the bars keep the table's width cap.
+    const bars = screen.getByTestId('tailor-ats-bars');
+    expect(table.contains(screen.getByTestId('tailor-ats-keyword'))).toBe(false);
+    expect(table.contains(screen.getByTestId('tailor-ats-bullets'))).toBe(false);
+    expect(bars.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(bars.className).toMatch(/\bmax-w-lg\b/);
   });
 });
