@@ -285,4 +285,26 @@ describe('8-ats-table: the check before the picture', () => {
     everythingAt({ ...INSIDE, bottom: window.innerHeight + 40 });
     expect(runCheck(CHECK_ATS_TABLE, STARTED_JOB_TITLE)).toMatch(/not wholly inside the window/);
   });
+
+  // L-396: the keyword and bullet rows are bars above the table, so the check
+  // must look at them too, and still find the three checks in the table.
+  it('boundary: fails when the bars are cut off by the top of the window, the table on screen', () => {
+    renderAts('ats', startedComparison());
+    const keyword = document.querySelector('[data-testid="tailor-ats-keyword"]')!;
+    const above = { ...INSIDE, top: -20, bottom: 10 };
+    keyword.getBoundingClientRect = () =>
+      ({ ...above, x: above.left, y: above.top, width: 860, height: 30 }) as DOMRect;
+    expect(runCheck(CHECK_ATS_TABLE, STARTED_JOB_TITLE)).toMatch(
+      /^the keyword row is not wholly inside the window/,
+    );
+  });
+
+  it('negative: fails when a check row is not in the table', () => {
+    renderAts('ats', startedComparison());
+    const length = document.querySelector('[data-testid="tailor-ats-check-cv_length"]')!;
+    document.querySelector('[data-testid="tailor-ats"]')!.append(length);
+    expect(runCheck(CHECK_ATS_TABLE, STARTED_JOB_TITLE)).toBe(
+      'the ATS table has no tailor-ats-check-cv_length row',
+    );
+  });
 });
