@@ -12,7 +12,7 @@
  *   * Escape closes it and puts focus back on the trigger;
  *   * Tab past the last item closes it, and focus goes on as usual;
  *   * choosing an item closes it, puts focus back on the trigger, then runs it;
- *   * a click anywhere else closes it — so opening a second menu closes the first.
+ *   * a press anywhere else closes it — so opening a second menu closes the first.
  * An item that cannot be used now is shown disabled, never left out.
  *
  * The trigger is the drawn "…" icon named by `label` for a screen reader, or,
@@ -56,13 +56,14 @@ export function MoreMenu({ label, items, showLabel = false, testId }: MoreMenuPr
   useEffect(() => {
     if (!open) return;
     root.current?.querySelector<HTMLButtonElement>('[data-more-item]:not(:disabled)')?.focus();
-    const outside = (event: MouseEvent) => {
+    const outside = (event: PointerEvent) => {
       if (!(event.target instanceof Node) || root.current?.contains(event.target) !== true) {
         setOpen(false);
       }
     };
-    document.addEventListener('click', outside);
-    return () => document.removeEventListener('click', outside);
+    // `pointerdown`, not `click`: iPhone Safari sends no click for a tap on plain text or blank page.
+    document.addEventListener('pointerdown', outside);
+    return () => document.removeEventListener('pointerdown', outside);
   }, [open]);
 
   const closeToTrigger = () => {
