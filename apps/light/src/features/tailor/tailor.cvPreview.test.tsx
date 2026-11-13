@@ -249,7 +249,7 @@ describe('the word count’s wording (L-343)', () => {
 });
 
 describe('a very long CV', () => {
-  it('boundary: renders whole, inside a height-capped, scrollable, wrapping block', async () => {
+  it('boundary: renders whole, in a height-capped, clipped, wrapping block that never scrolls, with "Show all" (L-322)', async () => {
     const long = Array.from(
       { length: 2000 },
       (_, index) => `Line ${index + 1}: ${'word '.repeat(20)}`,
@@ -259,10 +259,34 @@ describe('a very long CV', () => {
     await vi.waitFor(() => expect(previewText().textContent).toBe(long));
     const classes = previewText().className.split(/\s+/);
     expect(classes).toContain('max-h-72');
-    expect(classes).toContain('overflow-y-auto');
+    expect(classes).toContain('overflow-hidden');
     expect(classes).toContain('whitespace-pre-wrap');
-    // A scroll box a keyboard cannot reach is one only a mouse can read.
-    expect(previewText().tabIndex).toBe(0);
+    // A box inside the scrolling page catches the mouse wheel (L-322).
+    for (const scrolling of ['overflow-y-auto', 'overflow-auto', 'overflow-scroll']) {
+      expect(classes).not.toContain(scrolling);
+    }
+    // It was a tab stop only so a keyboard could scroll it.
+    expect(previewText().hasAttribute('tabindex')).toBe(false);
+    expect(screen.getByTestId('tailor-cv-show-all').textContent).toBe('Show all');
+  });
+
+  it('negative: Hide CV still hides the panel, and Show CV brings it back as it was, text whole (L-322)', async () => {
+    const long = Array.from({ length: 40 }, (_, index) => `Line ${index + 1}`).join('\n');
+    const user = await renderWith([cv('cv-1', 'Long CV.docx', long)]);
+    await vi.waitFor(() => expect(previewText().textContent).toBe(long));
+
+    await user.click(toggle());
+    await user.click(screen.getByTestId('tailor-cv-show-all'));
+    expect(screen.getByTestId('tailor-cv-show-all').textContent).toBe('Show less');
+
+    await user.click(toggle());
+    expect(toggle().textContent).toBe('Show CV');
+    expect(screen.getByTestId('tailor-cv-preview').hidden).toBe(true);
+
+    await user.click(toggle());
+    expect(screen.getByTestId('tailor-cv-preview').hidden).toBe(false);
+    expect(previewText().textContent).toBe(long);
+    expect(screen.getByTestId('tailor-cv-show-all').textContent).toBe('Show less');
   });
 });
 

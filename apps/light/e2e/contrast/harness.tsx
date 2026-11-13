@@ -15,7 +15,7 @@
  * Neither changes a single class name or colour. What the spec measures —
  * which text colour lands on which painted background — is the app's own.
  *
- * The page reads six switches from the address:
+ * The page reads seven switches from the address:
  *   - `?seen=1` skips the first-run welcome, as a returning user sees the app;
  *   - `?entries=1` puts three applications on the board, and gives Tailor
  *     their jobs, so a card's "Tailor" opens the real screen with its step
@@ -25,6 +25,9 @@
  *   - `?trackerLoadError=<text>` and `?profileLoadError=<text>` make the
  *     Tracker board or the profile fail to load with that message, so the
  *     real screen draws its real error strip (L-374: how an error lays out).
+ *   - `?cv=long` or `?cv=short` gives Tailor one CV of one line more than, or
+ *     exactly, the lines its CV text shows before "Show all" (L-322: no box
+ *     that scrolls inside the page);
  *   - `?marks=1` draws, instead of the app, the three components that put a
  *     drawn mark beside words (L-370: is any row taller for its mark).
  *
@@ -115,6 +118,7 @@ const { entry } = await import('../../src/features/search/test/fixtures');
 const { emptyQuota } = await import('@cviper/job-apis');
 const { ErrorBox } = await import('../../src/ui');
 const { SECONDARY_BUTTON } = await import('../../src/app/buttons');
+const { COLLAPSED_LINES } = await import('../../src/features/tailor/CvTextPanel');
 
 if (params.get('seen') === '1') markWelcomeSeen();
 
@@ -122,6 +126,29 @@ const entries =
   params.get('entries') === '1'
     ? [application('a', 'saved'), application('b', 'applied'), application('c', 'interviewing')]
     : [];
+
+const cvLines =
+  params.get('cv') === 'long'
+    ? COLLAPSED_LINES + 1
+    : params.get('cv') === 'short'
+      ? COLLAPSED_LINES
+      : 0;
+const cvs =
+  cvLines === 0
+    ? []
+    : [
+        {
+          id: 'cv-harness',
+          name: 'CV.docx',
+          file_path: null,
+          extracted_text: Array.from(
+            { length: cvLines },
+            (_, index) => `Line ${String(index + 1)} of the CV`,
+          ).join('\n'),
+          json_resume: null,
+          created_at: NOW.toISOString(),
+        },
+      ];
 
 /** A load that fails the way the database does, with the message from the address. */
 function failsToLoad(message: string | null) {
@@ -473,6 +500,7 @@ ReactDOM.createRoot(root).render(
           profileLoad === undefined ? profilePort : { ...profilePort, load: profileLoad }
         }
         tailorPort={createFakeTailorPort({
+          cvs,
           jobs: entries.map((tracked) => tracked.job),
           applications: entries.map((tracked) => tracked.application),
         })}

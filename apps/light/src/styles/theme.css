@@ -238,6 +238,16 @@
   }
 
   /*
+   * Placeholder text (L-316). Tailwind's reset paints it at half the text
+   * colour, about 3.4:1; faint ink clears 4.5:1 on card, canvas and sunken.
+   * In this layer it beats the reset, and a box's own `placeholder:` class
+   * (layer utilities) still beats it. `contrast.contract.test.ts` holds it.
+   */
+  ::placeholder {
+    color: var(--color-ink-faint);
+  }
+
+  /*
    * The motion budget: ONE moment, and it is a card arriving in its new column.
    * Everything else in this app is still. `prefers-reduced-motion` removes even
    * that one.

@@ -142,6 +142,14 @@ const PATHS = {
       <path d="m6 6 12 12" />
     </>
   ),
+  // "More" (L-392): three drawn dots, never typed ones.
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1" fill="currentColor" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" />
+      <circle cx="19" cy="12" r="1" fill="currentColor" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 /**
