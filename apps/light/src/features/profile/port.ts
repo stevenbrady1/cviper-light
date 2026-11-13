@@ -7,8 +7,16 @@
  * everything" clears, and a view that could delete it on its own would need a
  * confirmation this screen has no reason to carry.
  */
-import { getProfile, listCvs, upsertCv, upsertProfile, type DbError } from '../../db';
-import { type Profile, type Result } from '@cviper/core-types';
+import {
+  deleteCv,
+  getProfile,
+  listAnalysesForCv,
+  listCvs,
+  upsertCv,
+  upsertProfile,
+  type DbError,
+} from '../../db';
+import { type Analysis, type Profile, type Result } from '@cviper/core-types';
 
 import { type CvStorePort } from '../cv/ingestCv';
 
@@ -26,11 +34,22 @@ export function createDbProfilePort(): ProfilePort {
 /**
  * The CV half of the store, for the "Your CV" section (L-240).
  *
- * The same `CvStorePort` shape Analysis and Tailor already satisfy — the same
- * `cvs` table, read and written by the same two calls — so a CV uploaded here
- * is on every screen. Kept apart from `ProfilePort` so the profile row and the
- * CV rows stay two things, each injectable on its own in a test.
+ * The same `cvs` table Analysis and Tailor read and write, through the same
+ * two calls, so a CV uploaded here is on every screen. Kept apart from
+ * `ProfilePort` so the profile row and the CV rows stay two things, each
+ * injectable on its own in a test.
+ *
+ * Profile is also the one screen that can DELETE a CV (L-408), so its port
+ * carries the two calls that takes, and Analysis and Tailor's do not: the
+ * delete itself, and the saved checks it takes with it, read first so the
+ * question can say how many (`analyses.cv_id … ON DELETE CASCADE`).
  */
-export function createDbProfileCvPort(): CvStorePort {
-  return { loadCvs: listCvs, saveCv: upsertCv };
+export interface ProfileCvPort extends CvStorePort {
+  /** The saved checks made with ONE CV: what deleting it deletes too. */
+  loadHistory(cvId: string): Promise<Result<Analysis[], DbError>>;
+  deleteCv(cvId: string): Promise<Result<void, DbError>>;
+}
+
+export function createDbProfileCvPort(): ProfileCvPort {
+  return { loadCvs: listCvs, saveCv: upsertCv, loadHistory: listAnalysesForCv, deleteCv };
 }

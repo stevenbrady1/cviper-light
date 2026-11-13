@@ -16,13 +16,19 @@ import { type AnalysisPort } from '../port';
  * branches a user meets on the day their disk fills up.
  */
 
-type Method = 'loadCvs' | 'loadJobs' | 'saveCv' | 'loadHistory' | 'saveAnalysis';
+type Method = 'loadCvs' | 'loadJobs' | 'saveCv' | 'loadHistory' | 'saveAnalysis' | 'deleteCv';
 
 export interface FakeAnalysisPort extends AnalysisPort {
   /** Every CV currently "stored", newest first. */
   readonly storedCvs: () => readonly Cv[];
   /** Every analysis currently "stored", newest first. */
   readonly storedAnalyses: () => readonly Analysis[];
+  /**
+   * Not part of `AnalysisPort`: Profile's CV port has it (L-408), and Profile's
+   * tests drive "Your CV" with this fake. Takes the CV's analyses with it, as
+   * the database's `ON DELETE CASCADE` does.
+   */
+  readonly deleteCv: (cvId: string) => Promise<Result<void, DbError>>;
   /** Make the next call to the named method fail. */
   readonly failNext: (method: Method) => void;
   readonly calls: Record<Method, number>;
@@ -48,6 +54,7 @@ export function createFakeAnalysisPort(
     saveCv: 0,
     loadHistory: 0,
     saveAnalysis: 0,
+    deleteCv: 0,
   };
 
   function failure(method: Method): Result<never, DbError> | null {
@@ -83,6 +90,15 @@ export function createFakeAnalysisPort(
     async loadHistory(cvId) {
       calls.loadHistory += 1;
       return failure('loadHistory') ?? ok(analyses.filter((analysis) => analysis.cv_id === cvId));
+    },
+
+    async deleteCv(cvId) {
+      calls.deleteCv += 1;
+      const refused = failure('deleteCv');
+      if (refused !== null) return refused;
+      cvs = cvs.filter((cv) => cv.id !== cvId);
+      analyses = analyses.filter((analysis) => analysis.cv_id !== cvId);
+      return ok(undefined);
     },
 
     async saveAnalysis(analysis) {

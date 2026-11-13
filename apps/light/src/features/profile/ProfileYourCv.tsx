@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { wordCount, type Cv } from '@cviper/core-types';
 
@@ -7,8 +7,10 @@ import { cardClasses, ErrorBox, SectionHeading } from '../../ui';
 import { type FilePort } from '../../platform/files';
 
 import { CvUpload } from '../cv/CvUpload';
-import { type CvStorePort } from '../cv/ingestCv';
 import { formatPolicyDate } from '../settings/privacy/policyDocument';
+
+import { type ProfileCvPort } from './port';
+import { ConfirmDeleteCv, CvRow } from './ProfileCvRow';
 
 // --- Your CV (L-240) --------------------------------------------------------
 //
@@ -35,7 +37,7 @@ function cvFacts(cv: Cv): string {
 }
 
 interface YourCvProps {
-  readonly store: CvStorePort;
+  readonly store: ProfileCvPort;
   readonly files: FilePort;
   readonly now: Date | undefined;
 }
@@ -67,6 +69,60 @@ export function YourCv({ store, files, now }: YourCvProps) {
     setCvs((current) => [cv, ...current.filter((existing) => existing.id !== cv.id)]);
   }, []);
 
+  // --- Rename and Delete (L-408) --------------------------------------------
+
+  /** The CV the delete question is about, and what deleting it takes too. */
+  const [asking, setAsking] = useState<{ readonly cv: Cv; readonly checks: number } | null>(null);
+  /** True while the count is being read: a second press must not ask twice. */
+  const counting = useRef(false);
+  const currentRef = useRef<HTMLParagraphElement>(null);
+
+  const onRename = useCallback(
+    async (cv: Cv, name: string): Promise<string | null> => {
+      const renamed = { ...cv, name };
+      const saved = await store.saveCv(renamed);
+      if (!saved.ok) return `That CV could not be saved: ${saved.error.message} Try again.`;
+      // In place: the date did not change, so neither does the row's position.
+      setCvs((current) => current.map((existing) => (existing.id === cv.id ? renamed : existing)));
+      return null;
+    },
+    [store],
+  );
+
+  const onAskDelete = useCallback(
+    async (cv: Cv) => {
+      if (counting.current) return;
+      counting.current = true;
+      setCvError(null);
+      // Read now, not when the screen opened: a check saved since then counts.
+      const checks = await store.loadHistory(cv.id);
+      counting.current = false;
+      if (!checks.ok) {
+        // No count, no question: the warning must be true before anything is deleted.
+        setCvError(`${checks.error.message} Your data is still on this machine.`);
+        return;
+      }
+      setAsking({ cv, checks: checks.value.length });
+    },
+    [store],
+  );
+
+  const onConfirmDelete = useCallback(
+    async (cv: Cv) => {
+      setAsking(null);
+      const deleted = await store.deleteCv(cv.id);
+      if (!deleted.ok) {
+        setCvError(`${deleted.error.message} Your data is still on this machine.`);
+        return;
+      }
+      setCvs((current) => current.filter((existing) => existing.id !== cv.id));
+      // The row and its buttons are gone; land on the line that says what is true
+      // now. It sits just above where the row was, so nothing needs to scroll.
+      currentRef.current?.focus({ preventScroll: true });
+    },
+    [store],
+  );
+
   // Newest first, as every screen lists them: the one Analysis and Tailor start
   // on unless told otherwise, so "by default" (L-320).
   const newest = cvs[0] ?? null;
@@ -79,7 +135,14 @@ export function YourCv({ store, files, now }: YourCvProps) {
         goes to an AI you choose, and only when you ask it to read your CV.
       </p>
 
-      <p data-testid="profile-cv-current" className="mt-3 text-ink">
+      {/* `break-words`: a name with no spaces, now that one can be typed (L-408),
+          ran this line 130px off the side of the page at 1000px wide. */}
+      <p
+        ref={currentRef}
+        tabIndex={-1}
+        data-testid="profile-cv-current"
+        className="mt-3 break-words text-ink"
+      >
         {!cvsLoaded ? (
           'Reading your CVs…'
         ) : newest === null ? (
@@ -94,24 +157,15 @@ export function YourCv({ store, files, now }: YourCvProps) {
 
       {cvs.length === 0 ? null : (
         <ul data-testid="profile-cv-list" className="mt-2 space-y-2">
-          {cvs.map((cv) => {
-            const facts = cvFacts(cv);
-            return (
-              <li key={cv.id}>
-                <span
-                  data-testid="profile-cv-name"
-                  className="block font-medium break-words text-ink"
-                >
-                  {cv.name}
-                </span>
-                {facts === '' ? null : (
-                  <span data-testid="profile-cv-facts" className="block text-ink-muted">
-                    {facts}
-                  </span>
-                )}
-              </li>
-            );
-          })}
+          {cvs.map((cv) => (
+            <CvRow
+              key={cv.id}
+              cv={cv}
+              facts={cvFacts(cv)}
+              onRename={onRename}
+              onDelete={(target) => void onAskDelete(target)}
+            />
+          ))}
         </ul>
       )}
 
@@ -119,6 +173,15 @@ export function YourCv({ store, files, now }: YourCvProps) {
         <ErrorBox variant="box" gapAbove="mt-2" testId="profile-cv-error">
           {cvError}
         </ErrorBox>
+      )}
+
+      {asking === null ? null : (
+        <ConfirmDeleteCv
+          name={asking.cv.name}
+          checks={asking.checks}
+          onCancel={() => setAsking(null)}
+          onConfirm={() => void onConfirmDelete(asking.cv)}
+        />
       )}
 
       <div className="mt-3">
