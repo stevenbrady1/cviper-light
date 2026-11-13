@@ -141,15 +141,15 @@ export function CvTextPanel({ cv, disabled, onSave }: CvTextPanelProps) {
     <div>
       {text.trim() === '' ? (
         <p data-testid="tailor-cv-preview-empty" className="text-xs text-ink-faint">
-          No text could be read from this CV, so there is nothing for the rewrite to work from. You
-          can type or paste it in.
+          No text could be read from this CV.
         </p>
       ) : (
         <>
           <p data-testid="tailor-cv-source" className="mb-1 text-xs text-ink-muted">
+            {/* The file name sits on the line under the text (L-404). */}
             {corrected
-              ? `Read from ${cv.name}, then corrected by you. The AI works from exactly this text.`
-              : `Read from ${cv.name}. The AI works from exactly this text.`}
+              ? 'Corrected by you. The AI works from exactly this text.'
+              : 'The AI works from exactly this text.'}
           </p>
           <pre
             id="tailor-cv-preview-text"

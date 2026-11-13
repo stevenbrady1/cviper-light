@@ -52,7 +52,7 @@ export function MetricPromptBoxes({
           {`Add a number or result for your gaps (optional, ${added} of ${prompts.length} added)`}
         </summary>
         <p className="mt-2 text-sm text-ink-muted">
-          Optional: if you have a real number or result for any of these, add it. Skip the rest.
+          Add a real number or result where you have one. Skip the rest.
         </p>
         <ul className="mt-2 space-y-2">
           {prompts.map((prompt) => (
