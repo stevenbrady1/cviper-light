@@ -18,7 +18,12 @@ import { OllamaDownloadLink } from '../analysis/OllamaDownloadLink';
 import { ollamaNeedsChatModel, type Availability } from '../analysis/providers';
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 
-import { ONBOARDING_CARDS, localModelLine, type OnboardingCard } from './cards';
+import {
+  LOOKING_FOR_LOCAL_AI,
+  ONBOARDING_CARDS,
+  localModelLine,
+  type OnboardingCard,
+} from './cards';
 import { type LeftoverKeysPort } from './leftoverKeys';
 import { LeftoverKeysNotice } from './LeftoverKeysNotice';
 
@@ -292,7 +297,7 @@ function WelcomeCard({ card, availability, browser, onDismiss }: WelcomeCardProp
 
       {card.id === 'analysis' ? (
         <p data-testid="welcome-local-model" className="mt-2 text-xs text-ink-muted">
-          {availability === null ? 'Looking for free AI on this PC…' : localModelLine(availability)}
+          {availability === null ? LOOKING_FOR_LOCAL_AI : localModelLine(availability)}
           {availability !== null && ollamaNeedsChatModel(availability) ? (
             <OllamaDownloadLink idPrefix="welcome" browser={browser} />
           ) : null}
@@ -351,7 +356,7 @@ function Preview({ id }: { readonly id: OnboardingCard['id'] }) {
       <div className="flex items-baseline gap-2 px-1">
         <span
           data-testid="welcome-preview-score"
-          className="font-display text-3xl leading-none font-normal text-ink lining-nums tabular-nums"
+          className="text-3xl leading-none font-semibold text-ink lining-nums tabular-nums"
         >
           72%
         </span>

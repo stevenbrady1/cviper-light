@@ -276,6 +276,54 @@ describe('colour contrast on the rendered app (WCAG 2.1 AA)', () => {
   }
 
   /*
+    L-406: the "On this PC" box at the top of Settings, in each of its three
+    states. The plain Settings visit above only ever draws "nothing found",
+    because the harness has no Ollama; `?ollama=` makes the probe answer.
+    `long` is a model name with nowhere to break: at phone width it must wrap
+    inside the box, with the label still inside it and no sideways scroll.
+  */
+  for (const [width, viewport] of Object.entries(VIEWPORTS)) {
+    for (const [state, query, drawn] of [
+      ['nothing found', '?seen=1', 'settings-ollama-link'],
+      ['ready', '?seen=1&ollama=ready', 'on-this-pc-status'],
+      ['no chat model', '?seen=1&ollama=empty', 'settings-ollama-link'],
+      ['a very long model name', '?seen=1&ollama=long', 'on-this-pc-status'],
+    ] as const) {
+      it(`Settings "On this PC", ${state}, ${width}`, async () => {
+        const page = await open(query, viewport);
+        await goTo(page, 'settings');
+        // The probe answers after the screen draws: wait for the state itself.
+        await page.locator(`[data-testid="${drawn}"]:visible`).waitFor();
+        await page.locator('[data-testid="settings-on-this-pc"]').scrollIntoViewIfNeeded();
+        judge(`settings, on this PC, ${state} (${width})`, await contrast(page));
+
+        const spill = await page.evaluate(() => {
+          const box = document.querySelector('[data-testid="settings-on-this-pc"]');
+          if (box === null) return ['no box'];
+          const edge = box.getBoundingClientRect();
+          const out = [...box.querySelectorAll('h2, p, [data-testid="on-this-pc-status"]')]
+            .filter((part) => {
+              const at = part.getBoundingClientRect();
+              return at.left < edge.left - 0.5 || at.right > edge.right + 0.5;
+            })
+            .map((part) => `${part.tagName} leaves the box`);
+          // Text too long for its line sticks out of the paragraph without
+          // moving the paragraph's own edges, and Settings' scroll area then
+          // scrolls sideways in place of the page. So both are asked directly.
+          const line = box.querySelector('[data-testid="on-this-pc-line"]');
+          if (line !== null && line.scrollWidth > line.clientWidth) out.push('the sentence spills');
+          for (const area of [document.documentElement, box.closest('.overflow-y-auto')]) {
+            if (area !== null && area.scrollWidth > area.clientWidth) out.push('sideways scroll');
+          }
+          return out;
+        });
+        assert.deepEqual(spill, [], `on this PC, ${state} (${width})`);
+        await page.context().close();
+      });
+    }
+  }
+
+  /*
     L-398: "Where to look" is a closed fold now, so the plain Search visit
     above no longer measures its text. This opens it and measures its top and
     its foot in view, with and without a key saved (the keyed boards row).
@@ -480,6 +528,26 @@ describe('the match score is the hero, the keyword check a plain row below (L-39
       await page.context().close();
     });
   }
+
+  it("the match score's computed font family is Inter at weight 600, and the face loaded (L-407)", async () => {
+    const page = await openSample({ width: 1000, height: 700 });
+    const seen = await page.evaluate(() => {
+      const score = document.querySelector(
+        '[data-testid="analysis-sample"] [data-testid="band-scale-score"]',
+      );
+      const style = score === null ? null : getComputedStyle(score);
+      return {
+        family: style?.fontFamily.split(',')[0]?.trim().replaceAll(/['"]/g, '') ?? '',
+        weight: style?.fontWeight ?? '',
+        size: style?.fontSize ?? '',
+        // A family name in the computed style proves nothing if the file never
+        // arrived: the browser would draw a system fallback under that name.
+        loaded: document.fonts.check('600 72px Inter'),
+      };
+    });
+    assert.deepEqual(seen, { family: 'Inter', weight: '600', size: '72px', loaded: true });
+    await page.context().close();
+  });
 
   // NEGATIVE — a check that cannot fail is not a check.
   it('the check can fail: a big keyword number inside the hero, and touching labels, are reported', async () => {

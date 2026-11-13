@@ -221,3 +221,59 @@ describe('readEnvironmentStatus — AI provider keys (L-182)', () => {
     expect(status.ai.mistral).toBe('configured');
   });
 });
+
+/**
+ * L-406. Settings' "On this PC" box says which model Ollama has, so the status
+ * read keeps the list that came back with the probe it already made.
+ */
+describe('readEnvironmentStatus — the chat models Ollama listed (L-406)', () => {
+  const tagsFor = (...names: string[]): string =>
+    JSON.stringify({
+      models: names.map((name) => ({ model: name, name, details: { parameter_size: '3.2B' } })),
+    });
+
+  const probes = (): number =>
+    tauri.invoke.mock.calls.filter(([command]) => command === 'ollama_probe').length;
+
+  it('happy: names the chat models, in the order Ollama gave them, from the one probe', async () => {
+    respond({ tags: tagsFor('qwen2.5:7b', 'llama3.2:3b') });
+
+    const status = await readEnvironmentStatus(NOW);
+
+    expect(status.ollama).toBe('running');
+    expect(status.ollamaModels?.map((model) => model.id)).toEqual(['qwen2.5:7b', 'llama3.2:3b']);
+    // The list is read out of the answer in hand: no second request.
+    expect(probes()).toBe(1);
+  });
+
+  it('negative: no Ollama means no list, never an empty "running"', async () => {
+    respond({ tags: null });
+
+    const status = await readEnvironmentStatus(NOW);
+
+    expect(status.ollama).toBe('absent');
+    expect('ollamaModels' in status).toBe(false);
+  });
+
+  it('negative: an answer that is not a model list is running with nothing to chat with', async () => {
+    // A proxy's login page on the port: something answered, and nothing in it is a model.
+    respond({ tags: '<html>Sign in</html>' });
+
+    const status = await readEnvironmentStatus(NOW);
+
+    expect(status.ollama).toBe('running');
+    expect('ollamaModels' in status).toBe(false);
+  });
+
+  it('boundary: Ollama with no models pulled has no list either', async () => {
+    respond({ tags: tagsFor() });
+
+    expect('ollamaModels' in (await readEnvironmentStatus(NOW))).toBe(false);
+  });
+
+  it('boundary: a model that cannot chat is left out, as it is on Analysis', async () => {
+    respond({ tags: tagsFor('nomic-embed-text:latest') });
+
+    expect('ollamaModels' in (await readEnvironmentStatus(NOW))).toBe(false);
+  });
+});
