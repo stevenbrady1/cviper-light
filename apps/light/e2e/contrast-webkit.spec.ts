@@ -304,8 +304,9 @@ describe('the Tracker board lays out (L-311)', () => {
 
 /**
  * The funnel strip above the board wraps on a phone and never runs past the
- * window (L-383). "Applied so far" and "Interviewed so far" made two labels
- * longer, so at 375px the strip may take one more row, never a sideways scroll.
+ * window (L-383). "Applied so far" and "Interview or offer" (L-388; it was
+ * "Interviewed so far", the same length) are longer labels, so at 375px the strip
+ * may take one more row, never a sideways scroll.
  */
 async function funnelOverflow(page: Page): Promise<string[]> {
   return page.evaluate(() => {
