@@ -724,6 +724,7 @@ export function Tailor({
             elapsed={elapsed}
             choosingFile={saving === 'file'}
             saveMessage={saveMessage}
+            hasDraft={result !== null}
           />
 
           <TailorResultView

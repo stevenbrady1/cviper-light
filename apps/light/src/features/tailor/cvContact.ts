@@ -395,6 +395,21 @@ export function contactSummary(contact: CvContact): string {
 }
 
 /**
+ * The name and the line under it, from the details the user CONFIRMED: what
+ * every saved CV file carries at the top, and what the page on screen draws
+ * (L-400) — one helper, so the two cannot disagree. No details, or a blank
+ * field, is no name or no line; nothing is ever filled in from elsewhere.
+ */
+export function cvHeader(contact: CvContact | null): {
+  readonly name: string | null;
+  readonly line: string | null;
+} {
+  if (contact === null) return { name: null, line: null };
+  const name = contact.name.trim();
+  return { name: name === '' ? null : name, line: contactLine(contact) };
+}
+
+/**
  * The CV text as it will be SAVED: the draft with the confirmed details on
  * top. No details, or all blank, is the draft text exactly as it was.
  */
@@ -403,6 +418,6 @@ export function savedCvText(
   contact: CvContact | null,
 ): string {
   if (contact === null || contactSummary(contact) === '') return result.text;
-  const name = contact.name.trim();
-  return renderTailoredCv(result.cv, name === '' ? null : name, contactLine(contact));
+  const { name, line } = cvHeader(contact);
+  return renderTailoredCv(result.cv, name, line);
 }

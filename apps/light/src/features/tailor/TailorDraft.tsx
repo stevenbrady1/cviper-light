@@ -4,6 +4,8 @@ import { FLOW_HINT } from '../../app/hints';
 import { cardClasses } from '../../ui';
 import { providerInSentence } from '../analysis/model';
 
+import { type CvContact } from './cvContact';
+import { CvPage } from './CvPage';
 import { lineDiff } from './diff';
 import { type TailorResult } from './jobSessions';
 
@@ -18,13 +20,15 @@ export interface TailorDraftProps {
   readonly result: TailorResult;
   /** The original CV text, for the "what changed" list. */
   readonly cvText: string;
+  /** The details confirmed for this draft's CV (L-346), or `null`: the page shows no name. */
+  readonly contact: CvContact | null;
 }
 
 /**
  * The tailored draft: the fabrication report FIRST and never red (see the note
- * at the top of `Tailor.tsx`), who wrote it, the CV, and what changed.
+ * at the top of `Tailor.tsx`), who wrote it, the CV as a page, and what changed.
  */
-export function TailorDraft({ result, cvText }: TailorDraftProps) {
+export function TailorDraft({ result, cvText, contact }: TailorDraftProps) {
   return (
     <>
       {/* The fabrication report — FIRST, and never red. */}
@@ -65,12 +69,7 @@ export function TailorDraft({ result, cvText }: TailorDraftProps) {
         {result.retried ? ' · recovered on retry' : ''}
       </p>
 
-      <pre
-        data-testid="tailor-cv"
-        className={`${cardClasses({ padding: 'none' })} px-4 py-3 font-sans text-ink whitespace-pre-wrap`}
-      >
-        {result.text}
-      </pre>
+      <CvPage cv={result.cv} contact={contact} />
 
       <details className={`${cardClasses({ padding: 'none' })} px-4 py-3`}>
         <summary className="cursor-pointer font-medium text-ink">

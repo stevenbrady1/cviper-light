@@ -1,6 +1,7 @@
 import { type DraftReview } from '@cviper/core-types';
 
-import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { MoreMenu } from '../../app/MoreMenu';
 import { IconTile } from '../../ui';
 
 import { AtsStep } from './AtsStep';
@@ -71,7 +72,7 @@ export function TailorResultView({
 
   return (
     <div data-testid="tailor-result" className="space-y-4">
-      <TailorDraft result={result} cvText={cvText} />
+      <TailorDraft result={result} cvText={cvText} contact={contact} />
 
       {/*
         The ATS Score step (L-198): this draft re-scored against the same
@@ -113,7 +114,40 @@ export function TailorResultView({
         </div>
       )}
 
+      {/*
+        The one blue button once there is a draft (L-400): Save as PDF. The
+        other formats sit in the shared menu; "Tailor CV" turns grey above.
+      */}
       <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          data-testid="tailor-save-pdf-cv"
+          data-primary="true"
+          disabled={busy}
+          onClick={() => onSaveDocument('cv', 'pdf')}
+          className={PRIMARY_BUTTON}
+        >
+          Save as PDF…
+        </button>
+        <MoreMenu
+          label="More formats"
+          showLabel
+          testId="tailor-save-more"
+          items={[
+            {
+              label: 'Save as Word…',
+              onSelect: () => onSaveDocument('cv', 'docx'),
+              disabled: busy,
+              testId: 'tailor-save-docx-cv',
+            },
+            {
+              label: 'Save as text…',
+              onSelect: () => onSaveText('cv'),
+              disabled: busy,
+              testId: 'tailor-save-text',
+            },
+          ]}
+        />
         <button
           type="button"
           data-testid="tailor-review-run"
@@ -131,33 +165,6 @@ export function TailorResultView({
           className={SECONDARY_BUTTON}
         >
           {phase === 'writing' ? 'Writing…' : 'Write the cover letter'}
-        </button>
-        <button
-          type="button"
-          data-testid="tailor-save-text"
-          disabled={busy}
-          onClick={() => onSaveText('cv')}
-          className={SECONDARY_BUTTON}
-        >
-          Save CV as text…
-        </button>
-        <button
-          type="button"
-          data-testid="tailor-save-docx-cv"
-          disabled={busy}
-          onClick={() => onSaveDocument('cv', 'docx')}
-          className={SECONDARY_BUTTON}
-        >
-          Save CV as Word…
-        </button>
-        <button
-          type="button"
-          data-testid="tailor-save-pdf-cv"
-          disabled={busy}
-          onClick={() => onSaveDocument('cv', 'pdf')}
-          className={SECONDARY_BUTTON}
-        >
-          Save CV as PDF…
         </button>
       </div>
 
