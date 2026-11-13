@@ -481,6 +481,26 @@ describe('the match score is the hero, the keyword check a plain row below (L-39
     });
   }
 
+  it("the match score's computed font family is Inter at weight 600, and the face loaded (L-407)", async () => {
+    const page = await openSample({ width: 1000, height: 700 });
+    const seen = await page.evaluate(() => {
+      const score = document.querySelector(
+        '[data-testid="analysis-sample"] [data-testid="band-scale-score"]',
+      );
+      const style = score === null ? null : getComputedStyle(score);
+      return {
+        family: style?.fontFamily.split(',')[0]?.trim().replaceAll(/['"]/g, '') ?? '',
+        weight: style?.fontWeight ?? '',
+        size: style?.fontSize ?? '',
+        // A family name in the computed style proves nothing if the file never
+        // arrived: the browser would draw a system fallback under that name.
+        loaded: document.fonts.check('600 72px Inter'),
+      };
+    });
+    assert.deepEqual(seen, { family: 'Inter', weight: '600', size: '72px', loaded: true });
+    await page.context().close();
+  });
+
   // NEGATIVE — a check that cannot fail is not a check.
   it('the check can fail: a big keyword number inside the hero, and touching labels, are reported', async () => {
     const page = await openSample({ width: 1000, height: 700 });

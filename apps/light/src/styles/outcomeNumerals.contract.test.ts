@@ -1,30 +1,36 @@
 /**
- * Contract: the numbers that decide something are set apart from the numbers
- * that do not (Northlight).
+ * Contract: the number that decides something is set apart from the numbers
+ * that do not (Northlight, then L-407).
  *
  * CViper Light shows plenty of numbers -- result counts, board counts, a
  * character limit, a version. Exactly one of them changes what the user does
  * next, and it is the match score. Rendering it like the others makes the user
- * do the sorting; rendering it in the display serif does that sorting for them.
+ * do the sorting.
  *
- * Three properties are pinned, and all three are load-bearing rather than
- * decorative:
+ * How it is set apart turned over on 13 Nov 2026, when the owner dropped the
+ * serif from the whole app:
  *
- *   font-display   the serif. It is the whole signal.
- *   lining-nums    this serif defaults to OLD-STYLE figures, which sit above
- *                  and below the baseline. Without this a 71 and a 100 rock
- *                  against each other and the number reads as unstable.
- *   tabular-nums   inherited from the Plex Mono version this replaced, and
- *                  kept for the same reason: the figure must not jitter
- *                  between runs as the digits change.
+ *   before (Northlight)  the match score IS the display serif, at regular
+ *                        weight: "it is the whole signal"
+ *   now    (L-407)       the match score is never the serif. It is set apart
+ *                        by size and weight, in the app's one typeface
  *
- * FORBID-LIST (LESSON-033). The negative test encodes "the score is not set in
- * the body or mono face", not "the score has class X", so restyling around it
- * cannot turn this red -- only losing the serif can.
+ * FORBID-LIST (LESSON-033). The match score is:
+ *
+ *   never the serif        the owner's decision
+ *   never the mono face    it would read as one more count
+ *   never under 48px       size is half of what sets it apart
+ *   never regular weight   weight is the other half
+ *   never proportional     `tabular-nums`: the user compares it with earlier
+ *                          runs and it must not jitter as the digits change
+ *   never old-style        `lining-nums`: a 71 and a 100 must sit on one line
  *
  * This reads the SOURCE rather than rendering, because Tailwind class names are
  * the contract here and jsdom resolves no stylesheet: a render-based assertion
- * would pass on a component that had lost every one of these classes.
+ * would pass on a component that had lost every one of these classes. Comments
+ * are stripped first, so the comment explaining a rule can neither trip it nor
+ * satisfy it. The real engine's answer (Inter, 600, face loaded) is measured in
+ * `e2e/contrast-webkit.spec.ts`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,20 +40,38 @@ import { describe, it, expect } from 'vitest';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BAND_SCALE = path.resolve(HERE, '../features/analysis/BandScale.tsx');
 
-/** The className string on the element carrying `data-testid="band-scale-score"`. */
-function scoreClasses(): string {
-  const source = fs.readFileSync(BAND_SCALE, 'utf8');
-  const anchor = source.indexOf('data-testid="band-scale-score"');
-  expect(anchor, 'band-scale-score is missing from BandScale.tsx').toBeGreaterThan(-1);
-  const captured = source.slice(anchor, anchor + 400).match(/className=\{`([^`]+)`\}/)?.[1];
-  // A throw, not an expect: this helper's RETURN TYPE has to be `string` for
-  // every caller, and a non-null assertion would only silence the compiler
-  // while leaving `undefined` free to reach `.toContain()` -- where it fails
-  // with a type error about the matcher rather than naming the real problem.
-  if (!captured) {
-    throw new Error('could not read the score className from BandScale.tsx');
-  }
+/** Drop comments, so only the real element's classes are ever read. */
+function code(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
+}
+
+/** The className on the element carrying `data-testid="band-scale-score"`. */
+function scoreClasses(source: string): string {
+  const shipped = code(source);
+  const anchor = shipped.indexOf('data-testid="band-scale-score"');
+  if (anchor === -1) throw new Error('band-scale-score is missing from BandScale.tsx');
+  const match = shipped.slice(anchor, anchor + 400).match(/className=(?:\{`([^`]+)`\}|"([^"]+)")/);
+  const captured = match?.[1] ?? match?.[2];
+  if (!captured) throw new Error('could not read the score className from BandScale.tsx');
   return captured;
+}
+
+/** A class by its whole name: `font-mono`, never `font-monospace` or `md:font-mono`. */
+function names(classes: string, name: string): boolean {
+  return new RegExp(`(?:^|\\s)${name}(?=\\s|$)`).test(classes);
+}
+
+/** Every rule of the forbid-list the match score's classes break. Empty is a pass. */
+function scoreProblems(classes: string): string[] {
+  const problems: string[] = [];
+  if (names(classes, 'font-display')) problems.push('it is the serif');
+  if (names(classes, 'font-mono')) problems.push('it is the mono face');
+  // 48px is Tailwind's `text-5xl`; the base size counts, not a breakpoint's.
+  if (!names(classes, 'text-[5-9]xl')) problems.push('it is smaller than 48px');
+  if (!names(classes, 'font-(?:semibold|bold)')) problems.push('it is not set apart by weight');
+  if (!names(classes, 'tabular-nums')) problems.push('its digits are not fixed-width');
+  if (!names(classes, 'lining-nums')) problems.push('its digits are not level');
+  return problems;
 }
 
 const ANALYSIS_RESULT = path.resolve(HERE, '../features/analysis/AnalysisResult.tsx');
@@ -58,55 +82,73 @@ const ANALYSIS_RESULT = path.resolve(HERE, '../features/analysis/AnalysisResult.
  * nor stand in for the element.
  */
 function keywordNumberClasses(source: string): string {
-  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
-  const anchor = code.indexOf('data-testid="analysis-ats-score-value"');
+  const shipped = code(source);
+  const anchor = shipped.indexOf('data-testid="analysis-ats-score-value"');
   if (anchor === -1) throw new Error('analysis-ats-score-value is missing from AnalysisResult.tsx');
-  const match = code.slice(anchor, anchor + 400).match(/className=(?:\{`([^`]+)`\}|"([^"]+)")/);
+  const match = shipped.slice(anchor, anchor + 400).match(/className=(?:\{`([^`]+)`\}|"([^"]+)")/);
   const captured = match?.[1] ?? match?.[2];
   if (!captured) throw new Error('could not read the keyword number className');
   return captured;
 }
 
-describe('outcome numerals (Northlight)', () => {
-  it('the match score is set in the display serif', () => {
-    expect(scoreClasses()).toContain('font-display');
+/** The score's element as BandScale writes it, with these classes. */
+function scoreElement(classes: string): string {
+  return (
+    '<span\n  data-testid="band-scale-score"\n  className={`' +
+    classes +
+    ' ${VERDICT_INK[verdict]}`}\n>'
+  );
+}
+
+const GOOD = 'text-6xl leading-none font-semibold lining-nums tabular-nums md:text-7xl';
+
+describe('outcome numerals (Northlight, L-407)', () => {
+  it('the match score breaks no rule: not the serif, not mono, 48px or more, heavy, level fixed-width digits', () => {
+    expect(scoreProblems(scoreClasses(fs.readFileSync(BAND_SCALE, 'utf8')))).toEqual([]);
   });
 
-  it('the match score uses lining figures', () => {
-    // Old-style figures are this serif's default. They descend below the
-    // baseline on 3, 4, 5, 7 and 9, so a two-digit score visibly rocks.
-    expect(scoreClasses()).toContain('lining-nums');
+  it('the check can fail: each broken rule is named', () => {
+    expect(scoreProblems(scoreClasses(scoreElement(GOOD)))).toEqual([]);
+
+    // The score as it was before L-407: the serif, at regular weight.
+    const before =
+      'font-display text-6xl leading-none font-normal lining-nums tabular-nums md:text-7xl';
+    expect(scoreProblems(scoreClasses(scoreElement(before)))).toEqual([
+      'it is the serif',
+      'it is not set apart by weight',
+    ]);
+    expect(scoreProblems(scoreClasses(scoreElement(`font-mono ${GOOD}`)))).toEqual([
+      'it is the mono face',
+    ]);
+    // A big size at a breakpoint only is still a small number on a phone.
+    expect(scoreProblems(scoreClasses(scoreElement(GOOD.replace('text-6xl', 'text-4xl'))))).toEqual(
+      ['it is smaller than 48px'],
+    );
+    expect(scoreProblems(scoreClasses(scoreElement(GOOD.replace(' tabular-nums', ''))))).toEqual([
+      'its digits are not fixed-width',
+    ]);
+    expect(scoreProblems(scoreClasses(scoreElement(GOOD.replace(' lining-nums', ''))))).toEqual([
+      'its digits are not level',
+    ]);
   });
 
-  it('the match score keeps tabular figures', () => {
-    // Carried over from the Plex Mono version deliberately: the user compares
-    // this number against previous runs and it must not jitter.
-    expect(scoreClasses()).toContain('tabular-nums');
-  });
+  it('a comment neither trips the check nor stands in for the element', () => {
+    const commented =
+      '{/* data-testid="band-scale-score" className="font-display font-normal" */}\n' +
+      '// font-display was the old face\n' +
+      scoreElement(GOOD);
+    expect(scoreProblems(scoreClasses(commented))).toEqual([]);
 
-  it('the match score is NOT set in the body or mono face', () => {
-    const classes = scoreClasses();
-    expect(classes, 'the score fell back to a non-display face').not.toMatch(/\bfont-mono\b/);
-    expect(classes, 'the score fell back to a non-display face').not.toMatch(/\bfont-sans\b/);
-  });
-
-  it('the display face ships exactly one weight, so the score cannot ask for another', () => {
-    // Newsreader is self-hosted at 400 only. `font-medium` or heavier would be
-    // synthesised by the browser -- a smeared, faux-bold serif.
-    const classes = scoreClasses();
-    expect(classes).not.toMatch(/\bfont-(medium|semibold|bold|extrabold|black)\b/);
-  });
-
-  it('--font-display is defined in the theme, so the utility class resolves', () => {
-    // Tailwind 4 generates `font-display` FROM this token. Without it the class
-    // is inert and every assertion above passes while the serif never renders.
-    const theme = fs.readFileSync(path.resolve(HERE, './theme.css'), 'utf8');
-    expect(theme).toMatch(/--font-display:\s*'Newsreader'/);
+    const commentedGood =
+      `{/* data-testid="band-scale-score" className="${GOOD}" */}\n` +
+      '<span data-testid="band-scale-score" className="font-display text-6xl font-normal">';
+    expect(scoreProblems(scoreClasses(commentedGood))).toContain('it is the serif');
   });
 
   it('the keyword number is never in the display serif (L-391)', () => {
-    // FORBID-LIST: the serif marks the ONE number that decides something. The
-    // keyword check's number beside it in the same face read as a second score.
+    // FORBID-LIST: the first number to leave the serif. Beside the match score
+    // in the same face it read as a second score. No number is the serif now
+    // (L-407); the whole-app rule is in `heading-ladder.contract.test.ts`.
     const source = fs.readFileSync(ANALYSIS_RESULT, 'utf8');
     expect(keywordNumberClasses(source), 'the keyword number is in the serif').not.toMatch(
       /\bfont-display\b/,

@@ -195,9 +195,11 @@ describe('the examples on each card are examples, not the user’s data', () => 
 
     const score = await screen.findByTestId('welcome-preview-score');
     expect(score.textContent).toBe('72%');
-    for (const cls of ['font-display', 'font-normal', 'lining-nums', 'tabular-nums']) {
+    // Set apart by size and weight, never by the serif (L-407).
+    for (const cls of ['text-3xl', 'font-semibold', 'lining-nums', 'tabular-nums']) {
       expect(score.className).toContain(cls);
     }
+    expect(score.className).not.toContain('font-display');
   });
 
   it('shows one fresh and one gone-quiet application on the board example', async () => {

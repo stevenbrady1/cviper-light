@@ -351,7 +351,7 @@ function Preview({ id }: { readonly id: OnboardingCard['id'] }) {
       <div className="flex items-baseline gap-2 px-1">
         <span
           data-testid="welcome-preview-score"
-          className="font-display text-3xl leading-none font-normal text-ink lining-nums tabular-nums"
+          className="text-3xl leading-none font-semibold text-ink lining-nums tabular-nums"
         >
           72%
         </span>
