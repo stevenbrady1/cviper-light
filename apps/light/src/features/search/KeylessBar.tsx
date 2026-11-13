@@ -201,7 +201,7 @@ export function KeylessBar({
     >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h3 id="keyless-heading" className="font-medium text-ink">
-          Search job boards with these filters
+          Job boards to open in your browser
         </h3>
         {/*
           Where the boards are chosen, ordered and added (L-310). It used to be
@@ -220,9 +220,8 @@ export function KeylessBar({
         )}
       </div>
       <p className="mt-0.5 text-xs text-ink-muted">
-        Tick the boards you want, then press “Also open” under Search. Each one opens in your
-        browser, where you are already signed in, with the words and filters above. Point at, or tab
-        to, a board to see which filters it takes.
+        Tick the boards you want, then press “Also open” under Search. Point at, or tab to, a board
+        to see which filters it takes.
       </p>
 
       {shown.length === 0 ? (
@@ -254,10 +253,7 @@ export function KeylessBar({
         </fieldset>
       )}
 
-      <p className="mt-2 text-xs text-ink-faint">
-        CViper adds nothing to the link. Choose which boards appear, in what order, and add your
-        own, under Job boards in Settings.
-      </p>
+      <p className="mt-2 text-xs text-ink-faint">CViper adds nothing to the link.</p>
     </section>
   );
 }
