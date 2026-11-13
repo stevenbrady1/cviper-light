@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type Cv } from '@cviper/core-types';
 
-import { CvTextPanel } from './CvTextPanel';
+import { COLLAPSED_LINES, CvTextPanel } from './CvTextPanel';
 import { MAX_CV_TEXT_CHARS } from './cvCorrection';
 
 const CV: Cv = {
@@ -187,5 +187,105 @@ describe('a corrected CV (L-218)', () => {
     await user.type(screen.getByLabelText('Correct your CV text'), ', Excel');
     await user.click(screen.getByTestId('tailor-cv-edit-save'));
     expect(saved[0]?.original_text).toBe(CV.extracted_text);
+  });
+});
+
+describe('a long CV: no box that scrolls inside the page (L-322)', () => {
+  /** `count` short lines, so only the line count decides "long". */
+  const lines = (count: number) =>
+    Array.from({ length: count }, (_, index) => `Line ${String(index + 1)}`).join('\n');
+  const withText = (extracted_text: string): Cv => ({ ...CV, extracted_text });
+  const showAll = () => screen.getByTestId('tailor-cv-show-all');
+  const SCROLLING = ['overflow-y-auto', 'overflow-auto', 'overflow-scroll', 'overflow-y-scroll'];
+
+  it('the collapsed height holds 11 lines: 288px (max-h-72) less 24px padding, at 24px a line', () => {
+    expect(COLLAPSED_LINES).toBe(11);
+  });
+
+  it.each([
+    ['a short CV', 3],
+    ['a long CV', 200],
+  ])('%s: the text has no scrolling overflow class', (_label, count) => {
+    setUp(withText(lines(count)));
+    const classes = text().className.split(/\s+/);
+    for (const scrolling of SCROLLING) expect(classes).not.toContain(scrolling);
+    // Nothing scrolls, so nothing needs to be a tab stop.
+    expect(text().hasAttribute('tabindex')).toBe(false);
+  });
+
+  it('boundary: exactly 11 lines shows in full, unclipped, with no "Show all"', () => {
+    setUp(withText(lines(COLLAPSED_LINES)));
+    expect(text().textContent).toBe(lines(COLLAPSED_LINES));
+    expect(text().className).not.toContain('max-h-72');
+    expect(text().className).not.toContain('overflow-hidden');
+    expect(screen.queryByTestId('tailor-cv-show-all')).toBeNull();
+  });
+
+  it('boundary: trailing blank lines do not count, so 11 lines and a final newline is still short', () => {
+    setUp(withText(`${lines(COLLAPSED_LINES)}\n\n`));
+    expect(screen.queryByTestId('tailor-cv-show-all')).toBeNull();
+  });
+
+  it('12 lines starts collapsed: clipped, never scrolled, with "Show all" controlling it', () => {
+    setUp(withText(lines(COLLAPSED_LINES + 1)));
+    // The whole text is in the page; only its height is capped.
+    expect(text().textContent).toBe(lines(COLLAPSED_LINES + 1));
+    const classes = text().className.split(/\s+/);
+    expect(classes).toContain('max-h-72');
+    expect(classes).toContain('overflow-hidden');
+    expect(showAll().tagName).toBe('BUTTON');
+    expect(showAll().textContent).toBe('Show all');
+    expect(showAll().getAttribute('aria-expanded')).toBe('false');
+    expect(showAll().getAttribute('aria-controls')).toBe(text().id);
+    expect(text().id).not.toBe('');
+  });
+
+  it('interaction: pressing it expands in place, reads "Show less", and focus stays on it', async () => {
+    const { user } = setUp(withText(lines(40)));
+    const button = showAll();
+    await user.click(button);
+    expect(showAll()).toBe(button);
+    expect(button.textContent).toBe('Show less');
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement).toBe(button);
+    expect(text().className).not.toContain('max-h-72');
+    expect(text().className).not.toContain('overflow-hidden');
+  });
+
+  it('interaction: from the keyboard too, and pressing again collapses it', async () => {
+    const { user } = setUp(withText(lines(40)));
+    showAll().focus();
+    await user.keyboard('{Enter}');
+    expect(showAll().getAttribute('aria-expanded')).toBe('true');
+    await user.keyboard(' ');
+    expect(showAll().textContent).toBe('Show all');
+    expect(showAll().getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(showAll());
+    expect(text().className).toContain('max-h-72');
+  });
+
+  it('edge: text that grows from short to long gains the button, collapsed', () => {
+    const { view, onSave } = setUp(withText(lines(3)));
+    expect(screen.queryByTestId('tailor-cv-show-all')).toBeNull();
+    view.rerender(<CvTextPanel cv={withText(lines(30))} disabled={false} onSave={onSave} />);
+    expect(showAll().textContent).toBe('Show all');
+    expect(text().className).toContain('max-h-72');
+  });
+
+  it('edge: while the AI is working the text cannot change, but it can still be read in full', async () => {
+    const { user } = setUp(withText(lines(40)), { disabled: true });
+    expect(showAll()).toHaveProperty('disabled', false);
+    await user.click(showAll());
+    expect(showAll().textContent).toBe('Show less');
+  });
+
+  it('correcting: no "Show all" while the text box is open; Cancel brings back the view as it was', async () => {
+    const { user } = setUp(withText(lines(40)));
+    await user.click(showAll());
+    await user.click(screen.getByTestId('tailor-cv-correct'));
+    expect(screen.queryByTestId('tailor-cv-show-all')).toBeNull();
+    await user.click(screen.getByTestId('tailor-cv-edit-cancel'));
+    expect(showAll().textContent).toBe('Show less');
+    expect(text().className).not.toContain('max-h-72');
   });
 });

@@ -277,6 +277,54 @@ describe('colour contrast on the rendered app (WCAG 2.1 AA)', () => {
 });
 
 /**
+ * Placeholder text (L-316). axe's colour-contrast rule does not measure the
+ * example text in an empty box, so read the colour WebKit paints it in. Before
+ * the theme rule it was the text colour at 50%, about 3.4:1.
+ */
+const INK_FAINT = 'rgb(95, 107, 128)'; // --color-ink-faint, #5f6b80
+
+async function placeholderColours(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('[placeholder]')].map(
+      (box) =>
+        `${box.getAttribute('data-testid') ?? box.tagName}: ${getComputedStyle(box, '::placeholder').color}`,
+    ),
+  );
+}
+
+describe('placeholder text is painted in ink-faint (L-316)', () => {
+  for (const view of ['profile', 'search'] as const) {
+    it(`every placeholder on ${view} computes to the ink-faint colour`, async () => {
+      const page = await open('?seen=1', VIEWPORTS.desktop);
+      await goTo(page, view);
+      const found = await placeholderColours(page);
+      assert.ok(found.length >= 4, `${view}: only ${String(found.length)} placeholders found`);
+      assert.deepEqual(
+        found.filter((line) => !line.endsWith(`: ${INK_FAINT}`)),
+        [],
+        `${view}: placeholders not in ink-faint`,
+      );
+      await page.context().close();
+    });
+  }
+
+  // The rule sits in `@layer base`, so a box's own `placeholder:` class (layer
+  // utilities) must still win. SubstageEditor ships `placeholder:text-ink-muted`.
+  it("a box's own placeholder: class still beats the theme rule", async () => {
+    const page = await open('?seen=1', VIEWPORTS.desktop);
+    const colour = await page.evaluate(() => {
+      const box = document.createElement('input');
+      box.placeholder = 'probe';
+      box.className = 'placeholder:text-ink-muted';
+      document.querySelector('main')?.prepend(box);
+      return getComputedStyle(box, '::placeholder').color;
+    });
+    assert.equal(colour, 'rgb(70, 83, 106)', 'the per-box ink-muted placeholder lost to the theme');
+    await page.context().close();
+  });
+});
+
+/**
  * Tracker column headings whose content is wider than the heading (L-311).
  *
  * With an application open the board's columns shrink to their minimum, and
@@ -331,8 +379,9 @@ describe('the Tracker board lays out (L-311)', () => {
 
 /**
  * The funnel strip above the board wraps on a phone and never runs past the
- * window (L-383). "Applied so far" and "Interviewed so far" made two labels
- * longer, so at 375px the strip may take one more row, never a sideways scroll.
+ * window (L-383). "Applied so far" and "Interview or offer" (L-388; it was
+ * "Interviewed so far", the same length) are longer labels, so at 375px the strip
+ * may take one more row, never a sideways scroll.
  */
 async function funnelOverflow(page: Page): Promise<string[]> {
   return page.evaluate(() => {
@@ -2357,6 +2406,178 @@ describe('a slimmer step bar (L-386)', () => {
 });
 
 /**
+ * No box that scrolls inside Tailor's page (L-322).
+ *
+ * The CV text was a `max-h-72 overflow-y-auto` box inside Tailor's own scroll
+ * area, so the mouse wheel got caught in it. Now a long CV is clipped to the
+ * same height with "Show all" under it, and a CV that fits has no button.
+ * "Long" is counted in lines (`COLLAPSED_LINES`, 11); these checks prove the
+ * count against the real layout: 12 lines really are clipped, so the button is
+ * never a no-op, and 11 are not.
+ *
+ * The rule is general, not about the CV: nothing inside Tailor's reading view
+ * scrolls vertically except Tailor's own scroll area. A later slice (the
+ * tailored CV shown as a page) must pass it too. The correction text box is
+ * not open in any of these checks.
+ */
+const CV_WINDOWS = {
+  'desktop 1000x700': { width: 1000, height: 700 },
+  'phone 375x812': { width: 375, height: 812 },
+} as const;
+
+/** Tailor, its CV panel open, with the harness's CV of `cv` length. */
+async function tailorWithCv(
+  cv: 'long' | 'short',
+  viewport: { width: number; height: number },
+): Promise<Page> {
+  const page = await open(`?seen=1&cv=${cv}`, viewport);
+  await goTo(page, 'tailor');
+  await page.click('[data-testid="tailor-cv-preview-toggle"]');
+  await page.waitForSelector('[data-testid="tailor-cv-preview-text"]:visible');
+  return page;
+}
+
+/** Every element in Tailor, other than its own scroll area, that can scroll vertically. */
+async function innerScrollers(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const view = document.querySelector('[data-testid="view-tailor"]');
+    if (view === null) return ['no Tailor view'];
+    return [...view.querySelectorAll('*')]
+      .filter((element) => element.getAttribute('data-testid') !== 'tailor-scroll')
+      .filter((element) => ['auto', 'scroll'].includes(getComputedStyle(element).overflowY))
+      .filter((element) => element.scrollHeight > element.clientHeight)
+      .map(
+        (element) =>
+          `${element.getAttribute('data-testid') ?? element.tagName.toLowerCase()}: ` +
+          `${String(element.scrollHeight)} in ${String(element.clientHeight)}px`,
+      );
+  });
+}
+
+/** The CV text's own heights, and whether "Show all" is there. */
+async function cvText(page: Page): Promise<{
+  scrollHeight: number;
+  clientHeight: number;
+  lines: number;
+  button: string | null;
+}> {
+  return page.evaluate(() => {
+    const text = document.querySelector('[data-testid="tailor-cv-preview-text"]');
+    if (text === null) throw new Error('no CV text');
+    return {
+      scrollHeight: text.scrollHeight,
+      clientHeight: text.clientHeight,
+      lines: (text.textContent ?? '').split('\n').length,
+      button: document.querySelector('[data-testid="tailor-cv-show-all"]')?.textContent ?? null,
+    };
+  });
+}
+
+/** Wheel down over the middle of the CV text; how far the page and the text moved. */
+async function wheelOverCv(page: Page): Promise<{ page: number; text: number; room: number }> {
+  const start = await page.evaluate(() => {
+    const area = document.querySelector('[data-testid="tailor-scroll"]');
+    const text = document.querySelector('[data-testid="tailor-cv-preview-text"]');
+    if (area === null || text === null) throw new Error('no scroll area or CV text');
+    area.scrollTop = 0;
+    // The part of the text inside the scroll area, so the pointer is really over it.
+    const shown = area.getBoundingClientRect();
+    const box = text.getBoundingClientRect();
+    const bottom = Math.min(box.bottom, shown.bottom);
+    return {
+      x: box.left + box.width / 2,
+      y: (box.top + bottom) / 2,
+      room: area.scrollHeight - area.clientHeight,
+    };
+  });
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.wheel(0, 120);
+  await scrollingSettled(page);
+  return page.evaluate((room) => {
+    const area = document.querySelector('[data-testid="tailor-scroll"]');
+    const text = document.querySelector('[data-testid="tailor-cv-preview-text"]');
+    return { page: area?.scrollTop ?? -1, text: text?.scrollTop ?? -1, room };
+  }, start.room);
+}
+
+describe('no box that scrolls inside Tailor (L-322)', () => {
+  for (const [name, viewport] of Object.entries(CV_WINDOWS)) {
+    it(`a long CV, collapsed, is clipped under "Show all"; the page does not scroll sideways (${name})`, async () => {
+      const page = await tailorWithCv('long', viewport);
+      const seen = await cvText(page);
+      console.log(`long CV collapsed (${name}): ${JSON.stringify(seen)}`);
+      assert.equal(seen.lines, 12);
+      assert.equal(seen.button, 'Show all');
+      // 288px is `max-h-72`; clipped means there really is more to show.
+      assert.equal(seen.clientHeight, 288);
+      assert.ok(
+        seen.scrollHeight > seen.clientHeight,
+        `12 lines fit in ${String(seen.clientHeight)}px: "Show all" would do nothing`,
+      );
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      assert.deepEqual(await innerScrollers(page), []);
+      await page.context().close();
+    });
+
+    it(`a CV of exactly 11 lines is not clipped and has no button (${name})`, async () => {
+      const page = await tailorWithCv('short', viewport);
+      const seen = await cvText(page);
+      console.log(`short CV (${name}): ${JSON.stringify(seen)}`);
+      assert.equal(seen.lines, 11);
+      assert.equal(seen.button, null);
+      assert.ok(
+        seen.scrollHeight <= seen.clientHeight,
+        `11 lines are clipped: ${String(seen.scrollHeight)} in ${String(seen.clientHeight)}px`,
+      );
+      assert.deepEqual(await innerScrollers(page), []);
+      await page.context().close();
+    });
+
+    it(`the wheel over the CV text scrolls the page, collapsed and after "Show all" (${name})`, async () => {
+      const page = await tailorWithCv('long', viewport);
+      const collapsed = await wheelOverCv(page);
+      console.log(`wheel, collapsed (${name}): ${JSON.stringify(collapsed)}`);
+      assert.ok(collapsed.room > 0, 'Tailor has no room to scroll, so the wheel proves nothing');
+      assert.equal(collapsed.text, 0, 'the wheel scrolled the CV text');
+      assert.ok(collapsed.page > 0, 'the wheel did not scroll the page');
+
+      await page.click('[data-testid="tailor-cv-show-all"]');
+      const seen = await cvText(page);
+      console.log(`long CV expanded (${name}): ${JSON.stringify(seen)}`);
+      assert.equal(seen.button, 'Show less');
+      assert.ok(
+        seen.scrollHeight <= seen.clientHeight,
+        `after "Show all" the text is still clipped: ${String(seen.scrollHeight)} in ${String(seen.clientHeight)}px`,
+      );
+      assert.deepEqual(await innerScrollers(page), []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+
+      const expanded = await wheelOverCv(page);
+      console.log(`wheel, expanded (${name}): ${JSON.stringify(expanded)}`);
+      assert.equal(expanded.text, 0, 'the wheel scrolled the CV text');
+      assert.ok(expanded.page > 0, 'the wheel did not scroll the page');
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a box that scrolls inside Tailor is reported', async () => {
+    const page = await tailorWithCv('long', CV_WINDOWS['desktop 1000x700']);
+    await page.evaluate(() => {
+      const text = document.querySelector<HTMLElement>('[data-testid="tailor-cv-preview-text"]');
+      if (text === null) throw new Error('no CV text');
+      text.style.overflowY = 'auto';
+    });
+    const found = await innerScrollers(page);
+    assert.ok(
+      found.some((line) => line.startsWith('tailor-cv-preview-text: ')),
+      `the scrolling CV text went unreported: ${JSON.stringify(found)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
  * A tracker card's Continue and its dots (L-319).
  *
  * The button keeps its short word, "Continue", so in the sheet's 176px card it
@@ -3325,6 +3546,206 @@ describe('page titles stay on one line in the serif, and the header does not gro
     assert.ok(
       problems.some((line) => line.startsWith('settings: header is')),
       `the taller header was not flagged: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
+ * A result card's "…" menu stays on screen and on top (L-392).
+ *
+ * Each card has one bordered "Save to tracker" and a small "…" that opens a
+ * short list below it, right-aligned. The list hangs out of its card into the
+ * scrolling results, so three things only a real engine can show: it is wholly
+ * inside the window and adds no sideways scroll, it paints above the next card,
+ * and under the last card the area grows so it can be scrolled to, not cut off.
+ * On a phone the "…" and each item keep the 44px thumb height.
+ */
+const MENU_WINDOWS = {
+  smallest: { width: 1000, height: 700 },
+  phone: { width: 375, height: 700 },
+} as const;
+const FIRST_CARD = 'job-0';
+const LAST_CARD = 'job-11';
+
+/** Search with the harness's twelve fake adverts drawn. */
+async function openResults(viewport: { width: number; height: number }): Promise<Page> {
+  const page = await openTypedSearch(viewport, '?seen=1&results=1');
+  await page.locator('[data-testid="search-submit"]:not([disabled])').click();
+  await page.getByText('Project Coordinator 11').first().waitFor();
+  return page;
+}
+
+/**
+ * Press a card's "…" and scroll the results until the whole list is in view:
+ * axe measures only text that is on screen, and a user scrolls to read it too.
+ */
+async function openCardMenu(page: Page, id: string): Promise<void> {
+  await page.click(`[data-testid="result-more-${id}"]`);
+  await page.waitForSelector(`[data-testid="result-more-${id}"][aria-expanded="true"]`);
+  await page.evaluate(
+    ({ areaSelector, trigger }) => {
+      const area = document.querySelector(areaSelector);
+      const list = document.querySelector(trigger)?.nextElementSibling;
+      if (area === null || list === null || list === undefined) throw new Error('no open list');
+      const seen = area.getBoundingClientRect();
+      const box = list.getBoundingClientRect();
+      if (box.bottom > seen.bottom) area.scrollTop += box.bottom - seen.bottom + 8;
+      else if (box.top < seen.top) area.scrollTop -= seen.top - box.top + 8;
+    },
+    { areaSelector: SEARCH_AREA, trigger: `[data-testid="result-more-${id}"]` },
+  );
+}
+
+interface MenuReport {
+  readonly problems: readonly string[];
+  readonly width: number;
+  readonly triggerHeight: number;
+  readonly itemHeights: readonly number[];
+  /** How far the list reaches over the next card, in px; 0 for the last card. */
+  readonly overNext: number;
+}
+
+/** What is wrong with an open list as the user sees it. No problems means all is well. */
+async function menuReport(page: Page, id: string): Promise<MenuReport> {
+  const report = await page.evaluate(
+    ({ areaSelector, id }) => {
+      const problems: string[] = [];
+      const area = document.querySelector(areaSelector);
+      const trigger = document.querySelector(`[data-testid="result-more-${id}"]`);
+      const list = trigger?.nextElementSibling;
+      if (area === null || trigger === null || list === null || list === undefined) {
+        return {
+          problems: ['no open list'],
+          width: 0,
+          triggerHeight: 0,
+          itemHeights: [],
+          overNext: 0,
+        };
+      }
+      const box = list.getBoundingClientRect();
+      const seen = area.getBoundingClientRect();
+      if (box.left < 0 || box.right > window.innerWidth) {
+        problems.push(`list ${String(box.left)}–${String(box.right)} runs past the window`);
+      }
+      if (box.top < seen.top || box.bottom > seen.bottom) {
+        problems.push(
+          `list ${String(box.top)}–${String(box.bottom)} is outside the scroll area's ` +
+            `${String(seen.top)}–${String(seen.bottom)}`,
+        );
+      }
+      const items = [...list.querySelectorAll('button')];
+      for (const item of items) {
+        const part = item.getBoundingClientRect();
+        // Near each corner of each item, inside its rounding: anything but the
+        // list there means the item is covered, and nothing means it is cut off.
+        const corners = [
+          [part.left + 4, part.top + 4],
+          [part.right - 4, part.top + 4],
+          [part.left + 4, part.bottom - 4],
+          [part.right - 4, part.bottom - 4],
+        ] as const;
+        for (const [x, y] of corners) {
+          const onTop = document.elementFromPoint(x, y);
+          if (onTop === null || !list.contains(onTop)) {
+            problems.push(
+              `"${item.textContent ?? ''}" is covered or cut off at ${String(x)},${String(y)}`,
+            );
+          }
+        }
+      }
+      const next = trigger.closest('article')?.nextElementSibling?.getBoundingClientRect();
+      return {
+        problems,
+        width: box.width,
+        triggerHeight: trigger.getBoundingClientRect().height,
+        itemHeights: items.map((item) => item.getBoundingClientRect().height),
+        overNext: next === undefined ? 0 : Math.max(0, box.bottom - next.top),
+      };
+    },
+    { areaSelector: SEARCH_AREA, id },
+  );
+  return { ...report, problems: [...report.problems, ...(await sidewaysOverflow(page))] };
+}
+
+describe('a result card has one clear action, and its "…" menu stays in view (L-392)', () => {
+  for (const [name, viewport] of Object.entries(MENU_WINDOWS)) {
+    it(`${name}: the first card's open menu is wholly inside the window and paints above the next card`, async () => {
+      const page = await openResults(viewport);
+      await openCardMenu(page, FIRST_CARD);
+      const report = await menuReport(page, FIRST_CARD);
+      console.log(`first card menu (${name}): ${JSON.stringify(report)}`);
+      assert.deepEqual(report.problems, []);
+      // Proof the paint check looked at an overlap at all.
+      assert.ok(
+        report.overNext > 0,
+        `the list does not reach the next card: ${String(report.overNext)}`,
+      );
+      await page.context().close();
+    });
+
+    it(`${name}: the last card's menu can be scrolled to and is not cut off`, async () => {
+      const page = await openResults(viewport);
+      await openCardMenu(page, LAST_CARD);
+      const report = await menuReport(page, LAST_CARD);
+      console.log(`last card menu (${name}): ${JSON.stringify(report)}`);
+      assert.deepEqual(report.problems, []);
+      await page.context().close();
+    });
+
+    it(`${name}: colour contrast with a menu open`, async () => {
+      const page = await openResults(viewport);
+      await openCardMenu(page, FIRST_CARD);
+      const listed = await page.evaluate(
+        () =>
+          document.querySelectorAll(
+            '[data-testid^="result-analyse-"], [data-testid^="result-open-"]',
+          ).length,
+      );
+      assert.equal(listed, 2, 'the list was not open when contrast was measured');
+      judge(`search results, menu open (${name})`, await contrast(page));
+      await page.context().close();
+    });
+  }
+
+  it('at 375px "…" and each item are at least 44px tall', async () => {
+    const page = await openResults(MENU_WINDOWS.phone);
+    await openCardMenu(page, FIRST_CARD);
+    const report = await menuReport(page, FIRST_CARD);
+    assert.ok(report.triggerHeight >= 44, `"…" is ${String(report.triggerHeight)}px tall`);
+    assert.equal(report.itemHeights.length, 2);
+    for (const height of report.itemHeights) {
+      assert.ok(height >= 44, `an item is ${String(height)}px tall`);
+    }
+    await page.context().close();
+  });
+
+  // NEGATIVE — a list sent under the next card, and one cut off by its own card, are caught.
+  it('the check can fail: a list painted under the cards, and one cut off by its card, are reported', async () => {
+    const page = await openResults(MENU_WINDOWS.smallest);
+    await openCardMenu(page, FIRST_CARD);
+    const trigger = `[data-testid="result-more-${FIRST_CARD}"]`;
+    await page.evaluate((selector) => {
+      const list = document.querySelector(selector)?.nextElementSibling;
+      if (list instanceof HTMLElement) list.style.zIndex = '-1';
+    }, trigger);
+    const under = await menuReport(page, FIRST_CARD);
+    assert.ok(
+      under.problems.some((line) => line.includes('covered or cut off')),
+      `the list under the cards was not flagged: ${JSON.stringify(under.problems)}`,
+    );
+
+    await page.evaluate((selector) => {
+      const button = document.querySelector(selector);
+      const list = button?.nextElementSibling;
+      if (list instanceof HTMLElement) list.style.zIndex = '';
+      const card = button?.closest('article');
+      if (card instanceof HTMLElement) card.style.overflow = 'hidden';
+    }, trigger);
+    const clipped = await menuReport(page, FIRST_CARD);
+    assert.ok(
+      clipped.problems.some((line) => line.includes('covered or cut off')),
+      `the list cut off by its card was not flagged: ${JSON.stringify(clipped.problems)}`,
     );
     await page.context().close();
   });

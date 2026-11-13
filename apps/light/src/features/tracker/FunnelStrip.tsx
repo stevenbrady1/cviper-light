@@ -6,7 +6,7 @@ import { type TrackerEntry } from './model';
 /**
  * One quiet row under the board header: the campaign as a funnel (L-159).
  *
- *   SAVED   APPLIED SO FAR   INTERVIEWED SO FAR   OFFERS   REJECTED    Interview rate 33%
+ *   SAVED   APPLIED SO FAR   INTERVIEW OR OFFER   OFFERS   REJECTED    Interview rate 33%
  *     6         12                 4               1         5          Offer rate 8%
  *
  * ============================================================================
@@ -29,21 +29,25 @@ import { type TrackerEntry } from './model';
  * ============================================================================
  * FLOW WORDS, NOT COLUMN WORDS (L-175)
  * ============================================================================
- * The figures are cumulative — an offer has also been applied for and
- * interviewed — but the strip used to label them "Sent" and "Interviewing",
- * the second being a column name. "Interviewing 2" sat directly above an
- * Interviewing column holding one card and read as a contradiction. So the
- * labels are past tense where the figure is "got this far" (Applied,
- * Interviewed), and a sentence says so. The test ids and `funnel.ts` keep
- * their names: only the words a person reads changed.
+ * Two figures span more than one column, but the strip used to label them
+ * "Sent" and "Interviewing", the second being a column name. "Interviewing 2"
+ * sat directly above an Interviewing column holding one card and read as a
+ * contradiction (L-175). The test ids and `funnel.ts` keep their names: only
+ * the words a person reads changed.
  *
- * That sentence was a hover-only `title`, so a touch user never saw it, and
- * "Applied 5" above an Applied column of 2 still looked wrong. Those two labels
- * now say "so far" on the strip itself (L-383). Saved, Offers and Rejected are
- * plain counts of what is there now, so they do not.
+ * "Applied so far" is cumulative: every card that has left Saved, wherever it
+ * is now. It says "so far" on the strip itself (L-383), because "Applied 5"
+ * above an Applied column of 2 looked wrong.
  *
- * The sentence is now a Hint on "Applied so far" (L-387): ONE "i" for the
- * strip, on the first "so far", where keyboard and touch reach it too. That
+ * The third figure is NOT cumulative. It counts the cards in Interviewing or
+ * Offer NOW, so its label names those two columns: "Interview or offer"
+ * (L-388). A card that was interviewed and then rejected counts only under
+ * Rejected, because nothing stored says it was ever interviewed. It used to
+ * read "Interviewed so far", which promised a count the app cannot make.
+ * Saved, Offers and Rejected are plain counts of what is there now.
+ *
+ * The sentence saying so is a Hint on "Applied so far" (L-387): ONE "i" for
+ * the strip, on the one "so far", where keyboard and touch reach it too. That
  * label is on the phone's first row, which has room for it, so the strip takes
  * no extra row at 375px (measured in contrast-webkit.spec.ts).
  */
@@ -60,7 +64,7 @@ export function FunnelStrip({ entries }: FunnelStripProps) {
   const figures: ReadonlyArray<readonly [key: string, label: string, value: number]> = [
     ['saved', 'Saved', funnel.saved],
     ['sent', 'Applied so far', funnel.sent],
-    ['interviewing', 'Interviewed so far', funnel.interviewing],
+    ['interviewing', 'Interview or offer', funnel.interviewing],
     ['offers', 'Offers', funnel.offers],
     ['rejected', 'Rejected', funnel.rejected],
   ];

@@ -252,7 +252,8 @@ async function analyseFromSearch(user: User) {
   await screen.findByTestId('search-empty');
   await user.type(screen.getByTestId('search-keywords'), 'credit risk');
   await user.click(screen.getByTestId('search-submit'));
-  await user.click(await screen.findByTestId('result-analyse-search-copy'));
+  await user.click(await screen.findByTestId('result-more-search-copy'));
+  await user.click(screen.getByTestId('result-analyse-search-copy'));
   await screen.findByTestId('view-analysis');
   // Whichever CV is selected — the CV list has been read once one is.
   await vi.waitFor(() => expect(select('analysis-cv').value).not.toBe(''));

@@ -1,0 +1,151 @@
+import { type JobProviderId, type KeylessSourceId } from '@cviper/job-apis';
+
+import { SECONDARY_BUTTON } from '../../app/buttons';
+import { type Board } from '../boards/model';
+import { type KeyState } from '../../status/environment';
+import { ErrorBox } from '../../ui';
+
+import { openBoardsLabel } from './boardChoice';
+import { KeylessBar } from './KeylessBar';
+import { isUkLocation, type FeedChoice } from './feedDefaults';
+import { KeylessFeedToggles } from './KeylessFeedToggles';
+import { ProviderToggles } from './ProviderToggles';
+import { hasAnyJobBoardKey, type SearchForm } from './model';
+
+/*
+  Two parts of the Search form, moved here word for word so `Search.tsx` stays
+  under the 800-line limit (L-389). Search still owns every piece of state and
+  draws both exactly where they were; these only draw what they are handed.
+*/
+
+export interface WhereToLookProps {
+  readonly keyStates: Record<JobProviderId, KeyState>;
+  readonly chosen: ReadonlySet<JobProviderId>;
+  readonly onToggle: (provider: JobProviderId, next: boolean) => void;
+  readonly onOpenSettings?: (() => void) | undefined;
+  readonly running: boolean;
+  readonly keylessChosen: ReadonlySet<KeylessSourceId>;
+  readonly onToggleKeyless: (source: KeylessSourceId, next: boolean) => void;
+  readonly feedChoice: FeedChoice;
+  readonly form: SearchForm;
+  readonly jobBoards: readonly Board[];
+  readonly ticked: ReadonlySet<string>;
+  readonly onToggleBoard: (id: string, on: boolean) => void;
+  readonly onOpenJobBoards?: (() => void) | undefined;
+}
+
+/** The "Where to look" box: the keyed boards, the free feeds and the board ticks. */
+export function WhereToLook({
+  keyStates,
+  chosen,
+  onToggle,
+  onOpenSettings,
+  running,
+  keylessChosen,
+  onToggleKeyless,
+  feedChoice,
+  form,
+  jobBoards,
+  ticked,
+  onToggleBoard,
+  onOpenJobBoards,
+}: WhereToLookProps) {
+  return (
+    <section
+      aria-labelledby="search-where-heading"
+      data-testid="search-where"
+      className="mt-4 space-y-3 rounded-card border border-line bg-sunken px-4 py-3"
+    >
+      <h2 id="search-where-heading" className="font-medium text-ink">
+        Where to look
+      </h2>
+      {hasAnyJobBoardKey(keyStates) ? (
+        <div>
+          <ProviderToggles
+            keyStates={keyStates}
+            chosen={chosen}
+            onToggle={onToggle}
+            onOpenSettings={onOpenSettings ?? (() => undefined)}
+            disabled={running}
+          />
+        </div>
+      ) : null}
+
+      {/*
+      Under the keyed boards, not instead of them. The two are different
+      things and the screen says which is which: a search of a job board
+      with the user's own free key, and a browse of what a public
+      feed has just published. Neither is presented as a fallback for
+      the other.
+    */}
+      <div>
+        <KeylessFeedToggles
+          chosen={keylessChosen}
+          onToggle={onToggleKeyless}
+          arbeitnowOffForUk={feedChoice.arbeitnow === undefined && isUkLocation(form.location)}
+          disabled={running}
+        />
+      </div>
+
+      {/*
+        The same search on the whole of a job board, one tick away
+        (L-219). Inside the form now, so its ticks come before the
+        button that opens them.
+      */}
+      <KeylessBar
+        boards={jobBoards}
+        ticked={ticked}
+        onToggle={onToggleBoard}
+        disabled={running}
+        onManageBoards={onOpenJobBoards}
+      />
+    </section>
+  );
+}
+
+export interface OpenBoardsRowProps {
+  readonly running: boolean;
+  /** Why the boards' button cannot be pressed, or `null` when it can. */
+  readonly openBoardsReason: string | null;
+  readonly onOpenTicked: () => Promise<void>;
+  readonly boardsToOpen: readonly Board[];
+  /** Boards that would not open on the last press. */
+  readonly boardsProblem: readonly string[];
+}
+
+/** "Also open in N boards", its reason, and the boards that did not open. */
+export function OpenBoardsRow({
+  running,
+  openBoardsReason,
+  onOpenTicked,
+  boardsToOpen,
+  boardsProblem,
+}: OpenBoardsRowProps) {
+  return (
+    <>
+      <div data-testid="search-open-boards-row" className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          data-testid="search-open-boards"
+          disabled={running || openBoardsReason !== null}
+          onClick={() => void onOpenTicked()}
+          className={SECONDARY_BUTTON}
+        >
+          {openBoardsLabel(boardsToOpen.length)}
+        </button>
+
+        {openBoardsReason === null ? null : (
+          <p data-testid="search-open-boards-reason" className="text-ink-muted">
+            {openBoardsReason}
+          </p>
+        )}
+      </div>
+
+      {boardsProblem.length === 0 ? null : (
+        <ErrorBox variant="box" gapAbove="mt-2" testId="search-boards-problem">
+          {`${boardsProblem.join(', ')} did not open in your browser. Check that a default browser is set, then try again.`}
+        </ErrorBox>
+      )}
+    </>
+  );
+}
