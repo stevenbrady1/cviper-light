@@ -24,7 +24,9 @@
  *   blue   action. Exactly ONE primary button per view, links, the focus ring.
  *   teal   present / matched / fresh. Something is here and it is moving.
  *   gold   gap / attention / going quiet. Something needs the user.
- *   red    destructive, and the `rejected` status. Nothing else, ever.
+ *   red    destructive, and an overdue next action on a tracker card (its
+ *          words, and its dot beside the title). Nothing else, ever. The
+ *          `rejected` status pill that was red left the card in L-175.
  *
  * A second meaning attached to any of these is what turns a palette into
  * decoration. If a new state needs a colour, it takes one of these meanings or

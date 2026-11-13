@@ -10,15 +10,19 @@ import { type TrackerEntry } from './model';
 import { STALENESS_BANDS, stalenessBand, stalenessDescription } from './staleness';
 
 /**
- * One application, as four lines.
+ * One application, as four parts.
  *
- *   title                          Inter 500 — the thing you scan for
- *   company · location             Inter 400, muted — context, not headline
+ *   title                          Inter 500 — the thing you scan for. Up to
+ *                                  three lines (L-393); a red dot beside it when
+ *                                  the next action is overdue
+ *   company · location             Inter 400, muted — context, not headline. Up
+ *                                  to two lines
  *   12 days since last change      the left edge's age in words (L-318)
  *   Reply by Friday · due in 2 days  the next action, when there is one: the
  *                                  user's words, then how close it is, coloured
  *                                  by urgency. One line; the words clip with an
- *                                  ellipsis, the due never does
+ *                                  ellipsis, the due never does. With no date,
+ *                                  the words alone, muted (L-393)
  *
  * No status pill (L-175). The column header already says the status, so a
  * pill repeating it on every card spent the footer on a fact already on
@@ -76,6 +80,10 @@ export function TrackerCard({
     application.next_action_date,
     today,
   );
+  // An action with no readable date is a note, not a deadline: the user's own
+  // words, muted, with no colour and no dot (L-393).
+  const words = application.next_action?.trim() ?? '';
+  const note = line === null && words !== '' ? words : null;
 
   const where = [job.company, job.agency === null ? null : `via ${job.agency}`, job.location]
     .filter((part) => part !== null && part !== '')
@@ -95,6 +103,7 @@ export function TrackerCard({
         substage === null ? null : `Stage: ${substage}`,
         age,
         dueDescription,
+        note === null ? null : `Next action: ${note}`,
       ]
         .filter((part) => part !== null && part !== '')
         .join('. ')}
@@ -113,8 +122,20 @@ export function TrackerCard({
         settling ? 'cviper-card-settle' : '',
       ].join(' ')}
     >
-      <p className="truncate font-medium text-ink">{job.title}</p>
-      <p className="truncate text-xs text-ink-muted">{where}</p>
+      <div className="flex items-start gap-2">
+        <p className="line-clamp-3 min-w-0 flex-1 break-words font-medium text-ink">{job.title}</p>
+        {urgency === 'overdue' ? (
+          // Built like the side bar's status dot: a second telling of the red
+          // "overdue" words below, so it is hidden from screen readers. Not a
+          // StateMark: a mark needs a hint, and nothing can sit inside the card's button.
+          <span
+            aria-hidden="true"
+            data-testid={`tracker-card-overdue-${application.id}`}
+            className="mt-2 size-2 shrink-0 rounded-pill bg-danger"
+          />
+        ) : null}
+      </div>
+      <p className="line-clamp-2 break-words text-xs text-ink-muted">{where}</p>
 
       {substage === null ? null : (
         <p
@@ -160,6 +181,15 @@ export function TrackerCard({
           >
             {line.when}
           </span>
+        </p>
+      )}
+
+      {note === null ? null : (
+        <p
+          data-testid={`tracker-card-next-${application.id}`}
+          className="mt-2 truncate text-[11px] text-ink-muted"
+        >
+          {note}
         </p>
       )}
     </button>

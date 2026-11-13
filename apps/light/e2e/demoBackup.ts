@@ -28,6 +28,8 @@ interface DemoRole {
   /** How many days ago it last moved. */
   readonly daysAgo: number;
   readonly nextAction: string | null;
+  /** When the next action is due, in days from now (negative: overdue), or null. */
+  readonly nextActionInDays: number | null;
 }
 
 const ROLES: readonly DemoRole[] = [
@@ -41,6 +43,7 @@ const ROLES: readonly DemoRole[] = [
     status: 'saved',
     daysAgo: 1,
     nextAction: 'Tailor CV',
+    nextActionInDays: null,
   },
   {
     key: 'reporting-analyst',
@@ -52,6 +55,7 @@ const ROLES: readonly DemoRole[] = [
     status: 'applied',
     daysAgo: 4,
     nextAction: null,
+    nextActionInDays: null,
   },
   {
     key: 'bi-developer',
@@ -63,6 +67,7 @@ const ROLES: readonly DemoRole[] = [
     status: 'applied',
     daysAgo: 12,
     nextAction: 'Chase the recruiter',
+    nextActionInDays: -2,
   },
   {
     key: 'insight-analyst',
@@ -74,6 +79,7 @@ const ROLES: readonly DemoRole[] = [
     status: 'interviewing',
     daysAgo: 2,
     nextAction: 'Prepare STAR examples',
+    nextActionInDays: null,
   },
   {
     key: 'senior-analyst',
@@ -85,6 +91,7 @@ const ROLES: readonly DemoRole[] = [
     status: 'interviewing',
     daysAgo: 6,
     nextAction: null,
+    nextActionInDays: null,
   },
   {
     key: 'analytics-lead',
@@ -96,6 +103,7 @@ const ROLES: readonly DemoRole[] = [
     status: 'offer',
     daysAgo: 1,
     nextAction: 'Reply by Friday',
+    nextActionInDays: 2,
   },
 ];
 
@@ -142,7 +150,10 @@ export function demoBackup(now: Date): string {
       applied_date: role.status === 'saved' ? null : isoDate(updated),
       notes: null,
       next_action: role.nextAction,
-      next_action_date: null,
+      next_action_date:
+        role.nextActionInDays === null
+          ? null
+          : isoDate(new Date(now.getTime() + role.nextActionInDays * DAY_MS)),
       updated_at: updated.toISOString(),
       interview_substage_id: null,
     };
