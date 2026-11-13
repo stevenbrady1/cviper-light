@@ -260,6 +260,165 @@ describe('DetailPane on a phone keeps focus while it covers the screen (L-236)',
   });
 });
 
+describe('DetailPane over the view (L-401)', () => {
+  // The Tracker's pane floats over the right edge of the board on a desktop.
+  // It then covers what is behind it, so it keeps focus as on a phone, and it
+  // is still a pane: no dialog markers, no backdrop.
+  function installViewport(wide: boolean) {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: wide,
+        media: query,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }),
+    });
+  }
+
+  afterEach(() => {
+    delete (window as { matchMedia?: unknown }).matchMedia;
+  });
+
+  function Host({ over }: { over: boolean }) {
+    const [open, setOpen] = useState(false);
+    return (
+      <div>
+        <button type="button" data-testid="opener" onClick={() => setOpen(true)}>
+          Open card
+        </button>
+        {open ? (
+          <DetailPane title="Quant Developer" over={over} onClose={() => setOpen(false)}>
+            <button type="button" data-testid="inside">
+              Inside
+            </button>
+          </DetailPane>
+        ) : null}
+      </div>
+    );
+  }
+
+  function classesOf(element: HTMLElement): string[] {
+    return element.className.split(/\s+/).filter(Boolean);
+  }
+
+  it('wide + over: focus moves into the pane when it opens', async () => {
+    installViewport(true);
+    const user = userEvent.setup();
+    render(<Host over />);
+
+    await user.click(screen.getByTestId('opener'));
+
+    expect(document.activeElement).toBe(screen.getByTestId('detail-pane-close'));
+  });
+
+  it('wide + over: Tab from the last control wraps inside', async () => {
+    installViewport(true);
+    const user = userEvent.setup();
+    render(<Host over />);
+    await user.click(screen.getByTestId('opener'));
+    screen.getByTestId('inside').focus();
+
+    await user.tab();
+
+    expect(document.activeElement).toBe(screen.getByTestId('detail-pane-close'));
+  });
+
+  it('wide + over: closing returns focus to what opened it', async () => {
+    installViewport(true);
+    const user = userEvent.setup();
+    render(<Host over />);
+    await user.click(screen.getByTestId('opener'));
+
+    await user.click(screen.getByTestId('detail-pane-close'));
+
+    expect(document.activeElement).toBe(screen.getByTestId('opener'));
+  });
+
+  it('negative: over carries no dialog markers, so a confirm still owns Escape', async () => {
+    installViewport(true);
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    const { container } = render(
+      <DetailPane title="Quant Developer" over onClose={onClose}>
+        <div role="dialog" aria-modal="true" data-testid="confirm">
+          <button type="button" data-testid="keep">
+            Keep it
+          </button>
+        </div>
+      </DetailPane>,
+    );
+    const pane = screen.getByTestId('detail-pane');
+    expect(pane.getAttribute('role')).toBeNull();
+    expect(pane.hasAttribute('aria-modal')).toBe(false);
+    // No backdrop: the pane is the only thing drawn, so the board stays usable.
+    expect([...container.children]).toEqual([pane]);
+
+    screen.getByTestId('keep').focus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).not.toHaveBeenCalled();
+
+    // The pane's trap stands down for the confirm: Tab is not pulled to Close.
+    await user.tab();
+    expect(document.activeElement).not.toBe(screen.getByTestId('detail-pane-close'));
+  });
+
+  it('boundary: narrow + over is the same full screen as today', async () => {
+    installViewport(false);
+    const { unmount } = render(
+      <DetailPane title="Quant Developer" onClose={() => {}}>
+        <p>Body</p>
+      </DetailPane>,
+    );
+    const phone = (classes: string[]) => classes.filter((name) => !name.startsWith('md:'));
+    const today = phone(classesOf(screen.getByTestId('detail-pane')));
+    unmount();
+
+    const user = userEvent.setup();
+    render(<Host over />);
+    await user.click(screen.getByTestId('opener'));
+    const pane = screen.getByTestId('detail-pane');
+
+    expect(phone(classesOf(pane))).toEqual(today);
+    expect(today).toEqual(expect.arrayContaining(['fixed', 'inset-0', 'z-40', 'w-full']));
+    expect(pane.contains(document.activeElement)).toBe(true);
+  });
+
+  it('edge: it floats — md:absolute and md:shadow-overlay, never md:static', () => {
+    render(
+      <DetailPane title="Quant Developer" over onClose={() => {}}>
+        <p>Body</p>
+      </DetailPane>,
+    );
+    const over = classesOf(screen.getByTestId('detail-pane'));
+    expect(over).toEqual(
+      expect.arrayContaining([
+        'md:absolute',
+        'md:inset-y-0',
+        'md:right-0',
+        'md:left-auto',
+        'md:z-10',
+        'md:w-[380px]',
+        'md:shadow-overlay',
+      ]),
+    );
+    expect(over).not.toContain('md:static');
+    cleanup();
+
+    // Without `over` (Past checks on Analysis) it still sits beside the view.
+    render(
+      <DetailPane title="Quant Developer" onClose={() => {}}>
+        <p>Body</p>
+      </DetailPane>,
+    );
+    const beside = classesOf(screen.getByTestId('detail-pane'));
+    expect(beside).toContain('md:static');
+    expect(beside).not.toContain('md:absolute');
+    expect(beside).not.toContain('md:shadow-overlay');
+  });
+});
+
 describe('DetailPane Close is the shared quiet button (L-349)', () => {
   it('Close is a thumb-sized target on a phone', () => {
     // 44px below `md` is the smallest thing a thumb reliably hits (L-81). The

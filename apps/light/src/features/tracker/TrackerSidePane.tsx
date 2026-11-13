@@ -43,11 +43,13 @@ export type Pane =
   | { kind: 'entry'; applicationId: string };
 
 /**
- * The pane beside the board: paste a job, the interview-stage editor, a new
+ * The pane beside or over the board: paste a job, the interview-stage editor, a new
  * application, or the card that is open. Every value and handler belongs to
  * `Tracker`, which passes them down.
  */
 export interface TrackerSidePaneProps {
+  /** Float over the board on a desktop instead of sitting beside it (L-401). */
+  readonly over: boolean;
   readonly pane: Pane;
   readonly setPane: (pane: Pane) => void;
   readonly onOpenSettings: (() => void) | undefined;
@@ -83,6 +85,7 @@ export interface TrackerSidePaneProps {
 }
 
 export function TrackerSidePane({
+  over,
   pane,
   setPane,
   onOpenSettings,
@@ -115,6 +118,7 @@ export function TrackerSidePane({
 }: TrackerSidePaneProps) {
   return pane.kind === 'paste' ? (
     <DetailPane
+      over={over}
       title="Paste a job"
       subtitle="An AI reads the advert. You check every field before it is saved."
       onClose={() => setPane({ kind: 'closed' })}
@@ -140,6 +144,7 @@ export function TrackerSidePane({
     </DetailPane>
   ) : pane.kind === 'substages' ? (
     <DetailPane
+      over={over}
       title="Interview stages"
       subtitle="Your own stages inside Interviewing, such as HR Screen or Final."
       onClose={() => setPane({ kind: 'closed' })}
@@ -174,6 +179,7 @@ export function TrackerSidePane({
     </DetailPane>
   ) : pane.kind === 'new' ? (
     <DetailPane
+      over={over}
       title={pane.fromPaste === true ? 'Check the details' : 'New application'}
       subtitle={
         pane.fromPaste === true
@@ -211,6 +217,7 @@ export function TrackerSidePane({
     </DetailPane>
   ) : selected === null ? null : (
     <DetailPane
+      over={over}
       title={selected.job.title}
       subtitle={[selected.job.company, selected.job.location]
         .filter((part) => part !== null && part !== '')
