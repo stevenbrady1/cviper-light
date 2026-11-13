@@ -989,7 +989,7 @@ describe('the card and the board at a narrow width (L-175)', () => {
     // shrank to "Senior Pr…". A floor on the column plus sideways scroll on
     // desktop is the fix; jsdom cannot measure, so the classes are the pin.
     const column = screen.getByTestId('tracker-column-saved');
-    expect(column.className).toContain('md:min-w-44');
+    expect(column.className).toContain('md:min-w-34');
     expect(column.className).not.toContain('md:min-w-0');
     expect(column.parentElement?.className).toContain('overflow-x-auto');
     expect(column.parentElement?.className).not.toContain('md:overflow-x-visible');
