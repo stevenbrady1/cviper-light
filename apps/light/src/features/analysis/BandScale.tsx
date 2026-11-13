@@ -133,22 +133,20 @@ export function BandScale({ score, verdict }: BandScaleProps) {
     >
       <div className="flex items-baseline gap-2">
         {/*
-          The display serif, per the Northlight rule: numbers that change what
-          a person does next are set apart from numbers they scan past. This is
-          the former -- it is the whole reason the screen exists.
+          The Northlight rule: numbers that change what a person does next are
+          set apart from numbers they scan past. This is the former -- it is
+          the whole reason the screen exists.
 
-          It moved here from Plex Mono, which was chosen for the same property
-          this keeps: `tabular-nums`, so the figure does not jitter between runs
-          as the digits change. `lining-nums` is new and load-bearing -- this
-          serif defaults to OLD-STYLE figures that sit above and below the
-          baseline, which would make a 71 and a 100 rock against each other.
+          Set apart by size and weight, in the app's one typeface: the owner
+          dropped the serif from the whole app (L-407). 60px on a phone, 72px
+          from md: up, semibold, so it is the hero of the result (L-391).
 
-          `font-normal`, not medium: the face ships one weight. 60px on a phone,
-          72px from md: up, so it is the hero of the result (L-391).
+          `tabular-nums` so the figure does not jitter between runs as the
+          digits change; `lining-nums` so a 71 and a 100 sit on one line.
         */}
         <span
           data-testid="band-scale-score"
-          className={`font-display text-6xl leading-none font-normal lining-nums tabular-nums md:text-7xl ${VERDICT_INK[verdict]}`}
+          className={`text-6xl leading-none font-semibold lining-nums tabular-nums md:text-7xl ${VERDICT_INK[verdict]}`}
         >
           {value}
         </span>
