@@ -9,7 +9,8 @@ import { type HTMLAttributes, type ReactNode } from 'react';
  *   ready      teal   present, works now, fresh
  *   attention  gold   needs the user, going quiet
  *   neutral    —      a plain fact with no judgement in it
- *   danger     red    destructive or rejected. Nothing else.
+ *   danger     red    destructive, and an overdue next action on a tracker
+ *                     card. Nothing else. A rejected status is not red (L-175).
  *
  * There is no blue pill and no navy pill. Blue is action and navy is
  * structure; a status is neither, and a pill wearing either would teach the

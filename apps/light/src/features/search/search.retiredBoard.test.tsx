@@ -84,7 +84,7 @@ describe('a stored "guardian" tick, after the board was retired', () => {
     await vi.waitFor(() => expect(open.textContent).toBe('Also open in job boards'));
     expect(open.disabled).toBe(true);
     expect(screen.getByTestId('search-open-boards-reason').textContent).toBe(
-      'Tick a job board above to open this search in your browser too.',
+      'Tick a job board in “Where to look” first.',
     );
   });
 });

@@ -55,9 +55,11 @@ export function TrackerBoard({
      * Phone: the columns are wider than the screen and scroll sideways,
      * one column snapping into view at a time — the same board, read a
      * column at a time. Desktop: all of them, side by side, each at
-     * least 11rem wide (L-175). With the 380px detail pane open the
-     * five used to share ~630px and every title shrank to "Senior
-     * Pr…"; now the board scrolls sideways instead of crushing.
+     * least 136px wide (L-397; it was 176px, L-175). At 136px all five
+     * fit the smallest window (1000px), and titles now wrap rather than
+     * being cut, so a narrower column still reads. Below that — with the
+     * 380px detail pane open, say — the board scrolls sideways instead
+     * of crushing every title to "Senior Pr…".
      */
     <div className="flex h-full min-h-0 flex-col gap-2">
       <div className="flex shrink-0 items-center gap-2">

@@ -274,6 +274,27 @@ describe('colour contrast on the rendered app (WCAG 2.1 AA)', () => {
       });
     }
   }
+
+  /*
+    L-398: "Where to look" is a closed fold now, so the plain Search visit
+    above no longer measures its text. This opens it and measures its top and
+    its foot in view, with and without a key saved (the keyed boards row).
+  */
+  for (const [width, viewport] of Object.entries(VIEWPORTS)) {
+    for (const query of ['?seen=1', '?seen=1&results=1']) {
+      it(`Search with Where to look open, ${width}, ${query}`, async () => {
+        const page = await open(query, viewport);
+        await goTo(page, 'search');
+        await page.click('[data-testid="search-where-fold"] > summary');
+        await page.locator('[data-testid="keyless-bar"]:visible').waitFor();
+        await page.locator('[data-testid="keyless-feeds"]').scrollIntoViewIfNeeded();
+        judge(`search, where open, top (${width}, ${query})`, await contrast(page));
+        await page.locator('[data-testid="keyless-bar"]').scrollIntoViewIfNeeded();
+        judge(`search, where open, foot (${width}, ${query})`, await contrast(page));
+        await page.context().close();
+      });
+    }
+  }
 });
 
 /**
@@ -507,7 +528,7 @@ async function overflowingColumnHeadings(page: Page): Promise<string[]> {
 }
 
 describe('the Tracker board lays out (L-311)', () => {
-  for (const width of [1024, 1280, 1440]) {
+  for (const width of [1000, 1024, 1280, 1440]) {
     it(`every column heading fits its column at ${String(width)}px, with an application open`, async () => {
       const page = await open('?seen=1&entries=1', { width, height: 800 });
       await goTo(page, 'tracker');
@@ -801,6 +822,158 @@ describe('richer Tracker cards fit their column (L-393)', () => {
     assert.ok(
       fit.problems.some((line) => line.startsWith('long:')),
       `the unbreakable title was not flagged: ${JSON.stringify(fit.problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
+ * All five Tracker columns fit the smallest window (L-397).
+ *
+ * The app's smallest window is 1000px. Less the side menu and the board's
+ * padding, the board has 728px; five columns and four 8px gaps fit in it when
+ * a column's floor is 136px (712px in all). At a 176px floor they needed
+ * 912px and Rejected sat mostly off screen. Below the floor — a 768px window,
+ * or the detail pane open beside the board — the board scrolls sideways
+ * rather than squeezing a column under 136px.
+ */
+const COLUMN_FLOOR = 136;
+
+interface BoardFit {
+  readonly problems: string[];
+  readonly board: number;
+  readonly scroll: number;
+  readonly columns: number[];
+}
+
+async function boardFit(page: Page): Promise<BoardFit> {
+  return page.evaluate(() => {
+    const problems: string[] = [];
+    const board = document.querySelector('[data-testid="tracker-board"]');
+    if (board === null) return { problems: ['no board'], board: 0, scroll: 0, columns: [] };
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      problems.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    if (board.scrollWidth > board.clientWidth) {
+      problems.push(`board: scrolls ${String(board.scrollWidth - board.clientWidth)}px sideways`);
+    }
+    const outer = board.getBoundingClientRect();
+    const right = Math.min(outer.left + board.clientWidth, root.clientWidth);
+    const columns = [
+      ...board.querySelectorAll<HTMLElement>(':scope > [data-testid^="tracker-column-"]'),
+    ];
+    if (columns.length !== 5) problems.push(`${String(columns.length)} columns drawn, not 5`);
+    for (const column of columns) {
+      const box = column.getBoundingClientRect();
+      if (box.left < outer.left - 0.5 || box.right > right + 0.5) {
+        problems.push(
+          `${column.getAttribute('data-testid') ?? '?'}: ${String(box.left)}–${String(box.right)}px, board shows ${String(outer.left)}–${String(right)}px`,
+        );
+      }
+    }
+    return {
+      problems,
+      board: board.clientWidth,
+      scroll: board.scrollWidth,
+      columns: columns.map((column) => Math.round(column.getBoundingClientRect().width * 10) / 10),
+    };
+  });
+}
+
+async function openBoard(query: string, width: number, height: number): Promise<Page> {
+  const page = await open(`?seen=1&entries=${query}`, { width, height });
+  await goTo(page, 'tracker');
+  await page.waitForSelector('button[data-testid^="tracker-card-"][data-status]');
+  return page;
+}
+
+/** The dated action line on a card: how much of the user's words survive beside the due. */
+async function dueLine(page: Page): Promise<{ action: string; shown: number; full: number }[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('[data-testid^="tracker-card-due-action-"]')].map(
+      (span) => ({
+        action: span.textContent ?? '',
+        shown: span.clientWidth,
+        full: span.scrollWidth,
+      }),
+    ),
+  );
+}
+
+describe('all five Tracker columns fit the smallest window (L-397)', () => {
+  for (const query of ['1', 'long'] as const) {
+    for (const [width, height] of [
+      [1000, 700],
+      [1264, 720],
+      [1440, 900],
+      [1920, 900],
+    ] as const) {
+      it(`at ${String(width)}px (?entries=${query}) all five columns are wholly on screen and the board does not scroll sideways`, async () => {
+        const page = await openBoard(query, width, height);
+        const fit = await boardFit(page);
+        console.log(`board at ${String(width)}px (?entries=${query}): ${JSON.stringify(fit)}`);
+        assert.deepEqual(fit.problems, []);
+        if (query === 'long') {
+          const cards = await cardFit(page);
+          console.log(`  due line: ${JSON.stringify(await dueLine(page))}`);
+          assert.deepEqual(cards.problems, []);
+          const dot = await overdueDot(page);
+          assert.ok(dot.count === 1 && dot.inside, `overdue dot: ${JSON.stringify(dot)}`);
+        }
+        await page.context().close();
+      });
+    }
+
+    it(`at 768px (?entries=${query}) the board scrolls sideways rather than crushing columns below ${String(COLUMN_FLOOR)}px`, async () => {
+      const page = await openBoard(query, 768, 800);
+      const fit = await boardFit(page);
+      console.log(`board at 768px (?entries=${query}): ${JSON.stringify(fit)}`);
+      assert.ok(fit.scroll > fit.board, 'the board does not scroll sideways at 768px');
+      assert.equal(fit.columns.length, 5);
+      for (const column of fit.columns)
+        assert.ok(column >= COLUMN_FLOOR - 0.5, `${String(column)}px`);
+      await page.context().close();
+    });
+
+    // Since L-401 the detail pane floats over the board instead of sitting
+    // beside it, so the board keeps its 728px at 1000: the columns keep their
+    // width, the board does not scroll, and cards still fit.
+    it(`at 1000px with a card open (?entries=${query}) every column keeps its closed width (at least ${String(COLUMN_FLOOR)}px) and the board does not scroll sideways`, async () => {
+      const page = await openBoard(query, 1000, 700);
+      const closed = await boardFit(page);
+      await page.locator('button[data-testid^="tracker-card-"][data-status]').first().click();
+      await page.waitForSelector('[data-testid="detail-pane"]');
+      const fit = await boardFit(page);
+      console.log(`board at 1000px with a card open (?entries=${query}): ${JSON.stringify(fit)}`);
+      assert.deepEqual(fit.problems, []);
+      assert.deepEqual(fit.columns, closed.columns, 'a column changed width when the card opened');
+      for (const column of fit.columns)
+        assert.ok(column >= COLUMN_FLOOR - 0.5, `${String(column)}px`);
+      if (query === 'long') {
+        const cards = await cardFit(page);
+        console.log(`  due line: ${JSON.stringify(await dueLine(page))}`);
+        assert.deepEqual(cards.problems, []);
+        const dot = await overdueDot(page);
+        assert.ok(dot.count === 1 && dot.inside, `overdue dot: ${JSON.stringify(dot)}`);
+      }
+      await page.context().close();
+    });
+  }
+
+  // At 1000px the board has 728px; one 400px column and four at 136px need 976.
+  it('the check can fail: a column forced to 400px is reported', async () => {
+    const page = await openBoard('1', 1000, 700);
+    await page.evaluate(() => {
+      const column = document.querySelector<HTMLElement>('[data-testid="tracker-column-applied"]');
+      if (column === null) throw new Error('no Applied column');
+      column.style.minWidth = '400px';
+    });
+    const fit = await boardFit(page);
+    assert.ok(
+      fit.problems.some((line) => line.startsWith('board:')) &&
+        fit.problems.some((line) => line.startsWith('tracker-column-')),
+      `the widened column was not flagged: ${JSON.stringify(fit.problems)}`,
     );
     await page.context().close();
   });
@@ -1321,8 +1494,17 @@ const SUBMIT_ROW = '[data-testid="search-submit-row"]';
 const SMALLEST_WINDOW = { width: 1000, height: 700 };
 const NARROWEST_STICKY = { width: 768, height: 700 };
 
-/** Search with the owner's typing: a grey button, its reason, and the Reed fix. */
-async function openTypedSearch(
+/** "Where to look", a fold since L-398. */
+const WHERE_FOLD = '[data-testid="search-where-fold"]';
+
+/** Open "Where to look" as a person would: a click on its summary line. */
+async function openWhereToLook(page: Page): Promise<void> {
+  await page.click(`${WHERE_FOLD} > summary`);
+  await page.waitForSelector(`${WHERE_FOLD}[open]`);
+}
+
+/** Search with the owner's typing: a grey button, its reason, and the Reed fix. Still folded. */
+async function openTypedSearchFolded(
   viewport: { width: number; height: number },
   query = '?seen=1',
 ): Promise<Page> {
@@ -1331,6 +1513,19 @@ async function openTypedSearch(
   await page.fill('[data-testid="search-keywords"]', 'Project Coordinator');
   await page.fill('[data-testid="search-location"]', 'London');
   if (query === '?seen=1') await page.waitForSelector('[data-testid="search-get-reed-key"]');
+  return page;
+}
+
+/**
+ * The same, with "Where to look" opened (L-398). The tests below are about
+ * the TALLEST form; with the box folded they would pass on a short one.
+ */
+async function openTypedSearch(
+  viewport: { width: number; height: number },
+  query = '?seen=1',
+): Promise<Page> {
+  const page = await openTypedSearchFolded(viewport, query);
+  await openWhereToLook(page);
   return page;
 }
 
@@ -1945,6 +2140,186 @@ describe('"Found one? Bring it in" opens the paste pane, cursor in the link box 
 });
 
 /**
+ * "Where to look" folds (L-398).
+ *
+ * Closed, the box is one summary line, so at the smallest window the fields,
+ * Search with its reason and fix, and the top of the results area fit without
+ * a scroll, and the pinned row (L-342) has nothing to do. jsdom draws a closed
+ * fold's content and lets it be focused, clicked and tabbed into, so whether
+ * the fold really keeps its content out of reach is only knowable here.
+ */
+
+/** What of the results area's top is not on screen. Empty means all is well. */
+async function resultsTopProblems(page: Page): Promise<string[]> {
+  return page.evaluate((areaSelector) => {
+    const area = document.querySelector(areaSelector);
+    const header = document.querySelector('[data-testid="search-results-header"]');
+    const empty = document.querySelector('[data-testid="search-empty"]');
+    if (area === null || header === null || empty === null) return ['nothing to measure'];
+    const seen = area.getBoundingClientRect();
+    const top = header.getBoundingClientRect();
+    const box = empty.getBoundingClientRect();
+    // The results header whole, and the top edge of the box the results go in.
+    return top.top >= seen.top && top.bottom <= seen.bottom && box.top + 8 <= seen.bottom
+      ? []
+      : [
+          `the results area starts at ${String(top.top)}, its box at ${String(box.top)}, ` +
+            `the scroll area ends at ${String(seen.bottom)}`,
+        ];
+  }, SEARCH_AREA);
+}
+
+/** The summary line's height. */
+async function summaryHeight(page: Page): Promise<number> {
+  return page.evaluate(
+    (fold) => document.querySelector(`${fold} > summary`)?.getBoundingClientRect().height ?? 0,
+    WHERE_FOLD,
+  );
+}
+
+/** Every element Tab lands on, from the first field until focus leaves the form. */
+async function tabStops(page: Page): Promise<{ inside: string[]; summary: boolean }> {
+  await page.focus('[data-testid="search-keywords"]');
+  const inside: string[] = [];
+  let summary = false;
+  for (let presses = 0; presses < 60; presses += 1) {
+    await page.keyboard.press('Tab');
+    const stop = await page.evaluate((fold) => {
+      const active = document.activeElement;
+      const where = document.querySelector(fold);
+      return {
+        inForm: active?.closest('[data-testid="search-form"]') !== null,
+        isSummary: active === where?.querySelector(':scope > summary'),
+        insideFold: where !== null && active !== null && where.contains(active),
+        name: active?.getAttribute('data-testid') ?? active?.tagName ?? '?',
+      };
+    }, WHERE_FOLD);
+    if (!stop.inForm) break;
+    if (stop.isSummary) summary = true;
+    else if (stop.insideFold) inside.push(stop.name);
+  }
+  return { inside, summary };
+}
+
+describe('"Where to look" folds, and the form fits the smallest window (L-398)', () => {
+  it('at 1000×700, folded: Search, its reason and the fix, and the top of the results area are on screen unscrolled', async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    const seen = await page.evaluate(
+      ({ areaSelector, fold }) => ({
+        scrollTop: document.querySelector(areaSelector)?.scrollTop ?? -1,
+        open: (document.querySelector(fold) as HTMLDetailsElement | null)?.open ?? null,
+        resultsTop: document.querySelector('[data-testid="search-empty"]')?.getBoundingClientRect()
+          .top,
+      }),
+      { areaSelector: SEARCH_AREA, fold: WHERE_FOLD },
+    );
+    console.log(`folded at 1000×700: ${JSON.stringify(seen)}`);
+    assert.equal(seen.scrollTop, 0, 'the area was scrolled before measuring');
+    assert.equal(seen.open, false, 'the fold was not closed on arrival');
+    assert.deepEqual(await submitRowProblems(page), []);
+    assert.deepEqual(await resultsTopProblems(page), []);
+    await page.context().close();
+  });
+
+  it('folded at 1000×700, the button sits in its natural place (the pin is not needed)', async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    const { top, inFlow } = await rowAgainstFlow(page);
+    console.log(`row, folded at 1000×700: at ${String(top)}, in flow ${String(inFlow)}`);
+    assert.equal(top, inFlow);
+    await page.context().close();
+  });
+
+  it('the summary line is at least 44px tall, in whole pixels, at 375px and at 1000×700', async () => {
+    for (const viewport of [PHONE, SMALLEST_WINDOW]) {
+      const page = await openTypedSearchFolded(viewport);
+      const height = await summaryHeight(page);
+      console.log(`summary line at ${String(viewport.width)}px: ${String(height)}px`);
+      assert.ok(height >= 44, `${String(viewport.width)}px: ${String(height)}px tall`);
+      assert.ok(Number.isInteger(height), `${String(viewport.width)}px: ${String(height)}px`);
+      await page.context().close();
+    }
+  });
+
+  it('at 375px, with everything ticked, the summary wraps and adds no sideways scroll', async () => {
+    const page = await openTypedSearchFolded(PHONE, '?seen=1&results=1');
+    await openWhereToLook(page);
+    await page.click('[data-testid="keyless-more"]');
+    const unticked = page.locator(`${WHERE_FOLD} input:not(:checked)`);
+    while ((await unticked.count()) > 0) await unticked.first().check();
+    await page.click(`${WHERE_FOLD} > summary`);
+    await page.waitForSelector(`${WHERE_FOLD}:not([open])`);
+    const text = await page.locator('[data-testid="search-where-summary"]').textContent();
+    const height = await summaryHeight(page);
+    console.log(`summary line, all ticked at 375px: ${String(height)}px — ${String(text)}`);
+    assert.match(text ?? '', /^Adzuna · Reed · Arbeitnow · \d+ job boards ticked$/);
+    assert.ok(height >= 44, `${String(height)}px tall`);
+    assert.ok(height <= 68, `${String(height)}px tall: more than two lines`);
+    assert.deepEqual(await sidewaysOverflow(page), []);
+    await page.context().close();
+  });
+
+  it('a click on the summary opens it, and Space and Enter work; the first tick inside is then visible', async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    const firstTick = page.locator(`${WHERE_FOLD} input`).first();
+    const isOpen = (): Promise<boolean> =>
+      page.evaluate(
+        (fold) => (document.querySelector(fold) as HTMLDetailsElement | null)?.open ?? false,
+        WHERE_FOLD,
+      );
+    assert.equal(await firstTick.isVisible(), false, 'a tick shows while the fold is closed');
+
+    await page.click(`${WHERE_FOLD} > summary`);
+    await page.locator(`${WHERE_FOLD} input:visible`).first().waitFor();
+    assert.equal(await isOpen(), true);
+    await page.click(`${WHERE_FOLD} > summary`);
+    await firstTick.waitFor({ state: 'hidden' });
+
+    await page.focus(`${WHERE_FOLD} > summary`);
+    await page.keyboard.press(' ');
+    await page.locator(`${WHERE_FOLD} input:visible`).first().waitFor();
+    assert.equal(await isOpen(), true, 'Space did not open it');
+    await page.keyboard.press(' ');
+    await firstTick.waitFor({ state: 'hidden' });
+
+    await page.keyboard.press('Enter');
+    await page.locator(`${WHERE_FOLD} input:visible`).first().waitFor();
+    assert.equal(await isOpen(), true, 'Enter did not open it');
+    await page.context().close();
+  });
+
+  it('closed, nothing inside the fold can be reached by Tab; open, its ticks can', async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    const closed = await tabStops(page);
+    console.log(`Tab stops, closed: ${JSON.stringify(closed)}`);
+    assert.deepEqual(closed, { inside: [], summary: true });
+
+    // The same walk with the fold open does land inside: the walk can see ticks.
+    await openWhereToLook(page);
+    const opened = await tabStops(page);
+    assert.ok(opened.inside.includes('keyless-source-arbeitnow'), JSON.stringify(opened));
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a tall block pushed into the form is flagged', async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    await page.evaluate((row) => {
+      const block = document.createElement('div');
+      block.style.height = '400px';
+      document.querySelector(row)?.before(block);
+    }, SUBMIT_ROW);
+    const report = await resultsTopProblems(page);
+    assert.ok(
+      report.some((line) => line.startsWith('the results area starts at')),
+      `the pushed-down results area was not flagged: ${JSON.stringify(report)}`,
+    );
+    const { top, inFlow } = await rowAgainstFlow(page);
+    assert.notEqual(top, inFlow, 'the pin was not needed even with a tall block in the form');
+    await page.context().close();
+  });
+});
+
+/**
  * Every screen opens at the top of its scroll areas (L-353).
  *
  * Tailor scrolls to its current step when it opens, and `scrollWithin`
@@ -2103,6 +2478,7 @@ describe('every screen opens at the top of its scroll areas (L-353)', () => {
       const page = await open('?seen=1', viewport);
       await goTo(page, 'search');
       await recordScrollRequests(page, '[data-testid="boards-settings"]');
+      await openWhereToLook(page);
       await page.click('[data-testid="keyless-manage"]');
       await page.locator('[data-testid="nav-settings"][aria-current="page"]:visible').waitFor();
       await page.locator('[data-testid="boards-settings"]:focus').waitFor();
@@ -2328,6 +2704,7 @@ describe('the mono font cannot move Settings after a jump (L-364)', () => {
     it(`Settings opened at Job boards stops the padding below the top, ${width}`, async () => {
       const app = await openWithMonoStandIn(viewport);
       await goTo(app.page, 'search');
+      await openWhereToLook(app.page);
       await app.page.click('[data-testid="keyless-manage"]');
       await app.page.locator('[data-testid="nav-settings"][aria-current="page"]:visible').waitFor();
       await app.page.locator('[data-testid="boards-settings"]:focus').waitFor();
@@ -3885,6 +4262,253 @@ describe('the ATS Score numbers are drawn as bars (L-396)', () => {
       `the too-wide bars went unnoticed: ${JSON.stringify(report.problems)}`,
     );
     assert.ok((await atsTableOverflow(page)) > 0, 'the overflow check missed the bars');
+    await page.context().close();
+  });
+});
+
+/**
+ * The tailored CV as a page, with one main save button (L-400).
+ *
+ * The draft is drawn as a white sheet, at most 768px (`max-w-3xl`) and centred
+ * in the column, and the save row is a blue "Save as PDF…" with the other
+ * formats in the shared "More formats" menu. jsdom cannot say whether the sheet
+ * scrolls inside itself (the L-322 rule above), runs past the window, or where
+ * the menu opens; this can. The `?draft=` switch opens Tailor on a finished
+ * draft, the way a restart brings one back.
+ */
+const SHEET_WINDOWS = {
+  'desktop 1000x700': { width: 1000, height: 700 },
+  'phone 375x812': { width: 375, height: 812 },
+} as const;
+const SHEET_MAX_PX = 768;
+const SAVE_ROW = [
+  'tailor-save-pdf-cv',
+  'tailor-save-more',
+  'tailor-review-run',
+  'tailor-letter-run',
+];
+
+/** Tailor on the harness's draft; with `contact`, the confirmed details are on top. */
+async function tailorWithDraft(
+  viewport: { width: number; height: number },
+  draft: '1' | 'contact' = '1',
+): Promise<Page> {
+  const page = await open(`?seen=1&draft=${draft}`, viewport);
+  await goTo(page, 'tailor');
+  await page.waitForSelector('[data-testid="tailor-cv"] [data-block="heading"]');
+  return page;
+}
+
+interface SheetReport {
+  readonly width: number;
+  /** Sheet centre minus column centre, in px. */
+  readonly offCentre: number;
+  /** How many lines the save row's four buttons take. */
+  readonly rowLines: number;
+  readonly problems: readonly string[];
+}
+
+/** The sheet against its column, anything poking out of it, and the save row's lines. */
+async function sheetReport(page: Page): Promise<SheetReport> {
+  return page.evaluate((row) => {
+    const problems: string[] = [];
+    const sheet = document.querySelector('[data-testid="tailor-cv"]');
+    const column = document.querySelector('[data-content-column]');
+    if (sheet === null || column === null) {
+      return { width: 0, offCentre: 0, rowLines: 0, problems: ['no sheet or no column'] };
+    }
+    const box = sheet.getBoundingClientRect();
+    const room = column.getBoundingClientRect();
+    if (box.left < room.left - 0.5 || box.right > room.right + 0.5) {
+      problems.push(`sheet ${String(box.left)}–${String(box.right)} is outside its column`);
+    }
+    if (sheet.scrollWidth > sheet.clientWidth) problems.push('sheet: scrolls sideways');
+    for (const part of sheet.querySelectorAll('[data-block]')) {
+      if (part.getBoundingClientRect().right > box.right + 0.5) {
+        problems.push(`"${(part.textContent ?? '').slice(0, 20)}" runs past the sheet`);
+      }
+    }
+    // A button starts a new line when it sits wholly below the one before it.
+    // (A bordered button is 2px taller than the blue one, so tops alone differ.)
+    let rowLines = 0;
+    let lineBottom = -Infinity;
+    for (const id of row) {
+      const button = document.querySelector(`[data-testid="${id}"]`);
+      if (button === null) {
+        problems.push(`no ${id}`);
+        continue;
+      }
+      const { top, bottom } = button.getBoundingClientRect();
+      if (top >= lineBottom) {
+        rowLines += 1;
+        lineBottom = bottom;
+      } else {
+        lineBottom = Math.max(lineBottom, bottom);
+      }
+    }
+    return {
+      width: box.width,
+      offCentre: (box.left + box.right) / 2 - (room.left + room.right) / 2,
+      rowLines,
+      problems,
+    };
+  }, SAVE_ROW);
+}
+
+/** Scroll Tailor's own area so `selector` is wholly in view, top first when it is taller. */
+async function scrollTailorTo(page: Page, selector: string): Promise<void> {
+  await page.evaluate((target) => {
+    const area = document.querySelector('[data-testid="tailor-scroll"]');
+    const element = document.querySelector(target);
+    if (area === null || element === null) throw new Error(`no scroll area or ${target}`);
+    const seen = area.getBoundingClientRect();
+    const box = element.getBoundingClientRect();
+    if (box.bottom > seen.bottom && box.height < seen.height) {
+      area.scrollTop += box.bottom - seen.bottom + 8;
+    } else if (box.top < seen.top || box.height >= seen.height) {
+      area.scrollTop += box.top - seen.top - 8;
+    }
+  }, selector);
+  await scrollingSettled(page);
+}
+
+/** The open "More formats" list against the window and the scroll area; covered or cut-off items. */
+async function formatsMenuProblems(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const problems: string[] = [];
+    const trigger = document.querySelector('[data-testid="tailor-save-more"]');
+    const list = trigger?.nextElementSibling;
+    const area = document.querySelector('[data-testid="tailor-scroll"]');
+    if (
+      trigger?.getAttribute('aria-expanded') !== 'true' ||
+      list === null ||
+      list === undefined ||
+      area === null
+    ) {
+      return ['the menu is not open'];
+    }
+    const box = list.getBoundingClientRect();
+    const seen = area.getBoundingClientRect();
+    if (box.left < 0 || box.right > window.innerWidth) {
+      problems.push(`list ${String(box.left)}–${String(box.right)} runs past the window`);
+    }
+    if (box.top < seen.top || box.bottom > seen.bottom) {
+      problems.push(`list ${String(box.top)}–${String(box.bottom)} is outside the scroll area`);
+    }
+    const items = [...list.querySelectorAll('button')];
+    if (items.length !== 2) problems.push(`${String(items.length)} items, not 2`);
+    for (const item of items) {
+      const part = item.getBoundingClientRect();
+      const onTop = document.elementFromPoint(
+        part.left + part.width / 2,
+        part.top + part.height / 2,
+      );
+      if (onTop === null || !item.contains(onTop)) {
+        problems.push(`"${item.textContent ?? ''}" is covered or cut off`);
+      }
+    }
+    return problems;
+  });
+}
+
+describe('the tailored CV is a page, with one main save button (L-400)', () => {
+  for (const [name, viewport] of Object.entries(SHEET_WINDOWS)) {
+    it(`nothing inside the sheet scrolls on its own, and nothing scrolls sideways (${name})`, async () => {
+      const page = await tailorWithDraft(viewport, 'contact');
+      const report = await sheetReport(page);
+      console.log(`sheet (${name}): ${JSON.stringify(report)}`);
+      assert.deepEqual(report.problems, []);
+      assert.deepEqual(await innerScrollers(page), []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      assert.ok(report.width <= SHEET_MAX_PX + 0.5, `the sheet is ${String(report.width)}px wide`);
+      // One blue button on screen, and it is Save as PDF.
+      const primary = await page.evaluate(() =>
+        [...document.querySelectorAll('[data-primary="true"]')].map((button) =>
+          button.getAttribute('data-testid'),
+        ),
+      );
+      assert.deepEqual(primary, ['tailor-save-pdf-cv']);
+      await page.context().close();
+    });
+
+    it(`a real click opens More formats, it stays open, and it is wholly inside the window (${name})`, async () => {
+      const page = await tailorWithDraft(viewport);
+      await scrollTailorTo(page, '[data-testid="tailor-save-more"]');
+      await page.click('[data-testid="tailor-save-more"]');
+      await page.waitForSelector('[data-testid="tailor-save-more"][aria-expanded="true"]');
+      await scrollTailorTo(page, '[data-testid="tailor-save-more"] + div');
+      const problems = await formatsMenuProblems(page);
+      console.log(`More formats open (${name}): ${JSON.stringify(problems)}`);
+      assert.deepEqual(problems, []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      assert.equal(
+        await page.locator('[data-testid="tailor-save-docx-cv"]').textContent(),
+        'Save as Word…',
+      );
+      assert.equal(
+        await page.getAttribute('[data-testid="tailor-save-more"]', 'aria-expanded'),
+        'true',
+        'the menu closed by itself',
+      );
+      await page.context().close();
+    });
+  }
+
+  it('the sheet is never wider than about 768px and is centred at 1264', async () => {
+    const page = await tailorWithDraft({ width: 1264, height: 720 });
+    const report = await sheetReport(page);
+    console.log(`sheet (1264x720): ${JSON.stringify(report)}`);
+    assert.deepEqual(report.problems, []);
+    assert.ok(report.width <= SHEET_MAX_PX + 0.5, `the sheet is ${String(report.width)}px wide`);
+    assert.ok(report.width >= SHEET_MAX_PX - 0.5, 'the column is too narrow to show the cap');
+    assert.ok(
+      Math.abs(report.offCentre) <= 1,
+      `the sheet is ${String(report.offCentre)}px off centre`,
+    );
+    await page.context().close();
+  });
+
+  for (const [name, viewport] of Object.entries(SHEET_WINDOWS)) {
+    it(`colour contrast on the sheet, top and bottom (${name})`, async () => {
+      const page = await tailorWithDraft(viewport, 'contact');
+      // axe measures only text on screen, so the sheet is brought into view.
+      await scrollTailorTo(page, '[data-testid="tailor-cv"]');
+      judge(`tailored CV, top (${name})`, await contrast(page));
+      await page.evaluate(() => {
+        const area = document.querySelector('[data-testid="tailor-scroll"]');
+        const sheet = document.querySelector('[data-testid="tailor-cv"]');
+        if (area === null || sheet === null) throw new Error('no scroll area or sheet');
+        const bottom = sheet.getBoundingClientRect().bottom;
+        area.scrollTop += bottom - area.getBoundingClientRect().bottom + 8;
+      });
+      await scrollingSettled(page);
+      judge(`tailored CV, bottom (${name})`, await contrast(page));
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a sheet that scrolls inside itself, and one too wide, are reported', async () => {
+    const page = await tailorWithDraft(SHEET_WINDOWS['phone 375x812']);
+    await page.evaluate(() => {
+      const sheet = document.querySelector<HTMLElement>('[data-testid="tailor-cv"]');
+      if (sheet === null) throw new Error('no sheet');
+      sheet.style.maxHeight = '120px';
+      sheet.style.overflowY = 'auto';
+      sheet.style.maxWidth = 'none';
+      sheet.style.width = '900px';
+    });
+    const inner = await innerScrollers(page);
+    assert.ok(
+      inner.some((line) => line.startsWith('tailor-cv: ')),
+      `the scrolling sheet went unreported: ${JSON.stringify(inner)}`,
+    );
+    const report = await sheetReport(page);
+    assert.ok(
+      report.problems.some((line) => line.includes('outside its column')),
+      `the too-wide sheet went unreported: ${JSON.stringify(report.problems)}`,
+    );
+    assert.ok((await sidewaysOverflow(page)).length > 0, 'the sideways check missed the sheet');
     await page.context().close();
   });
 });

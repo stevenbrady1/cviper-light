@@ -24,7 +24,14 @@
  * behind. Storage that cannot be read or holds nonsense reads as nothing
  * ticked — the cost of that is one tick, never a surprise tab.
  */
-import { buildBoardUrl, type BrowserSearchInput } from '@cviper/job-apis';
+import {
+  KEYLESS_SOURCE_LABEL,
+  PROVIDER_LABEL,
+  buildBoardUrl,
+  type BrowserSearchInput,
+  type JobProviderId,
+  type KeylessSourceId,
+} from '@cviper/job-apis';
 
 import { type Board } from '../boards/model';
 import { type BrowserPort } from '../../platform/browser';
@@ -107,7 +114,27 @@ export function openBoardsLabel(boardCount: number): string {
 /** Why that button cannot be pressed, or `null` when it can. */
 export function openBoardsDisabledReason(boardCount: number): string | null {
   if (boardCount > 0) return null;
-  return 'Tick a job board above to open this search in your browser too.';
+  return 'Tick a job board in “Where to look” first.';
+}
+
+/**
+ * The line beside "Where to look" while it is folded (L-398): what Search will
+ * look at, then how many boards "Also open" will open. A keyed board is named
+ * only when it can really be searched, so the caller passes usable ones.
+ */
+export function whereToLookSummary(
+  providers: readonly JobProviderId[],
+  feeds: readonly KeylessSourceId[],
+  boardCount: number,
+): string {
+  const parts = [
+    ...providers.map((provider) => PROVIDER_LABEL[provider]),
+    ...feeds.map((feed) => KEYLESS_SOURCE_LABEL[feed]),
+  ];
+  if (boardCount > 0) {
+    parts.push(`${String(boardCount)} job ${boardCount === 1 ? 'board' : 'boards'} ticked`);
+  }
+  return parts.length === 0 ? 'Nothing ticked' : parts.join(' · ');
 }
 
 /**

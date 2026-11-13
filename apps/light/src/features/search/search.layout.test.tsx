@@ -128,7 +128,7 @@ describe('job boards, right under the fields (L-219, L-313)', () => {
     expect(boards.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(boards.compareDocumentPosition(quota) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(boards).getByRole('heading').textContent).toBe(
-      'Search job boards with these filters',
+      'Job boards to open in your browser',
     );
   });
 

@@ -276,8 +276,8 @@ export function searchDisabledReason(
   }
 
   return (
-    'Nothing is ticked for CViper to look at. Tick the free feed above ' +
-    '— it needs no key at all. Job sites you tick open in your browser with the button below.'
+    'Nothing is ticked for CViper to look at. Tick the free feed in “Where to look” ' +
+    '— it needs no key. Job sites you tick open in your browser with the button below.'
   );
 }
 

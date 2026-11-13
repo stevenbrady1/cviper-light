@@ -15,6 +15,7 @@ import { readAvailability } from '../analysis/availability';
 import { ConsentGate } from '../analysis/ConsentGate';
 import { cvCutNote } from '../analysis/cvCutNote';
 import {
+  CONSENT_KINDS,
   createTauriConsentPort,
   NO_CONSENT,
   type ConsentPort,
@@ -613,7 +614,7 @@ export function Tailor({
         ? 'Drafting the letter. '
         : '') + progressText;
 
-  const grantedConsents = (['anthropic', 'openai'] as const).filter((kind) => consent[kind]);
+  const grantedConsents = CONSENT_KINDS.filter((kind) => consent[kind]);
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-tailor">
@@ -724,6 +725,7 @@ export function Tailor({
             elapsed={elapsed}
             choosingFile={saving === 'file'}
             saveMessage={saveMessage}
+            hasDraft={result !== null}
           />
 
           <TailorResultView

@@ -32,6 +32,7 @@ import { ConsentGate } from './ConsentGate';
 import { cvCutNote } from './cvCutNote';
 import { GateNotice } from './GateNotice';
 import {
+  CONSENT_KINDS,
   createTauriConsentPort,
   isCloudKind,
   NO_CONSENT,
@@ -478,7 +479,7 @@ export function Analysis({
     [consentStore],
   );
 
-  const grantedConsents = (['anthropic', 'openai'] as const).filter((kind) => consent[kind]);
+  const grantedConsents = CONSENT_KINDS.filter((kind) => consent[kind]);
 
   // ── Rendering ────────────────────────────────────────────────────────────
 

@@ -14,6 +14,7 @@ import {
   NO_CONTACT,
   contactLine,
   contactSummary,
+  cvHeader,
   detectCvContact,
   savedCvText,
   type CvContact,
@@ -251,6 +252,40 @@ describe('contactLine and contactSummary', () => {
   it('boundary: all blank is no line at all', () => {
     expect(contactLine(NO_CONTACT)).toBeNull();
     expect(contactSummary(NO_CONTACT)).toBe('');
+  });
+});
+
+// L-400: one helper turns confirmed details into what goes at the top, for the
+// saved files AND the page on screen, so the two can never disagree.
+describe('cvHeader', () => {
+  const ALL: CvContact = { name: ' Jane Smith ', email: 'jane@x.com', phone: '07700 900123' };
+
+  it('happy: the trimmed name, and email and phone joined by a bar', () => {
+    expect(cvHeader(ALL)).toEqual({ name: 'Jane Smith', line: 'jane@x.com | 07700 900123' });
+  });
+
+  it('negative: no confirmed details is no name and no line', () => {
+    expect(cvHeader(null)).toEqual({ name: null, line: null });
+  });
+
+  it('boundary: all blank is no name and no line', () => {
+    expect(cvHeader(NO_CONTACT)).toEqual({ name: null, line: null });
+    expect(cvHeader({ name: ' ', email: '\t', phone: '' })).toEqual({ name: null, line: null });
+  });
+
+  it('edge: a blank name keeps the line, and a name alone has no line', () => {
+    expect(cvHeader({ ...ALL, name: '  ' })).toEqual({
+      name: null,
+      line: 'jane@x.com | 07700 900123',
+    });
+    expect(cvHeader({ ...ALL, email: '', phone: '' })).toEqual({ name: 'Jane Smith', line: null });
+  });
+
+  it('the text file carries the same name and line', () => {
+    const { name, line } = cvHeader(ALL);
+    expect(savedCvText({ cv: TAILORED, text: '' }, ALL)).toBe(
+      renderTailoredCv(TAILORED, name, line),
+    );
   });
 });
 

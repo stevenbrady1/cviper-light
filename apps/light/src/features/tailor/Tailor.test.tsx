@@ -20,6 +20,7 @@ import {
   type ProviderHttpResponse,
 } from '@cviper/ai-providers';
 import { expectSpoken } from '../../app/test/spoken';
+import { openMoreFormats } from './test/moreFormats';
 
 const tauri = vi.hoisted(() => ({
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
@@ -550,6 +551,7 @@ describe('saving', () => {
     await screen.findByTestId('tailor-result');
 
     filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Tailored CV.txt');
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
@@ -567,6 +569,7 @@ describe('saving', () => {
     await screen.findByTestId('tailor-result');
 
     filePort.nextSavePath(null);
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
@@ -681,6 +684,7 @@ describe('saving as a Word document (L-165)', () => {
     await screen.findByTestId('tailor-result');
 
     filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Tailored CV.docx');
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-docx-cv'));
     await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
@@ -719,6 +723,7 @@ describe('saving as a Word document (L-165)', () => {
     await screen.findByTestId('tailor-result');
 
     filePort.nextSavePath(null);
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-docx-cv'));
     await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
@@ -734,6 +739,7 @@ describe('saving as a Word document (L-165)', () => {
     await screen.findByTestId('tailor-result');
 
     filePort.failSave('Windows would not let CViper write there.');
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-docx-cv'));
     await user.click(await screen.findByTestId('tailor-contact-confirm'));
 
@@ -741,6 +747,92 @@ describe('saving as a Word document (L-165)', () => {
     expect(error.textContent).toContain('Windows would not let CViper write there.');
     expect(screen.getByTestId('tailor-cv')).toBeTruthy();
     expect(filePort.writtenBytes()).toHaveLength(0);
+  });
+});
+
+describe('one main button once there is a draft (L-400)', () => {
+  async function tailored(replies: readonly unknown[] = [FAITHFUL]) {
+    const ready = await renderReady(replies);
+    await ready.user.selectOptions(screen.getByTestId('tailor-job-pick'), 'job-1');
+    await ready.user.click(screen.getByTestId('tailor-run'));
+    await screen.findByTestId('tailor-result');
+    return ready;
+  }
+
+  it('happy: after a draft, exactly one primary button, and it is Save as PDF', async () => {
+    await tailored();
+
+    const primary = document.querySelectorAll('[data-primary="true"]');
+    expect(primary).toHaveLength(1);
+    expect(primary[0]?.getAttribute('data-testid')).toBe('tailor-save-pdf-cv');
+    expect(primary[0]?.textContent).toBe('Save as PDF…');
+    expect(screen.getByTestId('tailor-save-more').textContent).toBe('More formats');
+    // The quieter actions come after the save row's two.
+    const row = screen.getByTestId('tailor-save-pdf-cv').parentElement;
+    const order = [...(row?.querySelectorAll('[data-testid]') ?? [])].map((element) =>
+      element.getAttribute('data-testid'),
+    );
+    expect(order).toEqual([
+      'tailor-save-pdf-cv',
+      'tailor-save-more',
+      'tailor-review-run',
+      'tailor-letter-run',
+    ]);
+  });
+
+  it('the run button reads Tailor again after a draft and Tailor CV before', async () => {
+    const { user } = await renderReady([FAITHFUL]);
+    const run = () => screen.getByTestId('tailor-run');
+    expect(run().textContent).toBe('Tailor CV');
+    expect(run().getAttribute('data-primary')).toBe('true');
+
+    await user.selectOptions(screen.getByTestId('tailor-job-pick'), 'job-1');
+    await user.click(run());
+    await screen.findByTestId('tailor-result');
+
+    expect(run().textContent).toBe('Tailor again');
+    expect(run().hasAttribute('data-primary')).toBe(false);
+    expect(run().className).toContain('border-line');
+    expect(run().className).not.toContain('bg-blue');
+    // Grey, but still there and still pressable.
+    expect(run()).toHaveProperty('disabled', false);
+  });
+
+  it('More formats → Save as Word saves the same file as before', async () => {
+    const { user, filePort } = await tailored();
+
+    await openMoreFormats(user);
+    const items = screen
+      .getAllByRole('button')
+      .filter((button) => button.hasAttribute('data-more-item'));
+    expect(items.map((item) => item.textContent)).toEqual(['Save as Word…', 'Save as text…']);
+
+    filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Tailored CV.docx');
+    await user.click(screen.getByTestId('tailor-save-docx-cv'));
+    await user.click(await screen.findByTestId('tailor-contact-confirm'));
+
+    await screen.findByTestId('tailor-save-message');
+    const written = filePort.writtenBytes()[0];
+    expect(written?.extension).toBe('docx');
+    expect(written?.suggestedName).toBe('Tailored CV — Credit Risk Analyst.docx');
+    expect([...(written?.bytes.subarray(0, 4) ?? [])]).toEqual([0x50, 0x4b, 0x03, 0x04]);
+    expect(filePort.writtenText()).toHaveLength(0);
+  });
+
+  it('edge: the PDF warning says where Word is now', async () => {
+    const cyrillic = { ...FAITHFUL, summary: 'Аналитик кредитного риска.' };
+    const { user, filePort } = await tailored([cyrillic]);
+
+    filePort.nextSavePath('C:\\Users\\jamie\\Documents\\Tailored CV.pdf');
+    await user.click(screen.getByTestId('tailor-save-pdf-cv'));
+    await user.click(await screen.findByTestId('tailor-contact-confirm'));
+
+    const message = await screen.findByTestId('tailor-save-message');
+    expect(
+      message.textContent?.endsWith('Save as Word (under More formats) to keep them exactly.'),
+    ).toBe(true);
+    // The page itself still shows the letters the PDF could not.
+    expect(screen.getByTestId('tailor-cv').textContent).toContain('Аналитик кредитного риска.');
   });
 });
 
@@ -792,6 +884,7 @@ describe('while a save window is open (L-217)', () => {
     const { user, filePort } = await tailored();
     const held = holdSaves(filePort);
 
+    await openMoreFormats(user);
     await user.click(screen.getByTestId('tailor-save-text'));
     await user.click(await screen.findByTestId('tailor-contact-confirm'));
     await screen.findByTestId('tailor-save-choosing');
@@ -800,7 +893,30 @@ describe('while a save window is open (L-217)', () => {
     await vi.waitFor(() => expect(screen.queryByTestId('tailor-save-choosing')).toBeNull());
     expect(screen.queryByTestId('tailor-save-message')).toBeNull();
     expect(screen.queryByTestId('tailor-error')).toBeNull();
+    await openMoreFormats(user);
     expect(screen.getByTestId('tailor-save-text')).toHaveProperty('disabled', false);
+  });
+
+  // NEGATIVE — L-400: one save at a time, and nothing goes missing meanwhile.
+  it('negative: while saving, Save as PDF and every More-formats item are disabled, not gone', async () => {
+    const { user, filePort } = await tailored();
+    const held = holdSaves(filePort);
+
+    await user.click(screen.getByTestId('tailor-save-pdf-cv'));
+    await user.click(await screen.findByTestId('tailor-contact-confirm'));
+    await screen.findByTestId('tailor-save-choosing');
+
+    expect(screen.getByTestId('tailor-save-pdf-cv')).toHaveProperty('disabled', true);
+    await openMoreFormats(user);
+    expect(screen.getByTestId('tailor-save-docx-cv')).toHaveProperty('disabled', true);
+    expect(screen.getByTestId('tailor-save-text')).toHaveProperty('disabled', true);
+    expect(screen.getByTestId('tailor-review-run')).toHaveProperty('disabled', true);
+    expect(screen.getByTestId('tailor-letter-run')).toHaveProperty('disabled', true);
+
+    held.answer(null);
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('tailor-save-pdf-cv')).toHaveProperty('disabled', false),
+    );
   });
 
   it('boundary: with no save running there is no waiting line', async () => {
