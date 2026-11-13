@@ -68,10 +68,6 @@ export function TailorCvPicker({
           </option>
         ))}
       </select>
-      <p className="mt-1 text-xs text-ink-faint">
-        The CVs you have uploaded here, on Analysis or on Profile. The rewrite uses only what is
-        written in the one you choose.
-      </p>
       {/*
        * Here too, not only on Analysis (L-240) — and never disabled for
        * want of a model: a first run with nothing set up can still get
