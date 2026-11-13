@@ -468,6 +468,157 @@ async function funnelHintReport(page: Page): Promise<{
 }
 
 /**
+ * Richer cards (L-393): the title may take three lines and company · location
+ * two, an undated next action shows as one muted line, and an overdue one adds
+ * a red dot beside the title. `?entries=long` stretches every part of a card:
+ * a 200-letter word for a title, a long company, long action words. jsdom does
+ * no layout, so only a real engine can say the card still fits its column.
+ */
+async function openLongBoard(width: number, height: number): Promise<Page> {
+  const page = await open('?seen=1&entries=long', { width, height });
+  await goTo(page, 'tracker');
+  await page.waitForSelector('[data-testid="tracker-card-late"]');
+  return page;
+}
+
+interface CardFit {
+  readonly problems: string[];
+  readonly cards: { id: string; width: number; height: number; column: number }[];
+}
+
+async function cardFit(page: Page): Promise<CardFit> {
+  return page.evaluate(() => {
+    const problems: string[] = [];
+    const cards: { id: string; width: number; height: number; column: number }[] = [];
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      problems.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    const found = document.querySelectorAll<HTMLElement>(
+      'button[data-testid^="tracker-card-"][data-status]',
+    );
+    if (found.length === 0) problems.push('no tracker cards drawn');
+    for (const card of found) {
+      const id = (card.getAttribute('data-testid') ?? '').replace('tracker-card-', '');
+      const box = card.getBoundingClientRect();
+      const column = card.closest('[data-testid^="tracker-column-"]')?.getBoundingClientRect();
+      cards.push({
+        id,
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+        column: Math.round(column?.width ?? 0),
+      });
+      if (column === undefined) problems.push(`${id}: not in a column`);
+      else if (box.width > column.width + 0.5) {
+        problems.push(`${id}: card ${String(box.width)}px in a ${String(column.width)}px column`);
+      }
+      if (card.scrollWidth > card.clientWidth) {
+        problems.push(`${id}: ${String(card.scrollWidth - card.clientWidth)}px spills sideways`);
+      }
+      // The lines that wrap must break a long word, never run past the card.
+      for (const line of card.querySelectorAll<HTMLElement>('.break-words')) {
+        if (line.scrollWidth > line.clientWidth) {
+          problems.push(
+            `${id}: "${(line.textContent ?? '').slice(0, 20)}…" runs ${String(line.scrollWidth - line.clientWidth)}px past its line`,
+          );
+        }
+      }
+      const when = card.querySelector(`[data-testid="tracker-card-due-when-${id}"]`);
+      if (when !== null) {
+        const due = when.getBoundingClientRect();
+        if (
+          due.width === 0 ||
+          due.left < box.left ||
+          due.right > box.right ||
+          due.top < box.top ||
+          due.bottom > box.bottom
+        ) {
+          problems.push(`${id}: "${when.textContent ?? ''}" is not wholly inside the card`);
+        }
+      }
+    }
+    return { problems, cards };
+  });
+}
+
+async function overdueDot(
+  page: Page,
+): Promise<{ count: number; width: number; height: number; inside: boolean }> {
+  return page.evaluate(() => {
+    const card = document.querySelector('[data-testid="tracker-card-late"]');
+    const dots = card?.querySelectorAll('[data-testid="tracker-card-overdue-late"]') ?? [];
+    const dot = dots[0];
+    if (card === null || dot === undefined) return { count: 0, width: 0, height: 0, inside: false };
+    const box = dot.getBoundingClientRect();
+    const outer = card.getBoundingClientRect();
+    return {
+      count: dots.length,
+      width: box.width,
+      height: box.height,
+      inside:
+        box.left >= outer.left &&
+        box.right <= outer.right &&
+        box.top >= outer.top &&
+        box.bottom <= outer.bottom,
+    };
+  });
+}
+
+describe('richer Tracker cards fit their column (L-393)', () => {
+  for (const [width, height] of [
+    [1000, 700],
+    [1264, 720],
+    [1440, 900],
+    [375, 812],
+  ] as const) {
+    it(`at ${String(width)}px no card is wider than its column, the due words sit inside the card, and the page does not scroll sideways`, async () => {
+      const page = await openLongBoard(width, height);
+      const fit = await cardFit(page);
+      console.log(`cards at ${String(width)}px: ${JSON.stringify(fit.cards)}`);
+      assert.ok(fit.cards.length >= 3, `only ${String(fit.cards.length)} cards measured`);
+      assert.deepEqual(fit.problems, []);
+      await page.context().close();
+    });
+
+    it(`at ${String(width)}px the overdue dot is at least 8×8 and inside its card`, async () => {
+      const page = await openLongBoard(width, height);
+      const dot = await overdueDot(page);
+      console.log(`overdue dot at ${String(width)}px: ${JSON.stringify(dot)}`);
+      assert.equal(dot.count, 1, `${String(dot.count)} overdue dots on the card, not 1`);
+      assert.ok(dot.width >= 8 && dot.height >= 8, `the dot is ${JSON.stringify(dot)}`);
+      assert.ok(dot.inside, 'the dot is not wholly inside the card');
+      await page.context().close();
+    });
+  }
+
+  // `?entries=1` cards have no next action, so the board pass above never sees
+  // the new muted line, the gold "due" or the red "overdue" words. This does.
+  it('the stretched board passes colour contrast, the new action lines included', async () => {
+    const page = await openLongBoard(1264, 720);
+    await page.waitForSelector('[data-testid="tracker-card-next-long"]');
+    judge('stretched board', await contrast(page));
+    await page.context().close();
+  });
+
+  it('the check can fail: a 400-letter title with breaking turned off is reported', async () => {
+    const page = await openLongBoard(1264, 720);
+    await page.evaluate(() => {
+      const title = document.querySelector('[data-testid="tracker-card-long"] .break-words');
+      if (!(title instanceof HTMLElement)) throw new Error('no wrapping title line');
+      title.textContent = 'W'.repeat(400);
+      title.style.overflowWrap = 'normal';
+      title.style.wordBreak = 'normal';
+    });
+    const fit = await cardFit(page);
+    assert.ok(
+      fit.problems.some((line) => line.startsWith('long:')),
+      `the unbreakable title was not flagged: ${JSON.stringify(fit.problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
  * The shared content column (L-341) never makes a screen scroll sideways.
  *
  * jsdom does no layout, so `contentColumn.contract.test.tsx` can only read the

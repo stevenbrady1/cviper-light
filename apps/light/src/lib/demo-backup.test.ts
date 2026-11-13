@@ -56,4 +56,25 @@ describe('the screenshot demo backup (L-244)', () => {
       expect(NOW.getTime() - updated).toBeLessThan(30 * 24 * 60 * 60 * 1000);
     }
   });
+
+  // L-393: the pictures show one overdue action (red) and one due soon (gold),
+  // dated from the clock it is given so they never go stale.
+  it('dates two next actions from the clock: one 2 days overdue, one due in 2 days', () => {
+    const imported = importBackup(JSON.parse(demoBackup(NOW)));
+    if (!imported.ok) throw new Error(imported.error.message);
+    const dated = imported.value.applications
+      .filter((app) => app.next_action_date !== null)
+      .map((app) => [app.next_action, app.next_action_date]);
+    expect(dated).toEqual([
+      ['Chase the recruiter', '2026-10-26'],
+      ['Reply by Friday', '2026-10-30'],
+    ]);
+    const later = importBackup(JSON.parse(demoBackup(new Date('2027-03-01T12:00:00.000Z'))));
+    if (!later.ok) throw new Error(later.error.message);
+    expect(
+      later.value.applications.flatMap((app) =>
+        app.next_action_date === null ? [] : [app.next_action_date],
+      ),
+    ).toEqual(['2027-02-27', '2027-03-03']);
+  });
 });

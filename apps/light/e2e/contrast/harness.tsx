@@ -19,7 +19,9 @@
  *   - `?seen=1` skips the first-run welcome, as a returning user sees the app;
  *   - `?entries=1` puts three applications on the board, and gives Tailor
  *     their jobs, so a card's "Tailor" opens the real screen with its step
- *     bar (L-386);
+ *     bar (L-386); `?entries=long` instead puts three cards that stretch a
+ *     card: a 200-letter title, a long company, an undated next action, an
+ *     overdue one and one due soon (L-393);
  *   - `?results=1` says a job-board key is saved, and answers Search with a long
  *     list of adverts from the fake port (L-342: what results do to the layout).
  *   - `?trackerLoadError=<text>` and `?profileLoadError=<text>` make the
@@ -122,10 +124,66 @@ const { COLLAPSED_LINES } = await import('../../src/features/tailor/CvTextPanel'
 
 if (params.get('seen') === '1') markWelcomeSeen();
 
+/** L-393: an application with its job's words and next action replaced. */
+function stretched(
+  id: string,
+  status: Application['status'],
+  job: Pick<Job, 'title' | 'company' | 'location'>,
+  nextAction: string,
+  nextActionDate: string | null,
+): { job: Job; application: Application } {
+  const base = application(id, status);
+  return {
+    job: { ...base.job, ...job },
+    application: {
+      ...base.application,
+      next_action: nextAction,
+      next_action_date: nextActionDate,
+    },
+  };
+}
+
 const entries =
   params.get('entries') === '1'
     ? [application('a', 'saved'), application('b', 'applied'), application('c', 'interviewing')]
-    : [];
+    : params.get('entries') === 'long'
+      ? [
+          stretched(
+            'long',
+            'saved',
+            {
+              // One 200-letter word: nowhere a browser may break it unless told to.
+              title: 'Data'.repeat(50),
+              company: 'Harbour & Vale Insurance and Reinsurance Holdings International',
+              location: 'Manchester, Greater Manchester, England',
+            },
+            'Chase the recruiter about the second-round interview date',
+            null,
+          ),
+          stretched(
+            'late',
+            'applied',
+            {
+              title: 'Customer Insight Analyst',
+              company: 'Bramble Retail Group',
+              location: 'London',
+            },
+            'Chase the recruiter about the salary band and the start date',
+            '2026-08-17',
+          ),
+          stretched(
+            'soon',
+            'interviewing',
+            {
+              title: 'Senior Data Analyst',
+              company: 'Kestrel Health Partners',
+              location: 'Bristol',
+            },
+            'Reply by Friday',
+            '2026-08-21',
+          ),
+        ]
+      : [];
 
 const cvLines =
   params.get('cv') === 'long'
