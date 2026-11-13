@@ -56,7 +56,7 @@ describe('the rail', () => {
   it('each item with a shortcut explains it', () => {
     renderRail();
     const tailor = screen.getByTestId('nav-tailor');
-    expect(describedBy(tailor)).toBe(shortcutHint('Tailor', '5'));
+    expect(describedBy(tailor)).toBe(shortcutHint('Tailor', '4'));
   });
 
   it('negative: an item without a shortcut has no shortcut hint', () => {
@@ -85,7 +85,7 @@ describe('the rail', () => {
         .filter((tip) => !tip.hidden)
         .map((tip) => tip.textContent);
     await user.click(screen.getByTestId('nav-tailor'));
-    expect(shown()).toEqual([shortcutHint('Tailor', '5')]);
+    expect(shown()).toEqual([shortcutHint('Tailor', '4')]);
     await user.keyboard('{Escape}');
     expect(shown()).toEqual([]);
   });

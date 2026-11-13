@@ -107,9 +107,10 @@ describe('a CV opened from the share sheet', () => {
     });
     await vi.waitFor(() => expect(analysisPort.storedCvs()).toHaveLength(1));
 
-    // Something else re-renders the shell: the file must not come round again.
+    // Something else re-renders the shell (Ctrl+1: off Analysis, to the Tracker —
+    // L-402 renumbered it from Ctrl+3): the file must not come round again.
     act(() => {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: '3', ctrlKey: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', ctrlKey: true }));
     });
     await Promise.resolve();
 

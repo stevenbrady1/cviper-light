@@ -7,7 +7,7 @@
  * the state every user is in the first time they open the app, and it is the
  * state the whole product has to work in.
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -72,7 +72,54 @@ async function renderApp() {
   return result;
 }
 
+/** The rail's nav buttons, in the order they are drawn. */
+function railItems(): HTMLElement[] {
+  return [...screen.getByTestId('sidebar').querySelectorAll<HTMLElement>('[data-testid^="nav-"]')];
+}
+
 describe('the shell', () => {
+  it('lists Tracker, Search, Analysis, Tailor, then Profile and Settings (L-402)', async () => {
+    await renderApp();
+
+    expect(railItems().map((item) => item.getAttribute('data-testid'))).toEqual([
+      'nav-tracker',
+      'nav-search',
+      'nav-analysis',
+      'nav-tailor',
+      'nav-profile',
+      'nav-settings',
+    ]);
+  });
+
+  it('the "You" label names the list holding Profile and Settings, and is not a button (L-402)', async () => {
+    await renderApp();
+    const rail = within(screen.getByTestId('sidebar'));
+
+    const label = rail.getByText('You');
+    // Words, not a control: nothing to press, nothing to tab to, and not a
+    // seventh item in either list.
+    expect(label.tagName).toBe('P');
+    expect(label.closest('button, a, li, [role], [tabindex]')).toBeNull();
+
+    // A screen reader hears "You, list, 2 items".
+    const group = rail.getByRole('list', { name: 'You' });
+    expect(
+      within(group)
+        .getAllByRole('button')
+        .map((button) => button.getAttribute('data-testid')),
+    ).toEqual(['nav-profile', 'nav-settings']);
+    expect(within(group).queryByText('You')).toBeNull();
+  });
+
+  it('negative: the four steps are not in the "You" list', async () => {
+    await renderApp();
+    const group = within(screen.getByTestId('sidebar')).getByRole('list', { name: 'You' });
+
+    for (const id of ['tracker', 'search', 'analysis', 'tailor']) {
+      expect(within(group).queryByTestId(`nav-${id}`)).toBeNull();
+    }
+  });
+
   it('shows the rail with the five steps and Settings', async () => {
     await renderApp();
 
@@ -144,23 +191,38 @@ describe('focus follows the view (WCAG 2.4.3)', () => {
 });
 
 describe('keyboard shortcuts', () => {
-  it('switches to Profile, Search, Tracker, Analysis and Tailor with Ctrl+1 to Ctrl+5', async () => {
+  it('switches to Tracker, Search, Analysis, Tailor and Profile with Ctrl+1 to Ctrl+5 (L-402)', async () => {
     await renderApp();
 
-    fireEvent.keyDown(document, { key: '1', ctrlKey: true });
+    // Profile first: the app opens on the Tracker, so Ctrl+1 proves nothing
+    // until something else is on screen.
+    fireEvent.keyDown(document, { key: '5', ctrlKey: true });
     expect(screen.getByTestId('view-profile')).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: '1', ctrlKey: true });
+    expect(screen.getByTestId('view-tracker')).toBeTruthy();
 
     fireEvent.keyDown(document, { key: '2', ctrlKey: true });
     expect(screen.getByTestId('view-search')).toBeTruthy();
 
-    fireEvent.keyDown(document, { key: '4', ctrlKey: true });
+    fireEvent.keyDown(document, { key: '3', ctrlKey: true });
     expect(screen.getByTestId('view-analysis')).toBeTruthy();
 
-    fireEvent.keyDown(document, { key: '5', ctrlKey: true });
+    fireEvent.keyDown(document, { key: '4', ctrlKey: true });
     expect(screen.getByTestId('view-tailor')).toBeTruthy();
+  });
 
-    fireEvent.keyDown(document, { key: '3', ctrlKey: true });
-    expect(screen.getByTestId('view-tracker')).toBeTruthy();
+  it('boundary: the number printed beside each of the first five names is its place in the menu', async () => {
+    await renderApp();
+
+    expect(railItems().map((item) => item.textContent)).toEqual([
+      'TrackerCtrl 1',
+      'SearchCtrl 2',
+      'AnalysisCtrl 3',
+      'TailorCtrl 4',
+      'ProfileCtrl 5',
+      'Settings',
+    ]);
   });
 
   it('boundary: an unbound digit does nothing at all', async () => {

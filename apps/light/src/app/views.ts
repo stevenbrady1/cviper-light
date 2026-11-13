@@ -2,17 +2,14 @@
  * The six views, and the order they appear in the rail.
  *
  * ============================================================================
- * WORKFLOW ORDER, NOT ALPHABETICAL AND NOT BY IMPORTANCE
+ * THE WORK FIRST, THEN "YOU" (L-402)
  * ============================================================================
- *   Profile -> Search -> Tracker -> Analysis -> Tailor
+ *   Tracker, Search, Analysis, Tailor      then, under "You": Profile, Settings
  *
- * That is the order a job hunt actually happens in: say who you are and what
- * you will not take, find something, record that you are chasing it, work
- * out whether your CV is any good for it, then rewrite the CV and draft the
- * letter for that one advert. A rail that lists the app's features in the
- * order they were built teaches nobody anything; a rail that lists them in
- * the order they are used is a diagram of the process, for free, permanently
- * on screen.
+ * The Tracker LEADS because the app opens on it (below): the first name in the
+ * rail is the screen you are looking at, and `Ctrl+1` is the way back to it.
+ * Search, Analysis and Tailor follow in the order one job is worked: find it,
+ * check your CV against it, rewrite the CV for it.
  *
  * Tailor is AFTER Analysis (L-160) because it is what you do once the check
  * has told you what is missing: a rewrite that runs before the gaps are known
@@ -20,22 +17,22 @@
  * tracked jobs, and it needs a model — there is no keyword fallback for
  * writing prose, so the screen says so and points at Settings.
  *
- * Profile is FIRST (L-154) because it is the thing every later step reads
- * from — a search that does not know your deal breakers cannot filter, and a
- * cover letter that does not know how you write cannot sound like you. It is
- * a step once, at the start, and a reference for ever after.
+ * Profile and Settings sit in a SECOND GROUP, labelled "You", because neither
+ * is a step: they are about the person and the machine, set once and read by
+ * every step. Profile was first in the rail until L-402 (L-154: every later
+ * step reads from it); the owner moved it on 13 November 2026, with the six
+ * names unchanged. The Welcome screen is what points a new user at it now.
  *
- * Settings is PINNED TO THE BOTTOM and is not in that sequence, because it is
- * not a step. Putting it fifth in the list would imply it is what you do after
- * an analysis.
+ * `Ctrl+1` to `Ctrl+5` are the first five places in the rail, in order, so the
+ * number beside a name is always its position. Settings has none.
  *
  * ============================================================================
  * THE DEFAULT VIEW IS THE TRACKER
  * ============================================================================
- * Not Search, even though Search is first in the workflow. Opening this app on
- * a Tuesday morning, the question is almost never "what jobs exist" — it is
- * "where do I stand, and what has gone quiet". The first screen should answer
- * the question the user came with. Search is one keystroke away.
+ * Opening this app on a Tuesday morning, the question is almost never "what
+ * jobs exist" — it is "where do I stand, and what has gone quiet". The first
+ * screen should answer the question the user came with. Search is one
+ * keystroke away.
  *
  * ============================================================================
  * THERE IS NO HAMBURGER, AND EXACTLY ONE BREAKPOINT
@@ -54,17 +51,17 @@ export interface ViewDefinition {
   readonly label: string;
   /** One line under the heading, saying what the view is for. */
   readonly summary: string;
-  /** The `Ctrl+N` digit, or `null` for a view that is not part of the sequence. */
+  /** The `Ctrl+N` digit — the view's place in the rail — or `null` for Settings. */
   readonly shortcut: number | null;
-  /** `sequence` views sit at the top in workflow order; `pinned` sits at the bottom. */
-  readonly placement: 'sequence' | 'pinned';
+  /** `sequence` views are the steps, at the top; `you` views sit below, under "You". */
+  readonly placement: 'sequence' | 'you';
 }
 
 export const VIEWS: readonly ViewDefinition[] = [
   {
-    id: 'profile',
-    label: 'Profile',
-    summary: 'Who you are and what you want. Saved as you type.',
+    id: 'tracker',
+    label: 'Tracker',
+    summary: 'Every application you are chasing, and how long each has sat still.',
     shortcut: 1,
     placement: 'sequence',
   },
@@ -76,32 +73,32 @@ export const VIEWS: readonly ViewDefinition[] = [
     placement: 'sequence',
   },
   {
-    id: 'tracker',
-    label: 'Tracker',
-    summary: 'Every application you are chasing, and how long each has sat still.',
-    shortcut: 3,
-    placement: 'sequence',
-  },
-  {
     id: 'analysis',
     label: 'Analysis',
     summary: 'Check a CV against a role and see what is missing.',
-    shortcut: 4,
+    shortcut: 3,
     placement: 'sequence',
   },
   {
     id: 'tailor',
     label: 'Tailor',
     summary: 'Rewrite your CV for one advert, and draft the letter — from your own facts only.',
-    shortcut: 5,
+    shortcut: 4,
     placement: 'sequence',
+  },
+  {
+    id: 'profile',
+    label: 'Profile',
+    summary: 'Who you are and what you want. Saved as you type.',
+    shortcut: 5,
+    placement: 'you',
   },
   {
     id: 'settings',
     label: 'Settings',
     summary: 'Your AI set-up, your data, and where it all lives.',
     shortcut: null,
-    placement: 'pinned',
+    placement: 'you',
   },
 ];
 
@@ -112,8 +109,8 @@ export const SEQUENCE_VIEWS: readonly ViewDefinition[] = VIEWS.filter(
   (view) => view.placement === 'sequence',
 );
 
-export const PINNED_VIEWS: readonly ViewDefinition[] = VIEWS.filter(
-  (view) => view.placement === 'pinned',
+export const YOU_VIEWS: readonly ViewDefinition[] = VIEWS.filter(
+  (view) => view.placement === 'you',
 );
 
 /** The view bound to `Ctrl+<digit>`, or `null` if that digit is not bound. */
