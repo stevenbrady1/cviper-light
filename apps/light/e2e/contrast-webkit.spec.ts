@@ -506,7 +506,7 @@ async function overflowingColumnHeadings(page: Page): Promise<string[]> {
 }
 
 describe('the Tracker board lays out (L-311)', () => {
-  for (const width of [1024, 1280, 1440]) {
+  for (const width of [1000, 1024, 1280, 1440]) {
     it(`every column heading fits its column at ${String(width)}px, with an application open`, async () => {
       const page = await open('?seen=1&entries=1', { width, height: 800 });
       await goTo(page, 'tracker');
@@ -800,6 +800,155 @@ describe('richer Tracker cards fit their column (L-393)', () => {
     assert.ok(
       fit.problems.some((line) => line.startsWith('long:')),
       `the unbreakable title was not flagged: ${JSON.stringify(fit.problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
+ * All five Tracker columns fit the smallest window (L-397).
+ *
+ * The app's smallest window is 1000px. Less the side menu and the board's
+ * padding, the board has 728px; five columns and four 8px gaps fit in it when
+ * a column's floor is 136px (712px in all). At a 176px floor they needed
+ * 912px and Rejected sat mostly off screen. Below the floor — a 768px window,
+ * or the detail pane open beside the board — the board scrolls sideways
+ * rather than squeezing a column under 136px.
+ */
+const COLUMN_FLOOR = 136;
+
+interface BoardFit {
+  readonly problems: string[];
+  readonly board: number;
+  readonly scroll: number;
+  readonly columns: number[];
+}
+
+async function boardFit(page: Page): Promise<BoardFit> {
+  return page.evaluate(() => {
+    const problems: string[] = [];
+    const board = document.querySelector('[data-testid="tracker-board"]');
+    if (board === null) return { problems: ['no board'], board: 0, scroll: 0, columns: [] };
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      problems.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    if (board.scrollWidth > board.clientWidth) {
+      problems.push(`board: scrolls ${String(board.scrollWidth - board.clientWidth)}px sideways`);
+    }
+    const outer = board.getBoundingClientRect();
+    const right = Math.min(outer.left + board.clientWidth, root.clientWidth);
+    const columns = [
+      ...board.querySelectorAll<HTMLElement>(':scope > [data-testid^="tracker-column-"]'),
+    ];
+    if (columns.length !== 5) problems.push(`${String(columns.length)} columns drawn, not 5`);
+    for (const column of columns) {
+      const box = column.getBoundingClientRect();
+      if (box.left < outer.left - 0.5 || box.right > right + 0.5) {
+        problems.push(
+          `${column.getAttribute('data-testid') ?? '?'}: ${String(box.left)}–${String(box.right)}px, board shows ${String(outer.left)}–${String(right)}px`,
+        );
+      }
+    }
+    return {
+      problems,
+      board: board.clientWidth,
+      scroll: board.scrollWidth,
+      columns: columns.map((column) => Math.round(column.getBoundingClientRect().width * 10) / 10),
+    };
+  });
+}
+
+async function openBoard(query: string, width: number, height: number): Promise<Page> {
+  const page = await open(`?seen=1&entries=${query}`, { width, height });
+  await goTo(page, 'tracker');
+  await page.waitForSelector('button[data-testid^="tracker-card-"][data-status]');
+  return page;
+}
+
+/** The dated action line on a card: how much of the user's words survive beside the due. */
+async function dueLine(page: Page): Promise<{ action: string; shown: number; full: number }[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('[data-testid^="tracker-card-due-action-"]')].map(
+      (span) => ({
+        action: span.textContent ?? '',
+        shown: span.clientWidth,
+        full: span.scrollWidth,
+      }),
+    ),
+  );
+}
+
+describe('all five Tracker columns fit the smallest window (L-397)', () => {
+  for (const query of ['1', 'long'] as const) {
+    for (const [width, height] of [
+      [1000, 700],
+      [1264, 720],
+      [1440, 900],
+      [1920, 900],
+    ] as const) {
+      it(`at ${String(width)}px (?entries=${query}) all five columns are wholly on screen and the board does not scroll sideways`, async () => {
+        const page = await openBoard(query, width, height);
+        const fit = await boardFit(page);
+        console.log(`board at ${String(width)}px (?entries=${query}): ${JSON.stringify(fit)}`);
+        assert.deepEqual(fit.problems, []);
+        if (query === 'long') {
+          const cards = await cardFit(page);
+          console.log(`  due line: ${JSON.stringify(await dueLine(page))}`);
+          assert.deepEqual(cards.problems, []);
+          const dot = await overdueDot(page);
+          assert.ok(dot.count === 1 && dot.inside, `overdue dot: ${JSON.stringify(dot)}`);
+        }
+        await page.context().close();
+      });
+    }
+
+    it(`at 768px (?entries=${query}) the board scrolls sideways rather than crushing columns below ${String(COLUMN_FLOOR)}px`, async () => {
+      const page = await openBoard(query, 768, 800);
+      const fit = await boardFit(page);
+      console.log(`board at 768px (?entries=${query}): ${JSON.stringify(fit)}`);
+      assert.ok(fit.scroll > fit.board, 'the board does not scroll sideways at 768px');
+      assert.equal(fit.columns.length, 5);
+      for (const column of fit.columns)
+        assert.ok(column >= COLUMN_FLOOR - 0.5, `${String(column)}px`);
+      await page.context().close();
+    });
+
+    // The 380px detail pane beside the board leaves it ~348px at 1000: the
+    // board must scroll, the columns stay at the floor, and cards still fit.
+    it(`at 1000px with a card open (?entries=${query}) the board scrolls sideways and the columns hold ${String(COLUMN_FLOOR)}px`, async () => {
+      const page = await openBoard(query, 1000, 700);
+      await page.locator('button[data-testid^="tracker-card-"][data-status]').first().click();
+      await page.waitForSelector('[data-testid="detail-pane"]');
+      const fit = await boardFit(page);
+      console.log(`board at 1000px with a card open (?entries=${query}): ${JSON.stringify(fit)}`);
+      assert.ok(fit.scroll > fit.board, 'the board does not scroll sideways beside the pane');
+      for (const column of fit.columns)
+        assert.ok(column >= COLUMN_FLOOR - 0.5, `${String(column)}px`);
+      if (query === 'long') {
+        const cards = await cardFit(page);
+        console.log(`  due line: ${JSON.stringify(await dueLine(page))}`);
+        assert.deepEqual(cards.problems, []);
+        const dot = await overdueDot(page);
+        assert.ok(dot.count === 1 && dot.inside, `overdue dot: ${JSON.stringify(dot)}`);
+      }
+      await page.context().close();
+    });
+  }
+
+  // At 1000px the board has 728px; one 400px column and four at 136px need 976.
+  it('the check can fail: a column forced to 400px is reported', async () => {
+    const page = await openBoard('1', 1000, 700);
+    await page.evaluate(() => {
+      const column = document.querySelector<HTMLElement>('[data-testid="tracker-column-applied"]');
+      if (column === null) throw new Error('no Applied column');
+      column.style.minWidth = '400px';
+    });
+    const fit = await boardFit(page);
+    assert.ok(
+      fit.problems.some((line) => line.startsWith('board:')) &&
+        fit.problems.some((line) => line.startsWith('tracker-column-')),
+      `the widened column was not flagged: ${JSON.stringify(fit.problems)}`,
     );
     await page.context().close();
   });
