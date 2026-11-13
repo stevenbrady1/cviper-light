@@ -109,21 +109,22 @@ interface ConsentStatusProps {
  * with a button that says no.
  *
  * ============================================================================
- * WHY THIS LIVES HERE AND NOT IN SETTINGS
+ * WHY THIS IS ON THE SCREEN THAT ASKS, AS WELL AS IN SETTINGS
  * ============================================================================
- * `Settings.tsx` is owned by another change in flight. Consent is decided on
- * this screen, at the point of use, so withdrawing it belongs on the same
- * screen — not behind a navigation the user has no reason to take. Rendered
- * regardless of which option is currently picked in the dropdown, so a
- * consent granted earlier stays visible and revocable even after the user has
- * switched to Ollama or the basic match.
+ * Consent is decided on this screen, at the point of use, so withdrawing it
+ * belongs on the same screen — not only behind a navigation the user has no
+ * reason to take. Rendered regardless of which option is currently picked in
+ * the dropdown, so a consent granted earlier stays visible and revocable even
+ * after the user has switched to Ollama or the basic match. Settings draws
+ * these same rows under "What I have agreed to" (L-410, `AgreedList.tsx`).
  *
  * ============================================================================
  * ABSENT, NOT AN EMPTY BOX
  * ============================================================================
  * Nothing granted is the state of almost every user, and a permanent "no
  * providers have your consent" notice would be noise on every visit — the
- * same reasoning `providerOptions` uses for Ollama.
+ * same reasoning `providerOptions` uses for Ollama. Settings says "nothing"
+ * itself, around this list, because there it is the answer to a question.
  */
 export function ConsentStatus({ granted, onWithdraw }: ConsentStatusProps) {
   if (granted.length === 0) return null;

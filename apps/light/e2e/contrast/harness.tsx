@@ -15,7 +15,7 @@
  * Neither changes a single class name or colour. What the spec measures —
  * which text colour lands on which painted background — is the app's own.
  *
- * The page reads eight switches from the address:
+ * The page reads nine switches from the address:
  *   - `?seen=1` skips the first-run welcome, as a returning user sees the app;
  *   - `?entries=1` puts three applications on the board, and gives Tailor
  *     their jobs, so a card's "Tailor" opens the real screen with its step
@@ -34,6 +34,9 @@
  *     drawn mark beside words (L-370: is any row taller for its mark).
  *   - `?draft=1` opens Tailor's job on a finished tailored CV, and
  *     `?draft=contact` with confirmed details on top (L-400: the CV as a page).
+ *   - `?consent=openai,google` has those providers already agreed to, for
+ *     Settings' "What I have agreed to" (L-410); `&consentLate=1` holds the
+ *     consent file's answer back until a screen has had time to scroll.
  *
  * And it puts five helpers on `window`, each drawing real app components into
  * an element the spec has placed:
@@ -76,13 +79,43 @@ const OLLAMA_ANSWERS: Readonly<Record<string, string>> = {
   }),
 };
 
+/**
+ * The AI consent file (L-410), answered as the store plugin answers it: empty,
+ * as on every first launch, or a yes for each provider in `?consent=`. Held in
+ * memory, so "Withdraw" really takes a row away. Every other store file is
+ * still refused, as before.
+ */
+const CONSENT_FILE = 'ai-provider-consent.json';
+const CONSENT_RID = 1;
+let consentOnFile: unknown = Object.fromEntries(
+  (params.get('consent') ?? '')
+    .split(',')
+    .filter((kind) => kind !== '')
+    .map((kind) => [kind, true]),
+);
+/** `?consentLate=1`: long enough for Settings to have scrolled to a section first. */
+const CONSENT_DELAY = params.get('consentLate') === '1' ? 1500 : 0;
+
 (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
-  invoke: (command: string): Promise<unknown> => {
+  invoke: (command: string, args?: Record<string, unknown>): Promise<unknown> => {
     if (command === 'ollama_probe')
       return Promise.resolve(
         OLLAMA_ANSWERS[params.get('ollama') ?? ''] ?? (params.has('draft') ? DRAFT_MODELS : null),
       );
     if (command === 'secret_status') return Promise.resolve(params.get('results') === '1');
+    if (command === 'plugin:store|load' && args?.['path'] === CONSENT_FILE)
+      return Promise.resolve(CONSENT_RID);
+    if (args?.['rid'] === CONSENT_RID) {
+      if (command === 'plugin:store|get')
+        return new Promise((resolve) =>
+          setTimeout(() => resolve([consentOnFile, true]), CONSENT_DELAY),
+        );
+      if (command === 'plugin:store|set') {
+        consentOnFile = args['value'];
+        return Promise.resolve(null);
+      }
+      if (command === 'plugin:store|save') return Promise.resolve(null);
+    }
     return Promise.reject(new Error(`not available in the contrast harness: ${command}`));
   },
   transformCallback: (): number => 0,

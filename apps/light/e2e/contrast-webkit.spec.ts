@@ -324,6 +324,89 @@ describe('colour contrast on the rendered app (WCAG 2.1 AA)', () => {
   }
 
   /*
+    L-410: "What I have agreed to" in Settings, with nothing agreed (the one
+    empty line) and with three providers agreed (`?consent=`, three rows, each
+    with Withdraw). The plain Settings visit above only ever draws the empty
+    line. Rows must stay inside the section with no sideways scroll, Withdraw
+    must be a finger-sized target on a phone, and pressing it must take the
+    row away.
+  */
+  for (const [width, viewport] of Object.entries(VIEWPORTS)) {
+    it(`Settings "What I have agreed to", nothing agreed, ${width}`, async () => {
+      const page = await open('?seen=1', viewport);
+      await goTo(page, 'settings');
+      const empty = page.locator('[data-testid="settings-agreed-empty"]:visible');
+      await empty.waitFor();
+      await page.locator('[data-testid="settings-agreed"]').scrollIntoViewIfNeeded();
+      judge(`settings, agreed list, nothing agreed (${width})`, await contrast(page));
+      assert.equal(
+        await empty.textContent(),
+        'Nothing yet. A company appears here after you agree to send it your CV.',
+      );
+      assert.equal(await page.locator('[data-testid="settings-agreed-error"]').count(), 0);
+      await page.context().close();
+    });
+
+    it(`Settings "What I have agreed to", three agreed, ${width}`, async () => {
+      const page = await open('?seen=1&consent=openai,google,mistral', viewport);
+      await goTo(page, 'settings');
+      const section = page.locator('[data-testid="settings-agreed"]');
+      await section.locator('[data-testid="analysis-consent-status-mistral"]:visible').waitFor();
+      await section.scrollIntoViewIfNeeded();
+      judge(`settings, agreed list, three agreed (${width})`, await contrast(page));
+
+      const seen = await page.evaluate(() => {
+        const box = document.querySelector('[data-testid="settings-agreed"]');
+        if (box === null) throw new Error('no agreed section');
+        const edge = box.getBoundingClientRect();
+        const problems = [...box.querySelectorAll('h2, li, li > span, li > button')]
+          .filter((part) => {
+            const at = part.getBoundingClientRect();
+            return at.left < edge.left - 0.5 || at.right > edge.right + 0.5;
+          })
+          .map((part) => `${part.tagName} leaves the section`);
+        for (const area of [document.documentElement, box.closest('.overflow-y-auto')]) {
+          if (area !== null && area.scrollWidth > area.clientWidth)
+            problems.push('sideways scroll');
+        }
+        return {
+          problems,
+          rows: box.querySelectorAll('li').length,
+          empty: box.querySelector('[data-testid="settings-agreed-empty"]') !== null,
+          buttons: [...box.querySelectorAll('li > button')].map((button) => ({
+            text: button.textContent,
+            height: button.getBoundingClientRect().height,
+          })),
+        };
+      });
+      assert.deepEqual(seen.problems, [], `agreed list, three agreed (${width})`);
+      assert.equal(seen.rows, 3);
+      assert.equal(seen.empty, false, '"Nothing yet" beside three rows');
+      assert.deepEqual(
+        seen.buttons.map((button) => button.text),
+        ['Withdraw', 'Withdraw', 'Withdraw'],
+      );
+      if (width === 'phone') {
+        for (const button of seen.buttons) {
+          assert.ok(button.height >= 44, `Withdraw is ${String(button.height)}px tall on a phone`);
+        }
+      }
+
+      // Withdraw takes its own row away and leaves the others.
+      await section.locator('[data-testid="analysis-consent-withdraw-google"]').click();
+      await section
+        .locator('[data-testid="analysis-consent-status-google"]')
+        .waitFor({ state: 'detached' });
+      assert.equal(await section.locator('li').count(), 2);
+      assert.equal(
+        await section.locator('[data-testid="analysis-consent-status-openai"]').count(),
+        1,
+      );
+      await page.context().close();
+    });
+  }
+
+  /*
     L-398: "Where to look" is a closed fold now, so the plain Search visit
     above no longer measures its text. This opens it and measures its top and
     its foot in view, with and without a key saved (the keyed boards row).
@@ -2833,6 +2916,107 @@ describe('the mono font cannot move Settings after a jump (L-364)', () => {
     assert.notEqual(after, before, `a taller line went unnoticed: ${String(before)}`);
     await app.page.context().close();
   });
+});
+
+/**
+ * "What I have agreed to" cannot move Settings after a jump (L-410).
+ *
+ * The section sits above Job boards and learns its rows from the consent file,
+ * which answers a moment after the screen has drawn. Opened from Search's
+ * "Manage job boards", Settings has already scrolled to Job boards by then, so
+ * three rows arriving above it would push the section down the screen — the
+ * same fault as the late mono font (L-364), from a different cause.
+ *
+ * Two things keep the section still. With nothing agreed — almost everyone —
+ * the empty line holds its place, unseen, before the file answers, so nothing
+ * moves and Settings still asks its scroll area to move exactly once (the
+ * L-353 check above). With rows, which are taller than that one line, Settings
+ * scrolls to the section once more when they have drawn.
+ *
+ * "Late" is made exact: `?consentLate=1` holds the file's answer back until
+ * well after the jump, and each check waits for the answer before it measures.
+ * Even "on time" the answer lands after the jump, which is made as the screen
+ * is first drawn.
+ */
+describe('"What I have agreed to" cannot move Settings after a jump (L-410)', () => {
+  for (const [width, viewport] of Object.entries(VIEWPORTS)) {
+    const padding = width === 'phone' ? 16 : 20;
+
+    it(`nothing agreed, answer late: the empty line's place is held, so Job boards stays put and one scroll is asked for, ${width}`, async () => {
+      const page = await open('?seen=1&consentLate=1', viewport);
+      await goTo(page, 'search');
+      await recordScrollRequests(page, '[data-testid="boards-settings"]');
+      await openWhereToLook(page);
+      await page.click('[data-testid="keyless-manage"]');
+      await page.locator('[data-testid="nav-settings"][aria-current="page"]:visible').waitFor();
+      await page.locator('[data-testid="boards-settings"]:focus').waitFor();
+
+      // The file has not answered yet: nothing is said, and the line is unseen.
+      const waiting = await page.evaluate(() => {
+        const section = document.querySelector('[data-testid="settings-agreed"]');
+        const held = section?.querySelector('p[aria-hidden="true"]');
+        return {
+          said: section?.querySelector('[data-testid="settings-agreed-empty"]') !== null,
+          held:
+            held === null || held === undefined
+              ? null
+              : { visibility: getComputedStyle(held).visibility, height: held.clientHeight },
+        };
+      });
+      assert.equal(waiting.said, false, 'the file answered before the check looked: not "late"');
+      assert.equal(waiting.held?.visibility, 'hidden');
+      assert.ok((waiting.held?.height ?? 0) > 0, 'the held line takes no room');
+      const before = await aboveBoards(page);
+
+      const empty = page.locator('[data-testid="settings-agreed-empty"]');
+      await empty.waitFor();
+      await layoutSettled(page, { fonts: true });
+      assert.equal(await aboveBoards(page), before, 'Job boards moved when the answer landed');
+      assert.equal(
+        await empty.evaluate((line) => line.clientHeight),
+        waiting.held?.height,
+        'the line said is not the height that was held for it',
+      );
+
+      const requests = await scrollRequests(page);
+      const seen = await landing(page, '[data-testid="boards-settings"]');
+      console.log(
+        `Settings at Job boards, nothing agreed, late (${width}): ${JSON.stringify({ requests, landed: seen })}`,
+      );
+      assert.equal(requests.length, 1, 'Settings did not ask its scroll area to move once');
+      assert.ok(!seen.atEnd, 'the area ran out of room, so where it stopped proves nothing');
+      assert.equal(seen.gap, padding, 'Job boards did not stop the padding below the top');
+      await page.context().close();
+    });
+
+    for (const [when, late] of [
+      ['on time', ''],
+      ['late', '&consentLate=1'],
+    ] as const) {
+      it(`Settings opened at Job boards stops the padding below the top, three agreed, answer ${when}, ${width}`, async () => {
+        const page = await open(`?seen=1&consent=openai,google,mistral${late}`, viewport);
+        await goTo(page, 'search');
+        await openWhereToLook(page);
+        await page.click('[data-testid="keyless-manage"]');
+        await page.locator('[data-testid="nav-settings"][aria-current="page"]:visible').waitFor();
+        await page.locator('[data-testid="boards-settings"]:focus').waitFor();
+        // The rows have arrived, above the section the screen jumped to.
+        await page.locator('[data-testid="analysis-consent-status-mistral"]').waitFor({
+          state: 'attached',
+        });
+        await layoutSettled(page, { fonts: true });
+        const seen = await landing(page, '[data-testid="boards-settings"]');
+        console.log(
+          `Settings landed at Job boards, three agreed, ${when} (${width}): ${JSON.stringify(seen)}`,
+        );
+        assert.ok(seen.scrollTop > 0, 'Settings did not scroll at all');
+        assert.ok(!seen.atEnd, 'the area ran out of room, so where it stopped proves nothing');
+        assert.equal(seen.padding, padding);
+        assert.equal(seen.gap, padding, 'Job boards did not stop the padding below the top');
+        await page.context().close();
+      });
+    }
+  }
 });
 
 /**

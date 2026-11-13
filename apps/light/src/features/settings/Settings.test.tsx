@@ -26,6 +26,7 @@ import {
 } from '@cviper/core-types';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { createFakeConsentPort } from '../analysis/test/fakeConsentPort';
 
 import { Settings } from './Settings';
 import { createFakeBackupPort } from './test/fakePort';
@@ -128,7 +129,16 @@ function renderSettings(
   user: ReturnType<typeof userEvent.setup>;
 } {
   const user = userEvent.setup();
-  render(<Settings port={port} filePort={filePort} now={NOW} />);
+  render(
+    <Settings
+      port={port}
+      filePort={filePort}
+      now={NOW}
+      // L-410: an answering consent store, so "What I have agreed to" draws
+      // its empty line here and not the "could not be read" error.
+      consentPort={createFakeConsentPort()}
+    />,
+  );
   return { port, filePort, user };
 }
 
