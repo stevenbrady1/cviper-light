@@ -27,6 +27,7 @@ import { AI_KEY_PROVIDER_IDS } from './aiKeyProviders';
 import { createTauriAiKeyPort, type AiKeyPort } from './aiKeyPort';
 import { CustomServiceCard } from './CustomServiceCard';
 import { type CustomServicePort } from './customServicePort';
+import { KeyRow } from './KeyRow';
 import { KEY_STATE_LABEL, KEY_STATE_TONE } from './model';
 import { LiveStatus } from '../../../app/LiveStatus';
 
@@ -115,7 +116,7 @@ export function AiKeySetup({ ports, browser, customServicePort }: AiKeySetupProp
       <SectionHeading
         icon="key"
         title="AI provider keys"
-        description="Optional. The analysis screen already has a keyword match that needs no account, and the tracker is entirely offline. An AI key, or an AI service on your own computer, adds six things:"
+        description="Optional. An AI key, or an AI service on your own computer, adds six things:"
       />
 
       {/*
@@ -161,12 +162,12 @@ export function AiKeySetup({ ports, browser, customServicePort }: AiKeySetupProp
       >
         <p className="font-medium text-ink">How to add AI, in three steps</p>
         <ol className="mt-1.5 list-decimal space-y-1 pl-5">
-          <li>Pick one company below. You only need one.</li>
+          <li>Pick one company below and open it. You only need one.</li>
           <li>
-            On its card, press &ldquo;Where do I get &hellip; key?&rdquo;. Sign in on its website
-            and create a key: a long line of letters and numbers.
+            Inside, press &ldquo;Where do I get &hellip; key?&rdquo;. Sign in on its website and
+            create a key: a long line of letters and numbers.
           </li>
-          <li>Paste it into the card and press &ldquo;Test and save this key&rdquo;.</li>
+          <li>Paste it into the box and press &ldquo;Test and save this key&rdquo;.</li>
         </ol>
         <p className="mt-1.5 text-xs text-ink-faint">
           The key is kept in your computer&rsquo;s own password store, and is only used to talk to
@@ -174,7 +175,8 @@ export function AiKeySetup({ ports, browser, customServicePort }: AiKeySetupProp
         </p>
       </div>
 
-      <div className="mt-4 space-y-4">
+      {/* Short rows, 8px apart (L-390): each opens on click. */}
+      <div className="mt-4 space-y-2">
         {AI_KEY_PROVIDER_IDS.map((id) => (
           <AiKeyCard
             key={id}
@@ -214,6 +216,8 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<CardOutcome>(NOTHING);
   const [busy, setBusy] = useState(false);
+  // Here, not in the picker, so the closed row can name it (L-390).
+  const [model, setModel] = useState(() => chosenModel(provider.id));
 
   const refresh = useCallback(async () => {
     setAnswer(await keyPort.status());
@@ -314,18 +318,15 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
     await refresh();
   }, [keyPort, provider.removedMessage, refresh]);
 
-  const headingId = `ai-key-heading-${provider.id}`;
-
   return (
-    <article
-      data-testid={`ai-key-card-${provider.id}`}
-      aria-labelledby={headingId}
-      className={cardClasses()}
-    >
-      <header className="flex items-baseline justify-between gap-3">
-        <h3 id={headingId} className="font-medium text-ink">
-          {provider.label}
-        </h3>
+    <KeyRow
+      cardTestId={`ai-key-card-${provider.id}`}
+      rowTestId={`ai-key-row-${provider.id}`}
+      name={provider.label}
+      // Only with a key saved: a model with no key runs nothing.
+      model={answer === true ? model : null}
+      modelTestId={`ai-key-row-model-${provider.id}`}
+      pill={
         <StatusPill
           data-testid={`ai-key-state-${provider.id}`}
           data-state={state}
@@ -333,8 +334,9 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
         >
           {KEY_STATE_LABEL[state]}
         </StatusPill>
-      </header>
-
+      }
+    >
+      {/* What it adds, then who bills: the first thing inside, before the key box. */}
       <p className="mt-1 text-ink-muted">{provider.unlocks}</p>
       <p className="mt-1 text-xs text-ink-faint">{provider.billing}</p>
 
@@ -465,10 +467,10 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
         </ErrorBox>
       )}
 
-      <ModelPicker providerId={provider.id} />
+      <ModelPicker providerId={provider.id} model={model} onChange={setModel} />
 
       <p className="mt-3 text-xs text-ink-faint">{provider.privacyNote}</p>
-    </article>
+    </KeyRow>
   );
 }
 
@@ -480,15 +482,22 @@ function AiKeyCard({ provider, port: injectedPort, browser }: AiKeyCardProps) {
  * preference in Settings. Every AI feature reads the choice through
  * `providerOptions`, so there is nothing else to press.
  */
-function ModelPicker({ providerId }: { readonly providerId: AiKeyProviderId }) {
-  const [model, setModel] = useState(() => chosenModel(providerId));
+function ModelPicker({
+  providerId,
+  model,
+  onChange,
+}: {
+  readonly providerId: AiKeyProviderId;
+  readonly model: string;
+  readonly onChange: (model: string) => void;
+}) {
   const selectId = `ai-model-${providerId}`;
   const fallback = defaultModelFor(providerId);
 
   return (
     <div className="mt-3">
       <label htmlFor={selectId} className="block text-xs font-medium text-ink-muted">
-        Model
+        AI model
       </label>
       <select
         id={selectId}
@@ -498,7 +507,7 @@ function ModelPicker({ providerId }: { readonly providerId: AiKeyProviderId }) {
           const next = event.currentTarget.value;
           // Shown only once it is kept: a selection that silently fails to
           // save would run a different model from the one on screen.
-          if (chooseModel(providerId, next)) setModel(next);
+          if (chooseModel(providerId, next)) onChange(next);
         }}
         className={`${FIELD} mt-1 w-full`}
       >

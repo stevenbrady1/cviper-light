@@ -4,7 +4,7 @@ import { type ModelInfo } from '@cviper/ai-providers';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
 import { FIELD, FIELD_INVALID } from '../../../app/fields';
-import { cardClasses, ErrorBox, StatusPill } from '../../../ui';
+import { ErrorBox, StatusPill } from '../../../ui';
 import { type KeyState } from '../../../status/environment';
 import {
   chooseCustomModel,
@@ -18,6 +18,7 @@ import {
   type CustomServicePort,
   type CustomServiceStatus,
 } from './customServicePort';
+import { KeyRow } from './KeyRow';
 import { KEY_STATE_TONE } from './model';
 import { LiveStatus } from '../../../app/LiveStatus';
 
@@ -57,7 +58,8 @@ const REMOVED_MESSAGE = 'The service has been removed from this computer.';
 
 const STATE_LABEL: Record<KeyState, string> = {
   configured: 'Saved',
-  incomplete: 'Saved',
+  // Saved, but offered nowhere until a model is chosen (L-390).
+  incomplete: 'Choose a model',
   missing: 'Not set up',
   unreadable: 'Could not be read',
 };
@@ -81,6 +83,8 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
   const [passed, setPassed] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Here, not in the picker, so the closed row can say whether one is chosen (L-390).
+  const [model, setModel] = useState<string | null>(() => readCustomModel());
 
   const refresh = useCallback(async () => {
     const status = await port.status();
@@ -104,7 +108,9 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
     ? 'unreadable'
     : saved === undefined || saved === null
       ? 'missing'
-      : 'configured';
+      : model === null
+        ? 'incomplete'
+        : 'configured';
 
   const onSave = useCallback(async () => {
     setPassed(null);
@@ -150,20 +156,19 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
       return;
     }
     forgetCustomModel();
+    setModel(null);
     setPassed(REMOVED_MESSAGE);
     await refresh();
   }, [port, refresh]);
 
   return (
-    <article
-      data-testid="custom-service-card"
-      aria-labelledby="custom-service-heading"
-      className={cardClasses()}
-    >
-      <header className="flex items-baseline justify-between gap-3">
-        <h3 id="custom-service-heading" className="font-medium text-ink">
-          Your own AI service
-        </h3>
+    <KeyRow
+      cardTestId="custom-service-card"
+      rowTestId="custom-service-row"
+      name="Your own AI service"
+      model={saved ? model : null}
+      modelTestId="custom-service-row-model"
+      pill={
         <StatusPill
           data-testid="custom-service-state"
           data-state={state}
@@ -171,8 +176,8 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
         >
           {STATE_LABEL[state]}
         </StatusPill>
-      </header>
-
+      }
+    >
       <p className="mt-1 text-ink-muted">
         Any service that answers like OpenAI’s chat API: LM Studio or llama.cpp on your own
         computer, a model server on your network, or a hosted service not listed above.
@@ -336,9 +341,9 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
       )}
 
       {saved === undefined || saved === null ? null : (
-        <CustomModelPicker port={port} address={saved.address} />
+        <CustomModelPicker port={port} address={saved.address} model={model} onChange={setModel} />
       )}
-    </article>
+    </KeyRow>
   );
 }
 
@@ -350,12 +355,15 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
 function CustomModelPicker({
   port,
   address,
+  model,
+  onChange,
 }: {
   readonly port: CustomServicePort;
   /** Re-lists when the saved address changes. */
   readonly address: string;
+  readonly model: string | null;
+  readonly onChange: (model: string | null) => void;
 }) {
-  const [model, setModel] = useState<string | null>(() => readCustomModel());
   const [models, setModels] = useState<readonly ModelInfo[]>([]);
   const [listProblem, setListProblem] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
@@ -375,13 +383,13 @@ function CustomModelPicker({
 
   function use(raw: string): boolean {
     if (!chooseCustomModel(raw)) return false;
-    setModel(normaliseCustomModel(raw));
+    onChange(normaliseCustomModel(raw));
     return true;
   }
 
   return (
     <div className="mt-3">
-      <p className="text-xs font-medium text-ink-muted">Model</p>
+      <p className="text-xs font-medium text-ink-muted">AI model</p>
       <p data-testid="custom-service-model" className="mt-1 text-ink">
         {model === null ? (
           'None chosen yet. Choose one, and this service is offered wherever you use AI.'
