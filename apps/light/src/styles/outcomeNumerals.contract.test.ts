@@ -50,6 +50,23 @@ function scoreClasses(): string {
   return captured;
 }
 
+const ANALYSIS_RESULT = path.resolve(HERE, '../features/analysis/AnalysisResult.tsx');
+
+/**
+ * The className on the element carrying `data-testid="analysis-ats-score-value"`,
+ * read with comments stripped first, so a comment can neither trip the check
+ * nor stand in for the element.
+ */
+function keywordNumberClasses(source: string): string {
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
+  const anchor = code.indexOf('data-testid="analysis-ats-score-value"');
+  if (anchor === -1) throw new Error('analysis-ats-score-value is missing from AnalysisResult.tsx');
+  const match = code.slice(anchor, anchor + 400).match(/className=(?:\{`([^`]+)`\}|"([^"]+)")/);
+  const captured = match?.[1] ?? match?.[2];
+  if (!captured) throw new Error('could not read the keyword number className');
+  return captured;
+}
+
 describe('outcome numerals (Northlight)', () => {
   it('the match score is set in the display serif', () => {
     expect(scoreClasses()).toContain('font-display');
@@ -85,6 +102,33 @@ describe('outcome numerals (Northlight)', () => {
     // is inert and every assertion above passes while the serif never renders.
     const theme = fs.readFileSync(path.resolve(HERE, './theme.css'), 'utf8');
     expect(theme).toMatch(/--font-display:\s*'Newsreader'/);
+  });
+
+  it('the keyword number is never in the display serif (L-391)', () => {
+    // FORBID-LIST: the serif marks the ONE number that decides something. The
+    // keyword check's number beside it in the same face read as a second score.
+    const source = fs.readFileSync(ANALYSIS_RESULT, 'utf8');
+    expect(keywordNumberClasses(source), 'the keyword number is in the serif').not.toMatch(
+      /\bfont-display\b/,
+    );
+  });
+
+  it('the check can fail: a keyword number in the serif is caught, a comment is not', () => {
+    const serif =
+      '<span\n  data-testid="analysis-ats-score-value"\n  className={`font-display text-3xl ${tone}`}\n>';
+    expect(keywordNumberClasses(serif)).toMatch(/\bfont-display\b/);
+
+    // A comment naming the serif, or a commented-out element, neither trips
+    // nor satisfies the check: only the real element's classes are read.
+    const commented =
+      '{/* data-testid="analysis-ats-score-value" className="font-display" */}\n' +
+      '// font-display was the old face\n' +
+      '<span data-testid="analysis-ats-score-value" className="font-mono tabular-nums">';
+    expect(keywordNumberClasses(commented)).toBe('font-mono tabular-nums');
+    const commentedSerif =
+      '{/* data-testid="analysis-ats-score-value" className="font-mono" */}\n' +
+      '<span data-testid="analysis-ats-score-value" className="font-display">';
+    expect(keywordNumberClasses(commentedSerif)).toMatch(/\bfont-display\b/);
   });
 
   it('Newsreader is self-hosted, not fetched from a CDN', () => {

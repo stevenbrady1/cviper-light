@@ -263,48 +263,53 @@ export function AnalysisResult({
         ) : null}
       </p>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        {/*
-          flex-1 so the scale takes the row, not just the width of its numeral;
-          min-w-72 so on a narrow card the badge wraps below rather than
-          squeezing the scale until its labels collide (L-181).
-        */}
-        <div className="min-w-72 flex-1">
-          <BandScale score={analysis.match_score} verdict={analysis.verdict} />
+      {/*
+        The hero (L-391): the match score is the one number on this screen that
+        decides something, so it alone gets the card. Below the provenance strip,
+        never above it.
+      */}
+      <div data-testid="analysis-hero" className={`${cardClasses()} space-y-5`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          {/*
+            flex-1 so the scale takes the row, not just the width of its numeral;
+            min-w-72 so on a narrow card the badge wraps below rather than
+            squeezing the scale until its labels collide (L-181).
+          */}
+          <div className="min-w-72 flex-1">
+            <BandScale score={analysis.match_score} verdict={analysis.verdict} />
+          </div>
+          <span
+            data-testid="analysis-verdict"
+            className={`rounded-pill px-2.5 py-1 font-medium ${VERDICT_TONE[analysis.verdict]}`}
+          >
+            <Hint text={VERDICT_HINT[analysis.verdict]}>{VERDICT_LABEL[analysis.verdict]}</Hint>
+          </span>
         </div>
-        <span
-          data-testid="analysis-verdict"
-          className={`rounded-pill px-2.5 py-1 font-medium ${VERDICT_TONE[analysis.verdict]}`}
-        >
-          <Hint text={VERDICT_HINT[analysis.verdict]}>{VERDICT_LABEL[analysis.verdict]}</Hint>
-        </span>
+        {confidence === null ? null : (
+          <p
+            data-testid="analysis-confidence"
+            data-level={confidence.level}
+            className="-mt-3 text-xs text-ink-muted"
+          >
+            {confidenceSentence(confidence)}
+          </p>
+        )}
       </div>
-      {confidence === null ? null : (
-        <p
-          data-testid="analysis-confidence"
-          data-level={confidence.level}
-          className="-mt-3 text-xs text-ink-muted"
-        >
-          {confidenceSentence(confidence)}
-        </p>
-      )}
 
       {/*
         Its own block, never folded into the match score or the eligibility
         gates (L-196): "can they do the job" and "will a scanner find the words"
-        are different questions, and an average of them answers neither.
+        are different questions, and an average of them answers neither. A plain
+        row, outside the hero, its number in mono like every compared number
+        (L-391): set in the serif it read as a second score.
       */}
       {ats === null ? null : (
-        <div
-          data-testid="analysis-ats-score"
-          data-band={ats.band}
-          className={cardClasses({ padding: 'none' }) + ' p-3'}
-        >
-          <Eyebrow>Screening-software keyword check</Eyebrow>
-          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <div data-testid="analysis-ats-score" data-band={ats.band}>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <Eyebrow>Screening-software keyword check</Eyebrow>
             <span
               data-testid="analysis-ats-score-value"
-              className={`font-display text-3xl leading-none font-normal lining-nums tabular-nums ${ATS_BAND_TONE[ats.band]}`}
+              className={`font-mono tabular-nums ${ATS_BAND_TONE[ats.band]}`}
             >
               {ats.score}
             </span>

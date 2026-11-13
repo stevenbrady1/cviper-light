@@ -104,7 +104,7 @@ describe('the title ladder (L-382)', () => {
     expect(files.length).toBeGreaterThan(50);
     const lists = files.flatMap((file) => serifClassLists(shippedText(file)));
     // Proof the scan looked at real serif text: the score, the band, the titles.
-    expect(lists.length).toBeGreaterThanOrEqual(6);
+    expect(lists.length).toBeGreaterThanOrEqual(5); // was 6; lowered in L-391: the keyword number left the serif
     const offences = files.flatMap((file) =>
       serifWeightProblems(shippedText(file)).map((line) => `${displayPath(file)}: ${line}`),
     );

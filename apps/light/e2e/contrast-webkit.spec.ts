@@ -298,6 +298,166 @@ describe('placeholder text is painted in ink-faint (L-316)', () => {
 });
 
 /**
+ * The match score is the hero; the keyword check is a plain row under it (L-391).
+ *
+ * Both numbers are out of 100, and both used to be in the serif, the keyword
+ * one in a white card — so it read as a second score. jsdom does no layout and
+ * loads no fonts, so only a real engine can measure which one the eye meets.
+ * Measured on the real sample result, in its grey box, as Smoke picture 3 is.
+ */
+const HERO_WINDOWS = [
+  { width: 1000, height: 700 },
+  { width: 1264, height: 720 },
+  { width: 1440, height: 900 },
+  { width: 375, height: 812 },
+] as const;
+
+interface HeroReport {
+  readonly heroHeight: number;
+  readonly scorePx: number;
+  readonly keywordPx: number;
+  /** True when the verdict pill sits on the numeral's row, not under the bar. */
+  readonly pillBeside: boolean;
+  readonly problems: readonly string[];
+}
+
+async function openSample(viewport: { width: number; height: number }): Promise<Page> {
+  const page = await open('?seen=1', viewport);
+  await goTo(page, 'analysis');
+  await page.click('[data-testid="analysis-try-sample"]');
+  await page.waitForSelector('[data-testid="analysis-sample"] [data-testid="analysis-ats-score"]');
+  await page.evaluate(() => document.fonts.ready);
+  return page;
+}
+
+async function heroReport(page: Page): Promise<HeroReport> {
+  return page.evaluate(() => {
+    const problems: string[] = [];
+    const inSample = (id: string): HTMLElement | null =>
+      document.querySelector(`[data-testid="analysis-sample"] [data-testid="${id}"]`);
+    const hero = inSample('analysis-hero');
+    const score = inSample('band-scale-score');
+    const keyword = inSample('analysis-ats-score');
+    const keywordValue = inSample('analysis-ats-score-value');
+    const pill = inSample('analysis-verdict');
+    if (!hero || !score || !keyword || !keywordValue || !pill) {
+      return {
+        heroHeight: 0,
+        scorePx: 0,
+        keywordPx: 0,
+        pillBeside: false,
+        problems: ['the sample has no hero, score, verdict or keyword row'],
+      };
+    }
+    const scorePx = parseFloat(getComputedStyle(score).fontSize);
+    const keywordPx = parseFloat(getComputedStyle(keywordValue).fontSize);
+    if (scorePx < keywordPx * 2) {
+      problems.push(
+        `size: the score is ${String(scorePx)}px, the keyword number ${String(keywordPx)}px`,
+      );
+    }
+    const heroBox = hero.getBoundingClientRect();
+    const rowBox = keyword.getBoundingClientRect();
+    if (hero.contains(keyword) || keyword.contains(hero)) {
+      problems.push('place: the keyword row and the hero are one block');
+    }
+    if (rowBox.top < heroBox.bottom - 0.5) {
+      problems.push(
+        `place: the keyword row starts at ${String(rowBox.top)}px, above the hero's bottom ${String(heroBox.bottom)}px`,
+      );
+    }
+    const labels = ['weak', 'possible', 'strong'].map((band) =>
+      inSample(`band-scale-label-${band}`)?.getBoundingClientRect(),
+    );
+    for (let i = 0; i + 1 < labels.length; i += 1) {
+      const left = labels[i];
+      const right = labels[i + 1];
+      if (!left || !right) problems.push('labels: a band label is missing');
+      else if (left.right >= right.left) {
+        problems.push(`labels: band labels ${String(i)} and ${String(i + 1)} touch`);
+      }
+    }
+    const scoreBox = score.getBoundingClientRect();
+    const pillBox = pill.getBoundingClientRect();
+    return {
+      heroHeight: heroBox.height,
+      scorePx,
+      keywordPx,
+      pillBeside: pillBox.top < scoreBox.bottom,
+      problems,
+    };
+  });
+}
+
+describe('the match score is the hero, the keyword check a plain row below (L-391)', () => {
+  for (const viewport of HERO_WINDOWS) {
+    const size = `${String(viewport.width)}×${String(viewport.height)}`;
+
+    it(`the match score is drawn at least twice the size of the keyword number, ${size}`, async () => {
+      const page = await openSample(viewport);
+      const report = await heroReport(page);
+      console.log(`hero at ${size}: ${JSON.stringify(report)}`);
+      assert.deepEqual(
+        report.problems.filter((line) => line.startsWith('size') || line.startsWith('the sample')),
+        [],
+      );
+      await page.context().close();
+    });
+
+    it(`the keyword row starts below the hero, never beside or inside it, ${size}`, async () => {
+      const page = await openSample(viewport);
+      const report = await heroReport(page);
+      assert.deepEqual(
+        report.problems.filter((line) => line.startsWith('place') || line.startsWith('the sample')),
+        [],
+      );
+      await page.context().close();
+    });
+
+    it(`the band labels do not touch, ${size}`, async () => {
+      const page = await openSample(viewport);
+      const report = await heroReport(page);
+      assert.deepEqual(
+        report.problems.filter(
+          (line) => line.startsWith('labels') || line.startsWith('the sample'),
+        ),
+        [],
+      );
+      await page.context().close();
+    });
+
+    it(`no sideways scroll, ${size}`, async () => {
+      const page = await openSample(viewport);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a big keyword number inside the hero, and touching labels, are reported', async () => {
+    const page = await openSample({ width: 1000, height: 700 });
+    await page.evaluate(() => {
+      const inSample = (id: string): HTMLElement | null =>
+        document.querySelector(`[data-testid="analysis-sample"] [data-testid="${id}"]`);
+      const value = inSample('analysis-ats-score-value');
+      if (value) value.style.fontSize = '48px';
+      const keyword = inSample('analysis-ats-score');
+      if (keyword) inSample('analysis-hero')?.append(keyword);
+      const possible = inSample('band-scale-label-possible');
+      if (possible) possible.style.left = '2%';
+    });
+    const report = await heroReport(page);
+    for (const kind of ['size:', 'place:', 'labels:']) {
+      assert.ok(
+        report.problems.some((line) => line.startsWith(kind)),
+        `${kind} was not flagged: ${JSON.stringify(report.problems)}`,
+      );
+    }
+    await page.context().close();
+  });
+});
+
+/**
  * Tracker column headings whose content is wider than the heading (L-311).
  *
  * With an application open the board's columns shrink to their minimum, and
