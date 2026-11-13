@@ -58,7 +58,9 @@ describe('the Model select on each AI key card', () => {
     renderCards();
     const first = select('google').options[0];
     expect(first?.textContent).toMatch(/default/i);
-    expect(screen.getByLabelText('Model', { selector: '#ai-model-google' })).toBe(select('google'));
+    expect(screen.getByLabelText('AI model', { selector: '#ai-model-google' })).toBe(
+      select('google'),
+    );
   });
 
   it('choosing a model saves it, and the analysis options run it from then on', async () => {

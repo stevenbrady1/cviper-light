@@ -105,3 +105,42 @@ describe('Settings opened at the Reed key', () => {
     expect(onOpened).toHaveBeenCalledTimes(1);
   });
 });
+
+/** L-390: the Reed card is a row that opens on click; the jump opens it too. */
+describe('Settings opened at the Reed key opens the Reed row (L-390)', () => {
+  function row(id: 'adzuna' | 'reed'): HTMLDetailsElement {
+    return screen.getByTestId(`key-row-${id}`) as HTMLDetailsElement;
+  }
+
+  it('the Reed row is open, the Adzuna row is closed, and focus is inside the Reed row', async () => {
+    renderSettings({ openAt: 'reed-key', onOpened: vi.fn() });
+    const signup = await screen.findByTestId('key-signup-reed');
+    await vi.waitFor(() => expect(document.activeElement).toBe(signup));
+
+    expect(row('reed').open).toBe(true);
+    expect(row('reed').contains(signup)).toBe(true);
+    expect(row('adzuna').open).toBe(false);
+  });
+
+  it('negative: opened normally, the Reed row is closed', async () => {
+    renderSettings({ onOpened: vi.fn() });
+    await screen.findByTestId('key-card-reed');
+
+    expect(row('reed').open).toBe(false);
+    expect(row('adzuna').open).toBe(false);
+  });
+
+  it('boundary: after the shell forgets, a re-render does not reopen the Reed row', async () => {
+    const onOpened = vi.fn();
+    const { again } = renderSettings({ openAt: 'reed-key', onOpened });
+    const signup = await screen.findByTestId('key-signup-reed');
+    await vi.waitFor(() => expect(document.activeElement).toBe(signup));
+    // The user closes the Reed row by hand.
+    row('reed').open = false;
+
+    again({ onOpened });
+    await screen.findByTestId('key-card-reed');
+
+    expect(row('reed').open).toBe(false);
+  });
+});

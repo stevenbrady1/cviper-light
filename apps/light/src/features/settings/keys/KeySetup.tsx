@@ -4,7 +4,7 @@ import { type JobProviderId } from '@cviper/job-apis';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
 import { FIELD } from '../../../app/fields';
-import { cardClasses, ErrorBox, SectionHeading, StatusPill } from '../../../ui';
+import { ErrorBox, SectionHeading, StatusPill } from '../../../ui';
 import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 import { type KeyState, type SecretKeyName } from '../../../status/environment';
 
@@ -21,6 +21,7 @@ import {
   type CredentialAnswers,
   type KeyProvider,
 } from './model';
+import { KeyRow } from './KeyRow';
 import { createTauriKeyPort, type KeyPort } from './port';
 import { LiveStatus } from '../../../app/LiveStatus';
 
@@ -100,7 +101,8 @@ export function KeySetup({ port, browser, focused, onFocused }: KeySetupProps = 
         where you can save them to the tracker in one click. Both keys are free.
       </p>
 
-      <div className="mt-4 space-y-4">
+      {/* Short rows, 8px apart (L-390): each opens on click. */}
+      <div className="mt-4 space-y-2">
         {KEY_PROVIDERS.map((provider) => (
           <KeyCard
             key={provider.id}
@@ -130,6 +132,8 @@ function KeyCard({ provider, port, browser, focused, onFocused }: KeyCardProps) 
     button with the same words on Search, and getting the key is the next
     step. `preventScroll`, never `scrollIntoView` (L-216) — Settings moves its
     own scroll area, in `onFocused`. Once only; the shell clears the request.
+    The row starts open for it (L-390): a real browser cannot focus a button
+    inside a closed fold.
   */
   const card = useRef<HTMLElement>(null);
   const signup = useRef<HTMLButtonElement>(null);
@@ -252,13 +256,17 @@ function KeyCard({ provider, port, browser, focused, onFocused }: KeyCardProps) 
   }, [port, provider.id, provider.label, refresh]);
 
   return (
-    <article ref={card} data-testid={`key-card-${provider.id}`} className={cardClasses()}>
-      <header className="flex items-baseline justify-between gap-3">
-        <h3 className="font-medium text-ink">{provider.label}</h3>
-        {/*
-          The state, in words. The dot in the rail is the same fact in colour;
-          neither is ever the only telling of it.
-        */}
+    <KeyRow
+      cardRef={card}
+      cardTestId={`key-card-${provider.id}`}
+      rowTestId={`key-row-${provider.id}`}
+      name={provider.label}
+      startOpen={focused}
+      /*
+        The state, in words. The dot in the rail is the same fact in colour;
+        neither is ever the only telling of it.
+      */
+      pill={
         <StatusPill
           data-testid={`key-state-${provider.id}`}
           data-state={state}
@@ -266,8 +274,8 @@ function KeyCard({ provider, port, browser, focused, onFocused }: KeyCardProps) 
         >
           {KEY_STATE_LABEL[state]}
         </StatusPill>
-      </header>
-
+      }
+    >
       <p className="mt-1 text-ink-muted">{provider.unlocks}</p>
       <p className="mt-1 text-xs text-ink-faint">{provider.allowance}</p>
 
@@ -385,6 +393,6 @@ function KeyCard({ provider, port, browser, focused, onFocused }: KeyCardProps) 
       )}
 
       <p className="mt-3 text-xs text-ink-faint">{provider.privacyNote}</p>
-    </article>
+    </KeyRow>
   );
 }

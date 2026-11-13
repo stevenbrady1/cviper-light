@@ -247,6 +247,33 @@ describe('colour contrast on the rendered app (WCAG 2.1 AA)', () => {
     judge('opened application', await contrast(page));
     await page.context().close();
   });
+
+  /*
+    L-390: the key cards are closed rows now, and axe skips what a closed fold
+    hides, so the plain Settings visit above measures less than it used to.
+    This puts the inside of a row back under the check: one AI row open, and
+    the job-board fold with its Reed row open. With every key saved too, so
+    the saved lines and the model in each title are measured.
+  */
+  for (const [width, viewport] of Object.entries(VIEWPORTS)) {
+    for (const query of ['?seen=1', '?seen=1&results=1']) {
+      it(`Settings with an AI row and the Reed row open, ${width}, ${query}`, async () => {
+        const page = await open(query, viewport);
+        await goTo(page, 'settings');
+        await page.click('[data-testid="ai-key-row-openai"] > summary');
+        await page.locator('[data-testid="ai-key-input-openai"]:visible').waitFor();
+        // axe measures only text on screen, so each open row is brought into view.
+        await page.locator('[data-testid="ai-key-card-openai"]').scrollIntoViewIfNeeded();
+        judge(`settings, AI row open (${width}, ${query})`, await contrast(page));
+        await page.click('[data-testid="settings-advanced"] > summary');
+        await page.click('[data-testid="key-row-reed"] > summary');
+        await page.locator('[data-testid="key-input-reed_api_key"]:visible').waitFor();
+        await page.locator('[data-testid="key-card-reed"]').scrollIntoViewIfNeeded();
+        judge(`settings, Reed row open (${width}, ${query})`, await contrast(page));
+        await page.context().close();
+      });
+    }
+  }
 });
 
 /**
@@ -3879,6 +3906,221 @@ describe('a result card has one clear action, and its "…" menu stays in view (
     assert.ok(
       clipped.problems.some((line) => line.includes('covered or cut off')),
       `the list cut off by its card was not flagged: ${JSON.stringify(clipped.problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
+ * Settings key rows (L-390).
+ *
+ * Each AI provider, "Your own AI service" and the two job boards are short rows
+ * on the browser's own fold (`<details>`). jsdom keeps a closed fold's content
+ * drawn, focusable and clickable, and does not open one on Enter, so a row that
+ * never opens passes every unit test. Only a real engine can say that the title
+ * is one line, that Enter opens it, and that the Reed jump lands on a button a
+ * person can see.
+ */
+const ROW_WINDOWS = {
+  smallest: { width: 1000, height: 700 },
+  desktop: { width: 1280, height: 800 },
+  wide: { width: 1440, height: 900 },
+  phone: { width: 375, height: 700 },
+} as const;
+
+/** Every key row: six providers, your own service, and the two job boards. */
+const KEY_ROWS =
+  'details[data-testid^="ai-key-row-"], details[data-testid="custom-service-row"], ' +
+  'details[data-testid^="key-row-"]';
+
+/** Settings, with the job-board fold opened so its two rows are drawn too. */
+async function settingsWithRows(
+  viewport: { width: number; height: number },
+  query = '?seen=1',
+): Promise<Page> {
+  const page = await open(query, viewport);
+  await goTo(page, 'settings');
+  await page.waitForSelector('[data-testid="ai-key-row-openai"]');
+  await page.click('[data-testid="settings-advanced"] > summary');
+  await page.locator('[data-testid="key-row-reed"] > summary:visible').waitFor();
+  return page;
+}
+
+/**
+ * What is wrong with the closed rows. Empty means all is well: each title is
+ * 44px to `tallest`px, and nothing reaches past the window or scrolls sideways.
+ */
+async function keyRowProblems(page: Page, tallest: number): Promise<string[]> {
+  return page.evaluate(
+    ({ selector, max }) => {
+      const problems: string[] = [];
+      const rows = [...document.querySelectorAll<HTMLDetailsElement>(selector)];
+      if (rows.length !== 9) problems.push(`${String(rows.length)} rows drawn, not 9`);
+      for (const row of rows) {
+        const name = row.dataset.testid ?? '?';
+        const title = row.querySelector('summary');
+        if (title === null) {
+          problems.push(`${name}: no title`);
+          continue;
+        }
+        const box = title.getBoundingClientRect();
+        if (row.open) problems.push(`${name}: open`);
+        if (box.height < 44 || box.height > max) {
+          problems.push(`${name}: title is ${String(box.height)}px tall`);
+        }
+        if (box.right > document.documentElement.clientWidth) {
+          problems.push(`${name}: reaches ${String(box.right)}px, past the window`);
+        }
+      }
+      const area = document.querySelector('[data-testid="view-settings"] .overflow-y-auto');
+      for (const scroller of [document.documentElement, area]) {
+        if (scroller !== null && scroller.scrollWidth > scroller.clientWidth) {
+          problems.push(`${scroller.tagName.toLowerCase()} scrolls sideways`);
+        }
+      }
+      return problems;
+    },
+    { selector: KEY_ROWS, max: tallest },
+  );
+}
+
+/** Every closed title's height, for the log. */
+async function keyRowHeights(page: Page): Promise<Record<string, number>> {
+  return page.evaluate((selector) => {
+    const out: Record<string, number> = {};
+    for (const row of document.querySelectorAll<HTMLDetailsElement>(selector)) {
+      out[row.dataset.testid ?? '?'] =
+        row.querySelector('summary')?.getBoundingClientRect().height ?? 0;
+    }
+    return out;
+  }, KEY_ROWS);
+}
+
+/** Whether the row with this test id is open. */
+async function rowOpen(page: Page, testId: string): Promise<boolean> {
+  return page
+    .locator(`[data-testid="${testId}"]`)
+    .evaluate((row) => (row as HTMLDetailsElement).open);
+}
+
+describe('Settings key rows (L-390)', () => {
+  for (const [name, viewport] of Object.entries(ROW_WINDOWS)) {
+    // Two lines are allowed on a phone: the model may wrap under the name.
+    const tallest = name === 'phone' ? 76 : 56;
+    const size = `${String(viewport.width)}×${String(viewport.height)}`;
+
+    it(`every closed row is one title line, 44 to ${String(tallest)}px, nothing past the window, at ${size}`, async () => {
+      const page = await settingsWithRows(viewport);
+      console.log(`key rows (${size}): ${JSON.stringify(await keyRowHeights(page))}`);
+      assert.deepEqual(await keyRowProblems(page, tallest), []);
+      await page.context().close();
+    });
+
+    it(`with every key saved, the model shows in the title and the row still fits, at ${size}`, async () => {
+      const page = await settingsWithRows(viewport, '?seen=1&results=1');
+      await page.locator('[data-testid="ai-key-row-model-google"]').waitFor();
+      const title = await page.locator('[data-testid="ai-key-row-google"] > summary').textContent();
+      console.log(
+        `key rows, all saved (${size}): ${JSON.stringify(await keyRowHeights(page))} — ${String(title)}`,
+      );
+      assert.match(title ?? '', /^Google Gemini\s*gemini\S*\s*Key saved$/);
+      assert.deepEqual(await keyRowProblems(page, tallest), []);
+      await page.context().close();
+    });
+  }
+
+  it('a real Tab reaches the OpenAI row, Enter opens it and the key box is visible; Space closes it', async () => {
+    const page = await open('?seen=1', ROW_WINDOWS.smallest);
+    await goTo(page, 'settings');
+    await page.waitForSelector('[data-testid="ai-key-row-openai"]');
+    const box = page.locator('[data-testid="ai-key-input-openai"]');
+    assert.equal(await box.isVisible(), false, 'the key box shows while the row is closed');
+
+    let reached = false;
+    for (let presses = 0; presses < 80 && !reached; presses += 1) {
+      await page.keyboard.press('Tab');
+      reached = await page.evaluate(
+        () =>
+          document.activeElement ===
+          document.querySelector('[data-testid="ai-key-row-openai"] > summary'),
+      );
+    }
+    assert.ok(reached, 'Tab never reached the OpenAI row');
+
+    await page.keyboard.press('Enter');
+    await page.locator('[data-testid="ai-key-input-openai"]:visible').waitFor();
+    assert.equal(await rowOpen(page, 'ai-key-row-openai'), true);
+    // Only that row: the next one is still closed.
+    assert.equal(await page.locator('[data-testid="ai-key-input-anthropic"]').isVisible(), false);
+
+    await page.keyboard.press(' ');
+    await box.waitFor({ state: 'hidden' });
+    assert.equal(await rowOpen(page, 'ai-key-row-openai'), false);
+    await page.context().close();
+  });
+
+  for (const [name, viewport] of [
+    ['1000×700', ROW_WINDOWS.smallest],
+    ['375×700', ROW_WINDOWS.phone],
+  ] as const) {
+    it(`from Search, "Get a free Reed key" lands on a visible, focused Reed button inside an open row, ${name}`, async () => {
+      const page = await openTypedSearch(viewport);
+      await page.click('[data-testid="search-get-reed-key"]');
+      await page.locator('[data-testid="nav-settings"][aria-current="page"]:visible').waitFor();
+      await page.locator('[data-testid="key-signup-reed"]:visible:focus').waitFor();
+      await scrollingSettled(page);
+      const seen = await page.evaluate(() => {
+        const button = document.querySelector('[data-testid="key-signup-reed"]');
+        const area = document.querySelector('[data-testid="view-settings"] .overflow-y-auto');
+        if (button === null || area === null) return null;
+        const box = button.getBoundingClientRect();
+        const room = area.getBoundingClientRect();
+        const onTop = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        const open = (id: string): boolean =>
+          (document.querySelector(`[data-testid="${id}"]`) as HTMLDetailsElement | null)?.open ??
+          false;
+        return {
+          focused: document.activeElement === button,
+          reedOpen: open('key-row-reed'),
+          adzunaOpen: open('key-row-adzuna'),
+          inArea: box.height > 0 && box.top >= room.top && box.bottom <= room.bottom,
+          onTop: onTop !== null && button.contains(onTop),
+        };
+      });
+      console.log(`Reed jump (${name}): ${JSON.stringify(seen)}`);
+      assert.deepEqual(seen, {
+        focused: true,
+        reedOpen: true,
+        adzunaOpen: false,
+        inArea: true,
+        onTop: true,
+      });
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a row forced to two lines at 1000px is reported', async () => {
+    const page = await settingsWithRows(ROW_WINDOWS.smallest);
+    await page.evaluate(() => {
+      const heading = document.querySelector('[data-testid="ai-key-row-mistral"] h3');
+      if (heading !== null) heading.textContent = 'Mistral '.repeat(30).trim();
+    });
+    const problems = await keyRowProblems(page, 56);
+    assert.ok(
+      problems.some((line) => line.startsWith('ai-key-row-mistral: title is')),
+      `the two-line row was not flagged: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+
+  it('the check can fail: an open row is reported', async () => {
+    const page = await settingsWithRows(ROW_WINDOWS.smallest);
+    await page.click('[data-testid="ai-key-row-grok"] > summary');
+    const problems = await keyRowProblems(page, 56);
+    assert.ok(
+      problems.includes('ai-key-row-grok: open'),
+      `the open row was not flagged: ${JSON.stringify(problems)}`,
     );
     await page.context().close();
   });
