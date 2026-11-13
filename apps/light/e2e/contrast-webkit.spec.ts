@@ -2379,6 +2379,178 @@ describe('a slimmer step bar (L-386)', () => {
 });
 
 /**
+ * No box that scrolls inside Tailor's page (L-322).
+ *
+ * The CV text was a `max-h-72 overflow-y-auto` box inside Tailor's own scroll
+ * area, so the mouse wheel got caught in it. Now a long CV is clipped to the
+ * same height with "Show all" under it, and a CV that fits has no button.
+ * "Long" is counted in lines (`COLLAPSED_LINES`, 11); these checks prove the
+ * count against the real layout: 12 lines really are clipped, so the button is
+ * never a no-op, and 11 are not.
+ *
+ * The rule is general, not about the CV: nothing inside Tailor's reading view
+ * scrolls vertically except Tailor's own scroll area. A later slice (the
+ * tailored CV shown as a page) must pass it too. The correction text box is
+ * not open in any of these checks.
+ */
+const CV_WINDOWS = {
+  'desktop 1000x700': { width: 1000, height: 700 },
+  'phone 375x812': { width: 375, height: 812 },
+} as const;
+
+/** Tailor, its CV panel open, with the harness's CV of `cv` length. */
+async function tailorWithCv(
+  cv: 'long' | 'short',
+  viewport: { width: number; height: number },
+): Promise<Page> {
+  const page = await open(`?seen=1&cv=${cv}`, viewport);
+  await goTo(page, 'tailor');
+  await page.click('[data-testid="tailor-cv-preview-toggle"]');
+  await page.waitForSelector('[data-testid="tailor-cv-preview-text"]:visible');
+  return page;
+}
+
+/** Every element in Tailor, other than its own scroll area, that can scroll vertically. */
+async function innerScrollers(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const view = document.querySelector('[data-testid="view-tailor"]');
+    if (view === null) return ['no Tailor view'];
+    return [...view.querySelectorAll('*')]
+      .filter((element) => element.getAttribute('data-testid') !== 'tailor-scroll')
+      .filter((element) => ['auto', 'scroll'].includes(getComputedStyle(element).overflowY))
+      .filter((element) => element.scrollHeight > element.clientHeight)
+      .map(
+        (element) =>
+          `${element.getAttribute('data-testid') ?? element.tagName.toLowerCase()}: ` +
+          `${String(element.scrollHeight)} in ${String(element.clientHeight)}px`,
+      );
+  });
+}
+
+/** The CV text's own heights, and whether "Show all" is there. */
+async function cvText(page: Page): Promise<{
+  scrollHeight: number;
+  clientHeight: number;
+  lines: number;
+  button: string | null;
+}> {
+  return page.evaluate(() => {
+    const text = document.querySelector('[data-testid="tailor-cv-preview-text"]');
+    if (text === null) throw new Error('no CV text');
+    return {
+      scrollHeight: text.scrollHeight,
+      clientHeight: text.clientHeight,
+      lines: (text.textContent ?? '').split('\n').length,
+      button: document.querySelector('[data-testid="tailor-cv-show-all"]')?.textContent ?? null,
+    };
+  });
+}
+
+/** Wheel down over the middle of the CV text; how far the page and the text moved. */
+async function wheelOverCv(page: Page): Promise<{ page: number; text: number; room: number }> {
+  const start = await page.evaluate(() => {
+    const area = document.querySelector('[data-testid="tailor-scroll"]');
+    const text = document.querySelector('[data-testid="tailor-cv-preview-text"]');
+    if (area === null || text === null) throw new Error('no scroll area or CV text');
+    area.scrollTop = 0;
+    // The part of the text inside the scroll area, so the pointer is really over it.
+    const shown = area.getBoundingClientRect();
+    const box = text.getBoundingClientRect();
+    const bottom = Math.min(box.bottom, shown.bottom);
+    return {
+      x: box.left + box.width / 2,
+      y: (box.top + bottom) / 2,
+      room: area.scrollHeight - area.clientHeight,
+    };
+  });
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.wheel(0, 120);
+  await scrollingSettled(page);
+  return page.evaluate((room) => {
+    const area = document.querySelector('[data-testid="tailor-scroll"]');
+    const text = document.querySelector('[data-testid="tailor-cv-preview-text"]');
+    return { page: area?.scrollTop ?? -1, text: text?.scrollTop ?? -1, room };
+  }, start.room);
+}
+
+describe('no box that scrolls inside Tailor (L-322)', () => {
+  for (const [name, viewport] of Object.entries(CV_WINDOWS)) {
+    it(`a long CV, collapsed, is clipped under "Show all"; the page does not scroll sideways (${name})`, async () => {
+      const page = await tailorWithCv('long', viewport);
+      const seen = await cvText(page);
+      console.log(`long CV collapsed (${name}): ${JSON.stringify(seen)}`);
+      assert.equal(seen.lines, 12);
+      assert.equal(seen.button, 'Show all');
+      // 288px is `max-h-72`; clipped means there really is more to show.
+      assert.equal(seen.clientHeight, 288);
+      assert.ok(
+        seen.scrollHeight > seen.clientHeight,
+        `12 lines fit in ${String(seen.clientHeight)}px: "Show all" would do nothing`,
+      );
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      assert.deepEqual(await innerScrollers(page), []);
+      await page.context().close();
+    });
+
+    it(`a CV of exactly 11 lines is not clipped and has no button (${name})`, async () => {
+      const page = await tailorWithCv('short', viewport);
+      const seen = await cvText(page);
+      console.log(`short CV (${name}): ${JSON.stringify(seen)}`);
+      assert.equal(seen.lines, 11);
+      assert.equal(seen.button, null);
+      assert.ok(
+        seen.scrollHeight <= seen.clientHeight,
+        `11 lines are clipped: ${String(seen.scrollHeight)} in ${String(seen.clientHeight)}px`,
+      );
+      assert.deepEqual(await innerScrollers(page), []);
+      await page.context().close();
+    });
+
+    it(`the wheel over the CV text scrolls the page, collapsed and after "Show all" (${name})`, async () => {
+      const page = await tailorWithCv('long', viewport);
+      const collapsed = await wheelOverCv(page);
+      console.log(`wheel, collapsed (${name}): ${JSON.stringify(collapsed)}`);
+      assert.ok(collapsed.room > 0, 'Tailor has no room to scroll, so the wheel proves nothing');
+      assert.equal(collapsed.text, 0, 'the wheel scrolled the CV text');
+      assert.ok(collapsed.page > 0, 'the wheel did not scroll the page');
+
+      await page.click('[data-testid="tailor-cv-show-all"]');
+      const seen = await cvText(page);
+      console.log(`long CV expanded (${name}): ${JSON.stringify(seen)}`);
+      assert.equal(seen.button, 'Show less');
+      assert.ok(
+        seen.scrollHeight <= seen.clientHeight,
+        `after "Show all" the text is still clipped: ${String(seen.scrollHeight)} in ${String(seen.clientHeight)}px`,
+      );
+      assert.deepEqual(await innerScrollers(page), []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+
+      const expanded = await wheelOverCv(page);
+      console.log(`wheel, expanded (${name}): ${JSON.stringify(expanded)}`);
+      assert.equal(expanded.text, 0, 'the wheel scrolled the CV text');
+      assert.ok(expanded.page > 0, 'the wheel did not scroll the page');
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a box that scrolls inside Tailor is reported', async () => {
+    const page = await tailorWithCv('long', CV_WINDOWS['desktop 1000x700']);
+    await page.evaluate(() => {
+      const text = document.querySelector<HTMLElement>('[data-testid="tailor-cv-preview-text"]');
+      if (text === null) throw new Error('no CV text');
+      text.style.overflowY = 'auto';
+    });
+    const found = await innerScrollers(page);
+    assert.ok(
+      found.some((line) => line.startsWith('tailor-cv-preview-text: ')),
+      `the scrolling CV text went unreported: ${JSON.stringify(found)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
  * A tracker card's Continue and its dots (L-319).
  *
  * The button keeps its short word, "Continue", so in the sheet's 176px card it
