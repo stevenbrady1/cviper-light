@@ -7,7 +7,7 @@
  *
  * The owner chose the sizes on 12 Nov 2026 (L-382), set in the display serif.
  * On 13 Nov 2026 the owner dropped the serif from the whole app (L-405 is the
- * titles; the score numbers follow in their own change). So the rule on titles
+ * titles). So the rule on titles
  * turned over:
  *
  *   before (L-382)  the three titles ARE the serif, at regular weight
@@ -16,15 +16,17 @@
  * The sizes did not change: page title > section title > body, or the ladder
  * is not a ladder.
  *
- * The serif is still in the app until the score numbers leave it, and
- * Newsreader ships ONE weight, 400 (`fonts.css`). Ask a browser for a heavier
- * weight of a face it only has at 400 and it draws a faked, smeared bold. So
- * while any serif text is left:
+ * The score numbers left the serif next (L-407), so the rule for the whole app
+ * turned over too:
  *
- *   - nothing set in the serif asks for a weight above regular, and every class
- *     list that names the serif says `font-normal` out loud, so a bold parent
- *     cannot leak its weight in;
- *   - fonts.css declares no Newsreader face other than 400.
+ *   before (L-382)  serif text is allowed, at regular weight only, because
+ *                   Newsreader ships ONE weight and a browser fakes the rest
+ *   now    (L-407)  NOTHING that ships names the serif class. Not a title, not
+ *                   a number, not anything
+ *
+ * That zero is what makes it safe to take the font file out later: no class
+ * list can be left pointing at a face that is gone. Until it is taken out,
+ * fonts.css still declares no Newsreader face other than 400.
  *
  * FORBID-LIST (LESSON-033): the scans find every class list and every heading
  * tag that names the serif, wherever it is. They read source with comments
@@ -43,8 +45,6 @@ const THEME = readFileSync(join(REPO_ROOT, 'apps/light/src/styles/theme.css'), '
 const FONTS = readFileSync(join(REPO_ROOT, 'apps/light/src/styles/fonts.css'), 'utf8');
 
 const SERIF = /(?<![\w-])font-display(?![\w-])/;
-const HEAVIER = /(?<![\w-])font-(?:medium|semibold|bold|extrabold|black)(?![\w-])/;
-const REGULAR = /(?<![\w-])font-normal(?![\w-])/;
 
 /**
  * Every run of class text that names the serif. Class strings hold no quote
@@ -55,16 +55,6 @@ export function serifClassLists(source: string): string[] {
   return [...stripComments(source).matchAll(/[^'"`]*(?<![\w-])font-display(?![\w-])[^'"`]*/g)].map(
     (match) => match[0].trim(),
   );
-}
-
-/** One line per serif class list that asks for more than regular, or leaves the weight to its parent. */
-export function serifWeightProblems(source: string): string[] {
-  return serifClassLists(source).flatMap((classes) => {
-    if (!SERIF.test(classes)) return [];
-    if (HEAVIER.test(classes)) return [`asks for a weight above regular: "${classes}"`];
-    if (!REGULAR.test(classes)) return [`does not say font-normal: "${classes}"`];
-    return [];
-  });
 }
 
 /** The names of the title styles that name the serif. Titles are never the serif (L-405). */
@@ -145,15 +135,16 @@ describe('the title ladder (L-382, L-405)', () => {
     expect(offences).toEqual([]);
   });
 
-  it('no element set in the display serif asks for a weight above regular', () => {
+  it('nothing that ships names the serif class (L-407)', () => {
     const files = sourceFiles();
-    const lists = files.flatMap((file) => serifClassLists(shippedText(file)));
-    // Proof the scan looked at real serif text: the match score and the welcome
-    // card's example score. Was 6; 5 after L-391 (the keyword number left the
-    // serif); 2 after L-405 (the three titles left it).
-    expect(lists.length).toBeGreaterThanOrEqual(2);
+    // Proof the scan read the two files that held the last serif text: the
+    // match score and the welcome card's example score. The count of serif
+    // class lists was 6; 5 after L-391; 2 after L-405; none now.
+    for (const last of ['features/analysis/BandScale.tsx', 'features/onboarding/Welcome.tsx']) {
+      expect(files.map(displayPath).filter((file) => file.endsWith(last))).toHaveLength(1);
+    }
     const offences = files.flatMap((file) =>
-      serifWeightProblems(shippedText(file)).map((line) => `${displayPath(file)}: ${line}`),
+      serifClassLists(shippedText(file)).map((classes) => `${displayPath(file)}: "${classes}"`),
     );
     expect(offences).toEqual([]);
   });
@@ -196,29 +187,25 @@ describe('the check can fail', () => {
     expect(serifHeadings('{/* <h1 className="font-display"> was the old title */}')).toEqual([]);
   });
 
-  it('a bold serif heading is reported', () => {
+  it('a class list that names the serif is reported, whatever quotes it sits in', () => {
+    // The two that were left before L-407, as they were written.
     expect(
-      serifWeightProblems('<h2 className="font-display text-xl font-semibold text-ink">'),
-    ).toHaveLength(1);
-    expect(serifWeightProblems("const T = 'font-display font-normal md:font-bold';")).toHaveLength(
-      1,
+      serifClassLists('<span className={`font-display text-6xl font-normal ${INK[verdict]}`}>'),
+    ).toEqual(['font-display text-6xl font-normal ${INK[verdict]}']);
+    expect(serifClassLists('<span className="font-display text-3xl font-normal">')).toEqual([
+      'font-display text-3xl font-normal',
+    ]);
+    expect(serifClassLists("const SCORE = 'text-6xl font-display';")).toEqual([
+      'text-6xl font-display',
+    ]);
+  });
+
+  it('negative: sans text, a longer class name, and a comment are not reported', () => {
+    expect(serifClassLists('<p className="text-6xl font-semibold tabular-nums">72</p>')).toEqual(
+      [],
     );
-    expect(
-      serifWeightProblems('className={`font-display text-3xl font-black ${tone}`}'),
-    ).toHaveLength(1);
-  });
-
-  it('a serif heading that leaves its weight to a parent is reported', () => {
-    expect(serifWeightProblems('<h1 className="font-display text-2xl text-ink">')).toHaveLength(1);
-  });
-
-  it('negative: a regular serif heading, and bold sans text, are not reported', () => {
-    expect(serifWeightProblems('<h1 className="font-display text-2xl font-normal">')).toEqual([]);
-    expect(serifWeightProblems('<h3 className="font-semibold text-ink">')).toEqual([]);
-  });
-
-  it('a comment about the rule neither trips nor satisfies it', () => {
-    expect(serifWeightProblems('// never write font-display font-bold\nconst a = 1;')).toEqual([]);
+    expect(serifClassLists('<p className="font-display-2 my-font-display">')).toEqual([]);
+    expect(serifClassLists('// never write font-display again\nconst a = 1;')).toEqual([]);
     expect(serifClassLists('/* font-display font-normal */ const a = 1;')).toEqual([]);
   });
 

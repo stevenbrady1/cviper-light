@@ -35,7 +35,7 @@
  *   - `?draft=1` opens Tailor's job on a finished tailored CV, and
  *     `?draft=contact` with confirmed details on top (L-400: the CV as a page).
  *
- * And it puts five helpers on `window`, each drawing real app components into
+ * And it puts six helpers on `window`, each drawing real app components into
  * an element the spec has placed:
  *   - `__mountErrorBox` draws the app's own `ErrorBox`. The panel `box` shape
  *     has no screen that draws it yet (L-368 moved only the strips), so this is
@@ -45,7 +45,9 @@
  *   - `__mountPrioritySuggestions` draws `AnalysisResult` with one suggestion
  *     of each priority and long section names (L-378);
  *   - `__mountSearchFailures` and `__mountFollowUpPanel` draw the real
- *     `SearchResults` and `FollowUpPanel` showing their error boxes (L-380).
+ *     `SearchResults` and `FollowUpPanel` showing their error boxes (L-380);
+ *   - `__mountYourCv` draws Profile's real "Your CV" section with two saved
+ *     CVs, for their Rename and Delete (L-408).
  *
  * This file is never part of the app's own build: `vite.config.ts` builds
  * `index.html` at the app root, and this page has its own config.
@@ -524,6 +526,64 @@ interface MountedBlockErrorBox {
         })
       }
       onEdit={() => undefined}
+    />,
+  );
+};
+
+/**
+ * L-408: `__mountYourCv` draws Profile's real "Your CV" section with two saved
+ * CVs, so their Rename and Delete, the name box and the delete question can be
+ * laid out in a real browser. The app's own Profile cannot show them here: it
+ * is handed a fake profile, and so no CVs. One name is as long as a name may
+ * be (100 characters, no spaces), the worst case for a row and for the
+ * question's heading. `checks` is how many saved checks the older CV has.
+ */
+(
+  window as unknown as {
+    __mountYourCv: (into: Element, props: { checks: number }) => Promise<void>;
+  }
+).__mountYourCv = async (into, { checks }) => {
+  const { YourCv } = await import('../../src/features/profile/ProfileYourCv');
+  const { createFakeAnalysisPort } = await import('../../src/features/analysis/test/fakePort');
+  const { createFakeFilePort } = await import('../../src/platform/test/fakeFilePort');
+  const saved = (id: string, name: string, created_at: string) => ({
+    id,
+    name,
+    file_path: null,
+    extracted_text: Array.from({ length: 540 }, () => 'word').join(' '),
+    json_resume: null,
+    created_at,
+  });
+  ReactDOM.createRoot(into).render(
+    <YourCv
+      store={createFakeAnalysisPort({
+        cvs: [
+          saved('cv-2', `${'Curriculum'.repeat(9)}Vitae.docx`, '2026-08-10T09:00:00.000Z'),
+          saved('cv-1', 'Banking CV.pdf', '2026-08-01T09:00:00.000Z'),
+        ],
+        analyses: Array.from({ length: checks }, (_, index) => ({
+          id: `check-${String(index)}`,
+          cv_id: 'cv-1',
+          job_id: null,
+          provider: 'keyword',
+          model: 'keyword-v3',
+          match_score: 61,
+          result_json: {
+            match_score: 61,
+            verdict: 'possible' as const,
+            summary: 'Reasonable overlap.',
+            matched_skills: [],
+            missing_skills: [],
+            keyword_gaps: [],
+            matched_keywords: [],
+            suggestions: [],
+            ats_notes: [],
+          },
+          created_at: '2026-08-12T09:00:00.000Z',
+        })),
+      })}
+      files={createFakeFilePort()}
+      now={NOW}
     />,
   );
 };
