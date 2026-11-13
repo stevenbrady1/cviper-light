@@ -211,10 +211,9 @@ describe('the ATS Score step', () => {
     await user.type(screen.getByTestId('tailor-job-text'), JOB.description ?? '');
     await user.click(screen.getByTestId('tailor-run'));
 
-    const row = await screen.findByTestId('tailor-ats-keyword');
-    const cells = [...row.querySelectorAll('td')].map((cell) => cell.textContent ?? '');
-    expect(cells[0]).toMatch(/^\d+$/);
-    expect(cells[1]).toMatch(/^\d+/);
+    await screen.findByTestId('tailor-ats-keyword');
+    expect(screen.getByTestId('tailor-ats-keyword-before').textContent).toMatch(/^Before\d+$/);
+    expect(screen.getByTestId('tailor-ats-keyword-after').textContent).toMatch(/^After\d+/);
     expect(screen.getByTestId('tailor-ats-keyword-delta').textContent).not.toBe('—');
   });
 

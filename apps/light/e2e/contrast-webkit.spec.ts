@@ -2565,7 +2565,10 @@ async function markProblems(page: Page): Promise<MarkReport> {
 
     const marked = (selector: string): Element[] =>
       [...sheet.querySelectorAll(selector)].filter((row) => row.querySelector('[data-mark]'));
-    for (const row of marked('[data-testid="tailor-ats"] tbody tr')) {
+    // The table's rows, and the keyword and bullet rows drawn as bars (L-396).
+    for (const row of marked(
+      '[data-testid="tailor-ats"] tbody tr, [data-testid="tailor-ats-bars"] > li',
+    )) {
       againstTwin(row, `ATS row ${nameOf(row)}`);
     }
     for (const button of marked('[data-testid="job-steps"] button')) {
@@ -2600,7 +2603,9 @@ async function markProblems(page: Page): Promise<MarkReport> {
 
     // Every mark inside the cell, button or card row that holds it, and on screen.
     for (const mark of sheet.querySelectorAll('[data-mark]')) {
-      const holder = mark.closest('td, button, [data-testid^="tracker-card-progress-"]');
+      const holder = mark.closest(
+        'td, [data-testid="tailor-ats-bars"] > li > *, button, [data-testid^="tracker-card-progress-"]',
+      );
       const box = mark.getBoundingClientRect();
       const name = mark.getAttribute('data-mark') ?? '?';
       if (holder === null) {
@@ -3182,7 +3187,9 @@ async function hintButtonProblems(page: Page): Promise<HintButtonReport> {
       }
     }
     // The same row, beside itself, with each "i" flattened to no height.
-    for (const row of document.querySelectorAll('[data-testid="tailor-ats"] tr')) {
+    for (const row of document.querySelectorAll(
+      '[data-testid="tailor-ats"] tr, [data-testid="tailor-ats-bars"] > li',
+    )) {
       if (row.querySelector(selector) === null) continue;
       const twin = row.cloneNode(true) as Element;
       for (const button of twin.querySelectorAll<HTMLElement>(selector)) {
@@ -3208,20 +3215,24 @@ async function hintButtonProblems(page: Page): Promise<HintButtonReport> {
   }, HINT_BUTTON);
 }
 
-/** The ATS table's overflow past its own card, in px (0 when it fits). */
+/** The ATS table's, and the bar list's (L-396), overflow past their card, in px (0 when they fit). */
 async function atsTableOverflow(page: Page): Promise<number> {
   return page.evaluate(() => {
     const card = document.querySelector('[data-testid="tailor-ats"]');
     const table = card?.querySelector('table');
+    const bars = card?.querySelector('[data-testid="tailor-ats-bars"]');
     if (card === null || card === undefined || table === null || table === undefined) {
       throw new Error('no ATS table on the sheet');
     }
+    if (bars === null || bars === undefined) throw new Error('no ATS bars on the sheet');
     const inner =
       card.getBoundingClientRect().right - parseFloat(getComputedStyle(card).paddingRight);
     return Math.max(
       0,
-      table.getBoundingClientRect().right - inner,
-      table.scrollWidth - table.clientWidth,
+      ...[table, bars].flatMap((part) => [
+        part.getBoundingClientRect().right - inner,
+        part.scrollWidth - part.clientWidth,
+      ]),
     );
   });
 }
@@ -3405,6 +3416,121 @@ describe('hints show a small "i" button (L-384)', () => {
       report.problems.some((line) => line.startsWith('ATS row')),
       `the taller row was not reported: ${JSON.stringify(report.problems)}`,
     );
+    await page.context().close();
+  });
+});
+
+/**
+ * The ATS Score's two numbers as bars (L-396).
+ *
+ * Keyword coverage and bullet strength each draw a Before bar and an After bar
+ * as wide as the number beside them, out of their track. jsdom does no layout,
+ * so whether a 43 really is 43% of its track, and whether the bars fit a phone,
+ * is only knowable here. The `?marks=1` sheet draws a rise (16 → 43) and a fall
+ * (84 → 81).
+ */
+const BAR_WINDOWS = {
+  'desktop 1000x700': { width: 1000, height: 700 },
+  'phone 375x812': { width: 375, height: 812 },
+} as const;
+
+interface BarReport {
+  readonly bars: readonly { id: string; number: number; track: number; bar: number }[];
+  readonly problems: readonly string[];
+}
+
+/** Each bar against its number and its track; the bar list against its card and the window. */
+async function barProblems(page: Page): Promise<BarReport> {
+  return page.evaluate(() => {
+    const problems: string[] = [];
+    const list = document.querySelector('[data-testid="tailor-ats-bars"]');
+    const card = document.querySelector('[data-testid="tailor-ats"]');
+    if (list === null || card === null) return { bars: [], problems: ['no ATS bars'] };
+    const bars = [...list.querySelectorAll('[data-testid$="-track"]')].map((track) => {
+      const id = (track.getAttribute('data-testid') ?? '?').replace(/-track$/, '');
+      const fill = track.querySelector(`[data-testid="${id}-bar"]`);
+      const line = track.closest(`[data-testid="${id}"]`);
+      const number = Number(line?.querySelector('.font-mono')?.textContent);
+      const room = track.getBoundingClientRect();
+      const box = fill?.getBoundingClientRect();
+      if (fill === null || box === undefined || !Number.isFinite(number)) {
+        problems.push(`${id}: no bar or no number`);
+        return { id, number, track: room.width, bar: 0 };
+      }
+      const expected = (room.width * number) / 100;
+      if (Math.abs(box.width - expected) > 1) {
+        problems.push(
+          `${id}: ${String(box.width)}px for ${String(number)}, not ${String(expected)}px`,
+        );
+      }
+      if (box.left < room.left - 0.5 || box.right > room.right + 0.5) {
+        problems.push(`${id}: spills out of its track`);
+      }
+      return { id, number, track: room.width, bar: box.width };
+    });
+    if (bars.length !== 4) problems.push(`${String(bars.length)} bars, not 4`);
+    const inner =
+      card.getBoundingClientRect().right - parseFloat(getComputedStyle(card).paddingRight);
+    if (list.getBoundingClientRect().right > inner + 0.5)
+      problems.push('bars: wider than the card');
+    if (list.scrollWidth > list.clientWidth) problems.push('bars: scroll sideways');
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      problems.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    return { bars, problems };
+  });
+}
+
+describe('the ATS Score numbers are drawn as bars (L-396)', () => {
+  for (const [name, viewport] of Object.entries(BAR_WINDOWS)) {
+    it(`each bar's width matches its number to within 1px, ${name}`, async () => {
+      const page = await openHintSheet(viewport);
+      const report = await barProblems(page);
+      console.log(`ATS bars (${name}): ${JSON.stringify(report)}`);
+      assert.deepEqual(
+        report.bars.map((bar) => bar.number),
+        [16, 43, 84, 81],
+      );
+      assert.deepEqual(report.problems, []);
+      await page.context().close();
+    });
+  }
+
+  it('the bars do not scroll sideways at 375px', async () => {
+    const page = await openHintSheet(BAR_WINDOWS['phone 375x812']);
+    const report = await barProblems(page);
+    assert.deepEqual(
+      report.problems.filter((line) => /^(bars|page):/.test(line)),
+      [],
+    );
+    assert.equal(await atsTableOverflow(page), 0, 'the ATS bars or table are wider than the card');
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a bar the wrong width, and a bar list too wide for its card, are reported', async () => {
+    const page = await openHintSheet(BAR_WINDOWS['phone 375x812']);
+    await page.evaluate(() => {
+      const bar = document.querySelector<HTMLElement>(
+        '[data-testid="tailor-ats-keyword-after-bar"]',
+      );
+      const list = document.querySelector<HTMLElement>('[data-testid="tailor-ats-bars"]');
+      if (bar === null || list === null) throw new Error('no ATS bars');
+      bar.style.width = '60%';
+      list.style.maxWidth = 'none';
+      list.style.width = '600px';
+    });
+    const report = await barProblems(page);
+    assert.ok(
+      report.problems.some((line) => line.startsWith('tailor-ats-keyword-after: ')),
+      `the wrong width went unnoticed: ${JSON.stringify(report.problems)}`,
+    );
+    assert.ok(
+      report.problems.includes('bars: wider than the card'),
+      `the too-wide bars went unnoticed: ${JSON.stringify(report.problems)}`,
+    );
+    assert.ok((await atsTableOverflow(page)) > 0, 'the overflow check missed the bars');
     await page.context().close();
   });
 });
