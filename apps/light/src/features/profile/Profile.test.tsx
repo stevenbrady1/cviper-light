@@ -109,6 +109,47 @@ describe('rendering', () => {
   });
 });
 
+/**
+ * The plain line straight under a card's heading, or `null` when there is
+ * none. An empty-state note ("None added yet.") carries a testid and is not
+ * that line.
+ */
+function lineUnderHeading(card: string): string | null {
+  const next = screen.getByTestId(`profile-${card}`).firstElementChild?.nextElementSibling;
+  if (next?.tagName !== 'P' || next.hasAttribute('data-testid')) return null;
+  return next.textContent;
+}
+
+describe('the small print (L-320)', () => {
+  it("each card's line under its heading", async () => {
+    await renderProfile();
+
+    expect(lineUnderHeading('about')).toBe('Everything written for you starts from here.');
+    expect(lineUnderHeading('energy')).toBe('One per line.');
+    expect(lineUnderHeading('star')).toBe(
+      'Situation, task, action, result: the shape interviewers ask for.',
+    );
+  });
+
+  it('negative: the Languages card has no line under its heading', async () => {
+    await renderProfile(SAVED);
+
+    expect(lineUnderHeading('languages')).toBeNull();
+    expect(screen.getByTestId('profile-languages').textContent).not.toContain(
+      'how well you speak it',
+    );
+  });
+
+  it("boundary: 'Saved as you type' is on the screen exactly once, in the header", async () => {
+    await renderProfile();
+
+    const body = document.body.textContent ?? '';
+    expect(body.split('Saved as you type').length - 1).toBe(1);
+    const header = screen.getByTestId('view-profile').querySelector('header');
+    expect(header?.textContent).toContain('Who you are and what you want. Saved as you type.');
+  });
+});
+
 describe('editing a field', () => {
   it('hands the port the whole profile with the change and a fresh updated_at', async () => {
     const { port } = await renderProfile();

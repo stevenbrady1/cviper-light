@@ -99,9 +99,7 @@ export function ProfileForm({
     <div className="space-y-5">
       <section data-testid="profile-about" className={cardClasses()}>
         <SectionHeading title="About you" />
-        <p className="mt-1 text-ink-muted">
-          The short version of who you are. Everything written for you starts from here.
-        </p>
+        <p className="mt-1 text-ink-muted">Everything written for you starts from here.</p>
 
         <div className="mt-3 space-y-4">
           <div>
@@ -148,14 +146,12 @@ export function ProfileForm({
               onBlur={writingStyle.flush}
               className={PROFILE_FIELD}
             />
-            <p className="mt-1 text-xs text-ink-faint">Saved as you type.</p>
           </div>
         </div>
       </section>
 
       <section data-testid="profile-languages" className={cardClasses()}>
         <SectionHeading title="Languages" />
-        <p className="mt-1 text-ink-muted">Each one, and how well you speak it.</p>
 
         {languageKeys.length === 0 ? (
           <p data-testid="profile-languages-empty" className="mt-2 text-xs text-ink-faint">
@@ -246,9 +242,7 @@ export function ProfileForm({
 
       <section data-testid="profile-energy" className={cardClasses()}>
         <SectionHeading title="What energises you, what drains you" />
-        <p className="mt-1 text-ink-muted">
-          One per line. Honest answers here keep you out of jobs you would hate.
-        </p>
+        <p className="mt-1 text-ink-muted">One per line.</p>
 
         <div className="mt-3 grid gap-4 md:grid-cols-2">
           <div>
@@ -288,8 +282,7 @@ export function ProfileForm({
       <section data-testid="profile-star" className={cardClasses()}>
         <SectionHeading title="STAR examples" />
         <p className="mt-1 text-ink-muted">
-          Worked examples in the shape interviewers ask for them: the situation, the task, what you
-          did, and what came of it.
+          Situation, task, action, result: the shape interviewers ask for.
         </p>
 
         {starKeys.length === 0 ? (

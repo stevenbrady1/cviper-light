@@ -128,9 +128,18 @@ describe('empty states', () => {
     await renderPanel(portWith(ok({ cvText: null, jobs: [job('a', 'Kubernetes please')] })));
 
     expect((await screen.findByTestId('profile-gaps-empty')).textContent).toBe(
-      'Upload a CV on the Analysis screen to see what these adverts ask for that it does not mention.',
+      'Upload your CV at the top of this page to see what these adverts ask for that it does not mention.',
     );
     expect(screen.queryAllByTestId('profile-gap-row')).toHaveLength(0);
+  });
+
+  it('negative: the no-CV message never sends you to the Analysis screen (L-320)', async () => {
+    // The upload is on this page, at the top (L-240); pointing elsewhere is a wrong turn.
+    await renderPanel(portWith(ok({ cvText: null, jobs: [job('a', 'Kubernetes please')] })));
+
+    expect((await screen.findByTestId('profile-gaps-empty')).textContent).not.toContain(
+      'Analysis screen',
+    );
   });
 
   it('boundary: no CV and nothing on the tracker asks for the adverts first', async () => {

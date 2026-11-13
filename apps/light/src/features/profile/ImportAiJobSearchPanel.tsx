@@ -97,8 +97,7 @@ export function ImportAiJobSearch({ filePort, onApply }: ImportAiJobSearchProps)
     <section data-testid="profile-import" className={`mt-5 ${cardClasses()}`}>
       <SectionHeading title="Bring a profile in" />
       <p className="mt-1 text-ink-muted">
-        If you already keep a candidate profile in an ai-job-search folder, the parts this view has
-        a box for can be read in and added to what is here.
+        Already keep a profile in an ai-job-search folder? Read it in and add it to what is here.
       </p>
 
       <button

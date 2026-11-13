@@ -47,17 +47,16 @@ export function YourCv({ store, files, now }: YourCvProps) {
     setCvs((current) => [cv, ...current.filter((existing) => existing.id !== cv.id)]);
   }, []);
 
-  // Newest first, as every screen lists them — the one Tailor and Analysis
-  // start on.
+  // Newest first, as every screen lists them: the one Analysis and Tailor start
+  // on unless told otherwise, so "by default" (L-320).
   const newest = cvs[0] ?? null;
 
   return (
     <section data-testid="profile-cv" className={`mb-5 ${cardClasses()}`}>
       <SectionHeading title="Your CV" />
       <p className="mt-1 text-ink-muted">
-        Upload it once — here, on Analysis or on Tailor — and every screen can use it. The file is
-        read on this computer. Its text only goes to an AI you choose, and only when you ask it to
-        read your CV.
+        Upload it once and every screen can use it. The file is read on this computer. Its text only
+        goes to an AI you choose, and only when you ask it to read your CV.
       </p>
 
       <p data-testid="profile-cv-current" className="mt-3 text-ink">
@@ -67,7 +66,8 @@ export function YourCv({ store, files, now }: YourCvProps) {
           'No CV uploaded yet.'
         ) : (
           <>
-            Newest: <span className="font-medium">{newest.name}</span>
+            Used by default: <span className="font-medium">{newest.name}</span>
+            {cvs.length > 1 ? `, the newest of your ${cvs.length} CVs.` : '.'}
           </>
         )}
       </p>
