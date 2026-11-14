@@ -24,11 +24,14 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 
+import { emptyProfile } from '@cviper/core-types';
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { CardProgress } from '../features/flow/CardProgress';
 import { JobStepBar } from '../features/flow/JobStepBar';
+import { ProfileProgress } from '../features/profile/ProfileProgress';
+import { profileParts } from '../features/profile/progress';
 import { AtsStep } from '../features/tailor/AtsStep';
 import { type AtsComparison } from '../features/tailor/atsComparison';
 import { StateMark } from '../ui/StateMark';
@@ -169,6 +172,19 @@ const RENDERED: Readonly<Record<string, () => void>> = {
         onStep={() => undefined}
         onTracker={() => undefined}
         choice={{ cv: 'CV.docx', engine: 'Gemini' }}
+      />,
+    );
+  },
+  // One part filled in and five not, so both of its marks are drawn (L-413).
+  'apps/light/src/features/profile/ProfileProgress.tsx': () => {
+    render(
+      <ProfileProgress
+        parts={profileParts(
+          { ...emptyProfile('2026-11-14T09:00:00.000Z'), headline: 'Analyst' },
+          [],
+        )}
+        blocked={false}
+        onFillIn={() => undefined}
       />,
     );
   },

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { cardClasses, SectionHeading } from '../../ui';
@@ -33,6 +33,8 @@ export interface ImportAiJobSearchProps {
   readonly filePort: FilePort;
   /** Merge and save. The view does it; the panel only asks. */
   readonly onApply: (imported: ImportedProfile) => void;
+  /** Told when the review, and so its blue button, comes and goes (L-413). */
+  readonly onReviewing?: ((reviewing: boolean) => void) | undefined;
 }
 
 /** What the review shows for each field, in the order the form shows them. */
@@ -66,8 +68,10 @@ type Panel =
   | { readonly kind: 'problem'; readonly message: string }
   | { readonly kind: 'done'; readonly added: number };
 
-export function ImportAiJobSearch({ filePort, onApply }: ImportAiJobSearchProps) {
+export function ImportAiJobSearch({ filePort, onApply, onReviewing }: ImportAiJobSearchProps) {
   const [panel, setPanel] = useState<Panel>({ kind: 'idle' });
+  const reviewing = panel.kind === 'review';
+  useEffect(() => onReviewing?.(reviewing), [reviewing, onReviewing]);
 
   const pick = useCallback(async () => {
     setPanel({ kind: 'reading' });
