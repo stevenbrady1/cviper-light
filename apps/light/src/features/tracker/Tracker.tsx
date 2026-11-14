@@ -100,7 +100,7 @@ export interface TrackerProps {
   /** Injected by tests: the real one opens the user's browser at the advert. */
   readonly browser?: BrowserPort | undefined;
   /**
-   * "Analyse this job" and "Tailor my CV" on an application (L-190). The shell
+   * "Check my CV" and "Tailor my CV" on an application (L-190, L-411). The shell
    * owns which view is showing, so the entry goes back to it — the same
    * arrangement as `onOpenSettings`. Left undefined, no button is drawn.
    *

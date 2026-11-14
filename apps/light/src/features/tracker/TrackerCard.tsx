@@ -13,16 +13,19 @@ import { STALENESS_BANDS, stalenessBand, stalenessDescription } from './stalenes
  * One application, as four parts.
  *
  *   title                          Inter 500 — the thing you scan for. Up to
- *                                  three lines (L-393); a red dot beside it when
- *                                  the next action is overdue
+ *                                  three lines (L-393). When the next action is
+ *                                  overdue, a red dot sits in the card's top-right
+ *                                  corner, in its padding, so it never narrows
+ *                                  the title (L-409)
  *   company · location             Inter 400, muted — context, not headline. Up
  *                                  to two lines
  *   12 days since last change      the left edge's age in words (L-318)
- *   Reply by Friday · due in 2 days  the next action, when there is one: the
- *                                  user's words, then how close it is, coloured
- *                                  by urgency. One line; the words clip with an
- *                                  ellipsis, the due never does. With no date,
- *                                  the words alone, muted (L-393)
+ *   Reply by Friday                the next action, when there is one: the
+ *   due in 2 days                  user's words on one line, clipped with an
+ *                                  ellipsis; how close it is on the next,
+ *                                  coloured by urgency, never clipped (L-409).
+ *                                  With a date and no words, the due alone.
+ *                                  With no date, the words alone, muted (L-393)
  *
  * No status pill (L-175). The column header already says the status, so a
  * pill repeating it on every card spent the footer on a fact already on
@@ -114,7 +117,7 @@ export function TrackerCard({
       }}
       className={[
         'block w-full cursor-grab rounded-card border border-line border-l-2 bg-card',
-        'px-3 py-2.5 text-left shadow-raised active:cursor-grabbing',
+        'relative px-3 py-2.5 text-left shadow-raised active:cursor-grabbing',
         STALENESS_BANDS[band].edgeClass,
         selected ? 'border-blue' : 'hover:border-ink-faint',
         // The app's ONE motion moment: a card arriving in its new column. See
@@ -122,19 +125,19 @@ export function TrackerCard({
         settling ? 'cviper-card-settle' : '',
       ].join(' ')}
     >
-      <div className="flex items-start gap-2">
-        <p className="line-clamp-3 min-w-0 flex-1 break-words font-medium text-ink">{job.title}</p>
-        {urgency === 'overdue' ? (
-          // Built like the side bar's status dot: a second telling of the red
-          // "overdue" words below, so it is hidden from screen readers. Not a
-          // StateMark: a mark needs a hint, and nothing can sit inside the card's button.
-          <span
-            aria-hidden="true"
-            data-testid={`tracker-card-overdue-${application.id}`}
-            className="mt-2 size-2 shrink-0 rounded-pill bg-danger"
-          />
-        ) : null}
-      </div>
+      <p className="line-clamp-3 break-words font-medium text-ink">{job.title}</p>
+      {urgency === 'overdue' ? (
+        // Built like the side bar's status dot: a second telling of the red
+        // "overdue" words below, so it is hidden from screen readers. Not a
+        // StateMark: a mark needs a hint, and nothing can sit inside the card's button.
+        // In the card's right padding, level with the title's first line, and
+        // out of its flow, so the title keeps the card's full width (L-409).
+        <span
+          aria-hidden="true"
+          data-testid={`tracker-card-overdue-${application.id}`}
+          className="absolute top-4.5 right-0.5 size-2 rounded-pill bg-danger"
+        />
+      ) : null}
       <p className="line-clamp-2 break-words text-xs text-ink-muted">{where}</p>
 
       {substage === null ? null : (
@@ -157,27 +160,25 @@ export function TrackerCard({
         <p
           data-testid={`tracker-card-due-${application.id}`}
           data-urgency={urgency}
-          className="mt-2 flex min-w-0 text-[11px]"
+          className="mt-2 text-[11px]"
         >
           {/*
-            Only the user's words shrink. The due holds its width, so a long
-            action can never push "due today" off the card — the first cut of
-            this line clipped the whole thing, and the due was what went.
+            Two lines (L-409). The user's words get the card's full width and
+            clip with "…"; the due sits under them and may wrap, never clip. On
+            one shared row the due held its width and the words were what went:
+            in a narrow column, nothing but "· 2 days overdue".
           */}
           {line.action === null ? null : (
-            <>
-              <span
-                data-testid={`tracker-card-due-action-${application.id}`}
-                className="min-w-0 truncate text-ink-muted"
-              >
-                {line.action}
-              </span>
-              <span className="shrink-0 whitespace-pre text-ink-muted"> · </span>
-            </>
+            <span
+              data-testid={`tracker-card-due-action-${application.id}`}
+              className="block truncate text-ink-muted"
+            >
+              {line.action}
+            </span>
           )}
           <span
             data-testid={`tracker-card-due-when-${application.id}`}
-            className={`shrink-0 ${NEXT_ACTION_TONES[urgency]}`}
+            className={`block ${NEXT_ACTION_TONES[urgency]}`}
           >
             {line.when}
           </span>
