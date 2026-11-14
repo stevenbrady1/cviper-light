@@ -58,11 +58,77 @@ pub enum EmploymentType {
     Permanent,
 }
 
+/// Which country Adzuna searches (L-415). A CLOSED SET, like `JobProvider`.
+///
+/// Adzuna takes the country as a PATH segment of its address, so this is the
+/// one thing JavaScript says that decides where a request goes. It therefore
+/// says it by picking a variant, never by sending text: serde accepts exactly
+/// these nineteen lower-case codes and nothing else — not `GB`, not `gb `, not
+/// `../` — and `adzuna_url` gives each its own fixed address. The list is the
+/// `country` enum in Adzuna's own API description, and `ADZUNA_COUNTRIES` in
+/// packages/job-apis/src/countries.ts, which a test here reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Country {
+    /// What a search that names no country means: the app's only market until now.
+    #[default]
+    Gb,
+    Us,
+    At,
+    Au,
+    Be,
+    Br,
+    Ca,
+    Ch,
+    De,
+    Es,
+    Fr,
+    In,
+    It,
+    Mx,
+    Nl,
+    Nz,
+    Pl,
+    Sg,
+    Za,
+}
+
+impl Country {
+    /// Scheme, host AND path, one literal per country. Nothing is formatted in.
+    ///
+    /// Page `1` because the app does not paginate — it asks for one page of up
+    /// to fifty and spends no more of the user's allowance.
+    fn adzuna_url(self) -> &'static str {
+        match self {
+            Country::Gb => "https://api.adzuna.com/v1/api/jobs/gb/search/1",
+            Country::Us => "https://api.adzuna.com/v1/api/jobs/us/search/1",
+            Country::At => "https://api.adzuna.com/v1/api/jobs/at/search/1",
+            Country::Au => "https://api.adzuna.com/v1/api/jobs/au/search/1",
+            Country::Be => "https://api.adzuna.com/v1/api/jobs/be/search/1",
+            Country::Br => "https://api.adzuna.com/v1/api/jobs/br/search/1",
+            Country::Ca => "https://api.adzuna.com/v1/api/jobs/ca/search/1",
+            Country::Ch => "https://api.adzuna.com/v1/api/jobs/ch/search/1",
+            Country::De => "https://api.adzuna.com/v1/api/jobs/de/search/1",
+            Country::Es => "https://api.adzuna.com/v1/api/jobs/es/search/1",
+            Country::Fr => "https://api.adzuna.com/v1/api/jobs/fr/search/1",
+            Country::In => "https://api.adzuna.com/v1/api/jobs/in/search/1",
+            Country::It => "https://api.adzuna.com/v1/api/jobs/it/search/1",
+            Country::Mx => "https://api.adzuna.com/v1/api/jobs/mx/search/1",
+            Country::Nl => "https://api.adzuna.com/v1/api/jobs/nl/search/1",
+            Country::Nz => "https://api.adzuna.com/v1/api/jobs/nz/search/1",
+            Country::Pl => "https://api.adzuna.com/v1/api/jobs/pl/search/1",
+            Country::Sg => "https://api.adzuna.com/v1/api/jobs/sg/search/1",
+            Country::Za => "https://api.adzuna.com/v1/api/jobs/za/search/1",
+        }
+    }
+}
+
 /// What JavaScript is allowed to say about a search.
 ///
 /// Note what is NOT in here: no URL, no path, no header, no page number, no
-/// arbitrary key/value pairs. Every field is a value that ends up inside ONE
-/// query parameter whose NAME is a `&'static str` in this file.
+/// arbitrary key/value pairs. Every field but `country` is a value that ends
+/// up inside ONE query parameter whose NAME is a `&'static str` in this file;
+/// `country` is a variant of a closed set (see `Country`).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JobSearchParams {
@@ -72,6 +138,15 @@ pub struct JobSearchParams {
     pub distance_miles: Option<u32>,
     pub salary_min: Option<u32>,
     pub employment_type: Option<EmploymentType>,
+    /// Absent or `null` means the United Kingdom, so a screen build that has
+    /// never heard of countries sends exactly the search it always sent.
+    pub country: Option<Country>,
+}
+
+impl JobSearchParams {
+    fn country(&self) -> Country {
+        self.country.unwrap_or_default()
+    }
 }
 
 const ADZUNA_RESULT_CAP: u32 = 50;
@@ -92,13 +167,13 @@ const REED_TIMEOUT: Duration = Duration::from_secs(10);
 impl JobProvider {
     /// Scheme, host AND path. NEVER built from anything JavaScript sent.
     ///
-    /// Adzuna takes the country and the page number as PATH segments, so both
-    /// are baked in here: `gb` because this is a UK job-search tool, and page
-    /// `1` because the app does not paginate — it asks for one page of up to
-    /// fifty and spends no more of the user's allowance.
-    fn base_url(self) -> &'static str {
+    /// Adzuna takes the country as a PATH segment, so JavaScript chooses one
+    /// of `Country`'s variants and each variant has its own literal address
+    /// (L-415). Reed has one address and one country; `validate_country`
+    /// refuses a Reed search for anywhere else before this is reached.
+    fn base_url(self, country: Country) -> &'static str {
         match self {
-            JobProvider::Adzuna => "https://api.adzuna.com/v1/api/jobs/gb/search/1",
+            JobProvider::Adzuna => country.adzuna_url(),
             JobProvider::Reed => "https://www.reed.co.uk/api/1.0/search",
         }
     }
@@ -212,6 +287,21 @@ fn validate_params(params: &JobSearchParams) -> Result<(), String> {
             "That search is too long. Use a job title and a place name rather than a pasted advert."
                 .to_string(),
         );
+    }
+
+    Ok(())
+}
+
+/// Can this board search this country at all? (L-415)
+///
+/// Reed lists UK jobs only and takes no country, so a Reed search for anywhere
+/// else would quietly return UK adverts under another country's name. It is
+/// refused here, before a request is built or the submit slot is claimed.
+/// Adzuna serves every `Country` there is: one it does not serve cannot be
+/// deserialised, so it never gets this far.
+fn validate_country(provider: JobProvider, params: &JobSearchParams) -> Result<(), String> {
+    if provider == JobProvider::Reed && params.country() != Country::Gb {
+        return Err("Reed lists UK jobs only.".to_string());
     }
 
     Ok(())
@@ -393,6 +483,8 @@ fn probe_params() -> JobSearchParams {
         distance_miles: None,
         salary_min: None,
         employment_type: None,
+        // A key is tested against the UK address, as it always was.
+        country: None,
     }
 }
 
@@ -456,6 +548,8 @@ fn candidate_credentials(
 /// request to a real board and the board does not care why we sent it.
 fn validate_and_claim(provider: JobProvider, params: &JobSearchParams) -> Result<(), String> {
     validate_params(params).map_err(|message| transport_error("bad-request", message))?;
+    validate_country(provider, params)
+        .map_err(|message| transport_error("bad-request", message))?;
 
     if let Some(wait) = claim_submit_slot(provider, Instant::now()) {
         // Rounded up to whole seconds so the message is never "wait 0 seconds".
@@ -488,7 +582,7 @@ async fn send_search(
     let mut query = query_pairs(provider, params);
 
     let mut request = providers::client()?
-        .get(provider.base_url())
+        .get(provider.base_url(params.country()))
         .timeout(provider.timeout());
 
     match provider {
@@ -599,8 +693,69 @@ mod tests {
             distance_miles: None,
             salary_min: None,
             employment_type: None,
+            country: None,
         }
     }
+
+    /// Every country, beside the code that travels for it. Typed out again on
+    /// purpose: a test that derived the code from the variant would agree with
+    /// whatever the `rename_all` happened to produce.
+    const COUNTRIES: [(Country, &str); 19] = [
+        (Country::Gb, "gb"),
+        (Country::Us, "us"),
+        (Country::At, "at"),
+        (Country::Au, "au"),
+        (Country::Be, "be"),
+        (Country::Br, "br"),
+        (Country::Ca, "ca"),
+        (Country::Ch, "ch"),
+        (Country::De, "de"),
+        (Country::Es, "es"),
+        (Country::Fr, "fr"),
+        (Country::In, "in"),
+        (Country::It, "it"),
+        (Country::Mx, "mx"),
+        (Country::Nl, "nl"),
+        (Country::Nz, "nz"),
+        (Country::Pl, "pl"),
+        (Country::Sg, "sg"),
+        (Country::Za, "za"),
+    ];
+
+    /// What a hostile or careless frontend might send where a code belongs.
+    /// Each is the JSON VALUE, so the quotes are part of it.
+    const NOT_A_COUNTRY: [&str; 30] = [
+        "\"GB\"",
+        "\"Gb\"",
+        "\"gB\"",
+        "\"\"",
+        "\" \"",
+        "\" gb\"",
+        "\"gb \"",
+        "\"gb\\n\"",
+        "\"xx\"",
+        "\"uk\"",
+        "\"g\"",
+        "\"gbr\"",
+        "\"../\"",
+        "\"..\"",
+        "\"/\"",
+        "\"%2f\"",
+        "\"%2F\"",
+        "\"gb/../us\"",
+        "\"us/../../v1/api/jobs/gb\"",
+        "\"gb?x=1\"",
+        "\"gb#\"",
+        "\"gb&app_key=stolen\"",
+        "\"https://evil.example.com\"",
+        "\"Gb\\u0000\"",
+        "42",
+        "0",
+        "true",
+        "[\"gb\"]",
+        "{\"code\":\"gb\"}",
+        "{\"Gb\":null}",
+    ];
 
     fn value_of<'a>(pairs: &'a [(&'static str, String)], name: &str) -> Option<&'a str> {
         pairs
@@ -657,17 +812,228 @@ mod tests {
 
     #[test]
     fn both_boards_are_https_and_neither_url_is_templated() {
+        // L-415: the UK address was the only one. It is now the `gb` row of
+        // `each_country_has_exactly_its_own_adzuna_address`, and still what a
+        // search that names no country uses.
         assert_eq!(
-            JobProvider::Adzuna.base_url(),
+            JobProvider::Adzuna.base_url(Country::default()),
             "https://api.adzuna.com/v1/api/jobs/gb/search/1"
         );
-        assert_eq!(JobProvider::Reed.base_url(), "https://www.reed.co.uk/api/1.0/search");
 
+        for (country, _) in COUNTRIES {
+            // Reed has one address, whatever the country.
+            assert_eq!(
+                JobProvider::Reed.base_url(country),
+                "https://www.reed.co.uk/api/1.0/search"
+            );
+
+            for provider in ALL {
+                let url = provider.base_url(country);
+                assert!(url.starts_with("https://"), "{url} is not https");
+                assert!(!url.contains('{'), "{url} looks templated");
+                assert!(!url.contains('?'), "{url} already carries a query string");
+            }
+        }
+    }
+
+    // ── The country a search is for (L-415) ──────────────────────────────
+
+    #[test]
+    fn each_country_has_exactly_its_own_adzuna_address() {
+        let mut seen = std::collections::HashSet::new();
+
+        for (country, code) in COUNTRIES {
+            let url = JobProvider::Adzuna.base_url(country);
+            assert_eq!(url, format!("https://api.adzuna.com/v1/api/jobs/{code}/search/1"));
+            assert!(seen.insert(url), "{url} is the address of two countries");
+
+            // And what that literal becomes once reqwest has parsed it: the
+            // same host for all nineteen, and the code as one path segment.
+            let request = providers::client()
+                .unwrap()
+                .get(url)
+                .query(&query_pairs(JobProvider::Adzuna, &params()))
+                .build()
+                .unwrap();
+            assert_eq!(request.url().scheme(), "https");
+            assert_eq!(request.url().host_str(), Some("api.adzuna.com"));
+            assert_eq!(
+                request.url().path_segments().unwrap().collect::<Vec<_>>(),
+                vec!["v1", "api", "jobs", code, "search", "1"]
+            );
+        }
+
+        assert_eq!(seen.len(), 19);
+    }
+
+    #[test]
+    fn country_codes_travel_as_the_lower_case_codes_adzuna_lists() {
+        // The same nineteen, in the same order, as the TypeScript list the
+        // screen will choose from — which is the `country` enum in Adzuna's own
+        // API description. A code on one side only is a search that is refused
+        // for no reason the user can see.
+        const COUNTRIES_TS: &str = include_str!("../../../../packages/job-apis/src/countries.ts");
+        let list = COUNTRIES_TS
+            .split("export const ADZUNA_COUNTRIES = [")
+            .nth(1)
+            .and_then(|rest| rest.split("] as const;").next())
+            .expect("countries.ts no longer declares ADZUNA_COUNTRIES as a literal list");
+        let typescript: Vec<&str> = list
+            .split(',')
+            .map(|entry| entry.trim().trim_matches('\''))
+            .filter(|entry| !entry.is_empty())
+            .collect();
+        assert_eq!(
+            typescript,
+            COUNTRIES.iter().map(|(_, code)| *code).collect::<Vec<_>>()
+        );
+
+        for (country, code) in COUNTRIES {
+            assert_eq!(serde_json::to_string(&country).unwrap(), format!("\"{code}\""));
+            assert_eq!(
+                serde_json::from_str::<Country>(&format!("\"{code}\"")).unwrap(),
+                country
+            );
+        }
+    }
+
+    #[test]
+    fn a_country_outside_the_closed_set_is_refused_before_a_request_exists() {
+        for bad in NOT_A_COUNTRY {
+            assert!(
+                serde_json::from_str::<Country>(bad).is_err(),
+                "{bad} must not deserialise into a Country"
+            );
+
+            // And the search it arrived in is refused WHOLE: Tauri cannot call
+            // the command without a `JobSearchParams`, so nothing is validated,
+            // no slot is claimed, no key is read and nothing is sent.
+            let search =
+                format!(r#"{{"keywords":"java","location":"London","limit":20,"country":{bad}}}"#);
+            assert!(
+                serde_json::from_str::<JobSearchParams>(&search).is_err(),
+                "a search naming {bad} as its country must be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn boundary_a_very_long_country_is_refused_like_any_other() {
+        let long = format!("\"{}\"", "gb".repeat(50_000));
+        assert!(serde_json::from_str::<Country>(&long).is_err());
+    }
+
+    #[test]
+    fn a_refused_country_is_never_shown_to_the_user_in_serdes_words() {
+        // serde's own message names the value it refused. It is a sentence,
+        // not JSON, so `toJobApiError` in src/jobs/transport.ts cannot read a
+        // `{kind, message}` out of it and shows its own fixed sentence instead
+        // (`transport.country.test.ts` is the other half of this).
+        let refusal = serde_json::from_str::<Country>("\"../../admin\"")
+            .unwrap_err()
+            .to_string();
+        assert!(refusal.contains("../../admin"));
+        assert!(serde_json::from_str::<serde_json::Value>(&refusal).is_err());
+    }
+
+    #[test]
+    fn no_country_or_a_null_one_means_the_united_kingdom() {
+        for json in [
+            r#"{"keywords":"java","location":"London","limit":20}"#,
+            r#"{"keywords":"java","location":"London","limit":20,"country":null}"#,
+        ] {
+            let parsed: JobSearchParams = serde_json::from_str(json).unwrap();
+            assert_eq!(parsed.country, None);
+            assert_eq!(parsed.country(), Country::Gb);
+        }
+
+        let named: JobSearchParams =
+            serde_json::from_str(r#"{"keywords":"java","location":"London","limit":20,"country":"gb"}"#)
+                .unwrap();
+        assert_eq!(named.country(), Country::Gb);
+        assert_eq!(Country::default(), Country::Gb);
+    }
+
+    #[test]
+    fn a_search_for_another_country_goes_to_that_country_and_nowhere_else() {
+        let us = r#"{"keywords":"credit risk analyst","location":"Boston","limit":20,"distanceMiles":25,"salaryMin":60000,"employmentType":"Contract","country":"us"}"#;
+
+        assert_eq!(
+            wire_url(JobProvider::Adzuna, us),
+            "https://api.adzuna.com/v1/api/jobs/us/search/1\
+             ?what=credit+risk+analyst&where=Boston&results_per_page=20\
+             &content-type=application%2Fjson&sort_by=relevance\
+             &salary_min=60000&distance=40&contract=1"
+        );
+    }
+
+    #[test]
+    fn the_country_is_never_a_query_parameter() {
+        // It is part of the address and only that. Every country sends exactly
+        // the parameters the UK search sends, kilometres included (L-394).
+        let mut uk = params();
+        uk.distance_miles = Some(25);
+        uk.salary_min = Some(60_000);
+        let expected = query_pairs(JobProvider::Adzuna, &uk);
+        assert_eq!(value_of(&expected, "distance"), Some("40"));
+
+        for (country, code) in COUNTRIES {
+            let mut search = uk.clone();
+            search.country = Some(country);
+
+            let pairs = query_pairs(JobProvider::Adzuna, &search);
+            assert_eq!(pairs, expected, "{code} changed the query string");
+            assert_eq!(value_of(&pairs, "country"), None);
+        }
+    }
+
+    #[test]
+    fn reed_is_refused_for_every_country_but_the_united_kingdom() {
+        for (country, code) in COUNTRIES {
+            let mut search = params();
+            search.country = Some(country);
+
+            // Adzuna serves all nineteen.
+            assert!(validate_country(JobProvider::Adzuna, &search).is_ok());
+
+            let reed = validate_country(JobProvider::Reed, &search);
+            if country == Country::Gb {
+                assert!(reed.is_ok());
+            } else {
+                assert_eq!(
+                    reed.unwrap_err(),
+                    "Reed lists UK jobs only.",
+                    "Reed was not refused for {code}"
+                );
+            }
+        }
+
+        // No country at all is the UK, so Reed is searched as it always was.
+        assert!(validate_country(JobProvider::Reed, &params()).is_ok());
+    }
+
+    #[test]
+    fn a_reed_search_abroad_is_a_typed_refusal_and_is_never_sent() {
+        let mut search = params();
+        search.country = Some(Country::Us);
+
+        // `job_search` returns on this `Err` before it reads a key or builds a
+        // request. Asked twice in a row on purpose: the refusal comes before
+        // the submit slot, so the second is the same refusal, not "throttled".
+        for _ in 0..2 {
+            let refused = validate_and_claim(JobProvider::Reed, &search).unwrap_err();
+            let parsed: serde_json::Value = serde_json::from_str(&refused).unwrap();
+            assert_eq!(parsed["kind"], "bad-request");
+            assert_eq!(parsed["message"], "Reed lists UK jobs only.");
+        }
+    }
+
+    #[test]
+    fn a_key_is_still_tested_against_the_uk_address() {
+        let probe = probe_params();
+        assert_eq!(probe.country(), Country::Gb);
         for provider in ALL {
-            let url = provider.base_url();
-            assert!(url.starts_with("https://"), "{url} is not https");
-            assert!(!url.contains('{'), "{url} looks templated");
-            assert!(!url.contains('?'), "{url} already carries a query string");
+            assert!(validate_country(provider, &probe).is_ok());
         }
     }
 
@@ -912,7 +1278,7 @@ mod tests {
 
         let request = providers::client()
             .unwrap()
-            .get(JobProvider::Reed.base_url())
+            .get(JobProvider::Reed.base_url(Country::Gb))
             .query(&query_pairs(JobProvider::Reed, &hostile))
             .build()
             .unwrap();
@@ -944,7 +1310,7 @@ mod tests {
     fn the_adzuna_url_keeps_its_country_and_page_path_segments() {
         let request = providers::client()
             .unwrap()
-            .get(JobProvider::Adzuna.base_url())
+            .get(JobProvider::Adzuna.base_url(Country::Gb))
             .query(&query_pairs(JobProvider::Adzuna, &params()))
             .build()
             .unwrap();
@@ -963,7 +1329,7 @@ mod tests {
         let search: JobSearchParams = serde_json::from_str(json).unwrap();
         providers::client()
             .unwrap()
-            .get(provider.base_url())
+            .get(provider.base_url(search.country()))
             .query(&query_pairs(provider, &search))
             .build()
             .unwrap()

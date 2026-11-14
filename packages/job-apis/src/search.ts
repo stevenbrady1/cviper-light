@@ -142,6 +142,8 @@ async function askProvider(
   const parsed = PARSERS[provider](body, {
     createdAt: request.createdAt,
     newId: request.newId,
+    // The country that was SENT, so the stamp matches the search (L-415).
+    country: params.value.country,
   });
 
   return parsed.ok

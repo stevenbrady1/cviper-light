@@ -10,6 +10,7 @@
  */
 import { err, ok, type Result } from '@cviper/core-types';
 
+import { DEFAULT_COUNTRY, isCountryCode, type CountryCode } from './countries';
 import { jobApiError, type JobApiError } from './errors';
 import { toFiniteNumber } from './numbers';
 import { type JobProviderId, type JobSearchParams } from './types';
@@ -50,6 +51,8 @@ export interface SearchInput {
   readonly distanceMiles?: number | null;
   readonly salaryMin?: number | null;
   readonly employmentType?: 'Contract' | 'Permanent' | null;
+  /** Which country to search (L-415). Absent or `null` means the United Kingdom. */
+  readonly country?: CountryCode | null;
 }
 
 /**
@@ -113,6 +116,20 @@ export function buildSearchParams(
     );
   }
 
+  // L-415. A country is one of a closed list or it is refused: Adzuna takes it
+  // as part of its ADDRESS, so it is never passed on as text. Rust refuses the
+  // same two things again (`Country` and `validate_country` in `jobs.rs`).
+  const country = input.country ?? null;
+  if (country !== null) {
+    if (provider === 'reed' && country !== DEFAULT_COUNTRY) {
+      return err(jobApiError(provider, 'bad-request', 'Reed lists UK jobs only.'));
+    }
+    if (!isCountryCode(country)) {
+      // Fixed words: what was sent is never repeated back.
+      return err(jobApiError(provider, 'bad-request', 'Adzuna has no job list for this country.'));
+    }
+  }
+
   const cap = PROVIDER_RESULT_CAP[provider];
   // `positiveIntegerOrNull` already floors; a limit of 0, a negative, or a
   // value that will not read comes back `null` and becomes one result, never
@@ -127,5 +144,7 @@ export function buildSearchParams(
     distanceMiles: positiveIntegerOrNull(input.distanceMiles),
     salaryMin: positiveIntegerOrNull(input.salaryMin),
     employmentType: input.employmentType ?? null,
+    // Left out, not sent as "gb", when the caller named none: see `JobSearchParams`.
+    ...(country === null ? {} : { country }),
   });
 }

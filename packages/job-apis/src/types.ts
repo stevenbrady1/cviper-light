@@ -14,10 +14,13 @@
  * Note what `JobSearchParams` is NOT: it is not a URL, not a query string and
  * not a set of provider-specific field names. Rust maps these fields onto
  * `what`/`where` for Adzuna and `keywords`/`locationName` for Reed. A caller
- * cannot name a destination even by accident.
+ * cannot name a destination even by accident. The nearest it comes is
+ * `country` (L-415): one of nineteen codes, each of which Rust maps to its own
+ * fixed Adzuna address. It is a choice from a list, never text.
  */
 import { type Result } from '@cviper/core-types';
 
+import { type CountryCode } from './countries';
 import { type JobApiError } from './errors';
 
 /** The two providers this package can search. A CLOSED SET. */
@@ -38,6 +41,12 @@ export interface JobSearchParams {
   readonly salaryMin: number | null;
   /** `null` means "both" - no employment-type filter is sent. */
   readonly employmentType: 'Contract' | 'Permanent' | null;
+  /**
+   * Which country to search (L-415). ABSENT means the United Kingdom, and an
+   * absent one is not sent at all, so a search that names no country crosses
+   * to Rust exactly as it did before. A code from a closed list, never text.
+   */
+  readonly country?: CountryCode;
 }
 
 /** One HTTP exchange that actually completed. A non-2xx is still a response. */
