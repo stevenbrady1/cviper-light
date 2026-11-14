@@ -241,7 +241,7 @@ export function ApplicationDetail({
               onClick={onAnalyse}
               className={SECONDARY_BUTTON}
             >
-              Analyse this job
+              Check my CV
             </button>
           )}
           {onTailor === undefined ? null : (

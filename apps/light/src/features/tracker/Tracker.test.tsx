@@ -416,9 +416,9 @@ describe('the next action chip', () => {
       entry('bare', { next_action: null, next_action_date: '2026-08-18' }),
     ]);
 
-    expect(screen.getByTestId('tracker-card-due-soon').textContent).toBe(
-      'Reply by Friday · due in 2 days',
-    );
+    expect(screen.getByTestId('tracker-card-due-action-soon').textContent).toBe('Reply by Friday');
+    expect(screen.getByTestId('tracker-card-due-when-soon').textContent).toBe('due in 2 days');
+    expect(screen.getByTestId('tracker-card-due-soon').textContent).not.toContain('·');
     expect(screen.getByTestId('tracker-card-due-bare').textContent).toBe('1 day overdue');
     for (const id of ['soon', 'bare']) {
       expect(screen.getByTestId(`tracker-card-${id}`).textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
@@ -435,14 +435,16 @@ describe('the next action chip', () => {
 
     // jsdom cannot measure, so pin the classes. The first cut clipped the whole
     // line, and on a real card "due today" — the part that matters — was the
-    // bit that vanished. Now only the action shrinks; the due holds its width.
+    // bit that vanished. Since L-409 the words have a line of their own and
+    // clip there; the due sits on the next line and may wrap, never clip.
     const line = screen.getByTestId('tracker-card-due-long');
-    expect(line.className).toContain('min-w-0');
     const action = within(line).getByTestId('tracker-card-due-action-long');
     const when = within(line).getByTestId('tracker-card-due-when-long');
-    expect(action.className).toContain('truncate');
-    expect(when.className).toContain('shrink-0');
+    expect(action.className.split(' ')).toContain('block');
+    expect(action.className.split(' ')).toContain('truncate');
+    expect(when.className.split(' ')).toContain('block');
     expect(when.className).not.toContain('truncate');
+    expect(when.className).not.toContain('whitespace-nowrap');
     expect(when.textContent).toBe('due today');
   });
 
