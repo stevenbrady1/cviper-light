@@ -957,6 +957,55 @@ mod tests {
             .contains("what=credit+risk+analyst&where=London"));
     }
 
+    /// The whole request a search makes, as one string, without sending it.
+    /// The credentials are not in it: `send_search` adds those afterwards.
+    fn wire_url(provider: JobProvider, json: &str) -> String {
+        let search: JobSearchParams = serde_json::from_str(json).unwrap();
+        providers::client()
+            .unwrap()
+            .get(provider.base_url())
+            .query(&query_pairs(provider, &search))
+            .build()
+            .unwrap()
+            .url()
+            .to_string()
+    }
+
+    #[test]
+    fn a_search_that_names_no_country_is_the_uk_request_it_always_was() {
+        // Written against main BEFORE a search could carry a country (L-415)
+        // and not edited by it. The JSON is what the screen sends today: no
+        // `country` at all. Every byte of both requests is pinned.
+        let filtered = r#"{"keywords":"credit risk analyst","location":"London","limit":20,"distanceMiles":25,"salaryMin":60000,"employmentType":"Contract"}"#;
+        let plain = r#"{"keywords":"java","location":"Leeds","limit":20,"distanceMiles":null,"salaryMin":null,"employmentType":null}"#;
+
+        assert_eq!(
+            wire_url(JobProvider::Adzuna, filtered),
+            "https://api.adzuna.com/v1/api/jobs/gb/search/1\
+             ?what=credit+risk+analyst&where=London&results_per_page=20\
+             &content-type=application%2Fjson&sort_by=relevance\
+             &salary_min=60000&distance=40&contract=1"
+        );
+        assert_eq!(
+            wire_url(JobProvider::Adzuna, plain),
+            "https://api.adzuna.com/v1/api/jobs/gb/search/1\
+             ?what=java&where=Leeds&results_per_page=20\
+             &content-type=application%2Fjson&sort_by=relevance"
+        );
+        assert_eq!(
+            wire_url(JobProvider::Reed, filtered),
+            "https://www.reed.co.uk/api/1.0/search\
+             ?keywords=credit+risk+analyst&locationName=London&resultsToTake=20\
+             &minimumSalary=60000&distanceFromLocation=25\
+             &contract=true&temp=true&permanent=false"
+        );
+        assert_eq!(
+            wire_url(JobProvider::Reed, plain),
+            "https://www.reed.co.uk/api/1.0/search\
+             ?keywords=java&locationName=Leeds&resultsToTake=20"
+        );
+    }
+
     #[test]
     fn an_empty_search_is_refused_before_anything_is_sent() {
         let mut empty = params();
