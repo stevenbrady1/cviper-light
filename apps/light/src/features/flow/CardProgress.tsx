@@ -13,7 +13,7 @@ import { STEPS, continueStep, stepStates, type JobProgress, type StepId } from '
  * Sits UNDER the card, not inside it: the card is one big button (select it,
  * drag it), and a button inside a button is not a thing a browser or a screen
  * reader can make sense of. Only shown for a job that has been started — a
- * card fresh from Search already has "Analyse this job" one click away.
+ * card fresh from Search already has "Check my CV" one click away.
  *
  * Continue goes to the first thing still to do (`continueStep`). Like every
  * step control, it only moves the user; it never runs a check or a model.
