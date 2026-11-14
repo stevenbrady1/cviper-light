@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The tracker's way into the rest of the flow (L-190): "Analyse this job" and
- * "Tailor my CV" on an application's detail pane.
+ * The tracker's way into the rest of the flow (L-190): "Check my CV" (L-411,
+ * once "Analyse this job") and "Tailor my CV" on an application's detail pane.
  *
  * The board does not navigate — the shell owns which view is showing — so each
  * button hands the whole entry back through a prop. These tests press them and
@@ -69,12 +69,14 @@ async function renderBoard(props: {
 }
 
 describe('from an application to the rest of the flow', () => {
-  it('"Analyse this job" hands back the entry that is open', async () => {
+  it('the button reads "Check my CV" and hands back the entry that is open', async () => {
     const onAnalyse = vi.fn<(entry: TrackerEntry) => void>();
     const { user } = await renderBoard({ onAnalyse, onTailor: vi.fn() });
 
     await user.click(screen.getByTestId('tracker-card-b'));
-    await user.click(await screen.findByTestId('detail-analyse'));
+    const button = await screen.findByTestId('detail-analyse');
+    expect(button.textContent).toBe('Check my CV');
+    await user.click(button);
 
     expect(onAnalyse).toHaveBeenCalledTimes(1);
     expect(onAnalyse.mock.calls[0]?.[0].application.id).toBe('b');
@@ -113,6 +115,15 @@ describe('from an application to the rest of the flow', () => {
       (button) => !(button as HTMLButtonElement).disabled,
     );
     expect(enabled).toHaveLength(1);
+  });
+
+  it('negative: nothing in the open card reads "Analyse this job" any more (L-411)', async () => {
+    const { user } = await renderBoard({ onAnalyse: vi.fn(), onTailor: vi.fn() });
+
+    await user.click(screen.getByTestId('tracker-card-a'));
+    await screen.findByTestId('detail-analyse');
+
+    expect(document.body.textContent).not.toContain('Analyse this job');
   });
 
   it('negative: with nowhere to go, neither button is drawn', async () => {
