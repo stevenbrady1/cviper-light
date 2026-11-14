@@ -24,9 +24,9 @@
  *   now    (L-407)  NOTHING that ships names the serif class. Not a title, not
  *                   a number, not anything
  *
- * That zero is what makes it safe to take the font file out later: no class
- * list can be left pointing at a face that is gone. Until it is taken out,
- * fonts.css still declares no Newsreader face other than 400.
+ * That zero is what made it safe to take the font itself out (L-414): no class
+ * list was left pointing at a face that is gone. `fonts.contract.test.ts` keeps
+ * the files, the rules and the token gone.
  *
  * FORBID-LIST (LESSON-033): the scans find every class list and every heading
  * tag that names the serif, wherever it is. They read source with comments
@@ -42,7 +42,6 @@ import { REPO_ROOT, displayPath, shippedText, stripComments, walk } from '../lib
 import { HERO_TITLE, PAGE_TITLE, SECTION_TITLE } from '../ui/PageHeader';
 
 const THEME = readFileSync(join(REPO_ROOT, 'apps/light/src/styles/theme.css'), 'utf8');
-const FONTS = readFileSync(join(REPO_ROOT, 'apps/light/src/styles/fonts.css'), 'utf8');
 
 const SERIF = /(?<![\w-])font-display(?![\w-])/;
 
@@ -74,15 +73,6 @@ export function serifHeadings(source: string): string[] {
   return [
     ...stripComments(source).matchAll(/<h[1-6]\b[^>]*?(?<![\w-])font-display(?![\w-])[^>]*>/g),
   ].map((match) => match[0].replaceAll(/\s+/g, ' '));
-}
-
-/** The weight of every Newsreader face in a stylesheet that is not 400. */
-export function extraSerifWeights(css: string): string[] {
-  return [...stripComments(css).matchAll(/@font-face\s*\{([^}]*)\}/g)]
-    .map((match) => match[1] ?? '')
-    .filter((block) => /font-family:\s*['"]?Newsreader\b/.test(block))
-    .map((block) => /font-weight:\s*([^;]+);/.exec(block)?.[1]?.trim() ?? '(no weight)')
-    .filter((weight) => weight !== '400' && weight !== 'normal');
 }
 
 /** Tailwind's sizes, with the theme's own 13px `text-xs` (L-241). */
@@ -149,11 +139,6 @@ describe('the title ladder (L-382, L-405)', () => {
     expect(offences).toEqual([]);
   });
 
-  it('no Newsreader face other than 400 is declared in fonts.css', () => {
-    expect(FONTS).toMatch(/font-family:\s*'Newsreader'/);
-    expect(extraSerifWeights(FONTS)).toEqual([]);
-  });
-
   it('page title is larger than section title is larger than body', () => {
     const body = bodyPx(THEME);
     const page = sizePx(String(PAGE_TITLE)) ?? body;
@@ -207,14 +192,6 @@ describe('the check can fail', () => {
     expect(serifClassLists('<p className="font-display-2 my-font-display">')).toEqual([]);
     expect(serifClassLists('// never write font-display again\nconst a = 1;')).toEqual([]);
     expect(serifClassLists('/* font-display font-normal */ const a = 1;')).toEqual([]);
-  });
-
-  it('a second Newsreader weight is reported; other families are not', () => {
-    const css = `
-      @font-face { font-family: 'Newsreader'; font-weight: 400; src: url('/a.woff2'); }
-      @font-face { font-family: 'Newsreader'; font-weight: 700; src: url('/b.woff2'); }
-      @font-face { font-family: 'Inter'; font-weight: 300 700; src: url('/c.woff2'); }`;
-    expect(extraSerifWeights(css)).toEqual(['700']);
   });
 
   it('reads the base size, not a breakpoint size', () => {

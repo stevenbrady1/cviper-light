@@ -32,9 +32,18 @@
  * Like that check, a missing browser is a failure, not a skip.
  */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer, type Server } from 'node:http';
+import { tmpdir } from 'node:os';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -2880,10 +2889,13 @@ describe('every screen opens at the top of its scroll areas (L-353)', () => {
  * code carries `leading-none`, so that one line's height does not depend on
  * any font's metrics, however late the font arrives.
  *
- * Every check here serves a DIFFERENT font in place of Plex Mono (Newsreader,
- * whose line box differs from every platform's fallback mono face). That makes
- * the shift big and the same on every OS, instead of the half pixel Windows
- * happened to show.
+ * Every check here serves a DIFFERENT font in place of Plex Mono, so the face
+ * that lands late is never the one a platform happens to fall back to. It was
+ * the serif until that font left the app (L-414); it is Inter now, the only
+ * other family that ships. Inter moves the line less than the serif did: with
+ * both halves of the fix taken out, the phone check fails by half a pixel
+ * (2042 against 2042.5, measured on Windows). The checks compare exact
+ * heights, so half a pixel is enough.
  *
  * "Late" is made exact rather than raced: once the app has started, any Plex
  * Mono face asked for is HELD until the screen has settled, measured, and then
@@ -2892,7 +2904,7 @@ describe('every screen opens at the top of its scroll areas (L-353)', () => {
  * comparison, because both measurements are taken after it has arrived.
  */
 const MONO_FACES = /\/fonts\/ibm-plex-mono-(400|500)-latin\.woff2$/;
-const STAND_IN = join(DIST, 'fonts', 'newsreader-400-latin.woff2');
+const STAND_IN = join(DIST, 'fonts', 'inter-latin.woff2');
 
 interface StandInApp {
   readonly page: Page;
@@ -3102,6 +3114,52 @@ describe('the mono font cannot move Settings after a jump (L-364)', () => {
     const after = await aboveBoards(app.page);
     assert.notEqual(after, before, `a taller line went unnoticed: ${String(before)}`);
     await app.page.context().close();
+  });
+});
+
+/**
+ * The serif is not in the build (L-414).
+ *
+ * `src/styles/fonts.contract.test.ts` holds the source: no file, no
+ * `@font-face`, no `--font-display` token. This is the same rule read off what
+ * the build wrote, because a guard on source cannot see a face that a plugin,
+ * a dependency or a stale `public/` copy put back (LESSON-034).
+ */
+/** What in a built folder still carries the serif: by file name, or inside its CSS. */
+function serifInBuild(folder: string): string[] {
+  return readdirSync(folder, { recursive: true, encoding: 'utf8' })
+    .map((name) => name.replaceAll('\\', '/'))
+    .filter(
+      (name) =>
+        /newsreader/i.test(name) ||
+        (name.endsWith('.css') &&
+          /newsreader|--font-display(?![\w-])/i.test(readFileSync(join(folder, name), 'utf8'))),
+    );
+}
+
+describe('the serif font is not in the build (L-414)', () => {
+  it('no built file is the serif, and no built stylesheet names it or its token', () => {
+    const built = readdirSync(DIST, { recursive: true, encoding: 'utf8' });
+    // Proof the build was read: its stylesheet, and the fonts that do ship.
+    assert.ok(
+      built.some((name) => name.endsWith('.css')),
+      'no stylesheet in the build',
+    );
+    assert.ok(existsSync(join(DIST, 'fonts', 'inter-latin.woff2')), 'no fonts in the build');
+    assert.deepEqual(serifInBuild(DIST), []);
+  });
+
+  it('the check can fail: a serif file and a stylesheet naming the token are both reported', () => {
+    const folder = mkdtempSync(join(tmpdir(), 'cviper-serif-'));
+    try {
+      mkdirSync(join(folder, 'fonts'));
+      writeFileSync(join(folder, 'fonts', 'newsreader-400-latin.woff2'), '');
+      writeFileSync(join(folder, 'a.css'), ':root{--font-display:serif}');
+      writeFileSync(join(folder, 'b.css'), '@font-face{font-display:block}');
+      assert.deepEqual(serifInBuild(folder).sort(), ['a.css', 'fonts/newsreader-400-latin.woff2']);
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
   });
 });
 

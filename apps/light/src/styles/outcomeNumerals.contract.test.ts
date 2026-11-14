@@ -173,13 +173,12 @@ describe('outcome numerals (Northlight, L-407)', () => {
     expect(keywordNumberClasses(commentedSerif)).toMatch(/\bfont-display\b/);
   });
 
-  it('Newsreader is self-hosted, not fetched from a CDN', () => {
+  it('the fonts are self-hosted, not fetched from a CDN', () => {
     // This app promises that nothing leaves the machine unless the user asks.
     // A <link> to a font CDN would break that on the first paint of the first
-    // launch, invisibly.
+    // launch, invisibly. (The serif this once named left the app in L-414.)
     const fonts = fs.readFileSync(path.resolve(HERE, './fonts.css'), 'utf8');
-    expect(fonts).toMatch(/font-family:\s*'Newsreader'/);
-    expect(fonts).toMatch(/url\('\/fonts\/newsreader-400-latin\.woff2'\)/);
+    expect(fonts).toMatch(/url\('\/fonts\/inter-latin\.woff2'\)/);
     expect(fonts, 'a remote font URL appeared in fonts.css').not.toMatch(/https?:\/\//);
   });
 });
