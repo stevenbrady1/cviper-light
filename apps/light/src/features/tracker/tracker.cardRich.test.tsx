@@ -5,9 +5,11 @@
  *   - The job title may take up to three lines, and company · location two,
  *     instead of being cut to one with "…".
  *   - A next action with no date shows the user's own words as one muted line.
- *   - An overdue next action adds one small red dot beside the title. The red
- *     "2 days overdue" words stay; the dot is a second telling, so it is hidden
- *     from screen readers.
+ *   - An overdue next action adds one small red dot in the card's top-right
+ *     corner, out of the title's flow (L-409). The red "2 days overdue" words
+ *     stay; the dot is a second telling, so it is hidden from screen readers.
+ *   - A dated next action is two lines (L-409): the user's words on one,
+ *     clipped with "…", and how close it is on the next, never clipped.
  *
  * jsdom does no layout, so how many lines a title takes is measured in the
  * real browser (`e2e/contrast-webkit.spec.ts`). Here the classes are the pin.
@@ -163,14 +165,16 @@ describe('richer Tracker cards (L-393)', () => {
       expect(label).not.toContain('Next action');
     });
 
-    it('a dated action keeps its one line and draws no undated line beside it', () => {
+    it('a dated action keeps its two lines and draws no undated line beside it', () => {
       const { note, due } = renderCard({
         nextAction: 'Reply by Friday',
         nextActionDate: '2026-11-14',
       });
 
       expect(note).toBeNull();
-      expect(due?.textContent).toBe('Reply by Friday · due in 2 days');
+      expect(screen.getByTestId('tracker-card-due-action-a').textContent).toBe('Reply by Friday');
+      expect(screen.getByTestId('tracker-card-due-when-a').textContent).toBe('due in 2 days');
+      expect(due?.textContent).not.toContain('·');
     });
   });
 
@@ -225,5 +229,79 @@ describe('richer Tracker cards (L-393)', () => {
       expect(title).toHaveLength(200);
       expect(label.startsWith(`${title}. `)).toBe(true);
     });
+  });
+});
+
+describe('words on one line, due on the next (L-409)', () => {
+  const classesOf = (testId: string) => screen.getByTestId(testId).className.split(' ');
+
+  it('happy: a dated action draws the words (block, truncate) and the due (block, never truncate or nowrap), and the card\'s text has no "·"', () => {
+    const { card, due } = renderCard({
+      nextAction: 'Reply by Friday',
+      nextActionDate: '2026-11-14',
+    });
+
+    const words = classesOf('tracker-card-due-action-a');
+    expect(words).toContain('block');
+    expect(words).toContain('truncate');
+    expect(words).toContain('text-ink-muted');
+
+    const when = classesOf('tracker-card-due-when-a');
+    expect(when).toContain('block');
+    expect(when).not.toContain('truncate');
+    expect(when).not.toContain('whitespace-nowrap');
+    // The same face, size and tone as before.
+    expect(when).toContain('font-mono');
+    expect(when).toContain('text-gold-ink');
+    expect(due?.className.split(' ')).toContain('text-[11px]');
+    expect(due?.getAttribute('data-urgency')).toBe('soon');
+
+    // The one "·" left on the card is company · location's; the due line types none.
+    expect(due?.textContent).toBe('Reply by Fridaydue in 2 days');
+    expect(card.textContent?.split('·')).toHaveLength(2);
+  });
+
+  it('boundary: a date with no words shows only the due line', () => {
+    const { due } = renderCard({ nextActionDate: '2026-11-10' });
+
+    expect(due?.children).toHaveLength(1);
+    expect(screen.queryByTestId('tracker-card-due-action-a')).toBeNull();
+    expect(due?.textContent).toBe('2 days overdue');
+    expect(classesOf('tracker-card-due-when-a')).toContain('block');
+  });
+
+  it("edge: the overdue dot is out of the title's flow: the dot is absolute, the card is relative, the title has no flex-1", () => {
+    const { card, dots } = renderCard({
+      nextAction: 'Chase the recruiter',
+      nextActionDate: '2026-11-10',
+    });
+    const dot = screen.getByTestId('tracker-card-overdue-a');
+    const title = screen.getByText('Customer Insight Analyst');
+
+    expect(dots).toHaveLength(1);
+    expect(dot.className.split(' ')).toContain('absolute');
+    expect(dot.parentElement).toBe(card);
+    expect(card.className.split(' ')).toContain('relative');
+    expect(title.parentElement).toBe(card);
+    expect(title.className.split(' ')).not.toContain('flex-1');
+    expect(title.className.split(' ')).toContain('line-clamp-3');
+    expect(title.className.split(' ')).toContain('break-words');
+  });
+
+  it('negative: an undated action is drawn exactly as before', () => {
+    const { note, due, dots } = renderCard({ nextAction: 'Chase the recruiter' });
+
+    expect(note?.className).toBe('mt-2 truncate text-[11px] text-ink-muted');
+    expect(note?.textContent).toBe('Chase the recruiter');
+    expect(due).toBeNull();
+    expect(dots).toHaveLength(0);
+  });
+
+  it('edge: a 60-character action still has its full words in the screen-reader label', () => {
+    const words = 'Chase the recruiter about the salary band and the start date';
+    const { label } = renderCard({ nextAction: words, nextActionDate: '2026-11-10' });
+
+    expect(words).toHaveLength(60);
+    expect(label).toContain(`Next action: ${words} — overdue by 2 days`);
   });
 });
