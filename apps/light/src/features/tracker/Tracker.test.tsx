@@ -729,7 +729,7 @@ describe('the detail pane', () => {
     const { port } = await renderBoard([entry('a')]);
 
     await user.click(screen.getByTestId('tracker-card-a'));
-    await user.selectOptions(screen.getByTestId('detail-status'), 'rejected');
+    await user.click(screen.getByTestId('detail-status-rejected'));
 
     await vi.waitFor(() => {
       expect(port.entries()[0]?.application.status).toBe('rejected');
@@ -743,7 +743,7 @@ describe('the detail pane', () => {
     const { port } = await renderBoard([entry('a', { status: 'rejected' })]);
 
     await user.click(screen.getByTestId('tracker-card-a'));
-    await user.selectOptions(screen.getByTestId('detail-status'), 'saved');
+    await user.click(screen.getByTestId('detail-status-saved'));
 
     await vi.waitFor(() => {
       expect(port.entries()[0]?.application.status).toBe('saved');

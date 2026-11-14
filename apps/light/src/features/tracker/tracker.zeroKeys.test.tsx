@@ -100,7 +100,7 @@ describe('the tracker on a machine with no keys and no Ollama', () => {
     expect(applicationId).not.toBe('');
 
     // --- Change status -----------------------------------------------------
-    await user.selectOptions(await screen.findByTestId('detail-status'), 'applied');
+    await user.click(await screen.findByTestId('detail-status-applied'));
     await vi.waitFor(() => {
       expect(port.entries()[0]?.application.status).toBe('applied');
     });

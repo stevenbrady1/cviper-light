@@ -1045,21 +1045,17 @@ describe('the built CViper Light binary', () => {
 
   it('moves it to Applied', { timeout: 60_000 }, async () => {
     await visible('[data-testid="detail-status"]');
-    // The status picker is a native <select>. Clicking its <option> through the
-    // app's own WebDriver server did not change it (first CI run of this test:
-    // the card stayed in Saved), because the open list is drawn by the OS, not
-    // the page. So the pick is made the way the browser reports one: the value
-    // set and a bubbling `change` fired, which is the event React's handler
-    // listens for. Everything after that is real — the handler, the IPC call
-    // and the SQLite write that the restart below reads back.
-    const changed = await session().executeScript<string>(
-      `const select = document.querySelector('[data-testid="detail-status"]');
-       if (!(select instanceof HTMLSelectElement)) return 'no select';
-       select.value = 'applied';
-       select.dispatchEvent(new Event('change', { bubbles: true }));
-       return select.value;`,
+    // The status is five radio buttons drawn as a row (L-412), so this is a
+    // real click on the page, where the drop-down it replaced had to be set by
+    // script: its open list was drawn by the OS and a WebDriver click on an
+    // <option> changed nothing. The handler, the IPC call and the SQLite write
+    // that the restart below reads back are all real.
+    await click('[data-testid="detail-status-applied"]');
+    const chosen = await session().executeScript<string>(
+      `return [...document.querySelectorAll('[data-testid="detail-status"] input[type="radio"]')]
+         .filter((radio) => radio.checked).map((radio) => radio.value).join(',');`,
     );
-    assert.equal(changed, 'applied');
+    assert.equal(chosen, 'applied');
     await session().wait(until.elementLocated(cardIn('applied')), ELEMENT_TIMEOUT);
   });
 

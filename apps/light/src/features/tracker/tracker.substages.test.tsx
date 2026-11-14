@@ -183,12 +183,12 @@ describe('a card leaving Interviewing', () => {
     expect(screen.queryByTestId('tracker-card-substage-one')).toBeNull();
   });
 
-  it('drops it when moved with the keyboard route, the status select', async () => {
+  it('drops it when moved with the keyboard route, the status choices', async () => {
     const user = userEvent.setup();
     const port = await renderBoard([entry('one', { interview_substage_id: 'sub-b' })]);
 
     await user.click(screen.getByTestId('tracker-card-one'));
-    await user.selectOptions(await screen.findByTestId('detail-status'), 'rejected');
+    await user.click(await screen.findByTestId('detail-status-rejected'));
 
     await waitFor(() => expect(port.entries()[0]?.application.status).toBe('rejected'));
     expect(port.entries()[0]?.application.interview_substage_id ?? null).toBeNull();

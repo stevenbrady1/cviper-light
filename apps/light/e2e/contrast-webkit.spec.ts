@@ -1484,6 +1484,333 @@ describe('the detail pane floats over the Tracker board (L-401)', () => {
 });
 
 /**
+ * A job's status is five choices side by side, in the detail pane (L-412).
+ *
+ * jsdom proves the group, the names and that a choice is saved
+ * (`tracker.statusChoice.test.tsx`). It does no layout and has no real keyboard,
+ * so here the engine measures what the owner asked for: all five inside the
+ * pane with nothing cut off, at the smallest window, a usual one and a phone;
+ * a thumb-sized target on the phone; one Tab stop; arrow keys that choose.
+ */
+const STATUS_WINDOWS = [
+  { width: 1000, height: 700 },
+  { width: 1280, height: 800 },
+] as const;
+const STATUS_PHONE = { width: 375, height: 812 };
+const STATUSES = ['saved', 'applied', 'interviewing', 'offer', 'rejected'] as const;
+
+interface StatusLayout {
+  /** How many lines the five sit on. */
+  readonly rows: number;
+  /** Each choice's width and height, in board order. */
+  readonly sizes: readonly { readonly status: string; readonly w: number; readonly h: number }[];
+  /** The room the pane gives its contents, and what the row takes of it. */
+  readonly room: number;
+  readonly track: number;
+  readonly chosen: readonly string[];
+  readonly problems: readonly string[];
+}
+
+async function statusLayout(page: Page): Promise<StatusLayout> {
+  return page.evaluate(() => {
+    const problems: string[] = [];
+    const pane = document.querySelector('[data-testid="detail-pane"]');
+    const group = document.querySelector('[data-testid="detail-status"]');
+    const radios = [...(group?.querySelectorAll<HTMLInputElement>('input[type="radio"]') ?? [])];
+    const track = radios[0]?.closest('label')?.parentElement ?? null;
+    if (pane === null || group === null || track === null) {
+      return { rows: 0, sizes: [], room: 0, track: 0, chosen: [], problems: ['no status choices'] };
+    }
+    if (radios.length !== 5) problems.push(`${String(radios.length)} choices, not five`);
+
+    // The box that scrolls the pane's contents: nothing may make it scroll sideways.
+    let area: Element = group;
+    while (area !== pane && getComputedStyle(area).overflowY === 'visible') {
+      area = area.parentElement ?? pane;
+    }
+    if (area.scrollWidth > area.clientWidth) {
+      problems.push(
+        `the pane scrolls sideways by ${String(area.scrollWidth - area.clientWidth)}px`,
+      );
+    }
+    const style = getComputedStyle(area);
+    const outer = area.getBoundingClientRect();
+    const left = outer.left + parseFloat(style.paddingLeft);
+    const right = outer.left + area.clientWidth - parseFloat(style.paddingRight);
+
+    const trackBox = track.getBoundingClientRect();
+    if (trackBox.left < left - 0.5 || trackBox.right > right + 0.5) {
+      problems.push(
+        `the row runs ${String(Math.round(trackBox.left))}–${String(Math.round(trackBox.right))}, ` +
+          `outside the pane's ${String(Math.round(left))}–${String(Math.round(right))}`,
+      );
+    }
+
+    const boxes = radios.map((radio) => radio.getBoundingClientRect());
+    radios.forEach((radio, index) => {
+      const box = boxes[index];
+      const word = radio.nextElementSibling?.getBoundingClientRect();
+      if (box === undefined || word === undefined) return;
+      if (box.left < left - 0.5 || box.right > right + 0.5) {
+        problems.push(`${radio.value} sticks out of the pane`);
+      }
+      if (word.left < box.left - 0.5 || word.right > box.right + 0.5) {
+        problems.push(`the word in ${radio.value} is wider than its segment`);
+      }
+      // What a click in the middle of the segment lands on.
+      const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      if (top !== radio) problems.push(`${radio.value} is covered by ${top?.tagName ?? 'nothing'}`);
+      const next = boxes[index + 1];
+      if (next !== undefined && Math.abs(next.top - box.top) < 1 && next.left < box.right - 0.5) {
+        problems.push(`${radio.value} overlaps the next choice`);
+      }
+    });
+
+    return {
+      rows: new Set(boxes.map((box) => Math.round(box.top))).size,
+      sizes: radios.map((radio, index) => ({
+        status: radio.value,
+        w: Math.round((boxes[index]?.width ?? 0) * 10) / 10,
+        h: Math.round((boxes[index]?.height ?? 0) * 10) / 10,
+      })),
+      room: Math.round((right - left) * 10) / 10,
+      track: Math.round(trackBox.width * 10) / 10,
+      chosen: radios.filter((radio) => radio.checked).map((radio) => radio.value),
+      problems,
+    };
+  });
+}
+
+/** WCAG contrast of each word, and of the chosen segment's edge, as painted. */
+async function statusContrast(
+  page: Page,
+): Promise<{ readonly words: Record<string, number>; readonly edge: number }> {
+  return page.evaluate(() => {
+    const channel = (value: number) => {
+      const c = value / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const luminance = (colour: string) => {
+      const [r = 0, g = 0, b = 0] = (colour.match(/[\d.]+/g) ?? []).map(Number);
+      return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    };
+    const ratio = (one: string, other: string) => {
+      const [dark = 0, light = 0] = [luminance(one), luminance(other)].sort((a, b) => a - b);
+      return Math.round(((light + 0.05) / (dark + 0.05)) * 100) / 100;
+    };
+    const radios = [
+      ...document.querySelectorAll<HTMLInputElement>(
+        '[data-testid="detail-status"] input[type="radio"]',
+      ),
+    ];
+    const track = radios[0]?.closest('label')?.parentElement;
+    if (track === null || track === undefined) throw new Error('no status choices');
+    const trackFill = getComputedStyle(track).backgroundColor;
+    const words: Record<string, number> = {};
+    let edge = 0;
+    for (const radio of radios) {
+      const word = radio.nextElementSibling;
+      if (word === null) continue;
+      const own = getComputedStyle(radio);
+      // A chosen segment paints its own fill; the others show the track.
+      words[radio.value] = ratio(
+        getComputedStyle(word).color,
+        radio.checked ? own.backgroundColor : trackFill,
+      );
+      if (radio.checked) edge = ratio(own.borderTopColor, trackFill);
+    }
+    return { words, edge };
+  });
+}
+
+async function openCardC(page: Page): Promise<void> {
+  await page.click('[data-testid="tracker-card-c"]');
+  await page.waitForSelector('[data-testid="detail-status"]');
+}
+
+describe('a job’s status is five choices side by side (L-412)', () => {
+  for (const viewport of [...STATUS_WINDOWS, STATUS_PHONE]) {
+    const size = `${String(viewport.width)}×${String(viewport.height)}`;
+    const phone = viewport.width < 768;
+
+    it(`at ${size} all five are inside the pane, none cut off, and the pane does not scroll sideways`, async () => {
+      const page = await trackerWithCards(viewport);
+      await openCardC(page);
+      const layout = await statusLayout(page);
+      console.log(
+        `status choices at ${size}: ${String(layout.rows)} row(s), row ${String(layout.track)}px ` +
+          `of ${String(layout.room)}px, ${JSON.stringify(layout.sizes)}`,
+      );
+      assert.deepEqual(layout.problems, []);
+      assert.deepEqual(
+        layout.sizes.map((each) => each.status),
+        [...STATUSES],
+      );
+      assert.deepEqual(layout.chosen, ['interviewing'], 'the stored status is not the one marked');
+      // One row where they fit; two at the very most, never a third.
+      assert.ok(layout.rows >= 1 && layout.rows <= 2, `${String(layout.rows)} rows`);
+      if (!phone) assert.equal(layout.rows, 1, 'five choices do not fit one row in the pane');
+      // A thumb target on a phone, like every button (L-81); never a sliver.
+      const shortest = Math.min(...layout.sizes.map((each) => each.h));
+      assert.ok(shortest >= (phone ? 44 : 28), `a choice is only ${String(shortest)}px tall`);
+      await page.context().close();
+    });
+
+    it(`at ${size} a real click on Offer marks it and moves the card to that column`, async () => {
+      const page = await trackerWithCards(viewport);
+      await openCardC(page);
+      await page.click('[data-testid="detail-status-offer"]');
+      await page.waitForSelector(
+        '[data-testid="tracker-column-offer"] [data-testid="tracker-card-c"]',
+        { state: 'attached' },
+      );
+      const layout = await statusLayout(page);
+      assert.deepEqual(layout.chosen, ['offer']);
+      // Leaving Interviewing takes the interview-stage box away: nothing may be left cut off.
+      assert.deepEqual(layout.problems, []);
+      await page.context().close();
+    });
+  }
+
+  it('real keys: arrows move and choose, the ends are safe, and the group is one Tab stop', async () => {
+    const page = await trackerWithCards({ width: 1000, height: 700 });
+    await openCardByKeyboard(page);
+    await page.focus('[data-testid="detail-status-interviewing"]');
+
+    for (const [key, expected] of [
+      ['ArrowRight', 'offer'],
+      ['ArrowRight', 'rejected'],
+      ['ArrowLeft', 'offer'],
+      ['ArrowLeft', 'interviewing'],
+      ['ArrowLeft', 'applied'],
+      ['ArrowLeft', 'saved'],
+    ] as const) {
+      await page.keyboard.press(key);
+      assert.equal(await focusedTestId(page), `detail-status-${expected}`, key);
+      assert.deepEqual((await statusLayout(page)).chosen, [expected]);
+    }
+    await page.waitForSelector(
+      '[data-testid="tracker-column-saved"] [data-testid="tracker-card-c"]',
+      { state: 'attached' },
+    );
+
+    // Past the end is the engine's own rule: Edge, which the Windows app runs
+    // on, goes round to the other end; WebKit stays put. Either way focus
+    // stays in the group, on the one choice that is chosen.
+    await page.keyboard.press('ArrowLeft');
+    const atEnd = await focusedTestId(page);
+    console.log(`Left arrow on the first status choice lands on ${atEnd}`);
+    assert.ok(['detail-status-saved', 'detail-status-rejected'].includes(atEnd), atEnd);
+    assert.deepEqual(
+      (await statusLayout(page)).chosen.map((status) => `detail-status-${status}`),
+      [atEnd],
+    );
+
+    // One stop: Tab leaves the group, and Shift+Tab comes back to the chosen one.
+    await page.keyboard.press('Tab');
+    const after = await focusedTestId(page);
+    assert.ok(!after.startsWith('detail-status-'), `Tab stayed in the group, on ${after}`);
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await focusedTestId(page), atEnd);
+    await page.context().close();
+  });
+
+  it('the focus ring is drawn round the choice Tab lands on, above its neighbours; after an arrow key the focused choice is still the marked one', async () => {
+    const page = await trackerWithCards({ width: 1000, height: 700 });
+    await openCardByKeyboard(page);
+    // Out and back in with real keys: only a keyboard arrival draws the ring.
+    await page.focus('[data-testid="detail-status-interviewing"]');
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    const look = () =>
+      page.evaluate(() => {
+        const focused = document.activeElement;
+        if (!(focused instanceof HTMLInputElement)) return null;
+        const own = getComputedStyle(focused);
+        return {
+          on: focused.getAttribute('data-testid'),
+          chosen: focused.checked,
+          byKeyboard: focused.matches(':focus-visible'),
+          shadow: own.boxShadow,
+          fill: own.backgroundColor,
+          edge: own.borderTopWidth,
+          lifted: getComputedStyle(focused.closest('label') ?? focused).zIndex,
+          neighbour: getComputedStyle(
+            document.querySelector('[data-testid="detail-status-rejected"]')?.closest('label') ??
+              focused,
+          ).zIndex,
+        };
+      });
+    const arrived = await look();
+    assert.ok(arrived !== null, 'focus is not on a choice');
+    assert.equal(arrived.on, 'detail-status-interviewing');
+    assert.equal(arrived.byKeyboard, true);
+    assert.match(arrived.shadow, /rgb\(26, 86, 219\)/, `no blue ring: ${arrived.shadow}`);
+    assert.equal(arrived.lifted, '10');
+    assert.equal(arrived.neighbour, 'auto');
+
+    // WebKit drops `:focus-visible` when an arrow key moves between radio
+    // buttons (Edge keeps it). The arrow also CHOOSES, so where focus is can
+    // still be seen: it is the one white, edged segment.
+    await page.keyboard.press('ArrowLeft');
+    const moved = await look();
+    assert.ok(moved !== null, 'focus left the choices');
+    console.log(`after an arrow key the ring is ${moved.byKeyboard ? 'kept' : 'dropped'} here`);
+    assert.equal(moved.on, 'detail-status-applied');
+    assert.equal(moved.chosen, true);
+    assert.equal(moved.fill, 'rgb(255, 255, 255)');
+    assert.equal(moved.edge, '1px');
+    await page.context().close();
+  });
+
+  it('colour contrast: the chosen word, the four others, and the chosen segment’s edge', async () => {
+    for (const viewport of [{ width: 1000, height: 700 }, STATUS_PHONE]) {
+      const page = await trackerWithCards(viewport);
+      await openCardC(page);
+      const { words, edge } = await statusContrast(page);
+      console.log(
+        `status choices at ${String(viewport.width)}px: text ${JSON.stringify(words)}, edge ${String(edge)}`,
+      );
+      assert.deepEqual(Object.keys(words), [...STATUSES]);
+      for (const [status, ratio] of Object.entries(words)) {
+        assert.ok(ratio >= 4.5, `${status} is ${String(ratio)}:1, under 4.5:1`);
+      }
+      // The edge is the mark that is not a colour alone, so it must be seen (WCAG 1.4.11).
+      assert.ok(edge >= 3, `the chosen segment's edge is ${String(edge)}:1, under 3:1`);
+      judge(`status choices at ${String(viewport.width)}px`, await contrast(page));
+      await page.context().close();
+    }
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a row forced onto one line wider than the pane is reported', async () => {
+    const page = await trackerWithCards(STATUS_PHONE);
+    await openCardC(page);
+    await page.evaluate(async () => {
+      const track = document
+        .querySelector('[data-testid="detail-status-saved"]')
+        ?.closest('label')?.parentElement;
+      if (track instanceof HTMLElement) {
+        track.style.flexWrap = 'nowrap';
+        track.style.width = '600px';
+      }
+      await new Promise((done) => requestAnimationFrame(done));
+    });
+    const { problems } = await statusLayout(page);
+    console.log(`status row forced to 600px on a phone: ${JSON.stringify(problems)}`);
+    assert.ok(
+      problems.some((line) => line.startsWith('the row runs')),
+      'a row wider than the pane was not reported',
+    );
+    assert.ok(
+      problems.some((line) => line.includes('sticks out')),
+      'a choice outside the pane was not reported',
+    );
+    await page.context().close();
+  });
+});
+
+/**
  * The shared content column (L-341) never makes a screen scroll sideways.
  *
  * jsdom does no layout, so `contentColumn.contract.test.tsx` can only read the
