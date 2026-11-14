@@ -364,7 +364,8 @@ describe('CONSENT_KINDS — the one list of consents that can be withdrawn', () 
     return stripComments(readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8'));
   }
 
-  it.each(['./Analysis.tsx', '../tailor/Tailor.tsx'])(
+  // Settings' "What I have agreed to" draws the same rows (L-410).
+  it.each(['./Analysis.tsx', '../tailor/Tailor.tsx', '../settings/AgreedList.tsx'])(
     'guard: %s draws its rows from CONSENT_KINDS, not from a list typed by hand',
     (file) => {
       const source = shipped(file);

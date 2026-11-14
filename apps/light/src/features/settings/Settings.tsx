@@ -25,7 +25,10 @@ import {
 } from '../../platform/distribution';
 import { detectMobileOs, type MobileOs } from '../../platform/os';
 
+import { type ConsentPort } from '../analysis/consent';
+
 import { About } from './about/About';
+import { AgreedList } from './AgreedList';
 import { EraseEverything } from './erase/EraseEverything';
 import { OnThisPc, type LocalAi } from './OnThisPc';
 import { type ErasePort } from './erase/port';
@@ -114,6 +117,8 @@ export interface SettingsProps {
    * `null` until it has answered, and absent in a test that renders Settings alone.
    */
   readonly localAi?: LocalAi | null | undefined;
+  /** Injected by tests: the real one reads and writes the AI consent file (L-410). */
+  readonly consentPort?: ConsentPort | undefined;
   /**
    * Open at a place rather than the top: Search's "Manage job boards" (L-310),
    * or its "Get a free Reed key", which unfolds the job-board keys (L-338).
@@ -165,6 +170,11 @@ export interface SettingsProps {
   readonly onErased?: (() => void) | undefined;
 }
 
+/** How far down the scroll area's content a section starts, wherever it is scrolled to. */
+function topWithin(area: HTMLElement, section: HTMLElement): number {
+  return section.getBoundingClientRect().top - area.getBoundingClientRect().top + area.scrollTop;
+}
+
 export function Settings({
   port,
   filePort,
@@ -173,6 +183,7 @@ export function Settings({
   browser,
   boardsPort,
   localAi,
+  consentPort,
   updatePort,
   mobileOs = detectMobileOs(),
   distribution = distributionChannel(),
@@ -192,13 +203,33 @@ export function Settings({
   // Unfolded when opened at the Reed key, and only at first draw: once the
   // shell forgets the request the fold is the user's again (L-338).
   const [keysUnfolded] = useState(openAt === 'reed-key');
+  // The place this screen was opened at, and how far down the page it was then.
+  const openedAt = useRef<{ readonly place: HTMLElement; readonly top: number } | null>(null);
   const onPlaceFocused = useCallback(
     (section: HTMLElement) => {
-      if (scrollArea.current !== null) scrollWithin(scrollArea.current, section);
+      if (scrollArea.current !== null) {
+        openedAt.current = { place: section, top: topWithin(scrollArea.current, section) };
+        scrollWithin(scrollArea.current, section);
+      }
       onOpened?.();
     },
     [onOpened],
   );
+  /*
+    "What I have agreed to" sits above Job boards and learns its rows from a
+    file, a moment after this screen may have scrolled to the place it was
+    opened at. Its rows would push that place down the screen (L-364), so the
+    scroll is made once more — only if the place really moved (L-410).
+  */
+  const onAgreedDrawn = useCallback(() => {
+    const area = scrollArea.current;
+    const opened = openedAt.current;
+    if (area === null || opened === null) return;
+    // Half a pixel: a scroll still in flight rounds the two halves of the sum apart.
+    if (Math.abs(topWithin(area, opened.place) - opened.top) > 0.5) {
+      scrollWithin(area, opened.place);
+    }
+  }, []);
   const backupPort = useMemo(() => port ?? createDbBackupPort(), [port]);
   const files = useMemo(() => filePort ?? createTauriFilePort(), [filePort]);
   // One port for every link on this screen: the key signup pages, the privacy
@@ -388,6 +419,7 @@ export function Settings({
           </p>
           <OnThisPc browser={browserPort} localAi={localAi} />
           <AiKeySetup ports={aiKeyPorts} browser={browserPort} />
+          <AgreedList port={consentPort} onDrawn={onAgreedDrawn} />
 
           <section>
             <SectionHeading icon="data" title="Your data" />
