@@ -32,6 +32,7 @@ import { NO_PREFERENCES } from '../boards/model';
 import { createFakeBoardPort } from '../boards/test/fakeBoardPort';
 
 import { mainBoards } from './KeylessBar';
+import { COUNTRY_STORAGE_KEY } from './country';
 import { Search } from './Search';
 import { createFakeSearchPort, outcomeOf } from './test/fakeSearchPort';
 import { entry } from './test/fixtures';
@@ -101,7 +102,11 @@ function describedBy(element: Element): string {
   return id === null ? '' : (document.getElementById(id)?.textContent ?? '');
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  // Someone who used the app before countries existed: the United Kingdom, never asked (L-417).
+  localStorage.setItem(COUNTRY_STORAGE_KEY, 'gb');
+});
 afterEach(cleanup);
 
 describe('one search (L-219)', () => {

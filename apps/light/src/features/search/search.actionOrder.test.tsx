@@ -24,6 +24,7 @@ import { SHIPPED_BOARDS } from '../boards/defaults';
 import { NO_PREFERENCES, type BoardPreferences } from '../boards/model';
 import { createFakeBoardPort } from '../boards/test/fakeBoardPort';
 
+import { COUNTRY_STORAGE_KEY } from './country';
 import { Search } from './Search';
 import { createFakeSearchPort } from './test/fakeSearchPort';
 
@@ -56,7 +57,11 @@ function choices(): Element[] {
   return [...screen.getByTestId('search-form').querySelectorAll('input, select, textarea')];
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  // Someone who used the app before countries existed: the United Kingdom, never asked (L-417).
+  localStorage.setItem(COUNTRY_STORAGE_KEY, 'gb');
+});
 afterEach(cleanup);
 
 describe('the Search button comes after every choice that changes it (L-313)', () => {

@@ -21,6 +21,7 @@ import { SHIPPED_BOARDS } from '../boards/defaults';
 import { NO_PREFERENCES } from '../boards/model';
 import { createFakeBoardPort } from '../boards/test/fakeBoardPort';
 
+import { COUNTRY_STORAGE_KEY } from './country';
 import { Search } from './Search';
 import { createFakeSearchPort, outcomeOf } from './test/fakeSearchPort';
 
@@ -47,7 +48,11 @@ function timesEuropeIsExplained(): number {
   return text.match(/europe/gi)?.length ?? 0;
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  // Someone who used the app before countries existed: the United Kingdom, never asked (L-417).
+  localStorage.setItem(COUNTRY_STORAGE_KEY, 'gb');
+});
 afterEach(cleanup);
 
 describe('Arbeitnow is explained once (L-323)', () => {

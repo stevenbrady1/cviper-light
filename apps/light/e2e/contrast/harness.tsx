@@ -598,6 +598,7 @@ interface MountedBlockErrorBox {
       onAnalyse={undefined}
       searchBlocked={false}
       noFreeFeedHere={false}
+      noCountry={false}
     />,
   );
 };

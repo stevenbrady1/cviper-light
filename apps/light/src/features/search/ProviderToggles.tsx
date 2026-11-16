@@ -41,6 +41,12 @@ interface ProviderTogglesProps {
   readonly onToggle: (provider: JobProviderId, next: boolean) => void;
   readonly onOpenSettings: () => void;
   readonly disabled: boolean;
+  /**
+   * Why a board cannot search the chosen country, or `null` (L-417). It comes
+   * before the key's own reason: setting up a key would not change it, so
+   * there is no link to Settings beside it.
+   */
+  readonly blocked: (provider: JobProviderId) => string | null;
 }
 
 export function ProviderToggles({
@@ -49,6 +55,7 @@ export function ProviderToggles({
   onToggle,
   onOpenSettings,
   disabled,
+  blocked,
 }: ProviderTogglesProps) {
   return (
     <fieldset data-testid="provider-toggles" className="min-w-0">
@@ -56,7 +63,11 @@ export function ProviderToggles({
 
       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
         {JOB_PROVIDER_IDS.map((provider) => {
-          const { usable, reason } = providerAvailability(provider, keyStates[provider]);
+          const noList = blocked(provider);
+          const { usable, reason } =
+            noList === null
+              ? providerAvailability(provider, keyStates[provider])
+              : { usable: false, reason: null };
 
           return (
             <div key={provider} className="inline-flex items-center gap-1.5">
@@ -67,11 +78,22 @@ export function ProviderToggles({
                   data-usable={usable}
                   checked={usable && chosen.has(provider)}
                   disabled={disabled || !usable}
+                  aria-describedby={noList === null ? undefined : `provider-blocked-${provider}`}
                   onChange={(event) => onToggle(provider, event.currentTarget.checked)}
                   className="size-4 accent-blue"
                 />
                 {PROVIDER_LABEL[provider]}
               </label>
+
+              {noList === null ? null : (
+                <span
+                  id={`provider-blocked-${provider}`}
+                  data-testid={`provider-blocked-${provider}`}
+                  className="text-xs text-ink-muted"
+                >
+                  {noList}
+                </span>
+              )}
 
               {reason === null ? null : (
                 <>

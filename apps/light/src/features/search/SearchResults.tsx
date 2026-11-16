@@ -12,6 +12,7 @@ import { type Board } from '../boards/model';
 import { ANALYSE_DISCLOSURE } from '../flow/advert';
 import { type BrowserPort } from '../../platform/browser';
 
+import { CHOOSE_COUNTRY_REASON } from './country';
 import { FewResults, NothingMatchedNotes, fewResultsText } from './KeylessBar';
 import { nothingMatchedNote, type CombinedResults } from './keylessModel';
 import { clusterSiblings, externalKey, type SearchForm } from './model';
@@ -56,6 +57,8 @@ export interface SearchResultsProps {
    * Guardian Jobs closed (L-336), so the empty page names the free Reed key.
    */
   readonly noFreeFeedHere: boolean;
+  /** No country is chosen yet (L-417): the empty page says that, and nothing else. */
+  readonly noCountry: boolean;
 }
 
 export function SearchResults({
@@ -79,6 +82,7 @@ export function SearchResults({
   onAnalyse,
   searchBlocked,
   noFreeFeedHere,
+  noCountry,
 }: SearchResultsProps) {
   const failures = (outcome?.outcomes ?? []).filter((entry) => entry.error !== null);
   /*
@@ -156,14 +160,18 @@ export function SearchResults({
             <IconTile icon="search" />
           </div>
           <p className="font-medium text-ink">Nothing looked at yet.</p>
-          <p className="mt-1 text-ink-muted">
-            {searchBlocked
-              ? noFreeFeedHere
-                ? 'A free Reed key, set up in Settings, shows UK adverts here.'
-                : 'Tick a free feed in “Where to look” to see the newest adverts here — it needs no key.'
-              : 'Type a job title and press Search to see the newest adverts from the free feed.'}{' '}
-            Or tick job boards in “Where to look” and press “Also open”.
-          </p>
+          {noCountry ? (
+            <p className="mt-1 text-ink-muted">{CHOOSE_COUNTRY_REASON}</p>
+          ) : (
+            <p className="mt-1 text-ink-muted">
+              {searchBlocked
+                ? noFreeFeedHere
+                  ? 'A free Reed key, set up in Settings, shows UK adverts here.'
+                  : 'Tick a free feed in “Where to look” to see the newest adverts here — it needs no key.'
+                : 'Type a job title and press Search to see the newest adverts from the free feed.'}{' '}
+              Or tick job boards in “Where to look” and press “Also open”.
+            </p>
+          )}
         </div>
       ) : (
         <>

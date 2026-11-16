@@ -3099,6 +3099,298 @@ async function scrollRequests(page: Page): Promise<ScrollRequest[]> {
   );
 }
 
+/**
+ * L-417: Search asks which country to search before anything else works.
+ *
+ * jsdom proves what is disabled and what is sent. Only a real browser can say
+ * where the picker sits, whether its reason wraps inside the page, whether a
+ * greyed form still passes contrast, and whether choosing a country moves the
+ * boxes the person is about to type in.
+ */
+const COUNTRY_PICKER = '[data-testid="search-country"]';
+const COUNTRY_REASON = '[data-testid="search-country-reason"]';
+const COUNTRY_WINDOWS = [PHONE, SMALLEST_WINDOW, { width: 1280, height: 800 }] as const;
+
+/** A new install's Search: the welcome's own "Find jobs", nothing seeded. */
+async function openSearchUnasked(
+  viewport: { width: number; height: number },
+  query = '',
+): Promise<Page> {
+  const page = await open(query, viewport);
+  await page.locator('[data-testid="welcome-action-search"]:visible').click();
+  await page.waitForSelector(COUNTRY_PICKER);
+  return page;
+}
+
+interface CountryLayout {
+  /** The picker, its label and (while unasked) its reason, as boxes in the page. */
+  readonly picker: { left: number; right: number; top: number; bottom: number; height: number };
+  readonly reason: { left: number; right: number; bottom: number; lines: number } | null;
+  readonly keywords: { left: number; top: number; height: number };
+  /** The form's other drop-down: the picker is the same kind of control. */
+  readonly contractHeight: number;
+  readonly location: { left: number; right: number; top: number };
+  readonly column: { left: number; right: number };
+  readonly windowWidth: number;
+  readonly value: string;
+  readonly disabled: readonly string[];
+  readonly enabled: readonly string[];
+}
+
+async function countryLayout(page: Page): Promise<CountryLayout> {
+  return page.evaluate(
+    ({ pickerSelector, reasonSelector }) => {
+      const box = (selector: string): DOMRect => {
+        const node = document.querySelector(selector);
+        if (node === null) throw new Error(`${selector} is not in the page`);
+        return node.getBoundingClientRect();
+      };
+      const picker = box(pickerSelector);
+      const reasonNode = document.querySelector(reasonSelector);
+      const reasonBox = reasonNode?.getBoundingClientRect() ?? null;
+      const lineHeight =
+        reasonNode === null ? 1 : parseFloat(getComputedStyle(reasonNode).lineHeight) || 1;
+      const keywords = box('[data-testid="search-keywords"]');
+      const location = box('[data-testid="search-location"]');
+      const column = box('[data-content-column]');
+
+      const controls = [
+        'search-keywords',
+        'search-location',
+        'search-distance',
+        'search-salary',
+        'search-contract',
+        'search-submit',
+        'search-open-boards',
+        'saved-search-open',
+      ];
+      const isDisabled = (id: string): boolean =>
+        document.querySelector(`[data-testid="${id}"]`)?.matches(':disabled') ?? false;
+
+      return {
+        picker: {
+          left: picker.left,
+          right: picker.right,
+          top: picker.top,
+          bottom: picker.bottom,
+          height: picker.height,
+        },
+        reason:
+          reasonBox === null
+            ? null
+            : {
+                left: reasonBox.left,
+                right: reasonBox.right,
+                bottom: reasonBox.bottom,
+                lines: Math.round(reasonBox.height / lineHeight),
+              },
+        keywords: { left: keywords.left, top: keywords.top, height: keywords.height },
+        contractHeight: box('[data-testid="search-contract"]').height,
+        location: { left: location.left, right: location.right, top: location.top },
+        column: { left: column.left, right: column.right },
+        windowWidth: document.documentElement.clientWidth,
+        value: (document.querySelector(pickerSelector) as HTMLSelectElement).value,
+        disabled: controls.filter(isDisabled),
+        enabled: controls.filter((id) => !isDisabled(id)),
+      };
+    },
+    { pickerSelector: COUNTRY_PICKER, reasonSelector: COUNTRY_REASON },
+  );
+}
+
+/** What is wrong with where the picker and its reason sit. Empty means all is well. */
+function countryProblems(seen: CountryLayout): string[] {
+  const problems: string[] = [];
+  const { picker, reason, column, windowWidth } = seen;
+  if (picker.left < column.left - 0.5 || picker.right > column.right + 0.5) {
+    problems.push(
+      `the picker runs ${String(picker.left)}–${String(picker.right)}, outside the column`,
+    );
+  }
+  if (picker.right > windowWidth + 0.5) problems.push('the picker sticks out of the window');
+  if (picker.top >= seen.location.top && picker.left >= seen.location.left) {
+    problems.push('the picker comes after Location');
+  }
+  if (reason !== null) {
+    if (reason.left < column.left - 0.5 || reason.right > column.right + 0.5) {
+      problems.push(
+        `the reason runs ${String(reason.left)}–${String(reason.right)}, outside the column`,
+      );
+    }
+    if (reason.right > windowWidth + 0.5) problems.push('the reason sticks out of the window');
+  }
+  return problems;
+}
+
+describe('Search asks for a country before anything else works (L-417)', () => {
+  for (const viewport of COUNTRY_WINDOWS) {
+    const size = `${String(viewport.width)}×${String(viewport.height)}`;
+
+    it(`${size}, not chosen: the picker and its reason are inside the page, and every other control waits`, async () => {
+      const page = await openSearchUnasked(viewport);
+      const seen = await countryLayout(page);
+      console.log(`country, not chosen at ${size}: ${JSON.stringify(seen)}`);
+
+      assert.equal(seen.value, '');
+      assert.deepEqual(countryProblems(seen), []);
+      assert.ok(seen.reason !== null, 'no reason line');
+      assert.deepEqual(seen.enabled, [], 'a control was live before a country was chosen');
+      assert.equal(seen.disabled.length, 8);
+      // The same height as the form's other drop-down: one control, not a special one.
+      assert.equal(seen.picker.height, seen.contractHeight);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      judge(`search, no country chosen, ${size}`, await contrast(page));
+      await page.context().close();
+    });
+
+    it(`${size}, Germany chosen: the controls are live, nothing is outside the page, contrast holds`, async () => {
+      const page = await openSearchUnasked(viewport);
+      await page.selectOption(COUNTRY_PICKER, 'de');
+      await page.waitForSelector(COUNTRY_REASON, { state: 'detached' });
+      const seen = await countryLayout(page);
+      console.log(`country, Germany at ${size}: ${JSON.stringify(seen)}`);
+
+      assert.equal(seen.value, 'de');
+      assert.deepEqual(countryProblems(seen), []);
+      assert.deepEqual(
+        seen.disabled,
+        ['search-open-boards'],
+        'only the boards button waits, for a board to be ticked',
+      );
+      assert.equal(
+        await page.locator('label[for="search-salary"]').textContent(),
+        'Minimum salary (EUR)',
+      );
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      judge(`search, Germany, ${size}`, await contrast(page));
+      await page.context().close();
+    });
+  }
+
+  it('at 375px the picker is full width, above Location, at least 44px tall, and its reason is one or two lines', async () => {
+    const page = await openSearchUnasked(PHONE);
+    const seen = await countryLayout(page);
+
+    assert.ok(seen.picker.height >= 44, `${String(seen.picker.height)}px tall`);
+    assert.ok(
+      seen.picker.right - seen.picker.left >= seen.column.right - seen.column.left - 1,
+      `the picker is ${String(seen.picker.right - seen.picker.left)}px of a ${String(seen.column.right - seen.column.left)}px column`,
+    );
+    assert.ok(seen.picker.bottom <= seen.location.top, 'the picker is not above Location');
+    assert.ok(seen.reason !== null && seen.reason.lines >= 1 && seen.reason.lines <= 2);
+    await page.context().close();
+  });
+
+  it('from 768px up the picker shares the first row with the two boxes after it', async () => {
+    for (const viewport of [SMALLEST_WINDOW, { width: 1280, height: 800 }]) {
+      const page = await openSearchUnasked(viewport);
+      const seen = await countryLayout(page);
+      assert.ok(
+        Math.abs(seen.picker.top - seen.keywords.top) < 1,
+        `${String(viewport.width)}px: the picker is at ${String(seen.picker.top)}, the keywords box at ${String(seen.keywords.top)}`,
+      );
+      assert.ok(seen.picker.left < seen.keywords.left, 'the picker is not first in its row');
+      await page.context().close();
+    }
+  });
+
+  it('opening Search does not move the form afterwards: the picker is where it was drawn', async () => {
+    for (const viewport of COUNTRY_WINDOWS) {
+      const page = await openSearchUnasked(viewport);
+      const first = await countryLayout(page);
+      await layoutSettled(page, { fonts: true });
+      const later = await countryLayout(page);
+      assert.deepEqual(later.picker, first.picker, `${String(viewport.width)}px: the picker moved`);
+      assert.deepEqual(
+        later.keywords,
+        first.keywords,
+        `${String(viewport.width)}px: the boxes moved`,
+      );
+      await page.context().close();
+    }
+  });
+
+  it('someone who used the app before is not asked: United Kingdom, nothing waits, no reason line', async () => {
+    const page = await open('?seen=1', SMALLEST_WINDOW);
+    await goTo(page, 'search');
+    await page.waitForSelector(COUNTRY_PICKER);
+    const seen = await countryLayout(page);
+
+    assert.equal(seen.value, 'gb');
+    assert.equal(seen.reason, null);
+    assert.deepEqual(seen.disabled, ['search-open-boards']);
+    assert.equal(await page.locator(`${COUNTRY_PICKER} option`).first().textContent(), 'Australia');
+    await page.context().close();
+  });
+
+  it('"Another country", with a key saved: Adzuna and Reed each say why they wait, inside the box', async () => {
+    for (const viewport of [PHONE, SMALLEST_WINDOW]) {
+      const page = await openSearchUnasked(viewport, '?results=1');
+      await page.selectOption(COUNTRY_PICKER, 'other');
+      await openWhereToLook(page);
+      const seen = await page.evaluate(() => {
+        const where = document.querySelector('[data-testid="search-where"]');
+        const box = where?.getBoundingClientRect();
+        return ['adzuna', 'reed'].map((provider) => {
+          const reason = document.querySelector(`[data-testid="provider-blocked-${provider}"]`);
+          const tick = document.querySelector(`[data-testid="provider-${provider}"]`);
+          const rect = reason?.getBoundingClientRect();
+          return {
+            provider,
+            text: reason?.textContent ?? null,
+            disabled: tick?.matches(':disabled') ?? false,
+            inside:
+              rect !== undefined &&
+              box !== undefined &&
+              rect.left >= box.left - 0.5 &&
+              rect.right <= box.right + 0.5,
+          };
+        });
+      });
+      console.log(`another country at ${String(viewport.width)}px: ${JSON.stringify(seen)}`);
+
+      assert.deepEqual(seen, [
+        {
+          provider: 'adzuna',
+          text: 'Adzuna has no job list for this country.',
+          disabled: true,
+          inside: true,
+        },
+        { provider: 'reed', text: 'Reed lists UK jobs only.', disabled: true, inside: true },
+      ]);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      judge(`search, another country, ${String(viewport.width)}px`, await contrast(page));
+      await page.context().close();
+    }
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a picker pushed out of its column, and a reason too wide for the page, are flagged', async () => {
+    const page = await openSearchUnasked(PHONE);
+    await page.evaluate(
+      ({ pickerSelector, reasonSelector }) => {
+        const picker = document.querySelector(pickerSelector) as HTMLElement;
+        picker.style.width = '600px';
+        picker.style.maxWidth = 'none';
+        const reason = document.querySelector(reasonSelector) as HTMLElement;
+        reason.style.whiteSpace = 'nowrap';
+        reason.style.width = '900px';
+      },
+      { pickerSelector: COUNTRY_PICKER, reasonSelector: COUNTRY_REASON },
+    );
+    const report = countryProblems(await countryLayout(page));
+    assert.ok(
+      report.some((line) => line.startsWith('the picker runs')),
+      `the wide picker was not flagged: ${JSON.stringify(report)}`,
+    );
+    assert.ok(
+      report.some((line) => line.startsWith('the reason runs')),
+      `the wide reason was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+});
+
 describe('every screen opens at the top of its scroll areas (L-353)', () => {
   for (const [width, viewport] of Object.entries(VIEWPORTS)) {
     const padding = width === 'phone' ? 16 : 20;

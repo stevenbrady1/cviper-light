@@ -23,6 +23,7 @@ import { createFakeBrowserPort, type FakeBrowserPort } from '../../platform/test
 import { type KeyState } from '../../status/environment';
 import { QUOTA_STORAGE_KEY } from '../../jobs/quotaStore';
 
+import { COUNTRY_STORAGE_KEY } from './country';
 import { Search } from './Search';
 import { SEARCH_STORAGE_KEY } from './memory';
 import { createFakeSearchPort, outcomeOf, type FakeSearchPort } from './test/fakeSearchPort';
@@ -79,6 +80,8 @@ function quotaWith(counts: Partial<QuotaState['counts']>): QuotaState {
 
 beforeEach(() => {
   localStorage.clear();
+  // Someone who used the app before countries existed: the United Kingdom, never asked (L-417).
+  localStorage.setItem(COUNTRY_STORAGE_KEY, 'gb');
 });
 
 afterEach(() => {

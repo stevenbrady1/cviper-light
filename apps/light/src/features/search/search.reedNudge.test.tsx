@@ -21,6 +21,7 @@ import { createFakeBoardPort } from '../boards/test/fakeBoardPort';
 import { keyProvider } from '../settings/keys/model';
 
 import { FEED_CHOICE_KEY } from './feedDefaults';
+import { COUNTRY_STORAGE_KEY } from './country';
 import { Search } from './Search';
 import { createFakeSearchPort, outcomeOf } from './test/fakeSearchPort';
 
@@ -68,7 +69,11 @@ function expectButtonMatchesReason() {
   expect(reedButton() !== null).toBe(namesReed);
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  // Someone who used the app before countries existed: the United Kingdom, never asked (L-417).
+  localStorage.setItem(COUNTRY_STORAGE_KEY, 'gb');
+});
 afterEach(cleanup);
 
 describe('"Get a free Reed key" beside the grey Search for the UK (L-338)', () => {

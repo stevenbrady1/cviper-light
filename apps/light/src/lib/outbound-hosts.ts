@@ -138,7 +138,8 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
       'A job search you start, sent with the free Adzuna key you registered yourself. ' +
       'Adzuna’s API requires both parts of that key — the app ID and the app key — as ' +
       'parameters in the web address, so they appear in Adzuna’s own request logs. The ' +
-      'request also carries your search words and location, which is what a search is, and ' +
+      'request also carries your search words and location, and the country you chose, which ' +
+      'is what a search is, and ' +
       'Adzuna sees your IP address, exactly as it would if you searched on its own site ' +
       'yourself.',
   },

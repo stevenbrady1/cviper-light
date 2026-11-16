@@ -10,7 +10,7 @@ import { KeylessBar } from './KeylessBar';
 import { isUkLocation, type FeedChoice } from './feedDefaults';
 import { KeylessFeedToggles } from './KeylessFeedToggles';
 import { ProviderToggles } from './ProviderToggles';
-import { hasAnyJobBoardKey, type SearchForm } from './model';
+import { hasAnyJobBoardKey } from './model';
 
 /*
   Two parts of the Search form, moved here word for word so `Search.tsx` stays
@@ -23,11 +23,15 @@ export interface WhereToLookProps {
   readonly chosen: ReadonlySet<JobProviderId>;
   readonly onToggle: (provider: JobProviderId, next: boolean) => void;
   readonly onOpenSettings?: (() => void) | undefined;
+  /** True while a search runs, and while no country is chosen (L-417): every tick waits. */
   readonly running: boolean;
+  /** Why a keyed board cannot search the chosen country, or `null` (L-417). */
+  readonly blocked: (provider: JobProviderId) => string | null;
   readonly keylessChosen: ReadonlySet<KeylessSourceId>;
   readonly onToggleKeyless: (source: KeylessSourceId, next: boolean) => void;
   readonly feedChoice: FeedChoice;
-  readonly form: SearchForm;
+  /** The place typed, for a UK search; empty for any other country (L-417). */
+  readonly ukPlace: string;
   readonly jobBoards: readonly Board[];
   readonly ticked: ReadonlySet<string>;
   readonly onToggleBoard: (id: string, on: boolean) => void;
@@ -53,10 +57,11 @@ export function WhereToLook({
   onToggle,
   onOpenSettings,
   running,
+  blocked,
   keylessChosen,
   onToggleKeyless,
   feedChoice,
-  form,
+  ukPlace,
   jobBoards,
   ticked,
   onToggleBoard,
@@ -90,6 +95,7 @@ export function WhereToLook({
                 onToggle={onToggle}
                 onOpenSettings={onOpenSettings ?? (() => undefined)}
                 disabled={running}
+                blocked={blocked}
               />
             </div>
           ) : null}
@@ -105,7 +111,7 @@ export function WhereToLook({
             <KeylessFeedToggles
               chosen={keylessChosen}
               onToggle={onToggleKeyless}
-              arbeitnowOffForUk={feedChoice.arbeitnow === undefined && isUkLocation(form.location)}
+              arbeitnowOffForUk={feedChoice.arbeitnow === undefined && isUkLocation(ukPlace)}
               disabled={running}
             />
           </div>

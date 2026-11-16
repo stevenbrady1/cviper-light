@@ -232,6 +232,26 @@ describe('the first minute of use passes axe too', () => {
     expect(await violationsIn(WHOLE_SCREEN)).toEqual([]);
   });
 
+  it('Search before a country is chosen: the question a new install is asked (L-417)', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    // The raw first visit: nothing is seeded, the welcome's own route is taken.
+    await user.click(await screen.findByTestId('welcome-action-search'));
+    await screen.findByTestId('search-empty');
+
+    const picker = screen.getByLabelText('Country') as HTMLSelectElement;
+    expect(picker.required).toBe(true);
+    const reason = screen.getByTestId('search-country-reason');
+    expect(picker.getAttribute('aria-describedby')).toBe(reason.id);
+    const button = screen.getByTestId('search-submit');
+    expect(
+      document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent,
+    ).toBe(reason.textContent);
+
+    expect(await violationsIn(WHOLE_SCREEN)).toEqual([]);
+    expect(await rulesThatApplied(WHOLE_SCREEN)).toBeGreaterThanOrEqual(MIN_RULES_APPLIED);
+  });
+
   it('the box that asks before a CV is sent', async () => {
     render(<ConsentGate kind="openai" onAccept={vi.fn()} onDecline={vi.fn()} />);
     await screen.findByTestId('analysis-consent-gate');

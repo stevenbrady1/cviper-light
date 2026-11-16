@@ -26,6 +26,7 @@ import { NO_PREFERENCES } from '../boards/model';
 import { createFakeBoardPort } from '../boards/test/fakeBoardPort';
 
 import { FEED_CHOICE_KEY } from './feedDefaults';
+import { COUNTRY_STORAGE_KEY } from './country';
 import { Search } from './Search';
 import { createFakeSearchPort, outcomeOf } from './test/fakeSearchPort';
 
@@ -76,7 +77,11 @@ function textOutsideTheBoardLinks(): string {
   return `${copy.textContent ?? ''} ${titles.join(' ')}`;
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  // Someone who used the app before countries existed: the United Kingdom, never asked (L-417).
+  localStorage.setItem(COUNTRY_STORAGE_KEY, 'gb');
+});
 afterEach(cleanup);
 
 describe('the free feed on the Search screen — the default is unchanged, a stored untick is kept', () => {

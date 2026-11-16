@@ -1342,6 +1342,45 @@ describe('the built CViper Light binary', () => {
     await shot('3-analysis');
 
     await click('[data-testid="nav-search"]');
+    // This profile is a new install, so Search has not been told which country
+    // to search (L-417): the picker asks, and every other control waits.
+    await visible('[data-testid="search-country"]');
+    const asked = await session().executeScript<string>(
+      `const picker = document.querySelector('[data-testid="search-country"]');
+       const boxes = ['search-keywords', 'search-location', 'search-submit'].map(
+         (id) => document.querySelector('[data-testid="' + id + '"]'),
+       );
+       const reason = document.querySelector('[data-testid="search-country-reason"]');
+       return [
+         picker instanceof HTMLSelectElement ? picker.value : 'no picker',
+         boxes.every((box) => box !== null && box.matches(':disabled')) ? 'waiting' : 'live',
+         reason === null ? 'no reason' : reason.textContent,
+       ].join('|');`,
+    );
+    console.log(`smoke: country  = ${asked}`);
+    assert.equal(asked, '|waiting|Choose a country to search.');
+    // The pick is made the way the browser reports one: the value set and a
+    // bubbling `change` fired. The open list of a native <select> is drawn by
+    // the OS, and a WebDriver click on an <option> changes nothing here (see the
+    // history of 'moves it to Applied'). The handler and the saved choice are real.
+    const chosen = await session().executeScript<string>(
+      `const picker = document.querySelector('[data-testid="search-country"]');
+       if (!(picker instanceof HTMLSelectElement)) return 'no picker';
+       picker.value = 'gb';
+       picker.dispatchEvent(new Event('change', { bubbles: true }));
+       return picker.value;`,
+    );
+    assert.equal(chosen, 'gb');
+    await session().wait(async () => {
+      const state = await session().executeScript<string>(
+        `const box = document.querySelector('[data-testid="search-keywords"]');
+         const reason = document.querySelector('[data-testid="search-country-reason"]');
+         return (box !== null && !box.matches(':disabled') ? 'live' : 'waiting') +
+           '|' + (reason === null ? 'no reason' : 'reason') +
+           '|' + localStorage.getItem('cviper.light.country');`,
+      );
+      return state === 'live|no reason|gb';
+    }, ELEMENT_TIMEOUT);
     await shot('4-search');
 
     await click('[data-testid="nav-settings"]');

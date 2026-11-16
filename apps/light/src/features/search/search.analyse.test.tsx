@@ -32,6 +32,7 @@ import { type AnalyseHandoff } from '../flow/handoff';
 import type { FetchedPage, PageFetchError, PageFetchTransport } from '../tracker/pageFetch';
 
 import { ResultCard } from './ResultCard';
+import { COUNTRY_STORAGE_KEY } from './country';
 import { Search } from './Search';
 import { createFakeSearchPort, outcomeOf, type FakeSearchPort } from './test/fakeSearchPort';
 import { REED_DAY_RATE, SHARED_DESCRIPTION, entry } from './test/fixtures';
@@ -98,6 +99,8 @@ async function searchFor(user: ReturnType<typeof userEvent.setup>) {
 
 beforeEach(() => {
   localStorage.clear();
+  // Someone who used the app before countries existed: the United Kingdom, never asked (L-417).
+  localStorage.setItem(COUNTRY_STORAGE_KEY, 'gb');
 });
 
 afterEach(() => {

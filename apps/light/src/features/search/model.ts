@@ -10,6 +10,7 @@ import {
   MAX_QUERY_CHARS,
   PROVIDER_LABEL,
   type BrowserSearchInput,
+  type CountryCode,
   type DuplicateCluster,
   type JobProviderId,
   type SearchInput,
@@ -120,6 +121,11 @@ export interface ValidateOptions {
    * came back, on this machine, and an empty box means "do not narrow".
    */
   readonly requireQuery?: boolean;
+  /**
+   * Is the salary floor in pounds? TRUE unless told otherwise. Outside the
+   * United Kingdom the message must not name pounds (L-417).
+   */
+  readonly pounds?: boolean;
 }
 
 export function validateForm(formValues: SearchForm, options: ValidateOptions = {}): FormErrors {
@@ -146,7 +152,10 @@ export function validateForm(formValues: SearchForm, options: ValidateOptions = 
   }
 
   if (formValues.salaryMin.trim() !== '' && positiveWhole(formValues.salaryMin) === null) {
-    errors.salaryMin = 'Enter a salary as whole pounds — 45000, not £45k. Leave it empty for any.';
+    errors.salaryMin =
+      (options.pounds ?? true)
+        ? 'Enter a salary as whole pounds — 45000, not £45k. Leave it empty for any.'
+        : 'Enter a salary as a whole number — 45000, not 45k. Leave it empty for any.';
   }
 
   return errors;
@@ -156,14 +165,20 @@ export function formIsValid(errors: FormErrors): boolean {
   return Object.keys(errors).length === 0;
 }
 
-/** Turn a valid form into the input `searchJobs` takes. */
-export function toSearchInput(formValues: SearchForm): SearchInput {
+/**
+ * Turn a valid form into the input `searchJobs` takes.
+ *
+ * The United Kingdom is NOT named (L-417): a search that names no country is a
+ * UK search (L-415), so a UK search crosses to Rust exactly as it always did.
+ */
+export function toSearchInput(formValues: SearchForm, country: CountryCode = 'gb'): SearchInput {
   return {
     keywords: formValues.keywords.trim(),
     location: formValues.location.trim(),
     distanceMiles: positiveWhole(formValues.distanceMiles),
     salaryMin: positiveWhole(formValues.salaryMin),
     employmentType: formValues.contractType === 'any' ? null : formValues.contractType,
+    ...(country === 'gb' ? {} : { country }),
   };
 }
 
