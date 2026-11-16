@@ -148,7 +148,7 @@ jobs:
         with:
           toolchain: 1.99.1 # = rust-toolchain.toml
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: apps/light/src-tauri
           # Its own key: this job compiles a DIFFERENT feature set from ci.yml
@@ -401,7 +401,7 @@ jobs:
       # `@v0.2` tag (the same reasoning that pins gitleaks by version AND
       # checksum in ci.yml), and the CLI is pinned to v0.6.0, the latest stable.
       - name: Install winapp CLI 0.6.0
-        uses: microsoft/setup-WinAppCli@b93bbddc1f7abc061ca0d3a8119e3a0c7dd71495 # v0.2
+        uses: microsoft/setup-WinAppCli@9288bd0729bd3f71e2ed1b9eb247dc91470b824e # v0.3.0
         with:
           version: v0.6.0
 
