@@ -22,6 +22,7 @@
  */
 import { err, ok, type IsoTimestamp, type Job, type Result } from '@cviper/core-types';
 
+import { DEFAULT_COUNTRY, currencyFor, type CountryCode } from './countries';
 import { jobApiError, type JobApiError } from './errors';
 import { toFiniteNumber } from './numbers';
 import { classifyReedContractType, type ReedContractType } from './reed-contract';
@@ -49,13 +50,15 @@ export interface NormaliseContext {
   readonly createdAt: IsoTimestamp;
   /** Usually `crypto.randomUUID`. Injected so tests are deterministic. */
   readonly newId: () => string;
+  /** The country the search was for (L-415). Absent means the United Kingdom. */
+  readonly country?: CountryCode | undefined;
 }
 
 /** Shown when a provider omits the employer, which both of them sometimes do. */
 export const UNKNOWN_COMPANY = 'Unknown';
 
-/** Both providers are queried against the UK market - see `jobs.rs`. */
-const CURRENCY = 'GBP';
+/** Reed lists UK jobs only - `jobs.rs` refuses a Reed search for anywhere else. */
+const REED_CURRENCY = 'GBP';
 
 /*
   The four readers below are `export`ed for the keyless feeds (`keyless/`),
@@ -143,8 +146,16 @@ interface SalaryFields {
  *
  * A currency or a period without a figure beside it is noise at best and a
  * claim we cannot support at worst, so all four are decided in one place.
+ *
+ * `currency` is `null` when the country searched is not one we know the money
+ * of: the figure is then shown bare, never stamped with a guess (L-415).
  */
-function salaryFields(min: unknown, max: unknown, period: Job['salary_period']): SalaryFields {
+function salaryFields(
+  min: unknown,
+  max: unknown,
+  period: Job['salary_period'],
+  currency: string | null,
+): SalaryFields {
   const low = toFiniteNumber(min);
   const high = toFiniteNumber(max);
 
@@ -155,7 +166,7 @@ function salaryFields(min: unknown, max: unknown, period: Job['salary_period']):
   return {
     salary_min: low,
     salary_max: high,
-    salary_currency: CURRENCY,
+    salary_currency: currency,
     salary_period: period,
   };
 }
@@ -222,7 +233,14 @@ function normaliseAdzunaRecord(raw: unknown, context: NormaliseContext): SearchR
       // Adzuna annualises every salary it publishes, so the period is known
       // even though the response carries no field for it. This is exactly the
       // claim Reed cannot make, which is why Reed needs a classifier.
-      ...salaryFields(result['salary_min'], result['salary_max'], 'year'),
+      // Adzuna gives figures "in the local currency" and no currency field, so
+      // the stamp comes from the country searched (L-415; see `countries.ts`).
+      ...salaryFields(
+        result['salary_min'],
+        result['salary_max'],
+        'year',
+        currencyFor(context.country ?? DEFAULT_COUNTRY),
+      ),
       description: normaliseDescription(result['description']),
       url: asHttpUrl(result['redirect_url']),
       posted_date: toIsoDateOrNull(result['created']),
@@ -303,7 +321,7 @@ function normaliseReedRecord(raw: unknown, context: NormaliseContext): SearchRes
       // THE PORTED FIX. Reed's figures carry no unit, so the unit is derived
       // and stored as data. See `reed-salary.ts` for what happened when it was
       // encoded into prose instead.
-      ...salaryFields(minimum, maximum, classifyReedSalaryPeriod(minimum, maximum)),
+      ...salaryFields(minimum, maximum, classifyReedSalaryPeriod(minimum, maximum), REED_CURRENCY),
       description: normaliseDescription(result['jobDescription']),
       url: asHttpUrl(result['jobUrl']),
       posted_date: reedPostedDate(result['date']),

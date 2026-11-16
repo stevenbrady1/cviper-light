@@ -36,6 +36,16 @@ export {
   type JobApiErrorKind,
 } from './errors';
 
+// ── The countries a search can name (L-415) ──────────────────────────────────
+
+export {
+  ADZUNA_COUNTRIES,
+  DEFAULT_COUNTRY,
+  currencyFor,
+  isCountryCode,
+  type CountryCode,
+} from './countries';
+
 // ── Building a search ────────────────────────────────────────────────────────
 
 export {
