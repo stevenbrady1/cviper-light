@@ -377,7 +377,7 @@ describe('the guard itself', () => {
       keywords: 'analyst',
       location: 'London',
       limit: 1,
-      distanceMiles: null,
+      distance: null,
       salaryMin: null,
       employmentType: null,
     });

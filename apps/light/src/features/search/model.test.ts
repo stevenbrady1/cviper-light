@@ -112,7 +112,7 @@ describe('turning the form into a search', () => {
     expect(toSearchInput(form())).toEqual({
       keywords: 'credit risk analyst',
       location: 'London',
-      distanceMiles: null,
+      distance: null,
       salaryMin: null,
       employmentType: null,
     });
@@ -124,7 +124,7 @@ describe('turning the form into a search', () => {
     ).toEqual({
       keywords: 'credit risk analyst',
       location: 'London',
-      distanceMiles: 15,
+      distance: { value: 15, unit: 'miles' },
       salaryMin: 60000,
       employmentType: 'Contract',
     });

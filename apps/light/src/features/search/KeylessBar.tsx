@@ -1,6 +1,11 @@
 import { useState } from 'react';
 
-import { boardFilterSupport, buildBoardUrl, type KeylessSourceId } from '@cviper/job-apis';
+import {
+  boardFilterSupport,
+  buildBoardUrl,
+  type DistanceUnit,
+  type KeylessSourceId,
+} from '@cviper/job-apis';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { Hint } from '../../app/Hint';
@@ -81,14 +86,16 @@ export function mainBoards(enabled: readonly Board[]): {
 interface BoardButtonsProps {
   readonly boards: readonly Board[];
   readonly form: SearchForm;
+  /** The unit the form's distance is in (L-421). Left out, it is miles. */
+  readonly distanceUnit: DistanceUnit | undefined;
   readonly browser: BrowserPort;
   /** Test-id prefix, so two rows of the same boards stay distinguishable. */
   readonly prefix: string;
 }
 
 /** One button per board; each says which of the form's filters its link carries (L-219). */
-function BoardButtons({ boards, form, browser, prefix }: BoardButtonsProps) {
-  const input = boardSearchInput(form);
+function BoardButtons({ boards, form, distanceUnit, browser, prefix }: BoardButtonsProps) {
+  const input = boardSearchInput(form, distanceUnit);
   return (
     <>
       {boards.map((board) => (
@@ -265,6 +272,8 @@ interface FewResultsProps {
   /** How many jobs CViper's own sources found. */
   readonly count: number;
   readonly form: SearchForm;
+  /** The unit the form's distance is in (L-421). Left out, it is miles. */
+  readonly distanceUnit?: DistanceUnit | undefined;
   readonly browser: BrowserPort;
   readonly boards: readonly Board[];
   /** A line above already says why nothing came back (L-352) — see `fewResultsWords`. */
@@ -318,7 +327,14 @@ export function fewResultsText(
  * 2026-10-08). Nothing is opened on its own: a search that suddenly opened
  * five browser tabs would be the most jarring thing on the screen.
  */
-export function FewResults({ count, form, browser, boards, explained }: FewResultsProps) {
+export function FewResults({
+  count,
+  form,
+  distanceUnit,
+  browser,
+  boards,
+  explained,
+}: FewResultsProps) {
   const { main } = mainBoards(boards.filter((board) => board.enabled));
   if (fewResultsText(count, boards, explained) === null) return null;
 
@@ -329,7 +345,13 @@ export function FewResults({ count, form, browser, boards, explained }: FewResul
     >
       <p className="text-ink">{`${fewResultsWords(count, explained)}:`}</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <BoardButtons boards={main} form={form} browser={browser} prefix="few" />
+        <BoardButtons
+          boards={main}
+          form={form}
+          distanceUnit={distanceUnit}
+          browser={browser}
+          prefix="few"
+        />
       </div>
     </div>
   );

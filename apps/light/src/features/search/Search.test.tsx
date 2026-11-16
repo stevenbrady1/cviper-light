@@ -128,7 +128,7 @@ describe('nothing happens until the button is pressed', () => {
     expect(port.requests()[0]?.input).toEqual({
       keywords: 'quant developer',
       location: 'London',
-      distanceMiles: 15,
+      distance: { value: 15, unit: 'miles' },
       salaryMin: 90000,
       employmentType: 'Contract',
     });

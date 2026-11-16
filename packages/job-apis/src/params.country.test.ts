@@ -21,7 +21,7 @@ describe('buildSearchParams — a search that names no country', () => {
         expect(built.ok).toBe(true);
         if (built.ok) {
           expect(Object.keys(built.value).sort()).toEqual([
-            'distanceMiles',
+            'distance',
             'employmentType',
             'keywords',
             'limit',

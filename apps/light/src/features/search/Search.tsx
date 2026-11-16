@@ -38,6 +38,7 @@ import {
   CHOOSE_COUNTRY_REASON,
   OTHER_COUNTRY,
   countryBlocks,
+  formRulesFor,
   readCountry,
   saveCountry,
   type CountryChoice,
@@ -369,10 +370,11 @@ export function Search({
    * filters. A board that will not open is named; the rest still open.
    */
   const openTheseBoards = useCallback(
-    async (formValue: SearchForm, boardsValue: readonly Board[]) => {
+    async (formValue: SearchForm, boardsValue: readonly Board[], where: CountryChoice) => {
       setBoardsProblem([]);
       if (boardsValue.length === 0) return;
-      setBoardsProblem(await openBoards(browserPort, boardsValue, boardSearchInput(formValue)));
+      const input = boardSearchInput(formValue, formRulesFor(where).distanceUnit);
+      setBoardsProblem(await openBoards(browserPort, boardsValue, input));
     },
     [browserPort],
   );
@@ -404,13 +406,13 @@ export function Search({
       */
       const found = validateForm(formValue, {
         requireQuery: keyedBoards.length > 0,
-        pounds: where === 'gb',
+        ...formRulesFor(where),
       });
       setErrors(found);
       if (!formIsValid(found)) return;
 
       // A saved search's boards (L-309). An invalid form opened nothing above.
-      await openTheseBoards(formValue, boardsValue);
+      await openTheseBoards(formValue, boardsValue, where);
 
       if (keyedBoards.length === 0 && keylessValue.length === 0) return;
 
@@ -492,10 +494,10 @@ export function Search({
   */
   const onOpenTicked = useCallback(async () => {
     if (country === null) return;
-    const found = validateForm(form, { requireQuery: false, pounds: country === 'gb' });
+    const found = validateForm(form, { requireQuery: false, ...formRulesFor(country) });
     setErrors(found);
     if (!formIsValid(found)) return;
-    await openTheseBoards(form, boardsToOpen);
+    await openTheseBoards(form, boardsToOpen, country);
   }, [boardsToOpen, country, form, openTheseBoards]);
 
   /**
@@ -506,7 +508,7 @@ export function Search({
   const onSaveSearch = useCallback(
     (name: string): string | null => {
       if (country === null) return CHOOSE_COUNTRY_REASON;
-      const found = validateForm(form, { requireQuery: false, pounds: country === 'gb' });
+      const found = validateForm(form, { requireQuery: false, ...formRulesFor(country) });
       setErrors(found);
       if (!formIsValid(found)) return 'Fix the search above, then save it.';
 
@@ -755,6 +757,7 @@ export function Search({
             ordered={ranking.ordered}
             running={running}
             form={form}
+            distanceUnit={formRulesFor(country).distanceUnit}
             jobBoards={jobBoards}
             browser={browserPort}
             today={today}

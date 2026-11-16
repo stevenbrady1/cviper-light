@@ -26,7 +26,7 @@ describe('buildSearchParams — happy paths', () => {
     expect(built.ok).toBe(true);
     if (built.ok) {
       expect(built.value.salaryMin).toBeNull();
-      expect(built.value.distanceMiles).toBeNull();
+      expect(built.value.distance).toBeNull();
       expect(built.value.employmentType).toBeNull();
     }
   });
@@ -97,13 +97,13 @@ describe('buildSearchParams — negative cases', () => {
     const built = buildSearchParams('reed', {
       ...SENSIBLE,
       salaryMin: Number.NaN,
-      distanceMiles: -10,
+      distance: { value: -10, unit: 'miles' },
     });
 
     expect(built.ok).toBe(true);
     if (built.ok) {
       expect(built.value.salaryMin).toBeNull();
-      expect(built.value.distanceMiles).toBeNull();
+      expect(built.value.distance).toBeNull();
     }
   });
 

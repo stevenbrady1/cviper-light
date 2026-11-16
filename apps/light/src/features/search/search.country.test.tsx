@@ -332,7 +332,7 @@ describe('someone who used the app before', () => {
     for (const call of sent) {
       expect(JSON.stringify(call.params)).toBe(
         '{"keywords":"credit risk analyst","location":"London","limit":20,' +
-          '"distanceMiles":null,"salaryMin":null,"employmentType":null}',
+          '"distance":null,"salaryMin":null,"employmentType":null}',
       );
     }
     expect(screen.getByTestId('search-results').textContent).toContain('£');

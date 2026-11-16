@@ -79,3 +79,38 @@ export function isCountryCode(value: unknown): value is CountryCode {
 export function currencyFor(country: unknown): string | null {
   return isCountryCode(country) ? CURRENCY[country] : null;
 }
+
+/**
+ * The two units a search distance can be in (L-421). A CLOSED SET.
+ *
+ * Adzuna's `distance` is kilometres and Reed's is miles, so a distance crosses
+ * to Rust as a number AND one of these, never as a bare number (L-394 was the
+ * bare number). Rust holds the same two as an enum — `DistanceUnit` in
+ * `src-tauri/src/jobs.rs`, where a test reads this list to check.
+ */
+export const DISTANCE_UNITS = ['miles', 'km'] as const;
+
+export type DistanceUnit = (typeof DISTANCE_UNITS)[number];
+
+/** A search radius: the number as typed, and the unit it was typed in. */
+export interface Distance {
+  readonly value: number;
+  readonly unit: DistanceUnit;
+}
+
+/** Is this exactly one of the two? */
+export function isDistanceUnit(value: unknown): value is DistanceUnit {
+  return typeof value === 'string' && (DISTANCE_UNITS as readonly string[]).includes(value);
+}
+
+/**
+ * The unit a country's searches are in. THE ONE PLACE THIS IS DECIDED.
+ *
+ * Miles for the United Kingdom and the United States; kilometres for every
+ * other country, including one that is not on the list. A search that names no
+ * country is a United Kingdom search (`DEFAULT_COUNTRY`), so it is miles.
+ */
+export function distanceUnitFor(country: unknown): DistanceUnit {
+  const code = country ?? DEFAULT_COUNTRY;
+  return code === 'gb' || code === 'us' ? 'miles' : 'km';
+}
