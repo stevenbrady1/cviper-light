@@ -20,7 +20,7 @@
  */
 import { type Result } from '@cviper/core-types';
 
-import { type CountryCode } from './countries';
+import { type CountryCode, type Distance } from './countries';
 import { type JobApiError } from './errors';
 
 /** The two providers this package can search. A CLOSED SET. */
@@ -35,8 +35,12 @@ export interface JobSearchParams {
   readonly location: string;
   /** Already clamped to the provider's documented maximum page size. */
   readonly limit: number;
-  /** Radius in miles. `null` means "do not send a radius at all". */
-  readonly distanceMiles: number | null;
+  /**
+   * The radius AND its unit (L-421). `null` means "do not send a radius at
+   * all". Never a bare number: Adzuna wants kilometres and Reed wants miles,
+   * and Rust converts for each from the unit named here.
+   */
+  readonly distance: Distance | null;
   /** `null` means "do not send a salary floor at all". */
   readonly salaryMin: number | null;
   /** `null` means "both" - no employment-type filter is sent. */

@@ -29,7 +29,7 @@ const PARAMS: JobSearchParams = {
   keywords: 'credit risk analyst',
   location: 'London',
   limit: 20,
-  distanceMiles: null,
+  distance: null,
   salaryMin: null,
   employmentType: null,
 };

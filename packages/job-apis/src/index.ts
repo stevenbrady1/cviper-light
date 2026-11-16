@@ -41,9 +41,14 @@ export {
 export {
   ADZUNA_COUNTRIES,
   DEFAULT_COUNTRY,
+  DISTANCE_UNITS,
   currencyFor,
+  distanceUnitFor,
   isCountryCode,
+  isDistanceUnit,
   type CountryCode,
+  type Distance,
+  type DistanceUnit,
 } from './countries';
 
 // ── Building a search ────────────────────────────────────────────────────────

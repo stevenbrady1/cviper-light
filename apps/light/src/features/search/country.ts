@@ -30,8 +30,10 @@
 import {
   ADZUNA_COUNTRIES,
   currencyFor,
+  distanceUnitFor,
   isCountryCode,
   type CountryCode,
+  type DistanceUnit,
   type JobProviderId,
 } from '@cviper/job-apis';
 
@@ -167,4 +169,16 @@ export function countryBlocks(provider: JobProviderId, country: CountryChoice): 
 /** "£" for the United Kingdom, the currency's code elsewhere, nothing when unknown. */
 export function salaryUnit(country: CountryChoice | null): string | null {
   return country === 'gb' ? '£' : currencyFor(country);
+}
+
+/**
+ * The form rules that follow the country (L-421): the salary message names
+ * pounds for the United Kingdom only, and the distance is in the country's
+ * unit (`distanceUnitFor`, the one place that is decided).
+ */
+export function formRulesFor(country: CountryChoice | null): {
+  readonly pounds: boolean;
+  readonly distanceUnit: DistanceUnit;
+} {
+  return { pounds: country === 'gb', distanceUnit: distanceUnitFor(country) };
 }

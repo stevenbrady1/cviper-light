@@ -212,7 +212,7 @@ describe('someone who used the app before this build', () => {
       // Byte for byte what crossed to Rust before a search could carry a country.
       expect(JSON.stringify(call.params)).toBe(
         '{"keywords":"credit risk analyst","location":"London","limit":20,' +
-          '"distanceMiles":null,"salaryMin":null,"employmentType":null}',
+          '"distance":null,"salaryMin":null,"employmentType":null}',
       );
     }
   });

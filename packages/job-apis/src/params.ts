@@ -10,7 +10,13 @@
  */
 import { err, ok, type Result } from '@cviper/core-types';
 
-import { DEFAULT_COUNTRY, isCountryCode, type CountryCode } from './countries';
+import {
+  DEFAULT_COUNTRY,
+  isCountryCode,
+  isDistanceUnit,
+  type CountryCode,
+  type Distance,
+} from './countries';
 import { jobApiError, type JobApiError } from './errors';
 import { toFiniteNumber } from './numbers';
 import { type JobProviderId, type JobSearchParams } from './types';
@@ -48,7 +54,8 @@ export interface SearchInput {
   readonly keywords: string;
   readonly location: string;
   readonly limit?: number;
-  readonly distanceMiles?: number | null;
+  /** The radius and the unit it was typed in (L-421). Never a bare number. */
+  readonly distance?: Distance | null;
   readonly salaryMin?: number | null;
   readonly employmentType?: 'Contract' | 'Permanent' | null;
   /** Which country to search (L-415). Absent or `null` means the United Kingdom. */
@@ -78,6 +85,24 @@ function positiveIntegerOrNull(value: unknown): number | null {
 
   const whole = Math.floor(parsed);
   return whole > 0 ? whole : null;
+}
+
+/**
+ * The radius and its unit, or `null` for none (L-421).
+ *
+ * A NUMBER that cannot be read is dropped, like every other unreadable filter.
+ * A UNIT that is missing or is not one of the two is different: the number is
+ * real, and sending it in a guessed unit is how Adzuna was once handed miles
+ * (L-394). That search is refused, and `undefined` is the refusal.
+ */
+function readDistance(raw: unknown): Distance | null | undefined {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+
+  const { value, unit } = raw as Record<string, unknown>;
+  const whole = positiveIntegerOrNull(value);
+  if (whole === null) return null;
+  return isDistanceUnit(unit) ? { value: whole, unit } : undefined;
 }
 
 /**
@@ -130,6 +155,13 @@ export function buildSearchParams(
     }
   }
 
+  const distance = readDistance(input.distance);
+  if (distance === undefined) {
+    // The screen always names the unit, so nobody should ever read this. The
+    // words are the ones a refusal by Rust already shows (`jobs/transport.ts`).
+    return err(jobApiError(provider, 'bad-request', 'The search could not be sent. Try again.'));
+  }
+
   const cap = PROVIDER_RESULT_CAP[provider];
   // `positiveIntegerOrNull` already floors; a limit of 0, a negative, or a
   // value that will not read comes back `null` and becomes one result, never
@@ -141,7 +173,7 @@ export function buildSearchParams(
     keywords,
     location,
     limit,
-    distanceMiles: positiveIntegerOrNull(input.distanceMiles),
+    distance,
     salaryMin: positiveIntegerOrNull(input.salaryMin),
     employmentType: input.employmentType ?? null,
     // Left out, not sent as "gb", when the caller named none: see `JobSearchParams`.

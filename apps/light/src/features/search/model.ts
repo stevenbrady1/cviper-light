@@ -9,8 +9,10 @@ import {
   JOB_PROVIDER_IDS,
   MAX_QUERY_CHARS,
   PROVIDER_LABEL,
+  distanceUnitFor,
   type BrowserSearchInput,
   type CountryCode,
+  type DistanceUnit,
   type DuplicateCluster,
   type JobProviderId,
   type SearchInput,
@@ -28,7 +30,11 @@ export type ContractChoice = 'any' | 'Contract' | 'Permanent';
 export interface SearchForm {
   readonly keywords: string;
   readonly location: string;
-  /** Radius in miles, as typed. Empty means "do not send a radius at all". */
+  /**
+   * Radius, as typed. Empty means "do not send a radius at all". Named for its
+   * first unit and stored under that name, so the name stays: the unit is the
+   * search's country's (`distanceUnitFor`, L-421).
+   */
   readonly distanceMiles: string;
   /** Salary floor, as typed. Empty means "do not send a floor at all". */
   readonly salaryMin: string;
@@ -38,13 +44,19 @@ export interface SearchForm {
 /**
  * The form as a job-board link reads it (L-219): every field, so a board
  * button opens the same search the user set up — each board then takes the
- * filters it can and leaves the rest out (`buildBoardUrl`).
+ * filters it can and leaves the rest out (`buildBoardUrl`). The distance goes
+ * with its unit, and each board converts it to its own (L-421).
  */
-export function boardSearchInput(form: SearchForm): BrowserSearchInput {
+export function boardSearchInput(
+  form: SearchForm,
+  distanceUnit: DistanceUnit = 'miles',
+): BrowserSearchInput {
   return {
     keywords: form.keywords,
     location: form.location,
     distanceMiles: form.distanceMiles,
+    // Left out for miles, as `country` is for the United Kingdom: that link is as it was.
+    ...(distanceUnit === 'miles' ? {} : { distanceUnit }),
     salaryMin: form.salaryMin,
     contract:
       form.contractType === 'Permanent'
@@ -126,6 +138,8 @@ export interface ValidateOptions {
    * United Kingdom the message must not name pounds (L-417).
    */
   readonly pounds?: boolean;
+  /** The unit the distance box is in, which its message names (L-421). Miles unless told otherwise. */
+  readonly distanceUnit?: DistanceUnit;
 }
 
 export function validateForm(formValues: SearchForm, options: ValidateOptions = {}): FormErrors {
@@ -148,7 +162,10 @@ export function validateForm(formValues: SearchForm, options: ValidateOptions = 
   }
 
   if (formValues.distanceMiles.trim() !== '' && positiveWhole(formValues.distanceMiles) === null) {
-    errors.distanceMiles = 'Enter a distance in whole miles, or leave it empty for no limit.';
+    errors.distanceMiles =
+      (options.distanceUnit ?? 'miles') === 'miles'
+        ? 'Enter a distance in whole miles, or leave it empty for no limit.'
+        : 'Enter a distance in whole kilometres, or leave it empty for no limit.';
   }
 
   if (formValues.salaryMin.trim() !== '' && positiveWhole(formValues.salaryMin) === null) {
@@ -170,12 +187,16 @@ export function formIsValid(errors: FormErrors): boolean {
  *
  * The United Kingdom is NOT named (L-417): a search that names no country is a
  * UK search (L-415), so a UK search crosses to Rust exactly as it always did.
+ *
+ * The distance goes with the unit of the country searched (L-421): the same
+ * number typed in Germany is kilometres, and Rust converts for each site.
  */
 export function toSearchInput(formValues: SearchForm, country: CountryCode = 'gb'): SearchInput {
+  const distance = positiveWhole(formValues.distanceMiles);
   return {
     keywords: formValues.keywords.trim(),
     location: formValues.location.trim(),
-    distanceMiles: positiveWhole(formValues.distanceMiles),
+    distance: distance === null ? null : { value: distance, unit: distanceUnitFor(country) },
     salaryMin: positiveWhole(formValues.salaryMin),
     employmentType: formValues.contractType === 'any' ? null : formValues.contractType,
     ...(country === 'gb' ? {} : { country }),

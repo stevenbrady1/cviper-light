@@ -1,6 +1,7 @@
 import {
   ADZUNA_ATTRIBUTION_URL,
   ARBEITNOW_ATTRIBUTION,
+  type DistanceUnit,
   type JobSearchOutcome,
   type KeylessBrowseOutcome,
   type KeylessSourceId,
@@ -37,6 +38,8 @@ export interface SearchResultsProps {
   readonly ordered: CombinedResults['jobs'];
   readonly running: boolean;
   readonly form: SearchForm;
+  /** The unit the form's distance is in, for the board links (L-421). Left out, it is miles. */
+  readonly distanceUnit?: DistanceUnit | undefined;
   readonly jobBoards: readonly Board[];
   readonly browser: BrowserPort;
   readonly today: string;
@@ -68,6 +71,7 @@ export function SearchResults({
   ordered,
   running,
   form,
+  distanceUnit,
   jobBoards,
   browser,
   today,
@@ -179,6 +183,7 @@ export function SearchResults({
             <FewResults
               count={results.jobs.length}
               form={form}
+              distanceUnit={distanceUnit}
               browser={browser}
               boards={jobBoards}
               explained={explained}

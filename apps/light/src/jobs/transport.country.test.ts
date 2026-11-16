@@ -41,7 +41,7 @@ describe('createTauriJobTransport — the country', () => {
 
     expect(JSON.stringify(tauri.invoke.mock.calls[0]?.[1])).toBe(
       '{"provider":"adzuna","params":{"keywords":"credit risk analyst","location":"London",' +
-        '"limit":20,"distanceMiles":null,"salaryMin":null,"employmentType":null}}',
+        '"limit":20,"distance":null,"salaryMin":null,"employmentType":null}}',
     );
   });
 

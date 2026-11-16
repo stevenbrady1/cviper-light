@@ -123,19 +123,70 @@ impl Country {
     }
 }
 
+/// The unit a search radius was typed in (L-421). A CLOSED SET of two.
+///
+/// Serde accepts exactly `"miles"` and `"km"` — not `Miles`, not `mi`, not
+/// `kilometres` — the same two as `DISTANCE_UNITS` in
+/// packages/job-apis/src/countries.ts, which a test here reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DistanceUnit {
+    Miles,
+    Km,
+}
+
+/// A search radius: the number AND the unit it was typed in (L-421).
+///
+/// ============================================================================
+/// A DISTANCE NEVER CROSSES AS A BARE NUMBER.
+/// ============================================================================
+/// Adzuna's `distance` is whole KILOMETRES and Reed's `distanceFromLocation`
+/// is miles. A field that carried only "the number the user typed" was once
+/// passed to both (L-394). So the unit travels with the number, each site's
+/// number is worked out HERE and nowhere else, and a distance with no unit —
+/// or with a third field — does not deserialise, so that search is never sent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Distance {
+    pub value: u32,
+    pub unit: DistanceUnit,
+}
+
+impl Distance {
+    /// What Adzuna is sent. Nearest whole km, in u64 so no number can overflow.
+    fn kilometres(self) -> u64 {
+        match self.unit {
+            DistanceUnit::Km => u64::from(self.value),
+            DistanceUnit::Miles => (u64::from(self.value) * 1_609_344 + 500_000) / 1_000_000,
+        }
+    }
+
+    /// What Reed is sent. Nearest whole mile.
+    fn miles(self) -> u64 {
+        match self.unit {
+            DistanceUnit::Miles => u64::from(self.value),
+            DistanceUnit::Km => (u64::from(self.value) * 1_000_000 + 804_672) / 1_609_344,
+        }
+    }
+}
+
 /// What JavaScript is allowed to say about a search.
 ///
 /// Note what is NOT in here: no URL, no path, no header, no page number, no
 /// arbitrary key/value pairs. Every field but `country` is a value that ends
 /// up inside ONE query parameter whose NAME is a `&'static str` in this file;
 /// `country` is a variant of a closed set (see `Country`).
+///
+/// A field this struct does not name is REFUSED, not ignored (L-421): a screen
+/// build still sending the old bare `distanceMiles` must fail loudly rather
+/// than run a search with its radius silently dropped.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct JobSearchParams {
     pub keywords: String,
     pub location: String,
     pub limit: u32,
-    pub distance_miles: Option<u32>,
+    pub distance: Option<Distance>,
     pub salary_min: Option<u32>,
     pub employment_type: Option<EmploymentType>,
     /// Absent or `null` means the United Kingdom, so a screen build that has
@@ -338,11 +389,9 @@ fn query_pairs(provider: JobProvider, params: &JobSearchParams) -> Vec<(&'static
             if let Some(salary) = params.salary_min {
                 pairs.push(("salary_min", salary.to_string()));
             }
-            if let Some(miles) = params.distance_miles {
+            if let Some(distance) = params.distance {
                 // Adzuna's `distance` is whole KILOMETRES; Reed's is miles.
-                // Nearest km, in u64 so no mileage can overflow (L-394).
-                let kilometres = (u64::from(miles) * 1_609_344 + 500_000) / 1_000_000;
-                pairs.push(("distance", kilometres.to_string()));
+                pairs.push(("distance", distance.kilometres().to_string()));
             }
             // Adzuna's native filters, so the results arrive filtered rather
             // than being discarded after we have already paid for them.
@@ -360,8 +409,8 @@ fn query_pairs(provider: JobProvider, params: &JobSearchParams) -> Vec<(&'static
             if let Some(salary) = params.salary_min {
                 pairs.push(("minimumSalary", salary.to_string()));
             }
-            if let Some(distance) = params.distance_miles {
-                pairs.push(("distanceFromLocation", distance.to_string()));
+            if let Some(distance) = params.distance {
+                pairs.push(("distanceFromLocation", distance.miles().to_string()));
             }
             // All THREE of Reed's booleans, every time one is set. Reed's
             // default for an unmentioned flag is "include", so setting only
@@ -480,7 +529,7 @@ fn probe_params() -> JobSearchParams {
         keywords: "developer".to_string(),
         location: "London".to_string(),
         limit: 1,
-        distance_miles: None,
+        distance: None,
         salary_min: None,
         employment_type: None,
         // A key is tested against the UK address, as it always was.
@@ -690,11 +739,19 @@ mod tests {
             keywords: "credit risk analyst".to_string(),
             location: "London".to_string(),
             limit: 20,
-            distance_miles: None,
+            distance: None,
             salary_min: None,
             employment_type: None,
             country: None,
         }
+    }
+
+    fn miles(value: u32) -> Option<Distance> {
+        Some(Distance { value, unit: DistanceUnit::Miles })
+    }
+
+    fn km(value: u32) -> Option<Distance> {
+        Some(Distance { value, unit: DistanceUnit::Km })
     }
 
     /// Every country, beside the code that travels for it. Typed out again on
@@ -956,7 +1013,7 @@ mod tests {
 
     #[test]
     fn a_search_for_another_country_goes_to_that_country_and_nowhere_else() {
-        let us = r#"{"keywords":"credit risk analyst","location":"Boston","limit":20,"distanceMiles":25,"salaryMin":60000,"employmentType":"Contract","country":"us"}"#;
+        let us = r#"{"keywords":"credit risk analyst","location":"Boston","limit":20,"distance":{"value":25,"unit":"miles"},"salaryMin":60000,"employmentType":"Contract","country":"us"}"#;
 
         assert_eq!(
             wire_url(JobProvider::Adzuna, us),
@@ -972,7 +1029,7 @@ mod tests {
         // It is part of the address and only that. Every country sends exactly
         // the parameters the UK search sends, kilometres included (L-394).
         let mut uk = params();
-        uk.distance_miles = Some(25);
+        uk.distance = miles(25);
         uk.salary_min = Some(60_000);
         let expected = query_pairs(JobProvider::Adzuna, &uk);
         assert_eq!(value_of(&expected, "distance"), Some("40"));
@@ -1046,13 +1103,13 @@ mod tests {
             "keywords": "java",
             "location": "London",
             "limit": 20,
-            "distanceMiles": 25,
+            "distance": { "value": 25, "unit": "miles" },
             "salaryMin": 60000,
             "employmentType": "Contract"
         }"#;
 
         let parsed: JobSearchParams = serde_json::from_str(json).unwrap();
-        assert_eq!(parsed.distance_miles, Some(25));
+        assert_eq!(parsed.distance, miles(25));
         assert_eq!(parsed.salary_min, Some(60_000));
         assert_eq!(parsed.employment_type, Some(EmploymentType::Contract));
     }
@@ -1061,10 +1118,10 @@ mod tests {
     fn the_optional_filters_may_be_absent_or_null() {
         for json in [
             r#"{"keywords":"java","location":"London","limit":20}"#,
-            r#"{"keywords":"java","location":"London","limit":20,"distanceMiles":null,"salaryMin":null,"employmentType":null}"#,
+            r#"{"keywords":"java","location":"London","limit":20,"distance":null,"salaryMin":null,"employmentType":null}"#,
         ] {
             let parsed: JobSearchParams = serde_json::from_str(json).unwrap();
-            assert_eq!(parsed.distance_miles, None);
+            assert_eq!(parsed.distance, None);
             assert_eq!(parsed.salary_min, None);
             assert_eq!(parsed.employment_type, None);
         }
@@ -1161,7 +1218,7 @@ mod tests {
     fn the_filters_are_sent_when_the_user_asks_for_them() {
         let mut filtered = params();
         filtered.salary_min = Some(60_000);
-        filtered.distance_miles = Some(25);
+        filtered.distance = miles(25);
 
         // The user's 25 is MILES. Adzuna's `distance` is kilometres and Reed's
         // `distanceFromLocation` is miles, so the same search sends two
@@ -1179,7 +1236,7 @@ mod tests {
     #[test]
     fn adzuna_gets_whole_kilometres_and_reed_gets_the_miles_unchanged() {
         // Nearest whole kilometre: Adzuna's `distance` is an integer.
-        for (miles, kilometres) in [
+        for (typed, kilometres) in [
             (0, "0"),
             (1, "2"),
             (5, "8"),
@@ -1188,17 +1245,187 @@ mod tests {
             (u32::MAX, "6912079846"),
         ] {
             let mut search = params();
-            search.distance_miles = Some(miles);
+            search.distance = miles(typed);
 
             assert_eq!(
                 value_of(&query_pairs(JobProvider::Adzuna, &search), "distance"),
                 Some(kilometres),
-                "{miles} miles reached Adzuna as the wrong number of kilometres"
+                "{typed} miles reached Adzuna as the wrong number of kilometres"
             );
             assert_eq!(
                 value_of(&query_pairs(JobProvider::Reed, &search), "distanceFromLocation"),
-                Some(miles.to_string().as_str()),
-                "Reed's unit is miles: {miles} must arrive unchanged"
+                Some(typed.to_string().as_str()),
+                "Reed's unit is miles: {typed} must arrive unchanged"
+            );
+        }
+    }
+
+    // ── A distance travels with its unit (L-421) ─────────────────────────
+
+    #[test]
+    fn kilometres_reach_adzuna_unchanged_and_miles_are_converted_once() {
+        // The plan's own sentence: "20 km reaches Adzuna as 20; 25 miles
+        // reaches Adzuna as 40 and Reed as 25".
+        let mut german = params();
+        german.country = Some(Country::De);
+        german.distance = km(20);
+        assert_eq!(
+            value_of(&query_pairs(JobProvider::Adzuna, &german), "distance"),
+            Some("20")
+        );
+
+        let mut british = params();
+        british.distance = miles(25);
+        assert_eq!(
+            value_of(&query_pairs(JobProvider::Adzuna, &british), "distance"),
+            Some("40")
+        );
+        assert_eq!(
+            value_of(&query_pairs(JobProvider::Reed, &british), "distanceFromLocation"),
+            Some("25")
+        );
+    }
+
+    #[test]
+    fn a_kilometre_distance_is_never_converted_for_adzuna_whatever_its_size() {
+        for typed in [0, 1, 5, 20, 100, u32::MAX] {
+            let mut search = params();
+            search.distance = km(typed);
+
+            assert_eq!(
+                value_of(&query_pairs(JobProvider::Adzuna, &search), "distance"),
+                Some(typed.to_string().as_str()),
+                "{typed} km must reach Adzuna as {typed}"
+            );
+        }
+    }
+
+    #[test]
+    fn reed_always_gets_miles_even_for_a_distance_typed_in_kilometres() {
+        // The screen cannot ask this (Reed is the UK, and the UK is miles), so
+        // this is the backstop: nearest whole mile, never a bare pass-through.
+        for (typed, in_miles) in [
+            (0, "0"),
+            (1, "1"),
+            (2, "1"),
+            (5, "3"),
+            (20, "12"),
+            (100, "62"),
+            (u32::MAX, "2668768949"),
+        ] {
+            let mut search = params();
+            search.distance = km(typed);
+
+            assert_eq!(
+                value_of(&query_pairs(JobProvider::Reed, &search), "distanceFromLocation"),
+                Some(in_miles),
+                "{typed} km reached Reed as the wrong number of miles"
+            );
+        }
+    }
+
+    #[test]
+    fn the_two_units_are_the_two_typescript_names() {
+        // The same check `Country` has: the list is read out of the file the
+        // screen is built from, so the two sides cannot drift apart unnoticed.
+        const COUNTRIES_TS: &str = include_str!("../../../../packages/job-apis/src/countries.ts");
+        let list = COUNTRIES_TS
+            .split("export const DISTANCE_UNITS = [")
+            .nth(1)
+            .and_then(|rest| rest.split("] as const;").next())
+            .expect("countries.ts no longer declares DISTANCE_UNITS as a literal list");
+        let typescript: Vec<&str> = list
+            .split(',')
+            .map(|entry| entry.trim().trim_matches('\''))
+            .filter(|entry| !entry.is_empty())
+            .collect();
+        assert_eq!(typescript, ["miles", "km"]);
+
+        assert_eq!(
+            serde_json::from_str::<DistanceUnit>("\"miles\"").unwrap(),
+            DistanceUnit::Miles
+        );
+        assert_eq!(serde_json::from_str::<DistanceUnit>("\"km\"").unwrap(), DistanceUnit::Km);
+    }
+
+    #[test]
+    fn a_unit_outside_the_two_is_refused_before_a_request_exists() {
+        for bad in [
+            "\"Miles\"",
+            "\"MILES\"",
+            "\"KM\"",
+            "\"Km\"",
+            "\"mi\"",
+            "\"mile\"",
+            "\"kilometres\"",
+            "\"kilometers\"",
+            "\"furlongs\"",
+            "\"\"",
+            "\" km\"",
+            "\"km \"",
+            "null",
+            "1",
+            "true",
+            "[\"km\"]",
+        ] {
+            assert!(
+                serde_json::from_str::<DistanceUnit>(bad).is_err(),
+                "{bad} must not deserialise into a DistanceUnit"
+            );
+
+            // And the search it arrived in is refused WHOLE, as for a country.
+            let search = format!(
+                r#"{{"keywords":"java","location":"London","limit":20,"distance":{{"value":25,"unit":{bad}}}}}"#
+            );
+            assert!(
+                serde_json::from_str::<JobSearchParams>(&search).is_err(),
+                "a search whose distance is in {bad} must be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn a_distance_with_no_unit_is_refused_never_guessed() {
+        for distance in [
+            // The bare number that L-394 was about.
+            "25",
+            "\"25\"",
+            // The number, and nothing to say what it is in.
+            r#"{"value":25}"#,
+            // A unit, and nothing to convert.
+            r#"{"unit":"km"}"#,
+            "{}",
+            // Not a whole, non-negative number that fits.
+            r#"{"value":-1,"unit":"km"}"#,
+            r#"{"value":2.5,"unit":"km"}"#,
+            r#"{"value":"25","unit":"km"}"#,
+            r#"{"value":4294967296,"unit":"km"}"#,
+            // A third field is refused too: nothing rides along.
+            r#"{"value":25,"unit":"km","to":"miles"}"#,
+        ] {
+            let search = format!(
+                r#"{{"keywords":"java","location":"London","limit":20,"distance":{distance}}}"#
+            );
+            assert!(
+                serde_json::from_str::<JobSearchParams>(&search).is_err(),
+                "a search with the distance {distance} must be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn the_old_bare_miles_field_is_refused_rather_than_silently_dropped() {
+        // Ignoring it would run the search with NO radius: the "valid but
+        // inert" failure. Any field this struct does not name is refused.
+        for search in [
+            r#"{"keywords":"java","location":"London","limit":20,"distanceMiles":25}"#,
+            r#"{"keywords":"java","location":"London","limit":20,"distanceMiles":null}"#,
+            r#"{"keywords":"java","location":"London","limit":20,"distanceKm":25}"#,
+            r#"{"keywords":"java","location":"London","limit":20,"url":"https://example.invalid"}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<JobSearchParams>(search).is_err(),
+                "{search} must be refused"
             );
         }
     }
@@ -1342,8 +1569,12 @@ mod tests {
         // Written against main BEFORE a search could carry a country (L-415)
         // and not edited by it. The JSON is what the screen sends today: no
         // `country` at all. Every byte of both requests is pinned.
-        let filtered = r#"{"keywords":"credit risk analyst","location":"London","limit":20,"distanceMiles":25,"salaryMin":60000,"employmentType":"Contract"}"#;
-        let plain = r#"{"keywords":"java","location":"Leeds","limit":20,"distanceMiles":null,"salaryMin":null,"employmentType":null}"#;
+        //
+        // L-421 changed how the JSON says "25 miles" (the number now carries
+        // its unit). The two addresses asserted below were NOT edited: a UK
+        // search still reaches Adzuna as the same bytes.
+        let filtered = r#"{"keywords":"credit risk analyst","location":"London","limit":20,"distance":{"value":25,"unit":"miles"},"salaryMin":60000,"employmentType":"Contract"}"#;
+        let plain = r#"{"keywords":"java","location":"Leeds","limit":20,"distance":null,"salaryMin":null,"employmentType":null}"#;
 
         assert_eq!(
             wire_url(JobProvider::Adzuna, filtered),
@@ -1583,7 +1814,7 @@ mod tests {
         // ONE. A key test that pulled a full page would spend twenty of Reed's
         // hundred daily requests to answer a yes/no question.
         assert_eq!(probe.limit, 1);
-        assert_eq!(probe.distance_miles, None);
+        assert_eq!(probe.distance, None);
         assert_eq!(probe.salary_min, None);
         assert_eq!(probe.employment_type, None);
 

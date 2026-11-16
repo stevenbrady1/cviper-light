@@ -1,3 +1,5 @@
+import { distanceUnitFor } from '@cviper/job-apis';
+
 import { FIELD } from '../../app/fields';
 
 import {
@@ -110,7 +112,7 @@ export function SearchFields({ form, errors, onField, country, onCountry }: Sear
       <div className="mt-3 flex flex-wrap gap-3">
         <Field
           id="search-distance"
-          label="Within (miles)"
+          label={`Within (${distanceUnitFor(country)})`}
           value={form.distanceMiles}
           error={errors.distanceMiles}
           onChange={(value) => onField('distanceMiles', value)}

@@ -52,12 +52,19 @@ import {
   type BoardTemplate,
 } from '@cviper/core-types';
 
+import { type DistanceUnit } from './countries';
+
 /** The fields the real search uses, so one form drives both. */
 export interface BrowserSearchInput {
   readonly keywords: string;
   readonly location: string;
-  /** Distance from the location in miles, as typed (L-219). Empty or unusable: none sent. */
+  /**
+   * Distance from the location, as typed (L-219). Empty or unusable: none sent.
+   * Named for its first unit: it is in `distanceUnit`, which is miles when absent.
+   */
   readonly distanceMiles?: string | undefined;
+  /** The unit `distanceMiles` was typed in (L-421). Absent means miles. */
+  readonly distanceUnit?: DistanceUnit | undefined;
   /** Minimum yearly salary in pounds, as typed — `£60,000` and `60k` read (L-219). */
   readonly salaryMin?: string | undefined;
   /** `any` sends nothing (L-219). */
@@ -72,7 +79,7 @@ const MAX_MILES = 1000;
 const MAX_SALARY = 10_000_000;
 const KM_PER_MILE = 1.609344;
 
-/** Whole miles from what was typed, or `null` for anything that is not one. */
+/** A whole distance from what was typed, in either unit, or `null` for anything that is not one. */
 function wholeMiles(raw: string | undefined): number | null {
   const text = (raw ?? '').trim();
   if (!/^\d+$/.test(text)) return null;
@@ -107,10 +114,14 @@ function stepAtMost(value: number, steps: readonly number[] | undefined): number
 }
 
 function radiusValue(board: BoardTemplate, input: BrowserSearchInput): string {
-  const miles = wholeMiles(input.distanceMiles);
-  if (miles === null) return '';
+  const typed = wholeMiles(input.distanceMiles);
+  if (typed === null) return '';
   const rule = board.filters?.radius;
-  const distance = rule?.unit === 'km' ? Math.round(miles * KM_PER_MILE) : miles;
+  // From the search's unit to the board's, once (L-421). Same unit: as typed.
+  const from = input.distanceUnit ?? 'miles';
+  const to = rule?.unit ?? 'miles';
+  const distance =
+    from === to ? typed : Math.round(from === 'miles' ? typed * KM_PER_MILE : typed / KM_PER_MILE);
   return String(stepAtLeast(distance, rule?.steps));
 }
 
