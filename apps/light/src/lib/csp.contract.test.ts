@@ -189,7 +189,8 @@ describe('the bundle’s own assets are all same-origin, so the policy is suffic
     );
 
     // Anti-inert: a regex that matched nothing would clear this for ever.
-    expect(urls.length).toBeGreaterThanOrEqual(9);
+    // Six since L-414 took the three serif faces out: Inter 2, IBM Plex Mono 4.
+    expect(urls.length).toBeGreaterThanOrEqual(6);
     for (const url of urls) {
       expect(
         url,
