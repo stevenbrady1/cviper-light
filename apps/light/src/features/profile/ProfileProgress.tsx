@@ -58,6 +58,9 @@ export function ProfileProgress({ parts, blocked, onFillIn }: ProfileProgressPro
   const shown = parts ?? WAITING;
   const filled = shown.filter((part) => part.done).length;
   const next = shown.find((part) => !part.done) ?? null;
+  // Only when the import is the ONE thing in the way (L-416): at six of six the
+  // button stays greyed out after the import too, so the line would promise it.
+  const awaitingImport = !waiting && blocked && next !== null;
 
   return (
     <section
@@ -117,6 +120,7 @@ export function ProfileProgress({ parts, blocked, onFillIn }: ProfileProgressPro
             data-testid="profile-progress-fill"
             data-primary="true"
             disabled={waiting || next === null || blocked}
+            aria-describedby={awaitingImport ? 'profile-progress-reason' : undefined}
             onClick={() => {
               if (next !== null) onFillIn(next.id);
             }}
@@ -124,6 +128,16 @@ export function ProfileProgress({ parts, blocked, onFillIn }: ProfileProgressPro
           >
             Fill it in
           </button>
+          {/* shortcut: the line adds one 32px row to the card when a review opens (the browser keeps the import panel still: measured in WebKit); reserve the row if a jump is ever reported. */}
+          {awaitingImport ? (
+            <p
+              id="profile-progress-reason"
+              data-testid="profile-progress-reason"
+              className="basis-full text-ink-muted md:text-right"
+            >
+              Finish the import below first.
+            </p>
+          ) : null}
         </div>
       </div>
     </section>

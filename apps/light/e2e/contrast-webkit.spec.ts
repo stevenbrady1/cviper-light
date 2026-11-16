@@ -7205,6 +7205,63 @@ describe('the Profile checklist (L-413)', () => {
     }
   }
 
+  // L-416 — while an import is being reviewed "Fill it in" is greyed out, and
+  // one line under it says why. The line is a new row in the card, so the page
+  // below moves down by that row; the bound here is what "one row" means.
+  for (const size of [CHECKLIST_WINDOWS[0], CHECKLIST_WINDOWS[2]]) {
+    it(`at ${size.name}, with an import being reviewed, the reason is on screen inside the card (L-416)`, async () => {
+      const page = await openChecklist(size, 'five');
+      const before = await yourCvTop(page);
+      await page.click('[data-testid="profile-import-ajs"]');
+      await page.waitForSelector('[data-testid="profile-import-review"]');
+      await page.waitForSelector('[data-testid="profile-progress-reason"]');
+      // Back to the top, where the card is: the click scrolled to the import.
+      await page.evaluate((root) => {
+        const area = document.querySelector(root)?.closest('.overflow-y-auto');
+        if (area !== null && area !== undefined) area.scrollTop = 0;
+      }, CHECKLIST);
+
+      const reason = await page.evaluate((root) => {
+        const card = document.querySelector(root);
+        const line = card?.querySelector('[data-testid="profile-progress-reason"]');
+        const button = card?.querySelector('[data-testid="profile-progress-fill"]');
+        const area = card?.closest('.overflow-y-auto');
+        if (card == null || line == null || button == null || area == null) return null;
+        const frame = card.getBoundingClientRect();
+        const seen = area.getBoundingClientRect();
+        const box = line.getBoundingClientRect();
+        return {
+          text: line.textContent,
+          describes: button.getAttribute('aria-describedby') === line.id,
+          disabled: (button as HTMLButtonElement).disabled,
+          drawn: box.width >= 1 && box.height >= 1,
+          insideCard:
+            box.left >= frame.left - 0.5 &&
+            box.right <= frame.right + 0.5 &&
+            box.top >= frame.top - 0.5 &&
+            box.bottom <= frame.bottom + 0.5,
+          onScreen: box.top >= seen.top - 0.5 && box.bottom <= seen.bottom + 0.5,
+          underButton: box.top >= button.getBoundingClientRect().bottom - 0.5,
+        };
+      }, CHECKLIST);
+      assert.deepEqual(reason, {
+        text: 'Finish the import below first.',
+        describes: true,
+        disabled: true,
+        drawn: true,
+        insideCard: true,
+        onScreen: true,
+        underButton: true,
+      });
+
+      const grew = (await yourCvTop(page)) - before;
+      assert.ok(grew > 0.5 && grew <= 40, `the card grew by ${String(grew)}px, not one row`);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      judge(`checklist with an import being reviewed (${size.name})`, await contrast(page));
+      await page.context().close();
+    });
+  }
+
   // NEGATIVE — a check that cannot fail is not a check.
   it('the check can fail: a pill pushed out of the card is reported', async () => {
     const page = await openChecklist(CHECKLIST_WINDOWS[2], 'five');
