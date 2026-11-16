@@ -45,7 +45,7 @@ import {
 import {
   chosenFeeds,
   defaultFeeds,
-  isUkLocation,
+  isUkPlaceSearch,
   readFeedChoice,
   rememberFeedChoice,
   tickFeeds,
@@ -208,14 +208,15 @@ export function Search({
     and no setup, so a machine with an empty credential store returns real
     adverts the first time the button is pressed — which is the whole point of
     the feature, and would be undone by making the user find and tick it.
-    Except for a location in the UK (L-219): Arbeitnow is mostly Europe, and
-    since Guardian Jobs closed (L-336) the UK has no free feed on by default.
+    Except for a UK search that names a place (L-219): Arbeitnow is mostly Europe,
+    and since Guardian Jobs closed (L-336) the UK has no free feed on by default.
     A tick or untick the user makes wins, and is remembered (`feedDefaults`).
   */
   const [feedChoice, setFeedChoice] = useState<FeedChoice>(() => readFeedChoice());
-  // The UK's place rules — the free feed off for a UK place, the Reed hint —
-  // belong to a UK search only (L-417): "York" is not a UK place in a US search.
-  const ukPlace = country === 'gb' ? form.location : '';
+  // The UK's rules — the free feed off, the Reed hint — belong to a UK search
+  // that names a place. The Country setting says which search that is; the
+  // words typed in Location are never used to guess it (L-419).
+  const ukPlace = isUkPlaceSearch(country, form.location);
   const keylessChosen = useMemo(() => chosenFeeds(feedChoice, ukPlace), [feedChoice, ukPlace]);
   const [running, setRunning] = useState(false);
   const [outcome, setOutcome] = useState<JobSearchOutcome | null>(null);
@@ -327,10 +328,10 @@ export function Search({
   const ticked = useMemo(() => new Set(boardsToOpen.map((board) => board.id)), [boardsToOpen]);
   // Search only looks HERE (L-329), so a ticked board is not something for it
   // to do: the boards have their own button, with its own reason.
-  // A UK location with no usable key has no free feed on (L-336), so the
-  // reason names the free Reed key instead of a feed that is mostly Europe.
+  // A UK search with a place and no usable key has no free feed on (L-336), so
+  // the reason names the free Reed key instead of a feed that is mostly Europe.
   const ukWithoutKey =
-    isUkLocation(ukPlace) &&
+    ukPlace &&
     !JOB_PROVIDER_IDS.some(
       (provider) => providerAvailability(provider, keyStates[provider]).usable,
     );
@@ -546,7 +547,7 @@ export function Search({
           jobBoards,
         ),
       );
-      const feeds = chosenFeeds(feedChoice, where === 'gb' ? entry.form.location : '');
+      const feeds = chosenFeeds(feedChoice, isUkPlaceSearch(where, entry.form.location));
       void runSearch(
         entry.form,
         boardsValue,
@@ -600,7 +601,7 @@ export function Search({
 
   // Nothing to look at: one press ticks what the default would have (L-335).
   // Only when no feed is ticked — the one case the reason is about.
-  // A UK location has no default feed since L-336, so there is nothing to
+  // A UK search with a place has no default feed since L-336: nothing to
   // tick and no button: the reason names the free Reed key instead.
   const fixFeeds = defaultFeeds(ukPlace);
   const fixLabel = tickFeedsLabel(fixFeeds);

@@ -2,19 +2,20 @@
  * Which free feed a search reads by default (L-219).
  *
  * Arbeitnow is mostly Germany and the rest of Europe. For a search in the UK
- * it mostly adds noise, so it starts switched OFF when the location is
- * recognisably in the UK — a UK city or town, a county or nation, a postcode,
- * or "UK" itself (owner decision, 2026-10-08). A blank location, or one
- * outside the UK, keeps it on.
+ * it mostly adds noise, so it starts switched OFF for a United Kingdom search
+ * that names a place (owner decision, 2026-10-08). A United Kingdom search
+ * with no place typed, and a search of any other country, keep it on.
  *
  * Guardian Jobs, the UK feed that sat beside it, closed on 2 Sep 2026 and was
- * removed (L-336). So a UK location with no job-board key now has no free feed
- * on by default — the search screen says what to do instead.
+ * removed (L-336). So a UK search with a place and no job-board key now has no
+ * free feed on by default — the search screen says what to do instead.
  *
  * A tick or untick the user makes is theirs: it wins over the default from
  * then on, and is remembered across restarts in a small store of its own.
  */
 import { KEYLESS_SOURCE_IDS, KEYLESS_SOURCE_LABEL, type KeylessSourceId } from '@cviper/job-apis';
+
+import { type CountryChoice } from './country';
 
 export const FEED_CHOICE_KEY = 'cviper.light.search.feeds';
 
@@ -22,298 +23,34 @@ export const FEED_CHOICE_KEY = 'cviper.light.search.feeds';
 export type FeedChoice = Readonly<Partial<Record<KeylessSourceId, boolean>>>;
 
 /**
- * Places that mean "the UK" on their own: nations, the largest cities and
- * towns, and the counties and regions people type after a town. Not a
- * gazetteer — a town that is missing only keeps Arbeitnow on, which is how
- * the screen behaved before.
+ * A United Kingdom search with a place typed: the one search the free feed
+ * starts off for (L-419).
+ *
+ * The country is the Country setting (L-417), never a guess from the words in
+ * Location: a list of place names used to decide this, and it called York in
+ * a United States search a UK place. A place of only spaces is no place.
  */
-const UK_PLACES: ReadonlySet<string> = new Set([
-  'uk',
-  'u.k',
-  'united kingdom',
-  'great britain',
-  'britain',
-  'gb',
-  'england',
-  'scotland',
-  'wales',
-  'northern ireland',
-  'london',
-  'greater london',
-  'city of london',
-  'westminster',
-  'canary wharf',
-  'croydon',
-  'birmingham',
-  'manchester',
-  'greater manchester',
-  'leeds',
-  'glasgow',
-  'sheffield',
-  'bradford',
-  'liverpool',
-  'edinburgh',
-  'bristol',
-  'cardiff',
-  'leicester',
-  'coventry',
-  'belfast',
-  'nottingham',
-  'newcastle',
-  'newcastle upon tyne',
-  'sunderland',
-  'brighton',
-  'hull',
-  'plymouth',
-  'stoke',
-  'stoke-on-trent',
-  'wolverhampton',
-  'derby',
-  'swansea',
-  'southampton',
-  'salford',
-  'aberdeen',
-  'westminster',
-  'portsmouth',
-  'york',
-  'peterborough',
-  'dundee',
-  'lancaster',
-  'oxford',
-  'newport',
-  'preston',
-  'st albans',
-  'norwich',
-  'chester',
-  'cambridge',
-  'salisbury',
-  'exeter',
-  'gloucester',
-  'lisburn',
-  'chichester',
-  'winchester',
-  'londonderry',
-  'derry',
-  'carlisle',
-  'worcester',
-  'bath',
-  'durham',
-  'lincoln',
-  'hereford',
-  'armagh',
-  'inverness',
-  'stirling',
-  'canterbury',
-  'lichfield',
-  'newry',
-  'ripon',
-  'bangor',
-  'truro',
-  'ely',
-  'wakefield',
-  'wells',
-  'milton keynes',
-  'reading',
-  'slough',
-  'luton',
-  'northampton',
-  'swindon',
-  'bournemouth',
-  'poole',
-  'middlesbrough',
-  'huddersfield',
-  'ipswich',
-  'blackpool',
-  'bolton',
-  'stockport',
-  'watford',
-  'guildford',
-  'woking',
-  'basingstoke',
-  'crawley',
-  'maidstone',
-  'colchester',
-  'chelmsford',
-  'southend',
-  'warrington',
-  'telford',
-  'cheltenham',
-  'harrogate',
-  'doncaster',
-  'rotherham',
-  'barnsley',
-  'gateshead',
-  'birkenhead',
-  'wigan',
-  'oldham',
-  'rochdale',
-  'blackburn',
-  'burnley',
-  'high wycombe',
-  'aylesbury',
-  'bedford',
-  'stevenage',
-  'hemel hempstead',
-  'harlow',
-  'farnborough',
-  'reigate',
-  'redhill',
-  'sevenoaks',
-  'tunbridge wells',
-  'eastbourne',
-  'hastings',
-  'worthing',
-  'bracknell',
-  'maidenhead',
-  'newbury',
-  'leamington spa',
-  'solihull',
-  'dudley',
-  'walsall',
-  'west bromwich',
-  'kettering',
-  'corby',
-  'mansfield',
-  'grimsby',
-  'scunthorpe',
-  'darlington',
-  'hartlepool',
-  'stockton-on-tees',
-  'livingston',
-  'paisley',
-  'kilmarnock',
-  'falkirk',
-  'perth',
-  'wrexham',
-  'greater london',
-  'surrey',
-  'kent',
-  'essex',
-  'sussex',
-  'east sussex',
-  'west sussex',
-  'hampshire',
-  'berkshire',
-  'buckinghamshire',
-  'hertfordshire',
-  'oxfordshire',
-  'bedfordshire',
-  'cambridgeshire',
-  'norfolk',
-  'suffolk',
-  'yorkshire',
-  'west yorkshire',
-  'south yorkshire',
-  'north yorkshire',
-  'east yorkshire',
-  'lancashire',
-  'merseyside',
-  'cheshire',
-  'derbyshire',
-  'nottinghamshire',
-  'leicestershire',
-  'lincolnshire',
-  'staffordshire',
-  'warwickshire',
-  'west midlands',
-  'east midlands',
-  'midlands',
-  'worcestershire',
-  'shropshire',
-  'herefordshire',
-  'gloucestershire',
-  'wiltshire',
-  'somerset',
-  'dorset',
-  'devon',
-  'cornwall',
-  'cumbria',
-  'northumberland',
-  'tyne and wear',
-  'county durham',
-  'northamptonshire',
-  'rutland',
-  'isle of wight',
-  'south east',
-  'south west',
-  'north east',
-  'north west',
-  'east anglia',
-  'home counties',
-]);
-
-/**
- * Places elsewhere whose names hold a UK one — New York holds York — and
- * country names that settle it. A part naming one of these is not the UK.
- */
-const NOT_UK: ReadonlySet<string> = new Set([
-  'new york',
-  'new england',
-  'new south wales',
-  'new hampshire',
-  'ontario',
-  'australia',
-  'canada',
-  'usa',
-  'united states',
-  'america',
-  'new zealand',
-  'ireland',
-  'perth wa',
-]);
-
-/** A full postcode (`SW1A 1AA`) or just its first half (`EC2`, `M1`). */
-const POSTCODE = /^[a-z]{1,2}\d[a-z\d]?(\s*\d[a-z]{2})?$/;
-
-/** True when the location is recognisably in the UK. Blank is not. */
-export function isUkLocation(location: string): boolean {
-  const parts = location
-    .toLowerCase()
-    .split(',')
-    .map((part) =>
-      part
-        .replace(/[^a-z0-9\s.-]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim(),
-    )
-    .filter((part) => part !== '');
-
-  // Every run of one to three whole words in a part: "Greater London",
-  // "Leeds city centre". Whole words only — "Londoners" is not London.
-  const phrases = (part: string): string[] => {
-    const words = part.split(' ');
-    const found: string[] = [];
-    for (let length = 3; length >= 1; length -= 1) {
-      for (let start = 0; start + length <= words.length; start += 1) {
-        found.push(words.slice(start, start + length).join(' '));
-      }
-    }
-    return found;
-  };
-
-  // Across the commas too: "Perth, WA" is one place.
-  if (phrases(parts.join(' ')).some((phrase) => NOT_UK.has(phrase))) return false;
-  return parts.some(
-    (part) => POSTCODE.test(part) || phrases(part).some((phrase) => UK_PLACES.has(phrase)),
-  );
+export function isUkPlaceSearch(country: CountryChoice | null, location: string): boolean {
+  return country === 'gb' && location.trim() !== '';
 }
 
 /** The feeds a search reads: the user's own choice where there is one, the default elsewhere. */
-export function chosenFeeds(choice: FeedChoice, location: string): ReadonlySet<KeylessSourceId> {
-  const uk = isUkLocation(location);
+export function chosenFeeds(choice: FeedChoice, ukPlace: boolean): ReadonlySet<KeylessSourceId> {
   return new Set(
-    KEYLESS_SOURCE_IDS.filter((source) => choice[source] ?? (source === 'arbeitnow' ? !uk : true)),
+    KEYLESS_SOURCE_IDS.filter(
+      (source) => choice[source] ?? (source === 'arbeitnow' ? !ukPlace : true),
+    ),
   );
 }
 
 /**
- * The feeds the default ticks for this location, as if nothing were stored
+ * The feeds the default ticks for this search, as if nothing were stored
  * (L-335): what "tick the free feed" means when the user has unticked it.
- * Outside the UK that is Arbeitnow. For a UK location it is nothing at all
- * since Guardian Jobs closed (L-336) — never Arbeitnow, which is mostly Europe.
+ * That is Arbeitnow. For a UK search with a place it is nothing at all since
+ * Guardian Jobs closed (L-336) — never Arbeitnow, which is mostly Europe.
  */
-export function defaultFeeds(location: string): readonly KeylessSourceId[] {
-  const feeds = chosenFeeds({}, location);
+export function defaultFeeds(ukPlace: boolean): readonly KeylessSourceId[] {
+  const feeds = chosenFeeds({}, ukPlace);
   return KEYLESS_SOURCE_IDS.filter((source) => feeds.has(source));
 }
 
