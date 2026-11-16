@@ -107,10 +107,10 @@ const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {
 };
 
 /** A sign, or `CHF`, in front of a salary the model wrote as text. Built from the map above. */
-const LEADING_SIGN = new RegExp(
-  `^(?:${[...Object.keys(CURRENCY_SYMBOLS), 'CHF'].map((sign) => sign.replace('$', '\\$')).join('|')})\\s*`,
-  'i',
-);
+const SIGN_ALTERNATIVES = [...Object.keys(CURRENCY_SYMBOLS), 'CHF']
+  .map((sign) => sign.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  .join('|');
+const LEADING_SIGN = new RegExp(`^(?:${SIGN_ALTERNATIVES})\\s*`, 'i');
 
 /** How the preserved wording is introduced in `description`. */
 const WORDING_PREFIX = 'Pay as stated in the advert:';
