@@ -8,6 +8,7 @@ import { type TailorHandoff } from '../features/flow/handoff';
 import { Welcome } from '../features/onboarding/Welcome';
 import { type ProfileProps } from '../features/profile/Profile';
 import { forgetWelcome, hasSeenWelcome, markWelcomeSeen } from '../features/onboarding/store';
+import { settleCountry } from '../features/search/country';
 import { type SearchProps } from '../features/search/Search';
 import { type SettingsProps } from '../features/settings/Settings';
 import { createJobSessions } from '../features/tailor/jobSessions';
@@ -217,6 +218,10 @@ export default function App({
     heading.focus({ preventScroll: true });
   }, [activeView, settingsOpenAt, trackerOpensPaste]);
   const [status, setStatus] = useState<EnvironmentStatus | null>(null);
+  // Who is asked for a country is settled BEFORE the welcome can be dismissed:
+  // dismissing writes the flag that would make a new install look like a
+  // returning one (L-417; see `search/country.ts`).
+  useState(settleCountry);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !hasSeenWelcome());
   const [incomingCv, setIncomingCv] = useState<Result<PickedCv, FileError> | null>(null);
   const viewport = useViewportClass();
@@ -349,6 +354,9 @@ export default function App({
   const onErased = useCallback(() => {
     setActiveView(DEFAULT_VIEW);
     setStatus(null);
+    // An emptied computer is a new one: settled again before the welcome can
+    // be dismissed, so the person is asked for their country again (L-417).
+    settleCountry();
     setWelcomeOpen(true);
     // The CV and advert on the analysis screen were in the database that just
     // went; the screen must not be the one place they survive. The same goes

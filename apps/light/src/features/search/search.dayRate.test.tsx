@@ -41,6 +41,7 @@ import {
 import { createFakeBrowserPort } from '../../platform/test/fakeBrowserPort';
 import { type KeyState } from '../../status/environment';
 
+import { COUNTRY_STORAGE_KEY } from './country';
 import { Search } from './Search';
 import { createFakeSearchPort, outcomeOf } from './test/fakeSearchPort';
 
@@ -125,6 +126,8 @@ async function runSearch(): Promise<void> {
 
 beforeEach(() => {
   localStorage.clear();
+  // Someone who used the app before countries existed: the United Kingdom, never asked (L-417).
+  localStorage.setItem(COUNTRY_STORAGE_KEY, 'gb');
 });
 
 afterEach(() => {

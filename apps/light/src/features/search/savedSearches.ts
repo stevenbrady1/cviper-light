@@ -14,6 +14,7 @@
  * neighbours: storage that cannot be read, or holds nonsense, reads as no
  * saved searches, and one bad entry loses that entry only.
  */
+import { parseCountry, type CountryChoice } from './country';
 import { parseForm } from './memory';
 import { type SearchForm } from './model';
 
@@ -31,6 +32,12 @@ export interface SavedSearch {
   readonly form: SearchForm;
   /** Ids of the job boards ticked when it was saved. */
   readonly boards: readonly string[];
+  /**
+   * The country it was saved for (L-417). ABSENT means the United Kingdom:
+   * every search saved before countries existed was one, and a UK search is
+   * still stored without it.
+   */
+  readonly country?: CountryChoice;
 }
 
 export type SaveOutcome =
@@ -79,7 +86,18 @@ function parseOne(raw: unknown): SavedSearch | null {
     ? record['boards'].filter((board): board is string => typeof board === 'string')
     : [];
 
-  return { id, name: name.trim(), form, boards };
+  // A country this build does not know loses the entry: running it as a UK
+  // search would be a different search under the saved one's name.
+  const stored = record['country'];
+  const country = stored === undefined ? 'gb' : parseCountry(stored);
+  if (country === null) return null;
+
+  return { id, name: name.trim(), form, boards, ...countryField(country) };
+}
+
+/** The United Kingdom is stored as no country at all, as it always was. */
+function countryField(country: CountryChoice): { readonly country?: CountryChoice } {
+  return country === 'gb' ? {} : { country };
 }
 
 /** Rebuilt entry by entry, so a key stored by a future version is dropped here. */
@@ -124,6 +142,7 @@ export function saveSearch(
   form: SearchForm,
   boards: readonly string[],
   newId: () => string,
+  country: CountryChoice = 'gb',
 ): SaveOutcome {
   const problem = savedNameProblem(name);
   if (problem !== null) return { ok: false, problem };
@@ -134,7 +153,9 @@ export function saveSearch(
 
   if (existing !== -1) {
     const next = list.map((entry, index) =>
-      index === existing ? { id: entry.id, name: trimmed, form, boards: [...boards] } : entry,
+      index === existing
+        ? { id: entry.id, name: trimmed, form, boards: [...boards], ...countryField(country) }
+        : entry,
     );
     write(next);
     return { ok: true, list: next, replaced: true };
@@ -147,7 +168,10 @@ export function saveSearch(
     };
   }
 
-  const next = [{ id: newId(), name: trimmed, form, boards: [...boards] }, ...list];
+  const next = [
+    { id: newId(), name: trimmed, form, boards: [...boards], ...countryField(country) },
+    ...list,
+  ];
   write(next);
   return { ok: true, list: next, replaced: false };
 }

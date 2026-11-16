@@ -47,6 +47,7 @@ vi.mock('../../jobs/keylessTransport', () => ({
 import { createFakeBrowserPort } from '../../platform/test/fakeBrowserPort';
 import { type KeyState } from '../../status/environment';
 
+import { COUNTRY_STORAGE_KEY } from './country';
 import { Search } from './Search';
 import { createFakeSearchPort, outcomeOf, type FakeSearchPort } from './test/fakeSearchPort';
 import { entry } from './test/fixtures';
@@ -139,6 +140,8 @@ function portWithCv(dealBreakers: readonly string[] = []): FakeSearchPort {
 
 beforeEach(() => {
   localStorage.clear();
+  // Someone who used the app before countries existed: the United Kingdom, never asked (L-417).
+  localStorage.setItem(COUNTRY_STORAGE_KEY, 'gb');
   factories.job.mockClear();
   factories.keyless.mockClear();
 });

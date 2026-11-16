@@ -35,6 +35,14 @@ import {
   whereToLookSummary,
 } from './boardChoice';
 import {
+  CHOOSE_COUNTRY_REASON,
+  OTHER_COUNTRY,
+  countryBlocks,
+  readCountry,
+  saveCountry,
+  type CountryChoice,
+} from './country';
+import {
   chosenFeeds,
   defaultFeeds,
   isUkLocation,
@@ -174,6 +182,17 @@ export function Search({
   const readStates = readKeyStates ?? readJobKeyStates;
 
   const [form, setForm] = useState<SearchForm>(EMPTY_FORM);
+  /*
+    The country searched (L-417), read before the first paint so nothing jumps.
+    `null` is a new install that has not been asked yet: every other control
+    waits, disabled, and nothing is sent until the picker is answered.
+  */
+  const [country, setCountry] = useState<CountryChoice | null>(() => readCountry());
+  const locked = country === null;
+  const onCountry = useCallback((next: CountryChoice) => {
+    saveCountry(next);
+    setCountry(next);
+  }, []);
   const [recent, setRecent] = useState<readonly SearchForm[]>([]);
   const [errors, setErrors] = useState<FormErrors>({});
   const [keyStates, setKeyStates] = useState<Record<JobProviderId, KeyState>>({
@@ -194,10 +213,10 @@ export function Search({
     A tick or untick the user makes wins, and is remembered (`feedDefaults`).
   */
   const [feedChoice, setFeedChoice] = useState<FeedChoice>(() => readFeedChoice());
-  const keylessChosen = useMemo(
-    () => chosenFeeds(feedChoice, form.location),
-    [feedChoice, form.location],
-  );
+  // The UK's place rules — the free feed off for a UK place, the Reed hint —
+  // belong to a UK search only (L-417): "York" is not a UK place in a US search.
+  const ukPlace = country === 'gb' ? form.location : '';
+  const keylessChosen = useMemo(() => chosenFeeds(feedChoice, ukPlace), [feedChoice, ukPlace]);
   const [running, setRunning] = useState(false);
   const [outcome, setOutcome] = useState<JobSearchOutcome | null>(null);
   const [keylessOutcome, setKeylessOutcome] = useState<KeylessBrowseOutcome | null>(null);
@@ -280,10 +299,21 @@ export function Search({
   const clock = now ?? new Date();
   const today = todayIsoDate(clock);
 
-  const usableChosen = JOB_PROVIDER_IDS.filter(
-    (provider) =>
-      chosen.has(provider) && providerAvailability(provider, keyStates[provider]).usable,
+  // A keyed board is searched when it is ticked, has its key, and lists jobs
+  // for the country (L-417). With no country chosen, none is.
+  const keyedFor = useCallback(
+    (where: CountryChoice | null) =>
+      where === null
+        ? []
+        : JOB_PROVIDER_IDS.filter(
+            (provider) =>
+              chosen.has(provider) &&
+              providerAvailability(provider, keyStates[provider]).usable &&
+              countryBlocks(provider, where) === null,
+          ),
+    [chosen, keyStates],
   );
+  const usableChosen = keyedFor(country);
   const keylessWanted = KEYLESS_SOURCE_IDS.filter((source) => keylessChosen.has(source));
   /*
     The button is disabled only when there is NOTHING to look at. A free feed
@@ -300,13 +330,13 @@ export function Search({
   // A UK location with no usable key has no free feed on (L-336), so the
   // reason names the free Reed key instead of a feed that is mostly Europe.
   const ukWithoutKey =
-    isUkLocation(form.location) &&
+    isUkLocation(ukPlace) &&
     !JOB_PROVIDER_IDS.some(
       (provider) => providerAvailability(provider, keyStates[provider]).usable,
     );
-  const disabledReason = searchDisabledReason(usableChosen.length + keylessWanted.length, {
-    ukWithoutKey,
-  });
+  const disabledReason = locked
+    ? CHOOSE_COUNTRY_REASON
+    : searchDisabledReason(usableChosen.length + keylessWanted.length, { ukWithoutKey });
   const openBoardsReason = openBoardsDisabledReason(boardsToOpen.length);
 
   const reedVerdict = quotaVerdict(quota, 'reed', utcDateOf(clock) ?? quota.date);
@@ -357,7 +387,13 @@ export function Search({
       formValue: SearchForm,
       boardsValue: readonly Board[],
       keylessValue: readonly KeylessSourceId[],
+      where: CountryChoice | null,
     ) => {
+      // No country, no request of any kind (L-417). The controls are disabled
+      // too; this is the place that can actually refuse.
+      if (where === null) return;
+      const keyedBoards = keyedFor(where);
+
       /*
         The "type something first" rule belongs to the KEYED half only. Adzuna
         and Reed are query endpoints and an empty form is a mistake to point at;
@@ -365,14 +401,17 @@ export function Search({
         published with both boxes empty is the most natural thing a new user
         does. See `ValidateOptions` in model.ts.
       */
-      const found = validateForm(formValue, { requireQuery: usableChosen.length > 0 });
+      const found = validateForm(formValue, {
+        requireQuery: keyedBoards.length > 0,
+        pounds: where === 'gb',
+      });
       setErrors(found);
       if (!formIsValid(found)) return;
 
       // A saved search's boards (L-309). An invalid form opened nothing above.
       await openTheseBoards(formValue, boardsValue);
 
-      if (usableChosen.length === 0 && keylessValue.length === 0) return;
+      if (keyedBoards.length === 0 && keylessValue.length === 0) return;
 
       setRunning(true);
       clearCardNotes();
@@ -392,14 +431,15 @@ export function Search({
         hundred would take real searches away from the user for nothing.
       */
       const [keyed, keyless] = await Promise.all([
-        usableChosen.length === 0
+        // "Another country" has no keyed board to ask: both are blocked for it.
+        keyedBoards.length === 0 || where === OTHER_COUNTRY
           ? Promise.resolve(null)
           : searchPort.search({
               // Only the boards the user actually ticked. Unticking one really
               // does skip its call — see `searchJobs`, which contacts nothing
               // it is not given.
-              providers: usableChosen,
-              input: toSearchInput(formValue),
+              providers: keyedBoards,
+              input: toSearchInput(formValue, where),
               quota: readQuota(clock),
               today: utcToday,
               createdAt,
@@ -431,16 +471,16 @@ export function Search({
       setKeylessOutcome(keyless);
       setRunning(false);
     },
-    [clearCardNotes, clock, newId, openTheseBoards, quota.date, searchPort, usableChosen],
+    [clearCardNotes, clock, keyedFor, newId, openTheseBoards, quota.date, searchPort],
   );
 
   // The blue button: CViper's own search, and no browser tabs (L-329).
   const onSubmit = useCallback(
     async (event: FormEvent) => {
       event.preventDefault();
-      await runSearch(form, [], keylessWanted);
+      await runSearch(form, [], keylessWanted, country);
     },
-    [form, keylessWanted, runSearch],
+    [country, form, keylessWanted, runSearch],
   );
 
   /*
@@ -450,11 +490,12 @@ export function Search({
     nothing, and the field says what is wrong.
   */
   const onOpenTicked = useCallback(async () => {
-    const found = validateForm(form, { requireQuery: false });
+    if (country === null) return;
+    const found = validateForm(form, { requireQuery: false, pounds: country === 'gb' });
     setErrors(found);
     if (!formIsValid(found)) return;
     await openTheseBoards(form, boardsToOpen);
-  }, [boardsToOpen, form, openTheseBoards]);
+  }, [boardsToOpen, country, form, openTheseBoards]);
 
   /**
    * Save what is in the boxes and the ticked boards under a name (L-309).
@@ -463,7 +504,8 @@ export function Search({
    */
   const onSaveSearch = useCallback(
     (name: string): string | null => {
-      const found = validateForm(form, { requireQuery: false });
+      if (country === null) return CHOOSE_COUNTRY_REASON;
+      const found = validateForm(form, { requireQuery: false, pounds: country === 'gb' });
       setErrors(found);
       if (!formIsValid(found)) return 'Fix the search above, then save it.';
 
@@ -473,6 +515,7 @@ export function Search({
         form,
         boardsToOpen.map((board) => board.id),
         newId ?? (() => crypto.randomUUID()),
+        country,
       );
       if (!outcome.ok) return outcome.problem;
 
@@ -481,15 +524,18 @@ export function Search({
       setSavedNote(outcome.replaced ? `Updated “${kept}”.` : `Saved “${kept}”.`);
       return null;
     },
-    [boardsToOpen, form, newId, saved],
+    [boardsToOpen, country, form, newId, saved],
   );
 
   /**
    * One click: fill the boxes, tick its boards, and run Search. A board since
-   * switched off or deleted is dropped here, as a remembered tick is.
+   * switched off or deleted is dropped here, as a remembered tick is. It runs
+   * in the country it was saved for, and the picker says so (L-417).
    */
   const onRunSaved = useCallback(
     (entry: SavedSearch) => {
+      const where = entry.country ?? 'gb';
+      onCountry(where);
       setForm(entry.form);
       setErrors({});
       setSavedNote(null);
@@ -500,14 +546,15 @@ export function Search({
           jobBoards,
         ),
       );
-      const feeds = chosenFeeds(feedChoice, entry.form.location);
+      const feeds = chosenFeeds(feedChoice, where === 'gb' ? entry.form.location : '');
       void runSearch(
         entry.form,
         boardsValue,
         KEYLESS_SOURCE_IDS.filter((source) => feeds.has(source)),
+        where,
       );
     },
-    [feedChoice, jobBoards, runSearch],
+    [feedChoice, jobBoards, onCountry, runSearch],
   );
 
   const onDeleteSaved = useCallback(
@@ -555,10 +602,10 @@ export function Search({
   // Only when no feed is ticked — the one case the reason is about.
   // A UK location has no default feed since L-336, so there is nothing to
   // tick and no button: the reason names the free Reed key instead.
-  const fixFeeds = defaultFeeds(form.location);
+  const fixFeeds = defaultFeeds(ukPlace);
   const fixLabel = tickFeedsLabel(fixFeeds);
   const feedFix =
-    disabledReason === null || keylessWanted.length > 0 || fixLabel === null
+    locked || disabledReason === null || keylessWanted.length > 0 || fixLabel === null
       ? null
       : {
           label: fixLabel,
@@ -592,7 +639,13 @@ export function Search({
       <div className={`min-h-0 flex-1 overflow-y-auto ${SIDE_PADDING} py-5 md:scroll-pb-40`}>
         <div data-content-column className={`${CONTENT_COLUMN} space-y-5`}>
           <form data-testid="search-form" onSubmit={(event) => void onSubmit(event)}>
-            <SearchFields form={form} errors={errors} onField={setField} />
+            <SearchFields
+              form={form}
+              errors={errors}
+              onField={setField}
+              country={country}
+              onCountry={onCountry}
+            />
 
             {/*
               Only once a job-board key exists (L-276). With none, the free
@@ -614,11 +667,12 @@ export function Search({
               chosen={chosen}
               onToggle={onToggle}
               onOpenSettings={onOpenSettings}
-              running={running}
+              running={running || locked}
+              blocked={(provider) => (country === null ? null : countryBlocks(provider, country))}
               keylessChosen={keylessChosen}
               onToggleKeyless={onToggleKeyless}
               feedChoice={feedChoice}
-              form={form}
+              ukPlace={ukPlace}
               jobBoards={jobBoards}
               ticked={ticked}
               onToggleBoard={onToggleBoard}
@@ -639,7 +693,7 @@ export function Search({
               never hidden — with nothing ticked, and the reason beside it.
             */}
             <OpenBoardsRow
-              running={running}
+              running={running || locked}
               openBoardsReason={openBoardsReason}
               onOpenTicked={onOpenTicked}
               boardsToOpen={boardsToOpen}
@@ -655,7 +709,7 @@ export function Search({
           <SearchSaved
             saved={saved}
             suggestedName={suggestedName(form)}
-            disabled={running}
+            disabled={running || locked}
             note={savedNote}
             onSave={onSaveSearch}
             onRun={onRunSaved}
@@ -714,6 +768,7 @@ export function Search({
             onAnalyse={onAnalyse === undefined ? undefined : (jobId) => void onAnalyseJob(jobId)}
             searchBlocked={disabledReason !== null}
             noFreeFeedHere={ukWithoutKey}
+            noCountry={locked}
           />
         </div>
       </div>

@@ -246,7 +246,15 @@ describe('the Search, Settings key and Profile boxes on the shared style (L-379)
   });
 
   it('boundary: the Search boxes keep their own layout: full width, or none for the contract picker', () => {
-    render(<SearchFields form={EMPTY_FORM} errors={{}} onField={() => undefined} />);
+    render(
+      <SearchFields
+        form={EMPTY_FORM}
+        errors={{}}
+        onField={() => undefined}
+        country="gb"
+        onCountry={() => undefined}
+      />,
+    );
     expect(exactly(screen.getByTestId('search-keywords'))).toEqual(
       [...classesOf(FIELD), 'mt-1', 'w-full'].sort(),
     );

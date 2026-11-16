@@ -1,6 +1,6 @@
 # CViper Light privacy policy
 
-_This page is generated from the app's own list of the addresses it may contact — the same list the app shows under Settings → Privacy, and the one a test holds the code to. It changes when that list changes. Last updated: 6 November 2026._
+_This page is generated from the app's own list of the addresses it may contact — the same list the app shows under Settings → Privacy, and the one a test holds the code to. It changes when that list changes. Last updated: 16 November 2026._
 
 ## The short version
 
@@ -18,7 +18,7 @@ We — the people who make CViper Light — receive nothing from the app itself.
 - **Which job boards you enabled and how you ordered them** — job-boards.json in the same data folder.
 - **Which AI providers you agreed to send your CV to** — ai-provider-consent.json in the same data folder.
 - **Which job you were last tailoring for, so it can be offered back — its id only, no text** — workflow.json in the same data folder.
-- **Small conveniences: your last search, your saved searches, which free job feeds you ticked, which job boards Search opens, which AI model each service uses, today’s request count, that you have seen the introduction, and that you were asked about keys left by an earlier install** — this app’s own browser storage, which no other program reads.
+- **Small conveniences: your last search, your saved searches, the country you search in, which free job feeds you ticked, which job boards Search opens, which AI model each service uses, today’s request count, that you have seen the introduction, and that you were asked about keys left by an earlier install** — this app’s own browser storage, which no other program reads.
 
 ## Every address the app can contact
 
@@ -34,7 +34,7 @@ These carry a key you pasted into Settings, under an account that is yours. The 
 - `api.mistral.ai` — A CV analysis, or a pasted job advert, that you start, sent with your own Mistral key under your own Mistral account.
 - `api.x.ai` — A CV analysis, or a pasted job advert, that you start, sent with your own xAI key under your own xAI account.
 - `openrouter.ai` — A CV analysis, or a pasted job advert, that you start, sent with your own OpenRouter key under your own OpenRouter account. OpenRouter passes the request on to the company that runs the model you use. Its key page is also opened in your browser from Settings; the app never loads that page.
-- `api.adzuna.com` — A job search you start, sent with the free Adzuna key you registered yourself. Adzuna’s API requires both parts of that key — the app ID and the app key — as parameters in the web address, so they appear in Adzuna’s own request logs. The request also carries your search words and location, which is what a search is, and Adzuna sees your IP address, exactly as it would if you searched on its own site yourself.
+- `api.adzuna.com` — A job search you start, sent with the free Adzuna key you registered yourself. Adzuna’s API requires both parts of that key — the app ID and the app key — as parameters in the web address, so they appear in Adzuna’s own request logs. The request also carries your search words and location, and the country you chose, which is what a search is, and Adzuna sees your IP address, exactly as it would if you searched on its own site yourself.
 - `www.reed.co.uk` — A job search you start, sent with the free Reed key you registered yourself, carrying your search words and location — Reed sees those and your IP address, exactly as it would if you searched on reed.co.uk yourself. Reed’s developer page is also opened in your browser from Settings, and so is a keyless search link for Reed from job-boards.json; the app never loads either page.
 - **an AI service you add yourself in Settings, at the address you type there** — Contacted only if you add one. A CV analysis, a tailoring, a pasted job advert, a follow-up or an interview pack that you start, after you agree, is sent to the address you typed, with the key you saved for it, if any. The address must start with https:// and be on the internet, unless you tick that the service runs on your own computer or network, and then it must be there instead. Its key is kept with that address and is never sent anywhere else. Settings also asks the service which models it offers. The app follows no links the service sends back.
 

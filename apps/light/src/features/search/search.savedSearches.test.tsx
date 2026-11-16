@@ -28,6 +28,7 @@ import {
   readSavedSearches,
   type SavedSearch,
 } from './savedSearches';
+import { COUNTRY_STORAGE_KEY } from './country';
 import { Search } from './Search';
 import { SearchSaved } from './SearchSaved';
 import { createFakeSearchPort, outcomeOf } from './test/fakeSearchPort';
@@ -72,7 +73,11 @@ async function fillForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByTestId('search-location'), 'London');
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  // Someone who used the app before countries existed: the United Kingdom, never asked (L-417).
+  localStorage.setItem(COUNTRY_STORAGE_KEY, 'gb');
+});
 afterEach(cleanup);
 
 describe('saving a search', () => {
