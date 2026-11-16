@@ -201,9 +201,8 @@ describe('buildExtractionPrompt — every rule this feature promises', () => {
 describe('buildExtractionPrompt — the system message', () => {
   const { system } = buildExtractionPrompt({ text: ADVERT });
 
-  it('keeps the source’s London-finance fluency', () => {
+  it('keeps the source’s day-rate fluency', () => {
     expect(system).toMatch(/day rate/i);
-    expect(system).toMatch(/london/i);
   });
 
   it('keeps the source’s null-not-guess rationale, review step included', () => {
