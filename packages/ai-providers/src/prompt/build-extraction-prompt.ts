@@ -109,7 +109,9 @@ export function extractionSourceText(text: string): string {
 /**
  * The system message.
  *
- * Ported from `build_email_job_extraction_system` (line 122) with ONE deletion:
+ * Ported from `build_email_job_extraction_system` (line 122) with ONE deletion
+ * (below) and, since L-420, no country: the source says "UK" roles and
+ * "London" banking, and this app is for anyone in any country. The deletion:
  * the source's parenthetical fluency list reads "(day rates, IR35
  * determinations, umbrella/PSC engagement, notice periods)". IR35, umbrella/PSC
  * and notice periods are dropped because we return no field for any of them,
@@ -128,8 +130,8 @@ export function extractionSourceText(text: string): string {
  * package carries it — see `untrusted-boundary.contract.test.ts`.
  */
 const SYSTEM = [
-  'You are a meticulous job-advert parser for UK contract and permanent roles,',
-  'with particular fluency in London banking and finance conventions, including',
+  'You are a meticulous job-advert parser for contract and permanent roles,',
+  'with particular fluency in banking and finance conventions, including',
   'day rates and part-time pro rata pay. You extract only what is written. When a',
   'detail is absent you return null rather than guessing — the user reviews every',
   'field before saving, so a missing value costs them a few seconds while an',
@@ -166,7 +168,7 @@ const FIELD_RULES = `Field rules, in the order you must answer them:
 - title: the job title, word for word. null if the advert gives none.
 - company: the named hiring client. If no client is named and an agency posted the role, use that agency name for compatibility. For a direct employer, use the employer name. null if no organisation is named.
 - agency: the recruitment agency that posted or sent the role. Keep it separate from a named client. null for a direct employer or when no agency is named.
-- location: where the role is based, WORD FOR WORD. Keep any hybrid, remote, on-site or days-per-week wording exactly as written — "City of London (hybrid, 3 days on site)" stays whole, and "Fully remote (UK)" stays whole. Do not reduce it to a city. null if the advert does not say.
+- location: where the role is based, WORD FOR WORD. Keep any hybrid, remote, on-site or days-per-week wording exactly as written — "City centre (hybrid, 3 days on site)" stays whole, and "Fully remote (anywhere in the country)" stays whole. Do not reduce it to a city. null if the advert does not say.
 - url: a link to the advert if one appears in the text. null otherwise.
 - description: two to four sentences on the role. If pay is stated as a day rate, an hourly rate, pro rata, or in words rather than numbers, COPY THAT WORDING HERE word for word — it is the only place it survives. null only if there is nothing at all to summarise.
 - posted_date: the date the advert was posted, as YYYY-MM-DD. null unless a date is actually stated. Do not use today's date.
@@ -175,6 +177,8 @@ const FIELD_RULES = `Field rules, in the order you must answer them:
 - salary_min and salary_max: the bottom and top amounts for the stated period, as plain whole numbers with no symbols, commas or "k".
   * "£45k-£55k" is 45000 and 55000, currency GBP, period year.
   * "£95,000" alone is 95000 for both, period year.
+  * "€60,000" alone is 60000 for both, currency EUR, period year.
+  * "$120,000" alone is 120000 for both, currency USD, period year.
   * A day rate ("£650 per day", "£650/day") is 650 for both, period day. Do NOT multiply it up to a yearly figure.
   * An hourly rate ("£50 per hour", "£25/hr") is 50 for both, period hour.
   * Pro rata pay ("£45,000 pro rata") is null for both amounts and period — the real pay is not stated.
