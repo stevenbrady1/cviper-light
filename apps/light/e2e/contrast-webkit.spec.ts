@@ -2567,6 +2567,8 @@ describe('the Search button stays on screen on short windows (L-342)', () => {
   // things out of, so moving focus to Search from code threw the form 300px up.
   it('pressing the fix in the pinned row does not scroll the form', async () => {
     const page = await openTypedSearch(SMALLEST_WINDOW);
+    // A German search: a UK search that names a place has no feed to tick (L-419).
+    await page.selectOption('[data-testid="search-country"]', 'de');
     await page.fill('[data-testid="search-location"]', 'Berlin');
     await page.uncheck('[data-testid="keyless-source-arbeitnow"]');
     const fix = page.locator('[data-testid="search-tick-feeds"]');

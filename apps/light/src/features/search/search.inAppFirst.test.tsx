@@ -96,6 +96,8 @@ describe('the free feed on the Search screen — the default is unchanged, a sto
   });
 
   it('negative: an untick the user made stays off — after a re-render and after a remount', async () => {
+    // Outside the UK is the Country setting now, not the place typed (L-419).
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'de');
     const first = renderSearch();
     await screen.findByTestId('keyless-bar');
     await first.user.type(screen.getByTestId('search-location'), 'Berlin');
@@ -116,12 +118,14 @@ describe('the free feed on the Search screen — the default is unchanged, a sto
     expect(box('keyless-source-arbeitnow').checked).toBe(false);
   });
 
+  // Outside the UK is the Country setting now, not the place typed (L-419).
   it.each([
-    ['Berlin', true],
-    ['', true],
+    ['de', 'Berlin', true],
+    ['gb', '', true],
   ] as const)(
-    'boundary: location "%s" — Arbeitnow on (the existing rule)',
-    async (location, arbeitnow) => {
+    'boundary: a "%s" search of "%s" — Arbeitnow on (the existing rule)',
+    async (country, location, arbeitnow) => {
+      localStorage.setItem(COUNTRY_STORAGE_KEY, country);
       const { user } = renderSearch();
       await screen.findByTestId('keyless-bar');
       if (location !== '') await user.type(screen.getByTestId('search-location'), location);
@@ -133,6 +137,8 @@ describe('the free feed on the Search screen — the default is unchanged, a sto
 
 describe('the blue Search button searches here and opens no tabs', () => {
   it('with three boards ticked it says just "Search", opens nothing, and browses the ticked feeds', async () => {
+    // Outside the UK is the Country setting now, not the place typed (L-419).
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'de');
     const { user, port, browser } = renderSearch();
     await screen.findByTestId('keyless-bar');
     await user.type(screen.getByTestId('search-location'), 'Berlin');
@@ -277,6 +283,8 @@ describe('L-336: a UK location with no job-board key', () => {
 
 describe('L-336: outside the UK nothing changes', () => {
   it('boundary: Berlin with no key — Arbeitnow is ticked and Search is enabled', async () => {
+    // Outside the UK is the Country setting now, not the place typed (L-419).
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'de');
     const { user, port } = renderSearch();
     await screen.findByTestId('keyless-bar');
     await user.type(screen.getByTestId('search-location'), 'Berlin');

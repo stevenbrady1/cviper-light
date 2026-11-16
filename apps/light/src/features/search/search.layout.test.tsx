@@ -236,6 +236,8 @@ describe('Arbeitnow and a UK location (L-219)', () => {
   });
 
   it('negative: Berlin keeps it on, with no note', async () => {
+    // Outside the UK is the Country setting now, not the place typed (L-419).
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'de');
     const { user } = renderSearch(NO_KEYS);
     await screen.findByTestId('search-empty');
     await user.type(screen.getByTestId('search-location'), 'Berlin');

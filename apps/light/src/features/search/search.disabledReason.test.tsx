@@ -112,6 +112,8 @@ describe('the reason sits beside the disabled Search button (L-335)', () => {
   });
 
   it('boundary: Berlin with Arbeitnow unticked — "Tick Arbeitnow" ticks it, remembers it, enables Search and moves focus there', async () => {
+    // Outside the UK is the Country setting now, not the place typed (L-419).
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'de');
     localStorage.setItem(FEED_CHOICE_KEY, JSON.stringify({ arbeitnow: false }));
     const { user, port, browser } = await ownersCase('Berlin');
 
@@ -140,6 +142,8 @@ describe('the reason sits beside the disabled Search button (L-335)', () => {
   });
 
   it("remount after pressing it: the tick is the user's own and stays", async () => {
+    // Outside the UK is the Country setting now, not the place typed (L-419).
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'de');
     localStorage.setItem(FEED_CHOICE_KEY, JSON.stringify({ arbeitnow: false }));
     const first = await ownersCase('Berlin');
     await first.user.click(screen.getByTestId('search-tick-feeds'));
@@ -151,9 +155,14 @@ describe('the reason sits beside the disabled Search button (L-335)', () => {
     expect(screen.queryByTestId('search-tick-feeds')).toBeNull();
   });
 
-  it.each([['Berlin'], ['']] as const)(
-    'boundary: location "%s" with the feed unticked — "Tick Arbeitnow" ticks it',
-    async (location) => {
+  // Outside the UK is the Country setting now, not the place typed (L-419).
+  it.each([
+    ['de', 'Berlin'],
+    ['gb', ''],
+  ] as const)(
+    'boundary: a "%s" search of "%s" with the feed unticked — "Tick Arbeitnow" ticks it',
+    async (country, location) => {
+      localStorage.setItem(COUNTRY_STORAGE_KEY, country);
       localStorage.setItem(FEED_CHOICE_KEY, JSON.stringify({ arbeitnow: false }));
       const { user } = await ownersCase(location);
 
@@ -186,11 +195,13 @@ describe('the reason sits beside the disabled Search button (L-335)', () => {
   });
 
   it.each([
-    ['a usable job-board key', BOTH_KEYS, { arbeitnow: false }, 'London'],
-    ['a free feed ticked', NO_KEYS, {}, 'Berlin'],
+    ['a usable job-board key', BOTH_KEYS, { arbeitnow: false }, 'London', 'gb'],
+    // Outside the UK is the Country setting now, not the place typed (L-419).
+    ['a free feed ticked', NO_KEYS, {}, 'Berlin', 'de'],
   ] as const)(
     'boundary: with %s — Search enabled, no reason, no tick button',
-    async (_l, keys, choice, location) => {
+    async (_l, keys, choice, location, country) => {
+      localStorage.setItem(COUNTRY_STORAGE_KEY, country);
       localStorage.setItem(FEED_CHOICE_KEY, JSON.stringify(choice));
       renderSearch(keys);
       await screen.findByTestId('keyless-bar');
@@ -207,6 +218,8 @@ describe('the reason sits beside the disabled Search button (L-335)', () => {
 
 describe('the empty page never says "press Search" while it cannot be pressed (L-335)', () => {
   it('negative: Search disabled — the empty page gives the fix instead', async () => {
+    // Outside the UK is the Country setting now, not the place typed (L-419).
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'de');
     localStorage.setItem(FEED_CHOICE_KEY, JSON.stringify({ arbeitnow: false }));
     await ownersCase('Berlin');
 
@@ -227,6 +240,8 @@ describe('the empty page never says "press Search" while it cannot be pressed (L
   });
 
   it('happy: Search enabled — the empty page still names the button', async () => {
+    // Outside the UK is the Country setting now, not the place typed (L-419).
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'de');
     await ownersCase('Berlin');
     expect(submit().disabled).toBe(false);
     expect(screen.getByTestId('search-empty').textContent ?? '').toContain('press Search');

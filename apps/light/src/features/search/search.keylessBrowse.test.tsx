@@ -179,8 +179,9 @@ describe('a machine with no keys at all', () => {
     // The feeds cannot filter — that is the whole reason the filter is local —
     // so a keyword travelling to them would be both useless and a lie about
     // what this feature does.
-    // Berlin, not London: since L-219 a UK location starts with Arbeitnow off
-    // (feedDefaults.test.ts), and this test needs the feed asked.
+    // A German search: a UK search that names a place starts with Arbeitnow
+    // off (L-219, L-419; feedDefaults.test.ts), and this test needs the feed asked.
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'de');
     const { user, asked, argumentsSeen } = renderSearch();
     await browse(user, 'credit risk analyst', 'Berlin');
 

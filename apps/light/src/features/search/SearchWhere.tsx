@@ -7,7 +7,7 @@ import { ErrorBox } from '../../ui';
 
 import { openBoardsLabel } from './boardChoice';
 import { KeylessBar } from './KeylessBar';
-import { isUkLocation, type FeedChoice } from './feedDefaults';
+import { type FeedChoice } from './feedDefaults';
 import { KeylessFeedToggles } from './KeylessFeedToggles';
 import { ProviderToggles } from './ProviderToggles';
 import { hasAnyJobBoardKey } from './model';
@@ -30,8 +30,8 @@ export interface WhereToLookProps {
   readonly keylessChosen: ReadonlySet<KeylessSourceId>;
   readonly onToggleKeyless: (source: KeylessSourceId, next: boolean) => void;
   readonly feedChoice: FeedChoice;
-  /** The place typed, for a UK search; empty for any other country (L-417). */
-  readonly ukPlace: string;
+  /** A United Kingdom search with a place typed (L-419): the free feed's default is off. */
+  readonly ukPlace: boolean;
   readonly jobBoards: readonly Board[];
   readonly ticked: ReadonlySet<string>;
   readonly onToggleBoard: (id: string, on: boolean) => void;
@@ -111,7 +111,7 @@ export function WhereToLook({
             <KeylessFeedToggles
               chosen={keylessChosen}
               onToggle={onToggleKeyless}
-              arbeitnowOffForUk={feedChoice.arbeitnow === undefined && isUkLocation(ukPlace)}
+              arbeitnowOffForUk={feedChoice.arbeitnow === undefined && ukPlace}
               disabled={running}
             />
           </div>

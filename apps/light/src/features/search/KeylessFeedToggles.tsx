@@ -36,7 +36,7 @@ interface KeylessFeedTogglesProps {
   readonly chosen: ReadonlySet<KeylessSourceId>;
   readonly onToggle: (source: KeylessSourceId, next: boolean) => void;
   readonly disabled: boolean;
-  /** Arbeitnow is off only because the location is in the UK (L-219). */
+  /** Arbeitnow is off only because this is a UK search that names a place (L-219, L-419). */
   readonly arbeitnowOffForUk: boolean;
 }
 

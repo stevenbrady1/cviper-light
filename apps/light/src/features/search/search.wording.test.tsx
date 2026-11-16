@@ -85,6 +85,8 @@ describe('Arbeitnow is explained once (L-323)', () => {
   });
 
   it('negative: with no UK location there is no note, and the one explanation stays', async () => {
+    // Outside the UK is the Country setting now, not the place typed (L-419).
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'de');
     const { user } = renderSearch();
     await screen.findByTestId('search-empty');
     await user.type(screen.getByTestId('search-location'), 'Berlin');

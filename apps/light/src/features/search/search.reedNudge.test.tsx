@@ -115,6 +115,8 @@ describe('"Get a free Reed key" beside the grey Search for the UK (L-338)', () =
   });
 
   it('negative: Berlin with nothing ticked — the fix is "Tick Arbeitnow", not the Reed one', async () => {
+    // Outside the UK is the Country setting now, not the place typed (L-419).
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'de');
     localStorage.setItem(FEED_CHOICE_KEY, JSON.stringify({ arbeitnow: false }));
     await renderSearch('Berlin');
 
