@@ -310,6 +310,26 @@ describe('"Also open" job boards get the distance in their own unit', () => {
     expect(await openIndeed(harness, '20')).toBe('https://uk.indeed.com/jobs?q=analyst&radius=25');
   });
 
+  it('the board buttons beside few results convert the same way', async () => {
+    const harness = await ready('de');
+    await search(harness, '20', 1);
+
+    await harness.user.click(await screen.findByTestId('few-indeed'));
+
+    await vi.waitFor(() => expect(harness.browser.opened()).toHaveLength(1));
+    expect(harness.browser.opened()[0]).toBe('https://uk.indeed.com/jobs?q=data+analyst&radius=15');
+  });
+
+  it('regression: beside few results, a 20 mile search still opens Indeed at 25 miles', async () => {
+    const harness = await ready('gb');
+    await search(harness, '20', 2);
+
+    await harness.user.click(await screen.findByTestId('few-indeed'));
+
+    await vi.waitFor(() => expect(harness.browser.opened()).toHaveLength(1));
+    expect(harness.browser.opened()[0]).toBe('https://uk.indeed.com/jobs?q=data+analyst&radius=25');
+  });
+
   it('negative: a distance that is not a whole number opens nothing and says so in kilometres', async () => {
     const harness = await ready('de');
     (screen.getByTestId('search-where-fold') as HTMLDetailsElement).open = true;
