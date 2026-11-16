@@ -10,6 +10,7 @@ import { cardClasses, SectionHeading } from '../../ui';
 import { useDebouncedField } from '../../lib/useDebouncedField';
 
 import { linesToList, listToLines, textOrNull } from './model';
+import { PART_TITLE } from './progress';
 
 /** How long after the last keystroke a field saves itself. Same as the tracker. */
 export const AUTOSAVE_DELAY_MS = 600;
@@ -97,8 +98,8 @@ export function ProfileForm({
 
   return (
     <div className="space-y-5">
-      <section data-testid="profile-about" className={cardClasses()}>
-        <SectionHeading title="About you" />
+      <section id="profile-part-about" data-testid="profile-about" className={cardClasses()}>
+        <SectionHeading title={PART_TITLE.about} />
         <p className="mt-1 text-ink-muted">Everything written for you starts from here.</p>
 
         <div className="mt-3 space-y-4">
@@ -150,8 +151,12 @@ export function ProfileForm({
         </div>
       </section>
 
-      <section data-testid="profile-languages" className={cardClasses()}>
-        <SectionHeading title="Languages" />
+      <section
+        id="profile-part-languages"
+        data-testid="profile-languages"
+        className={cardClasses()}
+      >
+        <SectionHeading title={PART_TITLE.languages} />
 
         {languageKeys.length === 0 ? (
           <p data-testid="profile-languages-empty" className="mt-2 text-xs text-ink-faint">
@@ -185,8 +190,8 @@ export function ProfileForm({
         </button>
       </section>
 
-      <section data-testid="profile-wants" className={cardClasses()}>
-        <SectionHeading title="What you are looking for" />
+      <section id="profile-part-wants" data-testid="profile-wants" className={cardClasses()}>
+        <SectionHeading title={PART_TITLE.wants} />
         <p className="mt-1 text-ink-muted">One per line.</p>
 
         <div className="mt-3 space-y-4">
@@ -240,8 +245,8 @@ export function ProfileForm({
         </div>
       </section>
 
-      <section data-testid="profile-energy" className={cardClasses()}>
-        <SectionHeading title="What energises you, what drains you" />
+      <section id="profile-part-energy" data-testid="profile-energy" className={cardClasses()}>
+        <SectionHeading title={PART_TITLE.energy} />
         <p className="mt-1 text-ink-muted">One per line.</p>
 
         <div className="mt-3 grid gap-4 md:grid-cols-2">
@@ -279,8 +284,8 @@ export function ProfileForm({
         </div>
       </section>
 
-      <section data-testid="profile-star" className={cardClasses()}>
-        <SectionHeading title="STAR examples" />
+      <section id="profile-part-star" data-testid="profile-star" className={cardClasses()}>
+        <SectionHeading title={PART_TITLE.star} />
         <p className="mt-1 text-ink-muted">
           Situation, task, action, result: the shape interviewers ask for.
         </p>

@@ -79,9 +79,20 @@ describe('rendering', () => {
     expect(port.calls.load).toBe(1);
   });
 
-  it('has no primary button: the screen is for writing, and writing saves itself', async () => {
-    await renderProfile();
-    expect(document.querySelectorAll('[data-primary="true"]')).toHaveLength(0);
+  // Was "has no primary button" until L-413 gave the screen its checklist. The
+  // reason it had none still holds and is what this pins: nothing here saves.
+  it('has one primary button, "Fill it in", and it saves nothing: writing saves itself', async () => {
+    const { port, user } = await renderProfile();
+    const fill = await screen
+      .findByTestId('profile-progress-count')
+      .then(() => screen.getByTestId('profile-progress-fill'));
+
+    const primaries = document.querySelectorAll('[data-primary="true"]');
+    expect(primaries).toHaveLength(1);
+    expect(primaries[0]).toBe(fill);
+
+    await user.click(fill);
+    expect(port.calls.save).toBe(0);
   });
 
   it('shows a saved profile in its boxes, lists one per line', async () => {

@@ -15,7 +15,7 @@
  * Neither changes a single class name or colour. What the spec measures —
  * which text colour lands on which painted background — is the app's own.
  *
- * The page reads nine switches from the address:
+ * The page reads ten switches from the address:
  *   - `?seen=1` skips the first-run welcome, as a returning user sees the app;
  *   - `?entries=1` puts three applications on the board, and gives Tailor
  *     their jobs, so a card's "Tailor" opens the real screen with its step
@@ -37,6 +37,10 @@
  *   - `?consent=openai,google` has those providers already agreed to, for
  *     Settings' "What I have agreed to" (L-410); `&consentLate=1` holds the
  *     consent file's answer back until a screen has had time to scroll.
+ *   - `?profile=none|five|six` gives Profile a saved profile with that many of
+ *     its six parts filled in, and its own CV list (L-413: the checklist);
+ *     `&profileCvsLate=1` holds that list's answer back, so the checklist can
+ *     be measured before it has one.
  *
  * And it puts six helpers on `window`, each drawing real app components into
  * an element the spec has placed:
@@ -57,7 +61,7 @@
  */
 import './harness.css';
 
-import { err, type Application, type Job } from '@cviper/core-types';
+import { emptyProfile, err, type Application, type Job, type Profile } from '@cviper/core-types';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
@@ -361,7 +365,74 @@ function failsToLoad(message: string | null) {
 
 const trackerPort = createFakeTrackerPort(entries);
 const trackerLoad = failsToLoad(params.get('trackerLoadError'));
-const profilePort = createFakeProfilePort();
+/**
+ * `?profile=` (L-413). `six` is every part of the form filled in and one saved
+ * CV; `five` leaves "What energises you, what drains you" empty; `none` is an
+ * empty profile and no CV. Without the switch Profile is as it always was
+ * here: an empty profile, and no CV list of its own.
+ */
+const profileFilled = params.get('profile');
+const FULL_PROFILE: Profile = {
+  ...emptyProfile(NOW.toISOString()),
+  headline: 'Reporting analyst in social housing',
+  work_rights: 'Citizen, no visa needed',
+  writing_style: 'Plain and direct. Short sentences. No buzzwords.',
+  languages: [
+    { name: 'English', level: 'Native' },
+    { name: 'Spanish', level: 'Conversational' },
+  ],
+  deal_breakers: ['Fully office-based'],
+  target_sectors: ['Housing', 'Public sector'],
+  career_goals: ['Lead a small analytics team within three years'],
+  energising: ['Turning a messy spreadsheet into one clear page'],
+  draining: ['Status meetings with no decision'],
+  star_examples: [
+    {
+      title: 'Board pack in one day, not three',
+      situation: 'The monthly board pack took three days to build by hand.',
+      task: 'Cut the time without losing a figure.',
+      action: 'Rebuilt it as one refreshable report.',
+      result: 'One day, every month since.',
+    },
+  ],
+};
+const profilePort = createFakeProfilePort(
+  profileFilled === 'six'
+    ? FULL_PROFILE
+    : profileFilled === 'five'
+      ? { ...FULL_PROFILE, energising: [], draining: [] }
+      : null,
+);
+const { createFakeAnalysisPort: createFakeCvPort } =
+  await import('../../src/features/analysis/test/fakePort');
+const profileCvs = createFakeCvPort({
+  cvs:
+    profileFilled === 'five' || profileFilled === 'six'
+      ? [
+          {
+            id: 'cv-profile',
+            name: 'Alex Morgan CV.docx',
+            file_path: null,
+            extracted_text: Array.from({ length: 540 }, () => 'word').join(' '),
+            json_resume: null,
+            created_at: '2026-08-03T09:00:00.000Z',
+          },
+        ]
+      : [],
+});
+/** `&profileCvsLate=1`: long enough to measure the checklist while it waits. */
+const profileCvPort =
+  profileFilled === null
+    ? undefined
+    : params.get('profileCvsLate') === '1'
+      ? {
+          ...profileCvs,
+          loadCvs: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            return profileCvs.loadCvs();
+          },
+        }
+      : profileCvs;
 const profileLoad = failsToLoad(params.get('profileLoadError'));
 
 /** What the spec asks `__mountErrorBox` to draw. */
@@ -769,6 +840,7 @@ ReactDOM.createRoot(root).render(
         })}
         {...(drafted === null ? {} : { workflowPort: drafted.workflowPort })}
         {...(searchPort === undefined ? {} : { searchPort })}
+        {...(profileCvPort === undefined ? {} : { profileCvPort })}
         now={NOW}
       />
     )}

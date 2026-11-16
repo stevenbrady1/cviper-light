@@ -95,6 +95,8 @@ export interface AppProps {
   readonly trackerPort?: TrackerProps['port'];
   /** Injected by tests, for the same reason as `trackerPort`. */
   readonly profilePort?: ProfileProps['port'];
+  /** Injected by tests: Profile's own CV list, which `profilePort` alone leaves empty (L-413). */
+  readonly profileCvPort?: ProfileProps['cvPort'];
   /** Injected by tests, for the same reason as `trackerPort`. */
   readonly analysisPort?: AnalysisProps['port'];
   /** Injected by tests, for the same reason as `trackerPort` (L-160). */
@@ -159,6 +161,7 @@ export interface AppProps {
 export default function App({
   trackerPort,
   profilePort,
+  profileCvPort,
   analysisPort,
   tailorPort,
   filePort,
@@ -465,6 +468,7 @@ export default function App({
           {renderView(activeView, {
             profile: {
               port: profilePort,
+              cvPort: profileCvPort,
               now,
             },
             search: {

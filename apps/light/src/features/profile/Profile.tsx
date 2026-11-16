@@ -3,12 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   emptyProfile,
   ok,
+  type Cv,
   type Profile as CandidateProfile,
   type ProfileLanguage,
   type StarExample,
 } from '@cviper/core-types';
 
 import { CONTENT_COLUMN, SIDE_PADDING } from '../../app/layout';
+import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { createTauriFilePort, type FilePort } from '../../platform/files';
@@ -34,6 +36,8 @@ import {
   type ProfilePort,
 } from './port';
 import { ProfileForm, type Loaded } from './ProfileForm';
+import { ProfileProgress } from './ProfileProgress';
+import { profileParts, type ProfilePartId } from './progress';
 import { YourCv } from './ProfileYourCv';
 
 /**
@@ -48,11 +52,12 @@ import { YourCv } from './ProfileYourCv';
  * time as they think of it; a Save button would make every one of those
  * moments a moment to lose work.
  *
- * So this view has NO primary button at all. Blue means "the thing this
- * screen is for", and this screen is for writing, which needs no button.
- * (The one exception is inside the import review at the bottom (L-167):
- * "Add to my profile" is a decision about somebody else's file, and a
- * decision gets a button.)
+ * So nothing here saves, and the screen's one blue button does not either:
+ * "Fill it in", on the checklist at the top (L-413), only takes the user to
+ * the first part with nothing in it. It gives way to the one other blue
+ * button this view can show, inside the import review at the bottom (L-167):
+ * "Add to my profile" is a decision about somebody else's file, and while
+ * that decision is open "Fill it in" is disabled.
  *
  * ============================================================================
  * ONE ROW, LOADED ONCE, EDITED IN PLACE
@@ -127,6 +132,12 @@ export function Profile({ port, now, gapsPort, filePort, cvPort }: ProfileProps)
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // The checklist (L-413) counts from two reads. The CV list is "Your CV"'s
+  // own, so that section reports it: not read yet, `null` if it could not be.
+  const [cvs, setCvs] = useState<readonly Cv[] | null | undefined>(undefined);
+  const [importing, setImporting] = useState(false);
+  const scrollArea = useRef<HTMLDivElement>(null);
 
   // The latest state, readable from a debounced commit that fires after the
   // render it was created in. Two fields flushing in the same tick — every
@@ -287,6 +298,25 @@ export function Profile({ port, now, gapsPort, filePort, cvPort }: ProfileProps)
     [apply, keysFor],
   );
 
+  // No count from a read that failed: that read's own error is enough.
+  const countable = cvs !== null && (loading || loaded !== null);
+  const parts = useMemo(
+    () => (loaded === null || cvs == null ? null : profileParts(loaded.profile, cvs)),
+    [loaded, cvs],
+  );
+
+  const onFillIn = useCallback((part: ProfilePartId) => {
+    const section = document.getElementById(`profile-part-${part}`);
+    if (section === null || scrollArea.current === null) return;
+    scrollWithin(scrollArea.current, section);
+    // The first empty box. A part with no box yet (no CV, no language, no
+    // example) starts with the button that makes one.
+    const box = [...section.querySelectorAll<HTMLInputElement>('input, textarea')].find(
+      (field) => field.value.trim() === '',
+    );
+    (box ?? section.querySelector('button'))?.focus({ preventScroll: true });
+  }, []);
+
   const view = viewById('profile');
 
   return (
@@ -299,14 +329,20 @@ export function Profile({ port, now, gapsPort, filePort, cvPort }: ProfileProps)
         </ErrorBox>
       )}
 
-      <div className={`min-h-0 flex-1 overflow-y-auto ${SIDE_PADDING} py-4 md:py-5`}>
+      <div
+        ref={scrollArea}
+        className={`min-h-0 flex-1 overflow-y-auto ${SIDE_PADDING} py-4 md:py-5`}
+      >
         <div data-content-column className={CONTENT_COLUMN}>
           {loading ? (
             <p data-testid="profile-loading" className="text-ink-muted">
               Loading…
             </p>
           ) : null}
-          <YourCv store={cvStore} files={files} now={now} />
+          {countable ? (
+            <ProfileProgress parts={parts} blocked={importing} onFillIn={onFillIn} />
+          ) : null}
+          <YourCv store={cvStore} files={files} now={now} onCvs={setCvs} />
 
           {loaded === null ? null : (
             <ProfileForm
@@ -331,7 +367,7 @@ export function Profile({ port, now, gapsPort, filePort, cvPort }: ProfileProps)
             a control with no working state on this device teaches nothing.
           */}
           {loaded === null || detectMobileOs() !== null ? null : (
-            <ImportAiJobSearch filePort={files} onApply={onImport} />
+            <ImportAiJobSearch filePort={files} onApply={onImport} onReviewing={setImporting} />
           )}
         </div>
       </div>

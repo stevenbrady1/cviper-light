@@ -10,6 +10,7 @@ import { CvUpload } from '../cv/CvUpload';
 import { formatPolicyDate } from '../settings/privacy/policyDocument';
 
 import { type ProfileCvPort } from './port';
+import { PART_TITLE } from './progress';
 import { ConfirmDeleteCv, CvRow } from './ProfileCvRow';
 
 // --- Your CV (L-240) --------------------------------------------------------
@@ -40,11 +41,18 @@ interface YourCvProps {
   readonly store: ProfileCvPort;
   readonly files: FilePort;
   readonly now: Date | undefined;
+  /**
+   * Told what the list holds once it has been read, and again on every upload,
+   * rename and delete; `null` when it could not be read. For the page's
+   * checklist (L-413), which must not count a list it has not seen.
+   */
+  readonly onCvs?: ((cvs: readonly Cv[] | null) => void) | undefined;
 }
 
-export function YourCv({ store, files, now }: YourCvProps) {
+export function YourCv({ store, files, now, onCvs }: YourCvProps) {
   const [cvs, setCvs] = useState<readonly Cv[]>([]);
   const [cvsLoaded, setCvsLoaded] = useState(false);
+  const [cvsUnread, setCvsUnread] = useState(false);
   const [cvError, setCvError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -53,6 +61,7 @@ export function YourCv({ store, files, now }: YourCvProps) {
       if (cancelled) return;
       setCvsLoaded(true);
       if (!loaded.ok) {
+        setCvsUnread(true);
         setCvError(
           `Your CVs could not be read: ${loaded.error.message} They are still on this machine.`,
         );
@@ -64,6 +73,10 @@ export function YourCv({ store, files, now }: YourCvProps) {
       cancelled = true;
     };
   }, [store]);
+
+  useEffect(() => {
+    if (cvsLoaded) onCvs?.(cvsUnread ? null : cvs);
+  }, [cvs, cvsLoaded, cvsUnread, onCvs]);
 
   const onUploaded = useCallback((cv: Cv) => {
     setCvs((current) => [cv, ...current.filter((existing) => existing.id !== cv.id)]);
@@ -128,8 +141,8 @@ export function YourCv({ store, files, now }: YourCvProps) {
   const newest = cvs[0] ?? null;
 
   return (
-    <section data-testid="profile-cv" className={`mb-5 ${cardClasses()}`}>
-      <SectionHeading title="Your CV" />
+    <section id="profile-part-cv" data-testid="profile-cv" className={`mb-5 ${cardClasses()}`}>
+      <SectionHeading title={PART_TITLE.cv} />
       <p className="mt-1 text-ink-muted">
         Upload it once and every screen can use it. The file is read on this computer. Its text only
         goes to an AI you choose, and only when you ask it to read your CV.

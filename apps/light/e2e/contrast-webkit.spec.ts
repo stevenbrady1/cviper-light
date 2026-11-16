@@ -6619,3 +6619,268 @@ describe('Rename and Delete for a saved CV (L-408)', () => {
     await page.context().close();
   });
 });
+
+/**
+ * Profile's checklist (L-413). jsdom lays nothing out, so
+ * `Profile.progress.test.tsx` proves what is counted and said, and not where
+ * anything lands. The harness's `?profile=` gives the real Profile, in the
+ * real shell, a profile with none, five or all six of its parts filled in.
+ * Each is measured at the two desktop sizes and on a phone: the card is on
+ * screen under the page header, its count, six pills, "Next:" line and button
+ * are inside it, and the colours of both pill states are measured with it.
+ */
+const CHECKLIST_WINDOWS = [
+  { name: '1280×800', width: 1280, height: 800, button: 24 },
+  { name: '1000×700', width: 1000, height: 700, button: 24 },
+  // A phone: every button is a thumb target, 44px (L-81).
+  { name: '375×812', width: 375, height: 812, button: 44 },
+] as const;
+const CHECKLIST_STATES = [
+  { filled: 'none', says: '0 of 6 parts filled in', next: 'Next: Your CV', ticks: 0 },
+  {
+    filled: 'five',
+    says: '5 of 6 parts filled in',
+    next: 'Next: What energises you, what drains you',
+    ticks: 5,
+  },
+  { filled: 'six', says: 'All 6 parts filled in.', next: null, ticks: 6 },
+] as const;
+const CHECKLIST = '[data-testid="profile-progress"]';
+const HELD_ON_A_DESKTOP = ['none', 'five', 'six'] as const;
+
+async function openChecklist(
+  viewport: { width: number; height: number },
+  filled: string,
+  late = false,
+): Promise<Page> {
+  const page = await open(`?seen=1&profile=${filled}${late ? '&profileCvsLate=1' : ''}`, viewport);
+  await goTo(page, 'profile');
+  await page.waitForSelector(CHECKLIST);
+  if (!late) await page.waitForSelector('[data-testid="profile-progress-count"]');
+  return page;
+}
+
+interface ChecklistReport {
+  readonly problems: string[];
+  /** How many lines the six pills take. */
+  readonly rows: number;
+  readonly ticks: number;
+  readonly rings: number;
+  /** Whether the "Next:" line and the button share a line. */
+  readonly nextBesideButton: boolean;
+  readonly buttonUnderPills: boolean;
+}
+
+/** The card: on screen, clear of "Your CV", and everything it draws inside it. */
+async function checklistReport(page: Page, minButton: number): Promise<ChecklistReport> {
+  return page.evaluate(
+    ({ root, min }) => {
+      const problems: string[] = [];
+      const none = {
+        problems,
+        rows: 0,
+        ticks: 0,
+        rings: 0,
+        nextBesideButton: false,
+        buttonUnderPills: false,
+      };
+      const card = document.querySelector(root);
+      const area = card?.closest('.overflow-y-auto');
+      if (card === null || area === null || area === undefined) {
+        problems.push('no checklist inside a scroll area');
+        return none;
+      }
+      const frame = card.getBoundingClientRect();
+      const seen = area.getBoundingClientRect();
+      if (frame.top < seen.top - 0.5 || frame.bottom > seen.bottom + 0.5) {
+        problems.push('the card is not wholly on screen');
+      }
+      if (frame.left < seen.left - 0.5 || frame.right > seen.right + 0.5) {
+        problems.push('the card is wider than its area');
+      }
+      const inside = (name: string, part: Element | null): DOMRect | null => {
+        if (part === null) {
+          problems.push(`${name}: missing`);
+          return null;
+        }
+        const box = part.getBoundingClientRect();
+        if (box.width < 1 || box.height < 1) problems.push(`${name}: not drawn`);
+        if (
+          box.left < frame.left - 0.5 ||
+          box.right > frame.right + 0.5 ||
+          box.top < frame.top - 0.5 ||
+          box.bottom > frame.bottom + 0.5
+        ) {
+          problems.push(`${name}: outside the card`);
+        }
+        return box;
+      };
+
+      inside('count', card.querySelector('#profile-progress-count'));
+      const pills = [...card.querySelectorAll('[data-testid^="profile-progress-part-"]')];
+      if (pills.length !== 6) problems.push(`${String(pills.length)} pills drawn`);
+      const pillBoxes = pills
+        .map((pill) => inside(pill.getAttribute('data-testid') ?? 'pill', pill))
+        .filter((box): box is DOMRect => box !== null);
+      const next = card.querySelector('[data-testid="profile-progress-next"]');
+      const nextBox = next === null ? null : inside('next', next);
+      const button = inside('button', card.querySelector('[data-testid="profile-progress-fill"]'));
+      if (button !== null && button.height < min - 0.5) {
+        problems.push(`button: ${String(Math.round(button.height))}px tall, under ${String(min)}`);
+      }
+
+      // "Your CV" starts below the card, with a gap: the card does not crowd it.
+      const cv = document.querySelector('[data-testid="profile-cv"]')?.getBoundingClientRect();
+      if (cv === undefined || cv.top < frame.bottom + 8) problems.push('"Your CV" crowds the card');
+
+      return {
+        problems,
+        rows: new Set(pillBoxes.map((box) => Math.round(box.top))).size,
+        ticks: card.querySelectorAll('[data-mark="tick"]').length,
+        rings: card.querySelectorAll('[data-mark="ring"]').length,
+        nextBesideButton: nextBox !== null && button !== null && button.top < nextBox.bottom - 0.5,
+        buttonUnderPills:
+          button !== null && button.top >= Math.max(...pillBoxes.map((box) => box.bottom)) - 0.5,
+      };
+    },
+    { root: CHECKLIST, min: minButton },
+  );
+}
+
+/** Where "Your CV" starts: the first thing under the card, so it moves if the card grows. */
+async function yourCvTop(page: Page): Promise<number> {
+  return page.evaluate(
+    () => document.querySelector('[data-testid="profile-cv"]')?.getBoundingClientRect().top ?? -1,
+  );
+}
+
+describe('the Profile checklist (L-413)', () => {
+  for (const size of CHECKLIST_WINDOWS) {
+    for (const state of CHECKLIST_STATES) {
+      it(`at ${size.name}, "${state.says}": the card is on screen with everything inside it`, async () => {
+        const page = await openChecklist(size, state.filled);
+        assert.equal(
+          await page.locator('[data-testid="profile-progress-count"]').textContent(),
+          state.says,
+        );
+        const next = page.locator('[data-testid="profile-progress-next"]');
+        if (state.next === null)
+          assert.equal(await next.count(), 0, 'no "Next:" when all are done');
+        else assert.equal(await next.textContent(), state.next);
+        assert.equal(
+          await page.locator('[data-testid="profile-progress-fill"]').isDisabled(),
+          state.next === null,
+          'the button is disabled only when nothing is left',
+        );
+
+        const report = await checklistReport(page, size.button);
+        console.log(`checklist ${state.filled} at ${size.name}: ${JSON.stringify(report)}`);
+        assert.deepEqual(report.problems, []);
+        assert.equal(report.ticks, state.ticks, 'one tick per part filled in');
+        assert.equal(report.rings, 6 - state.ticks, 'one ring per part not filled in');
+        assert.ok(report.buttonUnderPills, 'the button sits under the pills');
+        if (size.width < 768) {
+          assert.ok(report.rows > 1, 'on a phone the pills wrap');
+          assert.ok(!report.nextBesideButton, 'on a phone the button sits under "Next:"');
+        } else if (state.next !== null) {
+          assert.ok(report.nextBesideButton, '"Next:" and the button share a line');
+        }
+        assert.deepEqual(await sidewaysOverflow(page), []);
+        judge(`checklist, ${state.filled} filled in (${size.name})`, await contrast(page));
+        await page.context().close();
+      });
+    }
+
+    it(`at ${size.name}, "Fill it in" brings the next part on screen and puts the cursor in it`, async () => {
+      const page = await openChecklist(size, 'five');
+      await page.click('[data-testid="profile-progress-fill"]');
+      // The scroll is smooth: wait for the part to come to rest inside the area.
+      await page.waitForFunction(() => {
+        const part = document.getElementById('profile-part-energy');
+        const area = part?.closest('.overflow-y-auto');
+        if (part === null || area === null || area === undefined) return false;
+        const box = part.getBoundingClientRect();
+        const seen = area.getBoundingClientRect();
+        return box.top >= seen.top - 0.5 && box.top < seen.top + seen.height / 2;
+      });
+      assert.equal(
+        await page.evaluate(() => document.activeElement?.getAttribute('data-testid')),
+        'profile-energising',
+      );
+      const field = await page.evaluate(() => {
+        const box = document.activeElement?.getBoundingClientRect();
+        return box === undefined ? null : { top: box.top, bottom: box.bottom };
+      });
+      assert.ok(
+        field !== null && field.top >= 0 && field.bottom <= size.height,
+        `the box with the cursor is on screen: ${JSON.stringify(field)}`,
+      );
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      await page.context().close();
+    });
+
+    // On a phone the card is only held exactly while "Next:" fits one line. The
+    // longest title wraps there (five filled in), and with all six filled in
+    // there is no "Next:" line at all, so those two are one line out.
+    for (const filled of size.width < 768 ? (['none'] as const) : HELD_ON_A_DESKTOP) {
+      it(`at ${size.name}, ${filled} filled in: the card holds its place before the count arrives, and says nothing`, async () => {
+        const page = await openChecklist(size, filled, true);
+        const waiting = await page.evaluate((root) => {
+          const card = document.querySelector<HTMLElement>(root);
+          return {
+            waiting: card?.getAttribute('data-waiting') ?? null,
+            // What a person can read: nothing, while the list is still being read.
+            reads: card?.innerText.trim() ?? null,
+            height: card?.getBoundingClientRect().height ?? 0,
+          };
+        }, CHECKLIST);
+        assert.deepEqual(
+          { waiting: waiting.waiting, reads: waiting.reads },
+          { waiting: 'true', reads: '' },
+        );
+        const before = await yourCvTop(page);
+
+        await page.waitForSelector('[data-testid="profile-progress-count"]');
+        const after = await yourCvTop(page);
+        console.log(
+          `checklist ${filled} at ${size.name}: "Your CV" at ${String(before)} waiting, ${String(after)} answered; card ${String(waiting.height)}px`,
+        );
+        assert.ok(waiting.height > 60, 'the waiting card takes real room');
+        assert.ok(
+          Math.abs(after - before) <= 0.5,
+          `"Your CV" moved ${String(after - before)}px when the count arrived`,
+        );
+        await page.context().close();
+      });
+    }
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a pill pushed out of the card is reported', async () => {
+    const page = await openChecklist(CHECKLIST_WINDOWS[2], 'five');
+    await page.evaluate(() => {
+      const pill = document.querySelector<HTMLElement>(
+        '[data-testid="profile-progress-part-energy"]',
+      );
+      if (pill !== null) pill.style.cssText = 'min-width:900px';
+    });
+    const report = await checklistReport(page, CHECKLIST_WINDOWS[2].button);
+    assert.ok(
+      report.problems.includes('profile-progress-part-energy: outside the card'),
+      `the pushed-out pill was not flagged: ${JSON.stringify(report.problems)}`,
+    );
+    await page.context().close();
+  });
+
+  it('the check can fail: a card that grows when the count arrives is reported', async () => {
+    const page = await openChecklist(CHECKLIST_WINDOWS[0], 'five', true);
+    const before = await yourCvTop(page);
+    await page.waitForSelector('[data-testid="profile-progress-count"]');
+    await page.evaluate(() => {
+      const next = document.querySelector<HTMLElement>('[data-testid="profile-progress-next"]');
+      if (next !== null) next.style.cssText = 'padding-bottom:40px';
+    });
+    assert.ok(Math.abs((await yourCvTop(page)) - before) > 0.5, 'a taller card moved nothing');
+    await page.context().close();
+  });
+});
