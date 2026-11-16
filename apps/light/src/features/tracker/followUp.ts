@@ -36,7 +36,7 @@
  * becomes worth one polite line — and it counts from the LAST thing that
  * happened, so the second nudge waits as long as the first. Two is the cap: a
  * third follow-up has never changed an outcome, and the kindest thing the
- * tracker can do after two is say so and point at the status select.
+ * tracker can do after two is say so and point at the status choices.
  */
 import {
   type Application,

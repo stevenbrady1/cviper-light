@@ -62,7 +62,7 @@ import { ErrorBox } from '../../ui';
  * ============================================================================
  * Not a permanent button: a thank-you note is a same-day thing, and a control
  * that sits there for a month is a control the user learns to ignore. The
- * offer appears when the status select moves INTO interviewing and goes away
+ * offer appears when the status moves INTO interviewing and goes away
  * when it moves out. No quiet rule and no cap — it is not a nudge.
  *
  * ============================================================================

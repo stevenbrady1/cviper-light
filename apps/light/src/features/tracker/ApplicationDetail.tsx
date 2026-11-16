@@ -20,9 +20,10 @@ import { ConfirmDelete } from './ConfirmDelete';
 import { InterviewPanel } from './InterviewPanel';
 import { FollowUpPanel } from './FollowUpPanel';
 import { NEXT_ACTION_TONES, nextActionUrgency } from './nextAction';
-import { STATUS_LABELS, TRACKER_COLUMNS, type TrackerEntry } from './model';
+import { type TrackerEntry } from './model';
 import { type TrackerPort } from './port';
 import { STALENESS_BANDS, stalenessBand, stalenessDescription } from './staleness';
+import { StatusChoice } from './StatusChoice';
 
 /**
  * Editing one application, in the pane.
@@ -30,7 +31,7 @@ import { STALENESS_BANDS, stalenessBand, stalenessDescription } from './stalenes
  * ============================================================================
  * THERE IS NO SAVE BUTTON, AND THAT IS THE POINT
  * ============================================================================
- * The status select and the date commit the moment they change; the two text
+ * The status choice and the date commit the moment they change; the two text
  * fields commit shortly after you stop typing, and immediately if you click
  * away (see `useDebouncedField` for why the second half matters). So the loop
  * is: click a card, change one thing, click the next card. No dialog, no
@@ -257,29 +258,7 @@ export function ApplicationDetail({
         </div>
       )}
 
-      <div>
-        <label htmlFor="detail-status" className="block text-xs font-medium text-ink-muted">
-          Status
-        </label>
-        {/*
-          The keyboard route to the same thing dragging does. Drag-and-drop is
-          faster with a mouse and impossible without one, so the board is never
-          the only way to move a card.
-        */}
-        <select
-          id="detail-status"
-          data-testid="detail-status"
-          value={application.status}
-          onChange={(event) => onStatusChange(event.currentTarget.value as ApplicationStatus)}
-          className={`${FIELD} mt-1 w-full`}
-        >
-          {TRACKER_COLUMNS.map((status) => (
-            <option key={status} value={status}>
-              {STATUS_LABELS[status]}
-            </option>
-          ))}
-        </select>
-      </div>
+      <StatusChoice value={application.status} onChange={onStatusChange} />
 
       {/*
         THE INTERVIEW STAGE (L-205). Only an Interviewing card has one, so the
