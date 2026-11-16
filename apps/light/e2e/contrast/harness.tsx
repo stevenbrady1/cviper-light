@@ -109,6 +109,12 @@ const CONSENT_DELAY = params.get('consentLate') === '1' ? 1500 : 0;
         OLLAMA_ANSWERS[params.get('ollama') ?? ''] ?? (params.has('draft') ? DRAFT_MODELS : null),
       );
     if (command === 'secret_status') return Promise.resolve(params.get('results') === '1');
+    // Profile's folder import (L-416): a filled ai-job-search folder, so a test
+    // can open the review. Nothing asks for it until the import button is pressed.
+    if (command === 'pick_and_read_profile_workspace')
+      return import('../../src/features/profile/test/aiJobSearchFixtures').then(
+        (fixtures) => fixtures.FILLED,
+      );
     if (command === 'plugin:store|load' && args?.['path'] === CONSENT_FILE)
       return Promise.resolve(CONSENT_RID);
     if (args?.['rid'] === CONSENT_RID) {

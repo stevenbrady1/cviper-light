@@ -434,3 +434,117 @@ describe('one blue button on the screen', () => {
     expect(fillIn().closest('[aria-hidden="true"]')).toBeNull();
   });
 });
+
+/**
+ * L-416. While the import review holds the screen's blue button, "Fill it in"
+ * is greyed out, and L-413 shipped that with no reason beside it. The sentence
+ * is the owner's, chosen on 16 November 2026.
+ */
+describe('the greyed-out "Fill it in" says why during an import (L-416)', () => {
+  const REASON = 'Finish the import below first.';
+
+  function reason(): HTMLElement | null {
+    return screen.queryByTestId('profile-progress-reason');
+  }
+
+  async function openReview(files: ReturnType<typeof createFakeFilePort>): Promise<HTMLElement> {
+    files.nextWorkspace(FILLED);
+    fireEvent.click(screen.getByTestId('profile-import-ajs'));
+    const review = await screen.findByTestId('profile-import-review');
+    await vi.waitFor(() => expect(fillIn().disabled).toBe(true));
+    return review;
+  }
+
+  it('happy: while a review is open the reason is shown, and it is the button’s description', async () => {
+    const { files } = await renderProfile({ cvs: [CV] });
+    await count();
+    expect(reason()).toBeNull();
+    expect(fillIn().getAttribute('aria-describedby')).toBeNull();
+
+    await openReview(files);
+
+    expect(reason()?.textContent).toBe(REASON);
+    expect(fillIn().getAttribute('aria-describedby')).toBe(reason()?.id);
+    // Disabled, never hidden: the button is still there to be read with its reason.
+    expect(fillIn().closest('[aria-hidden="true"]')).toBeNull();
+    expect(reason()?.closest('[aria-hidden="true"]')).toBeNull();
+  });
+
+  it('"below" is true: the review comes after the checklist on the page', async () => {
+    const { files } = await renderProfile({ cvs: [CV] });
+    await count();
+    const review = await openReview(files);
+
+    const card = screen.getByTestId('profile-progress');
+    expect(card.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('negative: cancelling the import takes the reason away with the block', async () => {
+    const { files } = await renderProfile({ cvs: [CV] });
+    await count();
+    await openReview(files);
+
+    fireEvent.click(screen.getByTestId('profile-import-cancel'));
+
+    await vi.waitFor(() => expect(fillIn().disabled).toBe(false));
+    expect(reason()).toBeNull();
+    expect(fillIn().getAttribute('aria-describedby')).toBeNull();
+  });
+
+  it('negative: "Add to my profile" takes the reason away too', async () => {
+    const { files } = await renderProfile({ cvs: [CV] });
+    await count();
+    const review = await openReview(files);
+
+    fireEvent.click(within(review).getByTestId('profile-import-apply'));
+
+    await vi.waitFor(() => expect(screen.queryByTestId('profile-import-review')).toBeNull());
+    await vi.waitFor(() => expect(reason()).toBeNull());
+    expect(fillIn().getAttribute('aria-describedby')).toBeNull();
+  });
+
+  it('boundary: at 6 of 6 the button is disabled for another reason, and no line claims this one', async () => {
+    await renderProfile({ profile: FULL, cvs: [CV] });
+    expect(await count()).toBe('All 6 parts filled in.');
+
+    expect(fillIn().disabled).toBe(true);
+    expect(reason()).toBeNull();
+    expect(fillIn().getAttribute('aria-describedby')).toBeNull();
+  });
+
+  it('boundary: at 0 of 6 with no import open there is no reason line', async () => {
+    await renderProfile();
+    expect(await count()).toBe('0 of 6 parts filled in');
+
+    expect(fillIn().disabled).toBe(false);
+    expect(reason()).toBeNull();
+  });
+
+  it('boundary: while the count is still being read there is no reason line', async () => {
+    const real = createFakeAnalysisPort({ cvs: [CV] });
+    const cvPort: FakeCvPort = { ...real, loadCvs: () => new Promise(() => {}) };
+    await renderProfile({ profile: FULL, cvPort });
+
+    expect(screen.getByTestId('profile-progress').getAttribute('data-waiting')).toBe('true');
+    expect(fillIn().disabled).toBe(true);
+    expect(reason()).toBeNull();
+    expect(fillIn().getAttribute('aria-describedby')).toBeNull();
+  });
+
+  it('boundary: a review opened at 6 of 6 gets no line, because finishing the import would not un-grey the button', async () => {
+    const { files } = await renderProfile({ profile: FULL, cvs: [CV] });
+    expect(await count()).toBe('All 6 parts filled in.');
+
+    files.nextWorkspace(FILLED);
+    fireEvent.click(screen.getByTestId('profile-import-ajs'));
+    await screen.findByTestId('profile-import-review');
+    // Long enough for the review to have told the page it is open.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(fillIn().disabled).toBe(true);
+    expect(reason()).toBeNull();
+    expect(fillIn().getAttribute('aria-describedby')).toBeNull();
+  });
+});
