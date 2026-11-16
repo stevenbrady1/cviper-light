@@ -4,11 +4,13 @@ import { type ApplicationStatus, type SalaryPeriod } from '@cviper/core-types';
 
 import { PRIMARY_BUTTON, QUIET_BUTTON } from '../../app/buttons';
 import { FIELD, FIELD_INVALID } from '../../app/fields';
+import { readCountry } from '../search/country';
 
 import {
   EMPTY_DRAFT,
   STATUS_LABELS,
   TRACKER_COLUMNS,
+  currencyExample,
   draftIsValid,
   validateDraft,
   type ApplicationDraft,
@@ -153,7 +155,11 @@ export function NewApplicationForm({ onCreate, onCancel, initial }: NewApplicati
   const [draft, setDraft] = useState<ApplicationDraft>(initial ?? EMPTY_DRAFT);
   const [showErrors, setShowErrors] = useState(false);
 
-  const errors: DraftErrors = validateDraft(draft);
+  // The country chosen on Search decides which code the currency box suggests
+  // (L-418). Read once, when the form opens.
+  const [example] = useState(() => currencyExample(readCountry()));
+
+  const errors: DraftErrors = validateDraft(draft, example);
   const visible: DraftErrors = showErrors ? errors : {};
 
   function onSubmit(event: FormEvent<HTMLFormElement>): void {
@@ -270,7 +276,7 @@ export function NewApplicationForm({ onCreate, onCancel, initial }: NewApplicati
             id="new-salary-currency"
             label="Currency"
             optional
-            placeholder="GBP"
+            placeholder={example}
             value={draft.salaryCurrency}
             error={visible.salaryCurrency}
             onChange={(salaryCurrency) => setDraft((current) => ({ ...current, salaryCurrency }))}

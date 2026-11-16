@@ -205,7 +205,9 @@ export const BLANK_VALUE_PATTERNS: readonly SalaryPattern[] = [
  * for.
  */
 const MONEY_FIGURE_PATTERNS: readonly RegExp[] = [
-  /(?:[£$€]|\b(?:GBP|USD|EUR|AUD|NZD|CAD)\b)\s*\d/i,
+  // The nineteen searchable countries' signs and codes (L-418). `zł` follows its
+  // number. South Africa's bare `R` is left out on purpose; `ZAR` is not.
+  /(?:[£$€₹]|\b(?:GBP|USD|EUR|AUD|NZD|CAD|CHF|SGD|BRL|MXN|INR|PLN|ZAR)\b)\s*\d|\d\s*zł/i,
   /\b\d+(?:\.\d+)?\s*k\b/i,
   /\b\d{1,3}(?:,\d{3})+\b/,
 ];

@@ -13,6 +13,7 @@ import {
   type Job,
   type SalaryPeriod,
 } from '@cviper/core-types';
+import { currencyFor } from '@cviper/job-apis';
 
 import { toLocalIsoDate } from '../../lib/dates';
 
@@ -235,12 +236,21 @@ function blank(value: string): boolean {
 }
 
 /**
+ * The code the currency box suggests: the currency of the country chosen on
+ * Search, or GBP when there is none to suggest (L-418). Only an example of the
+ * shape of a code; any three-letter code is accepted.
+ */
+export function currencyExample(country: unknown): string {
+  return currencyFor(country) ?? 'GBP';
+}
+
+/**
  * What is wrong with a draft, per field. An empty object means it is fine.
  *
  * Messages say what happened AND what to do, in that order, and never blame the
  * user for it.
  */
-export function validateDraft(draft: ApplicationDraft): DraftErrors {
+export function validateDraft(draft: ApplicationDraft, example = 'GBP'): DraftErrors {
   const errors: DraftErrors = {};
 
   if (draft.title.trim() === '') {
@@ -310,7 +320,7 @@ export function validateDraft(draft: ApplicationDraft): DraftErrors {
   }
 
   if (!blank(draft.salaryCurrency) && !/^[A-Za-z]{3}$/.test(draft.salaryCurrency.trim())) {
-    errors.salaryCurrency = 'Use the three-letter code for the currency, for example GBP.';
+    errors.salaryCurrency = `Use the three-letter code for the currency, for example ${example}.`;
   }
 
   if (hasSalary && draft.salaryPeriod === '') {
