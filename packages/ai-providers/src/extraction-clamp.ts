@@ -78,15 +78,39 @@ const SALARY_NUMBER_FIELDS = ['salary_min', 'salary_max'] as const;
  *
  * `Job.salary_currency` is documented as ISO-4217, and the search view's
  * formatter expects a code, so a bare `£` reaching the database would render as
- * "£45,000 £" or worse. Mapping the four symbols an advert in this app's market
- * actually uses is cheap; guessing beyond them is not.
+ * "£45,000 £" or worse.
+ *
+ * The first four are the UK market's. The rest (L-418) are the signs the
+ * nineteen searchable countries use that cannot be mistaken for another
+ * currency. Two things are deliberately NOT here:
+ *   - A bare `$` is USD and stays USD. Nothing in this package knows which
+ *     country the user searches in, and it must not start guessing.
+ *   - South Africa's `R`. One letter is too easy to misread, so a rand figure
+ *     is left exactly as the model wrote it, like any sign not listed.
+ * `CHF` needs no entry: it is already a code.
+ *
+ * Keys are UPPER CASE; a sign's letters are read in either case, as a code's are.
  */
 const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {
   '£': 'GBP',
   $: 'USD',
   '€': 'EUR',
   '¥': 'JPY',
+  A$: 'AUD',
+  C$: 'CAD',
+  NZ$: 'NZD',
+  S$: 'SGD',
+  R$: 'BRL',
+  MX$: 'MXN',
+  '₹': 'INR',
+  ZŁ: 'PLN',
 };
+
+/** A sign, or `CHF`, in front of a salary the model wrote as text. Built from the map above. */
+const LEADING_SIGN = new RegExp(
+  `^(?:${[...Object.keys(CURRENCY_SYMBOLS), 'CHF'].map((sign) => sign.replace('$', '\\$')).join('|')})\\s*`,
+  'i',
+);
 
 /** How the preserved wording is introduced in `description`. */
 const WORDING_PREFIX = 'Pay as stated in the advert:';
@@ -108,11 +132,7 @@ function readSalaryNumber(raw: unknown): number | null {
   if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
   if (typeof raw !== 'string') return null;
 
-  const trimmed = raw
-    .trim()
-    .replace(/^[£$€¥]\s*/, '')
-    .replace(/,/g, '')
-    .trim();
+  const trimmed = raw.trim().replace(LEADING_SIGN, '').replace(/,/g, '').trim();
   if (!/^-?\d+(\.\d+)?$/.test(trimmed)) return null;
 
   const parsed = Number(trimmed);
@@ -123,7 +143,7 @@ function readSalaryNumber(raw: unknown): number | null {
 function readCurrency(raw: string): { code: string | null; clamp: string | null } {
   const trimmed = raw.trim();
 
-  const mapped = CURRENCY_SYMBOLS[trimmed];
+  const mapped = CURRENCY_SYMBOLS[trimmed.toUpperCase()];
   if (mapped !== undefined) return { code: mapped, clamp: 'salary_currency:symbol-to-code' };
 
   if (/^[A-Za-z]{3}$/.test(trimmed)) {
