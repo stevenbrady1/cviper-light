@@ -17,18 +17,47 @@
  * import time, and the thing that would be broken is a row of buttons. So a bad
  * file leaves `SHIPPED_BOARDS` empty and `KeylessBar` says so, and
  * `defaults.test.ts` is what makes sure a bad file cannot be released: it
- * asserts `SHIPPED_BOARDS_PROBLEM` is `null` and that the nine ids are
- * present, in order. The guard is in the test, where a human sees it, rather
- * than in a crash the user sees.
+ * asserts `SHIPPED_BOARDS_PROBLEM` is `null` and that the United Kingdom's nine
+ * ids are present, in order. The guard is in the test, where a human sees it,
+ * rather than in a crash the user sees.
+ *
+ * ============================================================================
+ * A BOARD IS FOR SOME COUNTRIES, OR FOR ALL OF THEM (L-422)
+ * ============================================================================
+ * An entry names the countries it is for; one that names none is for everywhere.
+ * A person is offered the boards for the country they search in
+ * (`shippedBoardsFor`). Each country's board has its OWN id, so switching one
+ * country's Indeed off says nothing about another's, and the United Kingdom's
+ * ids are the ones every existing choice is stored against.
+ *
+ * A board is listed for a country only if its address was PROVED there:
+ * `shippedBoards.proved.contract.test.ts` holds the file to that table, both
+ * ways. Somebody who has not chosen a country, or whose country is not on the
+ * list, gets the boards that work everywhere.
  */
-import { parseBoardTemplates, type BoardTemplate } from '@cviper/core-types';
+import { parseShippedBoards, type ShippedBoard } from '@cviper/core-types';
 
 import rawBoards from '../../config/job-boards.json';
 
-const parsed = parseBoardTemplates(rawBoards);
+import { mergeBoards, type Board, type BoardPreferences } from './model';
 
-/** The shipped boards, in the order they are meant to appear. */
-export const SHIPPED_BOARDS: readonly BoardTemplate[] = parsed.ok ? parsed.value : [];
+const parsed = parseShippedBoards(rawBoards);
+
+/** Every shipped board, for every country, in the order they are meant to appear. */
+export const SHIPPED_BOARDS: readonly ShippedBoard[] = parsed.ok ? parsed.value : [];
 
 /** Why the shipped file could not be read, or `null`. Asserted `null` by a test. */
 export const SHIPPED_BOARDS_PROBLEM: string | null = parsed.ok ? null : parsed.error;
+
+/** The built-in boards for one country. `null`, or a country not listed: the worldwide ones. */
+export function shippedBoardsFor(country: string | null): readonly ShippedBoard[] {
+  return SHIPPED_BOARDS.filter(
+    (board) =>
+      board.countries === undefined || (country !== null && board.countries.includes(country)),
+  );
+}
+
+/** What a person is offered there: that country's boards, with their own choices on top. */
+export function boardsFor(country: string | null, preferences: BoardPreferences): readonly Board[] {
+  return mergeBoards(shippedBoardsFor(country), preferences);
+}

@@ -101,9 +101,11 @@ export {
   RADIUS_PLACEHOLDER,
   SALARY_MIN_PLACEHOLDER,
   parseBoardTemplates,
+  parseShippedBoards,
   type BoardEncoding,
   type BoardFilters,
   type BoardTemplate,
+  type ShippedBoard,
 } from './boards';
 
 export {

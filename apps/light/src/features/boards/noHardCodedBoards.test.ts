@@ -118,7 +118,8 @@ describe('no component names a job board', () => {
     // below would be vacuously true.
     expect(FILES.length).toBeGreaterThan(0);
     expect(FILES.some((file) => file.endsWith('KeylessBar.tsx'))).toBe(true);
-    expect(FORBIDDEN_HOSTS.length).toBe(9);
+    // The United Kingdom's nine, and each other country's Indeed and Adzuna site (L-422).
+    expect(FORBIDDEN_HOSTS.length).toBe(9 + 18 + 11);
     expect(FORBIDDEN_NAMES.length).toBeGreaterThanOrEqual(6);
   });
 

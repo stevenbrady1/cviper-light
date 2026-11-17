@@ -17,7 +17,7 @@ import { buildBoardUrl } from '@cviper/job-apis';
 import { BoardTemplateSchema } from '@cviper/core-types';
 import { describe, expect, it } from 'vitest';
 
-import { SHIPPED_BOARDS, SHIPPED_BOARDS_PROBLEM } from './defaults';
+import { SHIPPED_BOARDS, SHIPPED_BOARDS_PROBLEM, shippedBoardsFor } from './defaults';
 
 /** The worked example, used for every board. */
 const WORKED = { keywords: 'business analyst', location: 'Milton Keynes' };
@@ -82,8 +82,8 @@ describe('the shipped job-board config', () => {
     }
   });
 
-  it('holds exactly these nine ids, in this order', () => {
-    expect(SHIPPED_BOARDS.map((board) => board.id)).toEqual(EXPECTED_IDS);
+  it('holds exactly these nine ids for the United Kingdom, in this order', () => {
+    expect(shippedBoardsFor('gb').map((board) => board.id)).toEqual(EXPECTED_IDS);
   });
 
   it('gives every board a label, a {keyword} and an https template', () => {

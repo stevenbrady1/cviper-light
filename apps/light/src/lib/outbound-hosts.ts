@@ -65,6 +65,50 @@ export interface OutboundHost {
   readonly why: string;
 }
 
+/** Said of every Indeed site, the United Kingdom's and each other country's alike. */
+const INDEED_WHY =
+  'A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.';
+
+/**
+ * Each country's own Indeed and Adzuna site (L-422). A country is here only if
+ * its address was opened in a real browser and showed that country's jobs;
+ * `boards/shippedBoards.proved.contract.test.ts` holds the table.
+ */
+const INDEED_COUNTRY_HOSTS = [
+  'www.indeed.com',
+  'at.indeed.com',
+  'au.indeed.com',
+  'be.indeed.com',
+  'br.indeed.com',
+  'ca.indeed.com',
+  'ch.indeed.com',
+  'de.indeed.com',
+  'es.indeed.com',
+  'fr.indeed.com',
+  'in.indeed.com',
+  'it.indeed.com',
+  'mx.indeed.com',
+  'nl.indeed.com',
+  'nz.indeed.com',
+  'pl.indeed.com',
+  'sg.indeed.com',
+  'za.indeed.com',
+] as const;
+
+const ADZUNA_COUNTRY_HOSTS = [
+  'www.adzuna.at',
+  'www.adzuna.com.au',
+  'www.adzuna.be',
+  'www.adzuna.ch',
+  'www.adzuna.de',
+  'www.adzuna.es',
+  'www.adzuna.fr',
+  'www.adzuna.in',
+  'www.adzuna.it',
+  'www.adzuna.nl',
+  'www.adzuna.pl',
+] as const;
+
 export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
   {
     host: 'api.openai.com',
@@ -217,8 +261,13 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
   {
     host: 'uk.indeed.com',
     purpose: 'opened-in-your-browser',
-    why: 'A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.',
+    why: INDEED_WHY,
   },
+  ...INDEED_COUNTRY_HOSTS.map((host) => ({
+    host,
+    purpose: 'opened-in-your-browser' as const,
+    why: INDEED_WHY,
+  })),
   {
     host: 'www.totaljobs.com',
     purpose: 'opened-in-your-browser',
@@ -234,6 +283,12 @@ export const OUTBOUND_HOSTS: readonly OutboundHost[] = [
     purpose: 'opened-in-your-browser',
     why: 'A keyless search link for Adzuna’s public search, from job-boards.json, and the word “Adzuna” on each Adzuna advert, which Adzuna’s API terms ask to link to their site. Pressing either hands the address to your own browser; the app never loads the page.',
   },
+  // The search link only: the word “Adzuna” on an advert links to the site above.
+  ...ADZUNA_COUNTRY_HOSTS.map((host) => ({
+    host,
+    purpose: 'opened-in-your-browser' as const,
+    why: 'A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.',
+  })),
   {
     host: 'www.google.com',
     purpose: 'opened-in-your-browser',

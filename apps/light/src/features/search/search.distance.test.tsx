@@ -288,20 +288,31 @@ describe('what crosses to Rust', () => {
 });
 
 describe('"Also open" job boards get the distance in their own unit', () => {
-  async function openIndeed(harness: Harness, distance: string): Promise<string> {
+  async function openIndeed(harness: Harness, distance: string, board = 'indeed'): Promise<string> {
     (screen.getByTestId('search-where-fold') as HTMLDetailsElement).open = true;
     await harness.user.type(box('search-keywords'), 'analyst');
     await harness.user.type(box('search-distance'), distance);
-    await harness.user.click(screen.getByTestId('keyless-indeed'));
+    await harness.user.click(screen.getByTestId(`keyless-${board}`));
     await harness.user.click(screen.getByTestId('search-open-boards'));
     await vi.waitFor(() => expect(harness.browser.opened()).toHaveLength(1));
     return harness.browser.opened()[0] ?? '';
   }
 
-  it('a 20 km search opens Indeed, a miles board, at 15 miles: the nearest step that covers it', async () => {
+  // Germany's own Indeed takes kilometres (L-422), so the miles board here is LinkedIn.
+  it('a 20 km search opens LinkedIn, a miles board, at 25 miles: the nearest step that covers it', async () => {
     const harness = await ready('de');
 
-    expect(await openIndeed(harness, '20')).toBe('https://uk.indeed.com/jobs?q=analyst&radius=15');
+    expect(await openIndeed(harness, '20', 'linkedin')).toBe(
+      'https://www.linkedin.com/jobs/search/?keywords=analyst&distance=25',
+    );
+  });
+
+  it('a 20 km search opens Germany’s Indeed, a kilometre board, at 25 km', async () => {
+    const harness = await ready('de');
+
+    expect(await openIndeed(harness, '20', 'indeed-de')).toBe(
+      'https://de.indeed.com/jobs?q=analyst&radius=25',
+    );
   });
 
   it('regression: a 20 mile search opens Indeed at 25 miles, as it did', async () => {
@@ -314,10 +325,12 @@ describe('"Also open" job boards get the distance in their own unit', () => {
     const harness = await ready('de');
     await search(harness, '20', 1);
 
-    await harness.user.click(await screen.findByTestId('few-indeed'));
+    await harness.user.click(await screen.findByTestId('few-linkedin'));
 
     await vi.waitFor(() => expect(harness.browser.opened()).toHaveLength(1));
-    expect(harness.browser.opened()[0]).toBe('https://uk.indeed.com/jobs?q=data+analyst&radius=15');
+    expect(harness.browser.opened()[0]).toBe(
+      'https://www.linkedin.com/jobs/search/?keywords=data+analyst&distance=25',
+    );
   });
 
   it('regression: beside few results, a 20 mile search still opens Indeed at 25 miles', async () => {
@@ -334,7 +347,7 @@ describe('"Also open" job boards get the distance in their own unit', () => {
     const harness = await ready('de');
     (screen.getByTestId('search-where-fold') as HTMLDetailsElement).open = true;
     await harness.user.type(box('search-distance'), 'near');
-    await harness.user.click(screen.getByTestId('keyless-indeed'));
+    await harness.user.click(screen.getByTestId('keyless-indeed-de'));
     await harness.user.click(screen.getByTestId('search-open-boards'));
 
     expect((await screen.findByTestId('search-distance-error')).textContent).toBe(KM_SENTENCE);

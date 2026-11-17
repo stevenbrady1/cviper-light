@@ -142,8 +142,9 @@ describe('the blue Search button searches here and opens no tabs', () => {
     const { user, port, browser } = renderSearch();
     await screen.findByTestId('keyless-bar');
     await user.type(screen.getByTestId('search-location'), 'Berlin');
-    await user.click(box('keyless-reed'));
-    await user.click(box('keyless-indeed'));
+    // Germany's own boards (L-422).
+    await user.click(box('keyless-adzuna-de'));
+    await user.click(box('keyless-indeed-de'));
     await user.click(box('keyless-linkedin'));
 
     const submit = screen.getByTestId('search-submit') as HTMLButtonElement;

@@ -138,7 +138,11 @@ export function moveBoard(
   const [taken] = moved.splice(from, 1);
   moved.splice(to, 0, taken ?? id);
 
-  return { ...preferences, order: moved };
+  // Boards that are not on this list are another country's (L-422): their
+  // order is kept, after this one's, instead of being forgotten here.
+  const elsewhere = preferences.order.filter((entry) => !moved.includes(entry));
+
+  return { ...preferences, order: [...moved, ...elsewhere] };
 }
 
 export function addCustomBoard(

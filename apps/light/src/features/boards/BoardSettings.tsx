@@ -6,14 +6,14 @@ import { BOARD_ENCODINGS, type BoardEncoding } from '@cviper/core-types';
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { FIELD } from '../../app/fields';
 import { cardClasses, ErrorBox, Icon, SectionHeading, StatusPill } from '../../ui';
+import { COUNTRY_OPTIONS, OTHER_COUNTRY, readCountry } from '../search/country';
 
-import { SHIPPED_BOARDS } from './defaults';
+import { boardsFor } from './defaults';
 import {
   EMPTY_DRAFT,
   NO_PREFERENCES,
   addCustomBoard,
   customBoardFrom,
-  mergeBoards,
   moveBoard,
   removeCustomBoard,
   setBoardEnabled,
@@ -137,7 +137,14 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
     };
   }, [boardsPort]);
 
-  const boards = useMemo(() => mergeBoards(SHIPPED_BOARDS, preferences), [preferences]);
+  /*
+    The built-in boards are the ones for the country chosen on Search (L-422).
+    Read once: this screen is drawn afresh each time it is opened, and the
+    country cannot change while it is showing.
+  */
+  const [country] = useState(() => readCountry());
+  const boards = useMemo(() => boardsFor(country, preferences), [country, preferences]);
+  const countryName = COUNTRY_OPTIONS.find((option) => option.value === country)?.label;
 
   const apply = useCallback(
     async (next: BoardPreferences) => {
@@ -199,6 +206,17 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
         in your own browser. No key and no account is needed for any of them. Untick the ones you
         never use, put your favourites at the top, and add any site that is missing.
       </p>
+      {/*
+        Which country's boards these are (L-422). “Another country” has no line:
+        neither sentence would be true of it.
+      */}
+      {country === OTHER_COUNTRY ? null : (
+        <p data-testid="boards-country" className="mt-1 text-ink-muted">
+          {countryName === undefined
+            ? 'No country is chosen yet, so only the boards that work everywhere are listed. Choose a country on Search to see the rest.'
+            : `These are the boards for ${countryName}. To change the country, go to Search.`}
+        </p>
+      )}
 
       <ul data-testid="boards-list" className="mt-3 space-y-1">
         {boards.map((board, index) => (
