@@ -59,7 +59,7 @@ describe('the cards', () => {
 
   it('the search card says what you get with nothing set up', () => {
     const search = ONBOARDING_CARDS.find((card) => card.id === 'search');
-    expect(search?.body.toLowerCase()).toContain('uk job boards');
+    expect(search?.body.toLowerCase()).toContain('job boards');
     expect(search?.body.toLowerCase()).toContain('your board');
   });
 

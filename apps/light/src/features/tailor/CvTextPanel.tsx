@@ -45,7 +45,7 @@ export const COLLAPSED_LINES = 11;
 
 const PROBLEM = {
   empty: 'The CV text cannot be empty. Undo with Cancel if you did not mean to clear it.',
-  too_long: `The CV text can be at most ${MAX_CV_TEXT_CHARS.toLocaleString('en-GB')} characters.`,
+  too_long: `The CV text can be at most ${MAX_CV_TEXT_CHARS.toLocaleString()} characters.`,
 } as const;
 
 export function CvTextPanel({ cv, disabled, onSave }: CvTextPanelProps) {
@@ -102,7 +102,7 @@ export function CvTextPanel({ cv, disabled, onSave }: CvTextPanelProps) {
           Fix anything that was misread. Add only what is true: the AI treats this text as your
           facts.{' '}
           <span data-testid="tailor-cv-edit-count" className="font-mono tabular-nums">
-            {`${draft.length.toLocaleString('en-GB')} / ${MAX_CV_TEXT_CHARS.toLocaleString('en-GB')} characters`}
+            {`${draft.length.toLocaleString()} / ${MAX_CV_TEXT_CHARS.toLocaleString()} characters`}
           </span>
         </p>
         {problem === null ? null : (

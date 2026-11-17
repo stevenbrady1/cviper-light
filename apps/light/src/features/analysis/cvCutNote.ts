@@ -11,7 +11,8 @@ import { CLOUD_MAX_CV_CHARS, cvCutFor, isLocalProvider } from '@cviper/ai-provid
 
 import { type ProviderKind } from './providers';
 
-const count = (n: number): string => n.toLocaleString('en-GB');
+// The computer's own number format, not one country's (L-423).
+const count = (n: number): string => n.toLocaleString();
 
 export function cvCutNote(cvText: string | null, kind: ProviderKind | null): string | null {
   // The basic match reads every word of the CV; it never cuts.

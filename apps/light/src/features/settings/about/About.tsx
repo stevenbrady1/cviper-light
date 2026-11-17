@@ -22,7 +22,7 @@ export function About({ browser }: AboutProps) {
     <section data-testid="settings-about">
       <SectionHeading icon="info" title="About" />
       <p className="mt-1 text-ink-muted">
-        Light is free, MIT-licensed, made in the UK, and never sends us anything.
+        Light is free, MIT-licensed, and never sends us anything.
       </p>
       <p data-testid="about-version" className="mt-1 text-xs text-ink-faint">
         CViper Light {APP_VERSION} · MIT licence
