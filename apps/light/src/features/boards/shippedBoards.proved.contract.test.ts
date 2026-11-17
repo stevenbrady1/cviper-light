@@ -117,6 +117,12 @@ describe('a board ships for a country only if its address was proved', () => {
     expect([...SHIPPED].sort()).toEqual([...PROVED].sort());
   });
 
+  it('offers exactly one board everywhere, and it is LinkedIn', () => {
+    // A board that loses its `countries` is offered to all nineteen, unproved.
+    const everywhere = SHIPPED_BOARDS.filter((shipped) => shipped.countries === undefined);
+    expect(everywhere.map((shipped) => shipped.id)).toEqual(['linkedin']);
+  });
+
   it('names only the nineteen countries a search can be for', () => {
     for (const shipped of SHIPPED_BOARDS) {
       for (const country of shipped.countries ?? []) {
