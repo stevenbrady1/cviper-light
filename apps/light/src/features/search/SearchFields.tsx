@@ -103,7 +103,8 @@ export function SearchFields({ form, errors, onField, country, onCountry }: Sear
           value={form.location}
           error={errors.location}
           onChange={(value) => onField('location', value)}
-          placeholder="e.g. London"
+          // "London" is an example only a United Kingdom search should be shown (L-423).
+          placeholder={country === 'gb' ? 'e.g. London' : 'City or town'}
           disabled={locked}
           grow
         />

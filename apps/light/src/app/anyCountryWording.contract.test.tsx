@@ -181,14 +181,6 @@ const ON_SEARCH: readonly Allowed[] = [
     phrase: 'with a small London list',
     why: 'What the free feed, Arbeitnow, actually holds: a fact about the feed, not about where you are.',
   },
-  {
-    where: 'search-location',
-    phrase: 'e.g. London',
-    why:
-      'NOT SETTLED. The owner chose "City or town" here outside the UK (17 Nov), but that is not ' +
-      'an "e.g." example, and the L-330 rule (examplePlaceholders.test.tsx) needs the owner’s ' +
-      'say before it gains an exception. Delete this entry in the change that settles it.',
-  },
 ];
 
 const IN_SETTINGS: readonly Allowed[] = [
