@@ -30,6 +30,9 @@ const UK_NINE = [
 const NOT_CHOSEN_LINE =
   'No country is chosen yet, so only the boards that work everywhere are listed. Choose a country on Search to see the rest.';
 
+const OTHER_COUNTRY_LINE =
+  'There are no built-in boards for your country yet, so only the boards that work everywhere are listed. You can add your own below.';
+
 const OWN_BOARD = {
   id: 'custom-efinancialcareers',
   label: 'eFinancialCareers',
@@ -101,12 +104,33 @@ describe('which country’s boards are listed', () => {
     expect(line()).toBe(NOT_CHOSEN_LINE);
   });
 
-  it('“Another country”: only the worldwide board, and neither sentence, because neither would be true', async () => {
+  it('“Another country”: only the worldwide board, and its own line, which points at Add', async () => {
     await open('other');
 
     expect(rows()).toEqual(['linkedin']);
-    expect(line()).toBeNull();
+    expect(line()).toBe(OTHER_COUNTRY_LINE);
+    // “below” is true: the button that adds a board comes after the list.
+    const list = screen.getByTestId('boards-list');
+    const add = screen.getByTestId('boards-add-open');
+    expect(list.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it('negative: “Another country” is told neither that no country is chosen nor that these are its boards', async () => {
+    await open('other');
+
+    expect(line()).not.toContain('No country is chosen yet');
+    expect(line()).not.toContain('These are the boards for');
+  });
+
+  it.each(['gb', 'de', 'ca', COUNTRY_NOT_CHOSEN, 'atlantis', null])(
+    'negative: the “no built-in boards” line is not shown for %s',
+    async (country) => {
+      await open(country);
+
+      expect(line()).not.toBeNull();
+      expect(line()).not.toContain('no built-in boards');
+    },
+  );
 
   it('the line sits between the introduction and the list, and is not an alert', async () => {
     await open('de');

@@ -206,17 +206,14 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
         in your own browser. No key and no account is needed for any of them. Untick the ones you
         never use, put your favourites at the top, and add any site that is missing.
       </p>
-      {/*
-        Which country's boards these are (L-422). “Another country” has no line:
-        neither sentence would be true of it.
-      */}
-      {country === OTHER_COUNTRY ? null : (
-        <p data-testid="boards-country" className="mt-1 text-ink-muted">
-          {countryName === undefined
+      {/* Which country's boards these are (L-422). The owner's words, all three. */}
+      <p data-testid="boards-country" className="mt-1 text-ink-muted">
+        {country === OTHER_COUNTRY
+          ? 'There are no built-in boards for your country yet, so only the boards that work everywhere are listed. You can add your own below.'
+          : countryName === undefined
             ? 'No country is chosen yet, so only the boards that work everywhere are listed. Choose a country on Search to see the rest.'
             : `These are the boards for ${countryName}. To change the country, go to Search.`}
-        </p>
-      )}
+      </p>
 
       <ul data-testid="boards-list" className="mt-3 space-y-1">
         {boards.map((board, index) => (
