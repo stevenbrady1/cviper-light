@@ -47,7 +47,7 @@ product that exists (L-114).
 | Job search (Adzuna/Reed)                     | Yes — user's own API keys, direct calls                                                                                                                                                          | Yes — server-side, shared keys     | Built                     |
 | Browse recent jobs, no key                   | Yes — the Arbeitnow feed, filtered locally (the Guardian Jobs feed was removed when Guardian Jobs closed on 2 Sep 2026, L-336)                                                                   | Not applicable                     | Built                     |
 | Cross-post detection                         | Yes — flags duplicates, never merges                                                                                                                                                             | Yes — merges, with a server undo   | Built                     |
-| Keyless browser search links                 | Yes — nine UK boards, opens in browser                                                                                                                                                           | Not applicable                     | Built                     |
+| Keyless browser search links                 | Yes — the boards for your country, opens in browser                                                                                                                                              | Not applicable                     | Built                     |
 | Job-board list, user-edited                  | Yes — enable, reorder, add your own                                                                                                                                                              | Not applicable                     | Built                     |
 | API key setup                                | Yes — tested before saved, never read back                                                                                                                                                       | Not applicable                     | Built                     |
 | Application tracker                          | Yes — local SQLite                                                                                                                                                                               | Yes — synced                       | Built                     |
@@ -165,10 +165,21 @@ product that exists (L-114).
   new binary. None of it needs an API key. Choices go to `tauri-plugin-store`, a
   real file in the app's data directory, rather than `localStorage` — a board
   somebody worked out and typed in is their work, and the WebView clearing its
-  origin data should not take it. A failed read falls back to the shipped nine
+  origin data should not take it. A failed read falls back to the shipped list
   for the buttons but still reports the failure to the Settings screen, because
   quietly switching every disabled board back on with no explanation is the one
   outcome worth avoiding.
+- **The built-in boards follow the country (L-422).** Those nine are the United
+  Kingdom's. Every other country a search can be for gets LinkedIn and its own
+  Indeed, plus Adzuna's own site and Google Jobs where that country's address
+  was opened in a real browser and showed that country's jobs (17 Nov 2026):
+  Adzuna's site for eleven countries, Google Jobs for eleven. A board is not
+  listed for a country on the strength of a guess — Adzuna's site for the United
+  States asks every visitor to prove they are human, and Google Jobs shows an
+  empty page for France — and `shippedBoards.proved.contract.test.ts` holds the
+  file to the proved table in both directions. Each country's board has its own
+  id, so a board switched off for one country is not switched off for another,
+  and a board somebody added themselves is offered everywhere.
 - **A pasted advert is read by a model, then checked by a human before anything
   is saved.** Paste the text of an advert and the configured provider
   (Anthropic, OpenAI, Google Gemini, Mistral, xAI Grok, OpenRouter, a local

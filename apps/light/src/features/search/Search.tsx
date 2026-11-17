@@ -15,9 +15,9 @@ import {
 import { CONTENT_COLUMN, SIDE_PADDING } from '../../app/layout';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
-import { SHIPPED_BOARDS } from '../boards/defaults';
+import { boardsFor } from '../boards/defaults';
 import { type AnalyseHandoff } from '../flow/handoff';
-import { NO_PREFERENCES, mergeBoards, type Board } from '../boards/model';
+import { NO_PREFERENCES, type Board, type BoardPreferences } from '../boards/model';
 import { createTauriBoardPreferencesPort, type BoardPreferencesPort } from '../boards/port';
 import { keyProvider } from '../settings/keys/model';
 import { readQuota, writeQuota } from '../../jobs/quotaStore';
@@ -224,14 +224,14 @@ export function Search({
   const [keylessOutcome, setKeylessOutcome] = useState<KeylessBrowseOutcome | null>(null);
   const [quota, setQuota] = useState<QuotaState>(() => readQuota(now ?? new Date()));
   /*
-    Seeded with the SHIPPED list rather than an empty one, so the buttons are
+    Starts as the SHIPPED list rather than an empty one, so the buttons are
     there on the first paint instead of appearing a moment later. The user's own
-    list replaces it as soon as the store answers; if the store cannot be read
+    choices go on top as soon as the store answers; if the store cannot be read
     the shipped list is what stays, which is the whole point of a default layer.
+    The shipped list is the chosen country's (L-422).
   */
-  const [jobBoards, setJobBoards] = useState<readonly Board[]>(() =>
-    mergeBoards(SHIPPED_BOARDS, NO_PREFERENCES),
-  );
+  const [boardPrefs, setBoardPrefs] = useState<BoardPreferences>(NO_PREFERENCES);
+  const jobBoards = useMemo(() => boardsFor(country, boardPrefs), [country, boardPrefs]);
   /*
     The boards ticked to open with "Also open in N boards" (L-219 part 4, L-329), remembered
     between visits. Ids of boards since switched off or deleted are ignored
@@ -280,7 +280,7 @@ export function Search({
       // screen and every one of them works; a red banner over a row of working
       // buttons would be the larger error. Settings, where the user would
       // otherwise see their choices silently reverted, does report it.
-      setJobBoards(mergeBoards(SHIPPED_BOARDS, loaded.ok ? loaded.value : NO_PREFERENCES));
+      if (loaded.ok) setBoardPrefs(loaded.value);
     });
 
     return () => {
@@ -542,11 +542,13 @@ export function Search({
       setForm(entry.form);
       setErrors({});
       setSavedNote(null);
-      const boardsValue = tickedBoards(jobBoards, entry.boards);
+      // Its boards are that country's, whichever country the screen was on (L-422).
+      const theirs = boardsFor(where, boardPrefs);
+      const boardsValue = tickedBoards(theirs, entry.boards);
       setBoardChoice(
         chooseBoards(
           boardsValue.map((board) => board.id),
-          jobBoards,
+          theirs,
         ),
       );
       const feeds = chosenFeeds(feedChoice, isUkPlaceSearch(where, entry.form.location));
@@ -557,7 +559,7 @@ export function Search({
         where,
       );
     },
-    [feedChoice, jobBoards, onCountry, runSearch],
+    [boardPrefs, feedChoice, onCountry, runSearch],
   );
 
   const onDeleteSaved = useCallback(

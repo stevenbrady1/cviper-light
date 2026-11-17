@@ -13,14 +13,18 @@
  */
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { QUIET_BUTTON } from '../../app/buttons';
 import { drawingsAreDecoration, shownAs } from '../../ui/test/shownAs';
+import { COUNTRY_STORAGE_KEY } from '../search/country';
 
 import { BoardSettings } from './BoardSettings';
-import { SHIPPED_BOARDS } from './defaults';
+import { shippedBoardsFor } from './defaults';
 import { createFakeBoardPort, type FakeBoardPort } from './test/fakeBoardPort';
+
+/** The United Kingdom's boards: this file is a UK user's screen (L-422). */
+const SHIPPED_BOARDS = shippedBoardsFor('gb');
 
 const FIRST = SHIPPED_BOARDS[0]?.id ?? '';
 const SECOND = SHIPPED_BOARDS[1]?.id ?? '';
@@ -60,6 +64,11 @@ function rowOrder(): string[] {
     (row) => row.getAttribute('data-testid')?.replace('board-row-', '') ?? '',
   );
 }
+
+beforeEach(() => {
+  // Someone who used the app before countries existed: the United Kingdom (L-417).
+  localStorage.setItem(COUNTRY_STORAGE_KEY, 'gb');
+});
 
 afterEach(() => {
   cleanup();

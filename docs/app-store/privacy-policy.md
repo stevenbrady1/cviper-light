@@ -1,6 +1,6 @@
 # CViper Light privacy policy
 
-_This page is generated from the app's own list of the addresses it may contact — the same list the app shows under Settings → Privacy, and the one a test holds the code to. It changes when that list changes. Last updated: 16 November 2026._
+_This page is generated from the app's own list of the addresses it may contact — the same list the app shows under Settings → Privacy, and the one a test holds the code to. It changes when that list changes. Last updated: 17 November 2026._
 
 ## The short version
 
@@ -59,9 +59,38 @@ The app hands the address to your own browser and is not involved from then on. 
 - `ollama.com` — Ollama’s download page. When Ollama is running on your computer but has no model that can chat, the CV check, the tailor screen and the welcome screen offer this link, which hands the address to your browser when you tap it; the app never loads the page, and nothing is added to the link.
 - `www.linkedin.com` — A keyless search link for LinkedIn, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `uk.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `www.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `at.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `au.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `be.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `br.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `ca.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `ch.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `de.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `es.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `fr.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `in.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `it.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `mx.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `nl.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `nz.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `pl.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `sg.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `za.indeed.com` — A keyless search link for Indeed, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.totaljobs.com` — A keyless search link for Totaljobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.cv-library.co.uk` — A keyless search link for CV-Library, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.adzuna.co.uk` — A keyless search link for Adzuna’s public search, from job-boards.json, and the word “Adzuna” on each Adzuna advert, which Adzuna’s API terms ask to link to their site. Pressing either hands the address to your own browser; the app never loads the page.
+- `www.adzuna.at` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `www.adzuna.com.au` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `www.adzuna.be` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `www.adzuna.ch` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `www.adzuna.de` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `www.adzuna.es` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `www.adzuna.fr` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `www.adzuna.in` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `www.adzuna.it` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `www.adzuna.nl` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
+- `www.adzuna.pl` — A keyless search link for Adzuna’s public search, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.google.com` — A keyless search link for Google Jobs, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page.
 - `www.jobserve.com` — A keyless search link for Jobserve, from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page, and it never scrapes Jobserve.
 - `www.jobs.service.gov.uk` — A keyless search link for GOV.UK’s Find a job (the Work Hub service run by the Department for Work and Pensions), from job-boards.json. Pressing it hands the address to your own browser; the app never loads the page, and it never scrapes it.

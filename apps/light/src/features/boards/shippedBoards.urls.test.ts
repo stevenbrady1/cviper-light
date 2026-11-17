@@ -14,7 +14,7 @@
 import { buildBoardUrl } from '@cviper/job-apis';
 import { describe, expect, it } from 'vitest';
 
-import { SHIPPED_BOARDS } from './defaults';
+import { SHIPPED_BOARDS, shippedBoardsFor } from './defaults';
 
 const EXAMPLE = {
   keywords: 'software tester',
@@ -64,9 +64,12 @@ function board(id: string) {
 }
 
 describe('the exact link per board (L-219)', () => {
-  it('covers every shipped board', () => {
-    expect(Object.keys(PERMANENT).sort()).toEqual(SHIPPED_BOARDS.map((b) => b.id).sort());
-    expect(Object.keys(CONTRACT).sort()).toEqual(SHIPPED_BOARDS.map((b) => b.id).sort());
+  it('covers every board shipped for the United Kingdom', () => {
+    const uk = shippedBoardsFor('gb')
+      .map((b) => b.id)
+      .sort();
+    expect(Object.keys(PERMANENT).sort()).toEqual(uk);
+    expect(Object.keys(CONTRACT).sort()).toEqual(uk);
   });
 
   it.each(Object.entries(PERMANENT))('Permanent — %s', (id, url) => {

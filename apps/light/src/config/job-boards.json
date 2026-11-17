@@ -16,6 +16,7 @@
   },
   {
     "id": "indeed",
+    "countries": ["gb"],
     "label": "Indeed",
     "urlTemplate": "https://uk.indeed.com/jobs?q={keyword}&l={location}&radius={radius}",
     "encoding": "plus",
@@ -28,6 +29,7 @@
   },
   {
     "id": "totaljobs",
+    "countries": ["gb"],
     "label": "Totaljobs",
     "urlTemplate": "https://www.totaljobs.com/jobs/{contract}/{keyword}/in-{location}?radius={radius}&salary={salaryMin}",
     "encoding": "hyphen",
@@ -47,6 +49,7 @@
   },
   {
     "id": "cv-library",
+    "countries": ["gb"],
     "label": "CV-Library",
     "urlTemplate": "https://www.cv-library.co.uk/{keyword}-jobs-in-{location}?distance={radius}&salarymin={salaryMin}&{contract}",
     "encoding": "hyphen",
@@ -66,6 +69,7 @@
   },
   {
     "id": "reed",
+    "countries": ["gb"],
     "label": "Reed",
     "urlTemplate": "https://www.reed.co.uk/jobs/{keyword}-jobs-in-{location}?proximity={radius}&salaryFrom={salaryMin}&{contract}",
     "encoding": "hyphen",
@@ -81,12 +85,14 @@
   },
   {
     "id": "adzuna",
+    "countries": ["gb"],
     "label": "Adzuna",
     "urlTemplate": "https://www.adzuna.co.uk/search?q={keyword}&w={location}",
     "encoding": "plus"
   },
   {
     "id": "google-jobs",
+    "countries": ["gb"],
     "label": "Google Jobs",
     "urlTemplate": "https://www.google.com/search?q={keyword}+{contract}+jobs+{location}&udm=8&hl=en&gl=uk",
     "encoding": "plus",
@@ -99,14 +105,92 @@
   },
   {
     "id": "jobserve",
+    "countries": ["gb"],
     "label": "Jobserve",
     "urlTemplate": "https://www.jobserve.com/gb/en/JobSearch.aspx?q={keyword}&l={location}",
     "encoding": "plus"
   },
   {
     "id": "gov-uk-find-a-job",
+    "countries": ["gb"],
     "label": "GOV.UK Find a job",
     "urlTemplate": "https://www.jobs.service.gov.uk/jobs/search?keywords={keyword}&location={location}",
     "encoding": "plus"
+  },
+  {
+    "id": "indeed-us",
+    "countries": ["us"],
+    "label": "Indeed",
+    "urlTemplate": "https://www.indeed.com/jobs?q={keyword}&l={location}&radius={radius}",
+    "encoding": "plus",
+    "filters": {
+      "radius": {
+        "unit": "miles",
+        "steps": [5, 10, 15, 25, 35, 50, 100]
+      }
+    }
+  },
+  {
+    "id": "indeed-{country}",
+    "label": "Indeed",
+    "urlTemplate": "{site}/jobs?q={keyword}&l={location}&radius={radius}",
+    "encoding": "plus",
+    "filters": {
+      "radius": {
+        "unit": "km",
+        "steps": [5, 10, 15, 25, 35, 50, 100]
+      }
+    },
+    "sites": {
+      "at": "https://at.indeed.com",
+      "au": "https://au.indeed.com",
+      "be": "https://be.indeed.com",
+      "br": "https://br.indeed.com",
+      "ca": "https://ca.indeed.com",
+      "ch": "https://ch.indeed.com",
+      "de": "https://de.indeed.com",
+      "es": "https://es.indeed.com",
+      "fr": "https://fr.indeed.com",
+      "in": "https://in.indeed.com",
+      "it": "https://it.indeed.com",
+      "mx": "https://mx.indeed.com",
+      "nl": "https://nl.indeed.com",
+      "nz": "https://nz.indeed.com",
+      "pl": "https://pl.indeed.com",
+      "sg": "https://sg.indeed.com",
+      "za": "https://za.indeed.com"
+    }
+  },
+  {
+    "id": "adzuna-{country}",
+    "label": "Adzuna",
+    "urlTemplate": "{site}/search?q={keyword}&w={location}",
+    "encoding": "plus",
+    "sites": {
+      "at": "https://www.adzuna.at",
+      "au": "https://www.adzuna.com.au",
+      "be": "https://www.adzuna.be",
+      "ch": "https://www.adzuna.ch",
+      "de": "https://www.adzuna.de",
+      "es": "https://www.adzuna.es",
+      "fr": "https://www.adzuna.fr",
+      "in": "https://www.adzuna.in",
+      "it": "https://www.adzuna.it",
+      "nl": "https://www.adzuna.nl",
+      "pl": "https://www.adzuna.pl"
+    }
+  },
+  {
+    "id": "google-jobs-{country}",
+    "countries": ["us", "ca", "br", "ch", "de", "es", "in", "it", "mx", "sg", "za"],
+    "label": "Google Jobs",
+    "urlTemplate": "https://www.google.com/search?q={keyword}+{contract}+jobs+{location}&udm=8&hl=en&gl={country}",
+    "encoding": "plus",
+    "filters": {
+      "contract": {
+        "permanent": "permanent",
+        "contract": "contract"
+      }
+    }
   }
 ]

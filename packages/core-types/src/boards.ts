@@ -143,3 +143,74 @@ export function parseBoardTemplates(raw: unknown): Result<BoardTemplate[], strin
   const parsed = z.array(BoardTemplateSchema).safeParse(raw);
   return parsed.success ? ok(parsed.data) : err(z.prettifyError(parsed.error));
 }
+
+// ── The shipped file: which countries a board is for (L-422) ────────────────
+
+/** A built-in board, with the countries it is for. None named means everywhere. */
+export interface ShippedBoard extends BoardTemplate {
+  readonly countries?: readonly string[] | undefined;
+}
+
+/** In a shipped entry's id and address: the country's code. Marks "one board per country". */
+const COUNTRY_TOKEN = '{country}';
+/** In a shipped entry's address: that country's own site, from `sites`. */
+const SITE_TOKEN = '{site}';
+
+const countryCode = z.string().regex(/^[a-z]{2}$/);
+
+const ShippedEntrySchema = BoardTemplateSchema.extend({
+  countries: z.array(countryCode).min(1).optional(),
+  // A whole `https://host`, so every site is a literal address in the file,
+  // where the allowed-sites scan can read it.
+  sites: z.record(countryCode, z.string().regex(/^https:\/\/[a-z0-9.-]+$/)).optional(),
+});
+
+/**
+ * Read the SHIPPED list, where an entry may say which countries it is for.
+ *
+ * An entry with `{country}` in its id is one board PER country: each gets its
+ * own id, so a choice made about one country's board is never a choice about
+ * another's. Its countries are the `countries` list, or the keys of `sites`
+ * when each country has its own site. Like `parseBoardTemplates`, this is all
+ * or nothing: a half-good shipped file is a release that should not go out.
+ */
+export function parseShippedBoards(raw: unknown): Result<ShippedBoard[], string> {
+  const parsed = z.array(ShippedEntrySchema).safeParse(raw);
+  if (!parsed.success) return err(z.prettifyError(parsed.error));
+
+  const boards: ShippedBoard[] = [];
+  for (const { countries, sites, ...board } of parsed.data) {
+    if (countries !== undefined && sites !== undefined) {
+      return err(`${board.id}: name the countries once, in "countries" or in "sites".`);
+    }
+    const codes = sites === undefined ? countries : Object.keys(sites);
+
+    if (!board.id.includes(COUNTRY_TOKEN)) {
+      boards.push(codes === undefined ? board : { ...board, countries: codes });
+      continue;
+    }
+    if (codes === undefined) return err(`${board.id}: a per-country board names no country.`);
+
+    for (const code of codes) {
+      const fill = (text: string) =>
+        text.replaceAll(COUNTRY_TOKEN, code).replaceAll(SITE_TOKEN, sites?.[code] ?? SITE_TOKEN);
+      boards.push({
+        ...board,
+        id: fill(board.id),
+        urlTemplate: fill(board.urlTemplate),
+        countries: [code],
+      });
+    }
+  }
+
+  const unfilled = boards.find(
+    (board) => board.urlTemplate.includes(COUNTRY_TOKEN) || board.urlTemplate.includes(SITE_TOKEN),
+  );
+  if (unfilled !== undefined) return err(`${unfilled.id}: its address has nothing to fill it.`);
+
+  const ids = boards.map((board) => board.id);
+  const twice = ids.find((id, index) => ids.indexOf(id) !== index);
+  if (twice !== undefined) return err(`${twice}: two boards have this id.`);
+
+  return ok(boards);
+}
