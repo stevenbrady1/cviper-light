@@ -89,8 +89,7 @@ export const KEY_PROVIDERS: readonly KeyProvider[] = [
     label: PROVIDER_LABEL.adzuna,
     unlocks:
       'Searches Adzuna, which gathers adverts from hundreds of job boards and company career ' +
-      'pages, in 19 countries, into one feed. Results appear alongside Reed’s, marked with ' +
-      'where they came from.',
+      'pages, in 19 countries, into one feed. Results are marked with where they came from.',
     allowance:
       'The key is free. Adzuna’s daily allowance depends on the plan you sign up for and ' +
       'cannot be read back from their API, so CViper counts your Adzuna requests but never ' +
