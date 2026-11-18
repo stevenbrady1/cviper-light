@@ -13,7 +13,8 @@ const unlocks = (id: string): string =>
 describe('the job-board key text (L-423)', () => {
   it('Adzuna: the owner-approved words, with no country named', () => {
     expect(unlocks('adzuna')).toContain(
-      'gathers adverts from hundreds of job boards and company career pages, in 19 countries',
+      'Searches Adzuna, which gathers adverts from hundreds of job boards and company career ' +
+        'pages, in 19 countries, into one feed.',
     );
     expect(unlocks('adzuna')).not.toMatch(/\bUK\b|Britain|British/);
   });
