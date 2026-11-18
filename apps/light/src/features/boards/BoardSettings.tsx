@@ -304,7 +304,7 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
           {/* L-219: the filters a board's link can carry, if the site takes them. */}
           <p data-testid="boards-add-placeholders" className="mt-1 text-xs text-ink-muted">
             If the site takes them, you can also use <code>{'{radius}'}</code> for the distance in
-            miles, <code>{'{salaryMin}'}</code> for the minimum yearly salary in pounds, and{' '}
+            miles, <code>{'{salaryMin}'}</code> for the minimum yearly salary, and{' '}
             <code>{'{contract}'}</code> for the words permanent or contract. Anything left empty on
             the Search screen is left out of the link.
           </p>

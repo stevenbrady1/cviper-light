@@ -126,7 +126,7 @@ export function ProfileForm({
               id="profile-work-rights"
               data-testid="profile-work-rights"
               value={workRights.draft}
-              placeholder="e.g. UK citizen, no sponsorship needed"
+              placeholder="e.g. Citizen, no sponsorship needed"
               onChange={(event) => workRights.setDraft(event.currentTarget.value)}
               onBlur={workRights.flush}
               className={PROFILE_FIELD}
@@ -142,7 +142,7 @@ export function ProfileForm({
               data-testid="profile-writing-style"
               rows={3}
               value={writingStyle.draft}
-              placeholder="e.g. Plain, short sentences. No buzzwords. British spelling."
+              placeholder="e.g. Plain, short sentences. No buzzwords."
               onChange={(event) => writingStyle.setDraft(event.currentTarget.value)}
               onBlur={writingStyle.flush}
               className={PROFILE_FIELD}
@@ -204,7 +204,7 @@ export function ProfileForm({
               data-testid="profile-deal-breakers"
               rows={3}
               value={dealBreakers.draft}
-              placeholder={'e.g. Fully on-site\nBelow GBP 70k'}
+              placeholder={'e.g. Fully on-site\nBelow 70k'}
               onChange={(event) => dealBreakers.setDraft(event.currentTarget.value)}
               onBlur={dealBreakers.flush}
               className={PROFILE_FIELD}

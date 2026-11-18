@@ -97,7 +97,7 @@ describe('the three cards', () => {
 
     const search = screen.getByTestId('welcome-card-search');
     expect(search.textContent).toContain('Find jobs');
-    expect(search.textContent).toContain('Search UK jobs in one place.');
+    expect(search.textContent).toContain('Search jobs in one place.');
 
     expect(screen.getByTestId('welcome-status-tracker').textContent).toBe('Ready now');
     expect(screen.getByTestId('welcome-status-search').textContent).toBe('Ready now');

@@ -66,9 +66,9 @@ export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
   {
     id: 'search',
     title: 'Find jobs',
-    hook: 'Search UK jobs in one place.',
+    hook: 'Search jobs in one place.',
     status: 'Ready now',
-    body: 'Search UK job boards and a free feed. Save the good ones straight to your board.',
+    body: 'Search job boards. Save the good ones straight to your board.',
     view: 'search',
     actionLabel: 'Find jobs',
   },

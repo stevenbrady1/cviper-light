@@ -11,12 +11,17 @@ import { About } from './About';
 afterEach(cleanup);
 
 describe('About', () => {
-  it('says where Light was made, that it is free and MIT-licensed, and which version this is', () => {
+  it('says that Light is free and MIT-licensed, and which version this is, and not where it was made', () => {
     render(<About browser={createFakeBrowserPort()} />);
     const about = screen.getByTestId('settings-about');
+    // Light is for anyone, in any country (owner decision, 13 Nov 2026), so the
+    // line no longer says where it was made (L-423).
+    expect(about.textContent).toContain(
+      'Light is free, MIT-licensed, and never sends us anything.',
+    );
+    expect(about.textContent).not.toMatch(/made in the UK/);
     // Not "made by the people behind cviper.ai" (L-114): cviper.ai IS this
     // app's own site now, so that sentence pointed at itself.
-    expect(about.textContent).toMatch(/made in the UK/);
     expect(about.textContent).not.toMatch(/people behind/);
     expect(about.textContent).toMatch(/free/);
     expect(about.textContent).toMatch(/MIT/);

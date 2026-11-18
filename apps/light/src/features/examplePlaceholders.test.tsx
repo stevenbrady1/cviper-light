@@ -44,6 +44,10 @@ const NOT_EXAMPLES: Readonly<Record<string, string>> = {
   'search-distance': 'Any',
   // Empty means "no minimum salary": nothing is filtered out by pay.
   'search-salary': 'Any',
+  // Names what to type rather than giving an example of it (L-423, the owner's
+  // words). Shown for every country but the United Kingdom, which keeps
+  // "e.g. London".
+  'search-location': 'City or town',
 };
 
 interface Placeholder {
