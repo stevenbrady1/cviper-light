@@ -8,8 +8,10 @@
  *
  * A UK user sees exactly what they saw before: the first describe pins the old
  * text byte for byte. With no country chosen, or "Another country", there is no
- * currency to suggest, so the example stays "GBP": it is an example of the
- * SHAPE of a code, and no new wording was invented for it.
+ * currency to suggest, so the example is "USD" (L-424, the owner's choice): it
+ * is only an example of the SHAPE of a code, and USD is the code most people
+ * know. Before L-424 it was "GBP", which told someone outside the nineteen
+ * countries that the app expected pounds.
  */
 import { ADZUNA_COUNTRIES, currencyFor } from '@cviper/job-apis';
 import { cleanup, render, screen } from '@testing-library/react';
@@ -39,8 +41,22 @@ function renderForm() {
 }
 
 describe('the United Kingdom is unchanged', () => {
-  it('regression: the error is the sentence it always was when no example is given', () => {
-    expect(validateDraft(BAD_CURRENCY).salaryCurrency).toBe(
+  it('regression: the error is the sentence it always was for a UK search', () => {
+    expect(validateDraft(BAD_CURRENCY, currencyExample('gb')).salaryCurrency).toBe(
+      'Use the three-letter code for the currency, for example GBP.',
+    );
+  });
+
+  it('regression: the form shows that same sentence for a UK search', async () => {
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'gb');
+    const user = renderForm();
+
+    await user.type(screen.getByLabelText('Job title'), 'Analyst');
+    await user.type(screen.getByLabelText('Company'), 'Example');
+    await user.type(currencyBox(), 'pounds');
+    await user.click(document.querySelector('button[type="submit"]')!);
+
+    expect(document.getElementById('new-salary-currency-error')?.textContent).toBe(
       'Use the three-letter code for the currency, for example GBP.',
     );
   });
@@ -62,11 +78,25 @@ describe('currencyExample — which code the box suggests', () => {
     expect(currencyExample('za')).toBe('ZAR');
   });
 
-  it('negative: no country, "Another country" and rubbish all fall back to GBP', () => {
-    expect(currencyExample(null)).toBe('GBP');
-    expect(currencyExample(OTHER_COUNTRY)).toBe('GBP');
-    expect(currencyExample('AU')).toBe('GBP');
-    expect(currencyExample('constructor')).toBe('GBP');
+  it('happy path: GBP for the United Kingdom, EUR for Germany, USD when there is none', () => {
+    expect(currencyExample('gb')).toBe('GBP');
+    expect(currencyExample('de')).toBe('EUR');
+    expect(currencyExample(OTHER_COUNTRY)).toBe('USD');
+  });
+
+  it('negative: no country, "Another country" and rubbish all fall back to USD', () => {
+    expect(currencyExample(null)).toBe('USD');
+    expect(currencyExample(undefined)).toBe('USD');
+    expect(currencyExample(OTHER_COUNTRY)).toBe('USD');
+    expect(currencyExample(COUNTRY_NOT_CHOSEN)).toBe('USD');
+    expect(currencyExample('AU')).toBe('USD');
+    expect(currencyExample('constructor')).toBe('USD');
+  });
+
+  it('boundary: a caller that names no example gets the same one, never GBP', () => {
+    expect(validateDraft(BAD_CURRENCY).salaryCurrency).toBe(
+      'Use the three-letter code for the currency, for example USD.',
+    );
   });
 });
 
@@ -86,21 +116,42 @@ describe('the form follows the country chosen on Search', () => {
     );
   });
 
-  it('boundary: a new install that has not chosen a country is shown GBP', () => {
+  it('happy path: Germany suggests EUR', () => {
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'de');
+    renderForm();
+    expect(currencyBox().placeholder).toBe('EUR');
+  });
+
+  it('boundary: a new install that has not chosen a country is shown USD', () => {
     localStorage.setItem(COUNTRY_STORAGE_KEY, COUNTRY_NOT_CHOSEN);
     renderForm();
-    expect(currencyBox().placeholder).toBe('GBP');
+    expect(currencyBox().placeholder).toBe('USD');
   });
 
-  it('boundary: "Another country" is shown GBP — there is no currency to suggest', () => {
+  it('boundary: "Another country" is shown USD, in the box and in the error', async () => {
     localStorage.setItem(COUNTRY_STORAGE_KEY, OTHER_COUNTRY);
-    renderForm();
-    expect(currencyBox().placeholder).toBe('GBP');
+    const user = renderForm();
+    expect(currencyBox().placeholder).toBe('USD');
+
+    await user.type(screen.getByLabelText('Job title'), 'Analyst');
+    await user.type(screen.getByLabelText('Company'), 'Example');
+    await user.type(currencyBox(), 'dollars');
+    await user.click(document.querySelector('button[type="submit"]')!);
+
+    expect(document.getElementById('new-salary-currency-error')?.textContent).toBe(
+      'Use the three-letter code for the currency, for example USD.',
+    );
   });
 
-  it('edge: nothing stored at all is shown GBP', () => {
+  it('edge: nothing stored at all is shown USD', () => {
     renderForm();
-    expect(currencyBox().placeholder).toBe('GBP');
+    expect(currencyBox().placeholder).toBe('USD');
+  });
+
+  it('edge: a stored value that is not a country is shown USD', () => {
+    localStorage.setItem(COUNTRY_STORAGE_KEY, 'atlantis');
+    renderForm();
+    expect(currencyBox().placeholder).toBe('USD');
   });
 
   it('the suggestion is only a suggestion: any three-letter code is still accepted', () => {

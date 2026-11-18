@@ -366,7 +366,7 @@ function Preview({ id }: { readonly id: OnboardingCard['id'] }) {
   } else {
     body = (
       <ul className="space-y-1.5">
-        <PreviewRow edge="border-l-line" text="Data analyst" meta="Leeds" />
+        <PreviewRow edge="border-l-line" text="Data analyst" meta="Remote" />
         <PreviewRow edge="border-l-line" text="BI developer" meta="Remote" />
       </ul>
     );

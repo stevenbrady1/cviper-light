@@ -235,13 +235,16 @@ function blank(value: string): boolean {
   return value.trim() === '';
 }
 
+/** The example when there is no currency to suggest: the code most people know (L-424). */
+const NO_CURRENCY_EXAMPLE = 'USD';
+
 /**
  * The code the currency box suggests: the currency of the country chosen on
- * Search, or GBP when there is none to suggest (L-418). Only an example of the
+ * Search (L-418), or USD when there is none to suggest. Only an example of the
  * shape of a code; any three-letter code is accepted.
  */
 export function currencyExample(country: unknown): string {
-  return currencyFor(country) ?? 'GBP';
+  return currencyFor(country) ?? NO_CURRENCY_EXAMPLE;
 }
 
 /**
@@ -250,7 +253,7 @@ export function currencyExample(country: unknown): string {
  * Messages say what happened AND what to do, in that order, and never blame the
  * user for it.
  */
-export function validateDraft(draft: ApplicationDraft, example = 'GBP'): DraftErrors {
+export function validateDraft(draft: ApplicationDraft, example = NO_CURRENCY_EXAMPLE): DraftErrors {
   const errors: DraftErrors = {};
 
   if (draft.title.trim() === '') {
