@@ -60,3 +60,13 @@ updates:
     groups:
       cargo:
         patterns: ['*']
+    # sqlx stays on 0.8 while tauri-plugin-sql does (L-429). src/sql_gate.rs
+    # runs approved statements on the plugin's own pool, so our sqlx must be
+    # the version the plugin is built on; 0.9 made its Pool a different type
+    # and the whole grouped PR (#681) failed to compile. For a 0.x crate
+    # Dependabot calls 0.8 -> 0.9 a minor. Patches still flow. Remove this in
+    # the PR that moves to a tauri-plugin-sql built on sqlx 0.9.
+    # dependabot-holds-breaking-majors.contract.test.ts holds it here.
+    ignore:
+      - dependency-name: sqlx
+        update-types: ['version-update:semver-minor', 'version-update:semver-major']

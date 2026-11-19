@@ -32,15 +32,17 @@ const withoutComments = (text: string): string =>
     .map((line) => line.replace(/(^|\s)#.*$/, ''))
     .join('\n');
 
-/** The npm block: from its `package-ecosystem` line to the next one. */
-function npmBlock(text: string): string {
+/** One ecosystem's block: from its `package-ecosystem` line to the next one. */
+function ecosystemBlock(text: string, ecosystem: 'npm' | 'cargo'): string {
   const clean = withoutComments(text);
-  const start = clean.search(/package-ecosystem:\s*npm\b/);
+  const start = clean.search(new RegExp(String.raw`package-ecosystem:\s*${ecosystem}\b`));
   if (start === -1) return '';
   const rest = clean.slice(start + 1);
   const next = rest.search(/package-ecosystem:/);
   return next === -1 ? rest : rest.slice(0, next);
 }
+
+const npmBlock = (text: string): string => ecosystemBlock(text, 'npm');
 
 /** True when `block` ignores `kind` updates (major, minor) for `name`. */
 function holds(block: string, name: string, kind: 'major' | 'minor'): boolean {
@@ -86,6 +88,38 @@ describe('dependabot.yml holds zod on 4.4.x', () => {
       expect(holds(block, 'zod', kind)).toBe(true);
     });
   }
+});
+
+/**
+ * sqlx is held on 0.8 while tauri-plugin-sql is (L-429, 19 Nov 2026).
+ *
+ * `src-tauri/src/sql_gate.rs` runs approved statements on tauri-plugin-sql's
+ * OWN pool, so our `sqlx` must be the exact version the plugin is built on.
+ * tauri-plugin-sql 2.6.0, the newest 2.x, uses sqlx 0.8. The grouped Cargo
+ * PR #681 moved our copy to 0.9, making the plugin's `Pool` a different type
+ * from ours: the build failed and eight safe updates were stuck behind it.
+ * For a 0.x crate Dependabot calls 0.8 -> 0.9 a minor, so both are held.
+ * Patches (0.8.x) still flow. Remove both entries in the PR that moves to a
+ * tauri-plugin-sql built on sqlx 0.9.
+ */
+describe('dependabot.yml holds sqlx on 0.8', () => {
+  const block = ecosystemBlock(readFileSync(DEPENDABOT, 'utf8'), 'cargo');
+
+  it('has a cargo block at all', () => {
+    expect(block).not.toBe('');
+  });
+
+  for (const kind of ['minor', 'major'] as const) {
+    it(`ignores sqlx ${kind} updates`, () => {
+      expect(holds(block, 'sqlx', kind)).toBe(true);
+    });
+  }
+
+  it('negative: an sqlx hold under npm does not count for cargo', () => {
+    const text =
+      "version: 2\nupdates:\n  - package-ecosystem: npm\n    ignore:\n      - dependency-name: sqlx\n        update-types: ['version-update:semver-minor']\n  - package-ecosystem: cargo\n    directory: /x\n";
+    expect(holds(ecosystemBlock(text, 'cargo'), 'sqlx', 'minor')).toBe(false);
+  });
 });
 
 describe('the guard itself', () => {
