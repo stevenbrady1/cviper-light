@@ -342,3 +342,32 @@ describe('the third label says what it counts: cards in Interviewing or Offer no
     expect(labelOf('interviewing')).toBe('Interview or offer');
   });
 });
+
+describe('the strip labels are words in Inter, not small mono capitals (L-432)', () => {
+  it('happy: every label is text-xs in faint ink, with no mono face and no capitals', () => {
+    render(<FunnelStrip entries={board('saved', 'applied', 'interviewing')} />);
+
+    const labels = within(screen.getByTestId('tracker-funnel')).getAllByRole('term');
+    expect(labels).toHaveLength(5);
+    for (const label of labels) {
+      const classes = label.className.split(/\s+/);
+      expect(classes, label.textContent).toEqual(
+        expect.arrayContaining(['text-xs', 'text-ink-faint']),
+      );
+      expect(classes, label.textContent).not.toContain('font-mono');
+      expect(classes, label.textContent).not.toContain('uppercase');
+    }
+  });
+
+  it('negative: the five numbers keep the mono face, so the digits line up', () => {
+    render(<FunnelStrip entries={[]} />);
+
+    const figures = screen.getAllByTestId(/^tracker-funnel-count-/);
+    expect(figures).toHaveLength(5);
+    for (const figure of figures) {
+      expect(figure.className.split(/\s+/)).toEqual(
+        expect.arrayContaining(['font-mono', 'tabular-nums']),
+      );
+    }
+  });
+});
