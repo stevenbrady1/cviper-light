@@ -244,6 +244,40 @@
   }
 
   /*
+   * Slim scroll bars (W7). WebView2 is Chromium and draws these rules; so does
+   * WebKit on a Mac. An iPhone ignores them and keeps its own.
+   * `scrollbar-width` and `scrollbar-color` are left out ON PURPOSE: in
+   * Chromium either one switches these rules off, and Windows then draws its
+   * arrow buttons again. `scrollbars.contract.test.ts` keeps them out.
+   * 10px with a 2px clear edge: a 6px thumb you can see, a 10px strip you can
+   * grab. The thumb is the field-line colour, 3:1 on every light surface.
+   */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background: var(--color-field-line) padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover,
+  ::-webkit-scrollbar-thumb:active {
+    background-color: var(--color-ink-muted);
+  }
+
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
+
+  /*
    * The motion budget: ONE moment, and it is a card arriving in its new column.
    * Everything else in this app is still. `prefers-reduced-motion` removes even
    * that one.

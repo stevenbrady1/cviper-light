@@ -2,7 +2,7 @@ import { type ReactNode } from 'react';
 
 import { PageHeader } from '../ui';
 
-import { CONTENT_COLUMN } from './layout';
+import { CONTENT_COLUMN, HEADER_EDGE } from './layout';
 import { NAV_ICON } from './NavIcon';
 
 import { type ViewId } from './views';
@@ -24,6 +24,10 @@ import { type ViewId } from './views';
  * The title row carries `CONTENT_COLUMN` (L-326), so on a wide window the title
  * starts where the centred content starts. Not on Tracker: its board is full
  * width, and a centred title would sit away from the board's left edge.
+ *
+ * The strip also keeps the scroll bar's room on its right (`HEADER_EDGE`,
+ * L-435), the room the scroll area below always keeps, so the title row and
+ * the column are the same width. Not on Tracker, whose board keeps no such room.
  */
 
 interface ViewHeaderProps {
@@ -43,6 +47,7 @@ export function ViewHeader({ title, summary, action = null, view }: ViewHeaderPr
       actions={action}
       glyph={view === undefined ? undefined : NAV_ICON[view]}
       column={view === 'tracker' ? '' : CONTENT_COLUMN}
+      edge={view === 'tracker' ? '' : HEADER_EDGE}
     />
   );
 }
