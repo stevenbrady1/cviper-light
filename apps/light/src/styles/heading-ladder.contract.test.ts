@@ -1,7 +1,7 @@
 /**
  * The title ladder: three sizes, never in the serif (L-382, then L-405).
  *
- *   page title     24px   PAGE_TITLE, every screen's header and the crash screens
+ *   page title     30px   PAGE_TITLE, every screen's header and the crash screens
  *   section title  20px   SECTION_TITLE, `SectionHeading`
  *   welcome title  30px, 36px from `md:`   HERO_TITLE
  *
