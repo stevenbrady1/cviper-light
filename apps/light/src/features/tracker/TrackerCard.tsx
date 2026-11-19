@@ -138,8 +138,13 @@ export function TrackerCard({
           className="absolute top-4.5 right-0.5 size-2 rounded-pill bg-danger"
         />
       ) : null}
-      <p className="line-clamp-2 break-words text-xs text-ink-muted">{where}</p>
-
+      {/*
+        The {' '}s between the lines draw nothing (white space between blocks),
+        but keep the card's text as words: without them it reads "Data
+        AnalystAcme · London3 days…", and axe's label-in-name check (WCAG 2.5.3)
+        finds that run-together text missing from the aria-label (L-428).
+      */}{' '}
+      <p className="line-clamp-2 break-words text-xs text-ink-muted">{where}</p>{' '}
       {substage === null ? null : (
         <p
           data-testid={`tracker-card-substage-${application.id}`}
@@ -147,15 +152,13 @@ export function TrackerCard({
         >
           {substage}
         </p>
-      )}
-
+      )}{' '}
       <p
         data-testid={`tracker-card-age-${application.id}`}
         className="mt-1 truncate text-[11px] text-ink-muted"
       >
         {age}
-      </p>
-
+      </p>{' '}
       {line === null || urgency === 'none' ? null : (
         <p
           data-testid={`tracker-card-due-${application.id}`}
@@ -183,8 +186,7 @@ export function TrackerCard({
             {line.when}
           </span>
         </p>
-      )}
-
+      )}{' '}
       {note === null ? null : (
         <p
           data-testid={`tracker-card-next-${application.id}`}
