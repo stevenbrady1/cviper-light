@@ -28,6 +28,9 @@
 ; When @tauri-apps/cli is upgraded, re-diff this file against the new stock template
 ; and carry the CVIPER changes across. src/packaging/installerTemplate.contract.test.ts
 ; fails until the version recorded above matches pnpm-lock.yaml.
+; Re-diff windows/English.nsh too (bundle.windows.nsis.customLanguageFiles, L-426): it
+; REPLACES the stock languages/English.nsh, so it is a full copy with only
+; appRunningOkKill reworded. src/packaging/installerLanguage.contract.test.ts pins it.
 
 Unicode true
 ManifestDPIAware true

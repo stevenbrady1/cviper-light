@@ -20,7 +20,12 @@ const NSIS = (
   JSON.parse(readFileSync(`${SRC_TAURI}tauri.conf.json`, 'utf8')) as {
     bundle?: {
       windows?: {
-        nsis?: { sidebarImage?: string; headerImage?: string; installerIcon?: string };
+        nsis?: {
+          sidebarImage?: string;
+          headerImage?: string;
+          installerIcon?: string;
+          uninstallerIcon?: string;
+        };
       };
     };
   }
@@ -47,6 +52,13 @@ export function readBmpHeader(bytes: Uint8Array): BmpHeader {
   };
 }
 
+/** ICONDIR: reserved 0, type 1 (icon), at least one image. */
+function expectIcoAt(path: string | undefined): void {
+  const bytes = readFileSync(`${SRC_TAURI}${path ?? ''}`);
+  expect([bytes[0], bytes[1], bytes[2], bytes[3]]).toEqual([0, 0, 1, 0]);
+  expect(bytes[4] ?? 0).toBeGreaterThan(0);
+}
+
 const IMAGES = [
   { key: 'sidebarImage', path: NSIS?.sidebarImage, width: 164, height: 314 },
   { key: 'headerImage', path: NSIS?.headerImage, width: 150, height: 57 },
@@ -71,10 +83,17 @@ describe('the installer images are real, NSIS-readable bitmaps at the configured
 
   it('the installer icon is the app’s own .ico, at the configured path', () => {
     expect(NSIS?.installerIcon).toMatch(/\.ico$/);
-    const bytes = readFileSync(`${SRC_TAURI}${NSIS?.installerIcon ?? ''}`);
-    // ICONDIR: reserved 0, type 1 (icon), at least one image.
-    expect([bytes[0], bytes[1], bytes[2], bytes[3]]).toEqual([0, 0, 1, 0]);
-    expect(bytes[4] ?? 0).toBeGreaterThan(0);
+    expectIcoAt(NSIS?.installerIcon);
+  });
+
+  it('the uninstaller icon is the same .ico (L-426)', () => {
+    expect(
+      NSIS?.uninstallerIcon,
+      'without bundle.windows.nsis.uninstallerIcon the uninstaller shows NSIS’s default icon',
+    ).toBeDefined();
+    expect(NSIS?.uninstallerIcon).toMatch(/\.ico$/);
+    expectIcoAt(NSIS?.uninstallerIcon);
+    expect(NSIS?.uninstallerIcon).toBe(NSIS?.installerIcon);
   });
 
   describe('the header check can fail', () => {

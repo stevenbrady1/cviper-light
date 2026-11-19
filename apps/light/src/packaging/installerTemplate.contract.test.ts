@@ -232,6 +232,8 @@ describe('what must not change', () => {
     expect(TEMPLATE).toContain('!define SIDEBARIMAGE "{{sidebar_image}}"');
     expect(TEMPLATE).toContain('!define HEADERIMAGE "{{header_image}}"');
     expect(TEMPLATE).toContain('!define INSTALLERICON "{{installer_icon}}"');
+    expect(TEMPLATE).toContain('!define UNINSTALLERICON "{{uninstaller_icon}}"');
+    expect(TEMPLATE).toContain('!define MUI_UNICON "${UNINSTALLERICON}"');
     expect(TEMPLATE).toContain('!define MUI_WELCOMEFINISHPAGE_BITMAP "${SIDEBARIMAGE}"');
     expect(TEMPLATE).toContain('!define MUI_HEADERIMAGE_BITMAP "${HEADERIMAGE}"');
   });
