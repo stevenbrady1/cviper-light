@@ -14,6 +14,7 @@
  * search", which saves the same choices.
  */
 import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type JobProviderId } from '@cviper/job-apis';
@@ -99,8 +100,13 @@ describe('the Search button comes after every choice that changes it (L-313)', (
     expect(before(submit, save)).toBe(true);
     // Before the shortcuts and results, so the two actions sit together.
     expect(before(save, screen.getByTestId('search-results-header'))).toBe(true);
-    // And outside the search form: its name box is a form of its own.
-    expect(screen.getByTestId('search-form').contains(save)).toBe(false);
+    // In the form's one action row since L-433, as a button that cannot submit it…
+    expect(screen.getByTestId('search-submit-row').contains(save)).toBe(true);
+    expect(save.getAttribute('type')).toBe('button');
+    // …while its NAME BOX stays outside the search form: a form of its own.
+    await userEvent.setup().click(save);
+    const box = screen.getByTestId('saved-search-form');
+    expect(screen.getByTestId('search-form').contains(box)).toBe(false);
   });
 
   it('boundary: every board switched off — the box still says why, and the button still follows it', async () => {

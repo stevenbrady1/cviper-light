@@ -227,7 +227,7 @@ export function KeylessBar({
         )}
       </div>
       <p className="mt-0.5 text-xs text-ink-muted">
-        Tick the boards you want, then press “Also open” under Search. Point at, or tab to, a board
+        Tick the boards you want, then press “Also open” beside Search. Point at, or tab to, a board
         to see which filters it takes.
       </p>
 

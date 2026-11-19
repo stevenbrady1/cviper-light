@@ -204,7 +204,7 @@ describe('each wording row as approved (L-398)', () => {
   it('row 3: the instruction under it, middle sentence cut', async () => {
     renderApproved();
     expect(paragraphs(await screen.findByTestId('keyless-bar'))).toContain(
-      'Tick the boards you want, then press “Also open” under Search. Point at, or tab to, a ' +
+      'Tick the boards you want, then press “Also open” beside Search. Point at, or tab to, a ' +
         'board to see which filters it takes.',
     );
   });

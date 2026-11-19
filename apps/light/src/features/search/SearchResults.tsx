@@ -8,7 +8,7 @@ import {
 } from '@cviper/job-apis';
 
 import { LiveStatus } from '../../app/LiveStatus';
-import { ErrorBox, IconTile } from '../../ui';
+import { EmptyState, ErrorBox } from '../../ui';
 import { type Board } from '../boards/model';
 import { ANALYSE_DISCLOSURE } from '../flow/advert';
 import { type BrowserPort } from '../../platform/browser';
@@ -156,27 +156,25 @@ export function SearchResults({
       {/* The few-results message, spoken from here (L-238) — see `fewResultsText`. */}
       <LiveStatus text={results.ran && !running ? fewText : null} />
       {!results.ran ? (
-        <div
-          data-testid="search-empty"
-          className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
-        >
-          <div className="mb-3 flex justify-center">
-            <IconTile icon="search" />
-          </div>
-          <p className="font-medium text-ink">Nothing looked at yet.</p>
-          {noCountry ? (
-            <p className="mt-1 text-ink-muted">{CHOOSE_COUNTRY_REASON}</p>
-          ) : (
-            <p className="mt-1 text-ink-muted">
-              {searchBlocked
-                ? noFreeFeedHere
-                  ? 'A free Reed key, set up in Settings, shows UK adverts here.'
-                  : 'Tick a free feed in “Where to look” to see the newest adverts here — it needs no key.'
-                : 'Type a job title and press Search to see the newest adverts from the free feed.'}{' '}
-              Or tick job boards in “Where to look” and press “Also open”.
-            </p>
-          )}
-        </div>
+        <EmptyState
+          icon="search"
+          title="Nothing looked at yet."
+          testId="search-empty"
+          body={
+            noCountry ? (
+              CHOOSE_COUNTRY_REASON
+            ) : (
+              <>
+                {searchBlocked
+                  ? noFreeFeedHere
+                    ? 'A free Reed key, set up in Settings, shows UK adverts here.'
+                    : 'Tick a free feed in “Where to look” to see the newest adverts here — it needs no key.'
+                  : 'Type a job title and press Search to see the newest adverts from the free feed.'}{' '}
+                Or tick job boards in “Where to look” and press “Also open”.
+              </>
+            )
+          }
+        />
       ) : (
         <>
           {running ? null : (

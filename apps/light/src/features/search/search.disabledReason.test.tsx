@@ -91,20 +91,18 @@ describe('the reason sits beside the disabled Search button (L-335)', () => {
     expect(submit().disabled).toBe(true);
     const reason = screen.getByTestId('search-reason');
     // Same row as the button: they share the row element, so whenever the
-    // button is on screen its reason is next to it, not a row further down.
+    // button is on screen its reason is too, not a row further down.
     const row = screen.getByTestId('search-submit-row');
     expect(row.contains(submit())).toBe(true);
     expect(row.contains(reason)).toBe(true);
-    expect(screen.getByTestId('search-open-boards-row').contains(reason)).toBe(false);
-    // And it can sit BESIDE the button: in a wrapping row a long sentence at
-    // its natural width is pushed onto a line of its own, under the button —
-    // the bug. A flexible, shrinkable item takes the rest of the button's line
-    // instead, and only drops under it once the row is narrower than its basis.
+    // Since L-433 the row holds four buttons, so the reason is on the line
+    // UNDER them, still inside the row. The row is sticky (L-342), so that line
+    // is on screen whenever the buttons are — the L-335 bug was a line BELOW
+    // the row, before the row was sticky.
     const area = screen.getByTestId('search-reason-area');
     expect(area.parentElement).toBe(row);
     expect(area.contains(reason)).toBe(true);
-    const classes = area.className.split(/\s+/);
-    for (const name of ['flex-1', 'min-w-0', 'basis-64']) expect(classes).toContain(name);
+    expect(area.previousElementSibling?.contains(submit())).toBe(true);
 
     const describedBy = (submit().getAttribute('aria-describedby') ?? '').split(/\s+/);
     expect(reason.id).not.toBe('');
