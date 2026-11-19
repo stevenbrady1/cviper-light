@@ -169,7 +169,7 @@ export function YourCv({ store, files, now, onCvs }: YourCvProps) {
       </p>
 
       {cvs.length === 0 ? null : (
-        <ul data-testid="profile-cv-list" className="mt-2 space-y-2">
+        <ul data-testid="profile-cv-list" className="mt-2">
           {cvs.map((cv) => (
             <CvRow
               key={cv.id}

@@ -12,6 +12,12 @@ import { Dialog } from '../../ui';
 export const MAX_CV_NAME = 100;
 
 /**
+ * A thin line above every row but the first (L-436). A border on each row, not
+ * a divide colour on the list: `contrast.contract.test.ts` forbids those.
+ */
+const ROW_LINE = 'border-t border-line first:border-t-0';
+
+/**
  * What is wrong with a name, already trimmed, or `null`.
  *
  * Counted in code points, so an emoji or an accented letter is one character
@@ -84,7 +90,7 @@ export function CvRow({ cv, facts, onRename, onDelete }: CvRowProps) {
 
   if (draft !== null) {
     return (
-      <li>
+      <li className={`${ROW_LINE} py-2.5`}>
         <form noValidate onSubmit={(event) => void onSubmit(event)}>
           <label htmlFor={`${id}-name`} className="block text-xs font-medium text-ink-muted">
             Name
@@ -137,17 +143,23 @@ export function CvRow({ cv, facts, onRename, onDelete }: CvRowProps) {
     );
   }
 
+  // One row (L-436): the buttons sit to the right from `md` up, under the name on a phone.
   return (
-    <li>
-      <span data-testid="profile-cv-name" className="block font-medium break-words text-ink">
-        {cv.name}
-      </span>
-      {facts === '' ? null : (
-        <span data-testid="profile-cv-facts" className="block text-ink-muted">
-          {facts}
+    <li
+      className={`${ROW_LINE} flex flex-col gap-1 py-2.5 md:flex-row md:items-center md:justify-between`}
+    >
+      {/* `min-w-0`: a flex item is otherwise never narrower than its longest word. */}
+      <div className="min-w-0 flex-1">
+        <span data-testid="profile-cv-name" className="block font-medium break-words text-ink">
+          {cv.name}
         </span>
-      )}
-      <div className="mt-1 flex flex-wrap gap-2">
+        {facts === '' ? null : (
+          <span data-testid="profile-cv-facts" className="block text-xs text-ink-muted">
+            {facts}
+          </span>
+        )}
+      </div>
+      <div className="flex shrink-0 flex-wrap gap-2">
         {/* Two rows each have a "Rename" and a "Delete": the label says whose. */}
         <button
           ref={renameRef}
@@ -155,7 +167,7 @@ export function CvRow({ cv, facts, onRename, onDelete }: CvRowProps) {
           aria-label={`Rename ${cv.name}`}
           onClick={() => setDraft(cv.name)}
           data-testid={`profile-cv-rename-${cv.id}`}
-          className={QUIET_BUTTON}
+          className={`${QUIET_BUTTON} text-xs`}
         >
           Rename
         </button>
@@ -164,7 +176,7 @@ export function CvRow({ cv, facts, onRename, onDelete }: CvRowProps) {
           aria-label={`Delete ${cv.name}`}
           onClick={() => onDelete(cv)}
           data-testid={`profile-cv-delete-${cv.id}`}
-          className={QUIET_BUTTON}
+          className={`${QUIET_BUTTON} text-xs`}
         >
           Delete
         </button>

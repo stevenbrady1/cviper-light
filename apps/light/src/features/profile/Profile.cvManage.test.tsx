@@ -463,3 +463,83 @@ describe('Delete', () => {
     expect(screen.getAllByTestId('profile-cv-delete-dialog')).toHaveLength(1);
   });
 });
+
+/**
+ * Each saved CV is one row (L-436): the name with its facts under it in small
+ * grey, and Rename and Delete in a group after them, on the right from `md` up
+ * and under the name on a phone. jsdom lays nothing out, so this proves the
+ * shape the layout is built from; `e2e/contrast-webkit.spec.ts` measures where
+ * it lands at 1000 and 375 wide.
+ */
+describe('each saved CV is one row (L-436)', () => {
+  /** The row's two parts: the text (name and facts), then the buttons. */
+  function partsOf(id: string): { row: HTMLElement; text: HTMLElement; buttons: HTMLElement } {
+    const row = screen.getByTestId(`profile-cv-rename-${id}`).closest('li');
+    if (row === null) throw new Error(`no row for ${id}`);
+    const [text, buttons, ...rest] = [...row.children] as HTMLElement[];
+    expect(rest).toEqual([]);
+    if (text === undefined || buttons === undefined) throw new Error(`row ${id} has one part`);
+    return { row, text, buttons };
+  }
+
+  it('happy: name and facts in one block, Rename then Delete in a group after it, side by side from md up', async () => {
+    await renderView(createFakeAnalysisPort({ cvs: [NEWER, OLDER] }));
+
+    // Thin lines between rows, not gaps: a line above every row but the first.
+    expect(screen.getByTestId('profile-cv-list').className).not.toContain('space-y-');
+
+    for (const cv of [NEWER, OLDER]) {
+      const { row, text, buttons } = partsOf(cv.id);
+      expect(row.className).toContain('flex-col');
+      expect(row.className).toContain('md:flex-row');
+      expect(row.className).toContain('border-t border-line first:border-t-0');
+
+      expect(within(text).getByTestId('profile-cv-name').textContent).toBe(cv.name);
+      const facts = within(text).getByTestId('profile-cv-facts');
+      expect(facts.textContent).toMatch(/^\d+ words?\. Added /);
+      expect(facts.className).toContain('text-xs');
+      expect(facts.className).toContain('text-ink-muted');
+
+      const rename = screen.getByTestId(`profile-cv-rename-${cv.id}`);
+      const remove = screen.getByTestId(`profile-cv-delete-${cv.id}`);
+      expect([...buttons.children]).toEqual([rename, remove]);
+      // Delete is as quiet as Rename: the question asks before anything goes.
+      expect(remove.className).toBe(rename.className);
+      expect(remove.className).not.toContain('bg-danger');
+      // Small words, still a 44px thumb target on a phone (L-81).
+      expect(rename.className).toContain('text-xs');
+      expect(rename.className).toContain('min-h-11');
+    }
+  });
+
+  it('negative: a CV with no facts draws the name alone, and no empty line', async () => {
+    const bare: Cv = {
+      ...OLDER,
+      extracted_text: null,
+      created_at: 'nope' as Cv['created_at'],
+    };
+    await renderView(createFakeAnalysisPort({ cvs: [bare] }));
+
+    const { text } = partsOf(bare.id);
+    expect([...text.children]).toEqual([within(text).getByTestId('profile-cv-name')]);
+    expect(screen.queryByTestId('profile-cv-facts')).toBeNull();
+  });
+
+  it('boundary: a 100-character name with no spaces may wrap, and cannot squeeze the buttons', async () => {
+    const long: Cv = { ...NEWER, name: `${'Curriculum'.repeat(9)}Vitae.docx` };
+    expect([...long.name].length).toBe(100);
+    await renderView(createFakeAnalysisPort({ cvs: [long] }));
+
+    const { text, buttons } = partsOf(long.id);
+    // `min-w-0`: without it a flex item is never narrower than its longest word.
+    expect(text.className).toContain('min-w-0');
+    expect(text.className).toContain('flex-1');
+    expect(within(text).getByTestId('profile-cv-name').className).toContain('break-words');
+    expect(buttons.className).toContain('shrink-0');
+    expect(
+      within(buttons)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Rename', 'Delete']);
+  });
+});
