@@ -640,7 +640,7 @@ export function Search({
       <ViewHeader view={view.id} title={view.label} summary={view.summary} />
 
       {/* `scroll-pb`: a focused tick stays clear of the pinned row at its tallest (L-342). */}
-      <div className={`min-h-0 flex-1 overflow-y-auto ${SIDE_PADDING} py-5 md:scroll-pb-48`}>
+      <div className={`min-h-0 flex-1 overflow-y-auto ${SIDE_PADDING} py-5 md:scroll-pb-64`}>
         <div data-content-column className={`${CONTENT_COLUMN} space-y-5`}>
           <form data-testid="search-form" onSubmit={(event) => void onSubmit(event)}>
             <SearchFields

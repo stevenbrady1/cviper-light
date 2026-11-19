@@ -2755,26 +2755,32 @@ describe('Search has one action row (L-433)', () => {
 
   // TRAP — the row is taller since L-433 (both reasons are in it), so the scroll
   // padding that keeps a focused tick clear of it (L-342) must still cover it.
-  it('at 1000×700 the tallest row, Reed fix and both reasons showing, fits in the scroll padding', async () => {
-    const page = await openTypedSearch(SMALLEST_WINDOW);
-    await pressMoreBoards(page);
-    await page.waitForSelector('[data-testid="search-open-boards-reason"]');
-    const seen = await page.evaluate(
-      ({ areaSelector, rowSelector }) => {
-        const area = document.querySelector(areaSelector);
-        const row = document.querySelector(rowSelector);
-        if (area === null || row === null) throw new Error('no area or row');
-        return {
-          row: row.getBoundingClientRect().height,
-          padding: parseFloat(getComputedStyle(area).scrollPaddingBottom),
-        };
-      },
-      { areaSelector: SEARCH_AREA, rowSelector: SUBMIT_ROW },
-    );
-    console.log(`tallest row at 1000×700: ${JSON.stringify(seen)}`);
-    assert.ok(seen.row <= seen.padding, JSON.stringify(seen));
-    await page.context().close();
-  });
+  // At 768px the buttons and the reasons wrap, so the row is tallest there.
+  for (const viewport of [SMALLEST_WINDOW, NARROWEST_STICKY]) {
+    const size = `${String(viewport.width)}×${String(viewport.height)}`;
+
+    it(`at ${size} the tallest row, Reed fix and both reasons showing, fits in the 256px scroll padding`, async () => {
+      const page = await openTypedSearch(viewport);
+      await pressMoreBoards(page);
+      await page.waitForSelector('[data-testid="search-open-boards-reason"]');
+      const seen = await page.evaluate(
+        ({ areaSelector, rowSelector }) => {
+          const area = document.querySelector(areaSelector);
+          const row = document.querySelector(rowSelector);
+          if (area === null || row === null) throw new Error('no area or row');
+          return {
+            row: row.getBoundingClientRect().height,
+            padding: parseFloat(getComputedStyle(area).scrollPaddingBottom),
+          };
+        },
+        { areaSelector: SEARCH_AREA, rowSelector: SUBMIT_ROW },
+      );
+      console.log(`tallest row at ${size}: ${JSON.stringify(seen)}`);
+      assert.equal(seen.padding, 256);
+      assert.ok(seen.row <= seen.padding, JSON.stringify(seen));
+      await page.context().close();
+    });
+  }
 
   it('at 1000×700 the four buttons share one line, and the divider is drawn between them', async () => {
     const page = await openTypedSearch(SMALLEST_WINDOW);

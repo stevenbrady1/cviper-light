@@ -798,7 +798,8 @@ describe('exactly one blue pill, and it is "Start here" (L-378)', () => {
     expect(names.some((name) => /\.test\.tsx?$/.test(name))).toBe(false);
     expect(BLUE_TOKENS).toContain('blue');
     expect(REAL.elements.length).toBeGreaterThan(1000);
-    expect(REAL.elements.filter((element) => element.pill).length).toBeGreaterThan(10);
+    // 9, not 10: L-433 removed the dashed "Save this search" pill on purpose.
+    expect(REAL.elements.filter((element) => element.pill).length).toBeGreaterThan(9);
   });
 
   it('sees the pills it must see, through the constants and props they are built from', () => {
