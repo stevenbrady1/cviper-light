@@ -40,11 +40,11 @@ const LOCK = readFileSync(`${REPO_ROOT}pnpm-lock.yaml`, 'utf8');
 const LOCKED_CLI = /'@tauri-apps\/cli@(\d+\.\d+\.\d+)':/.exec(LOCK)?.[1] ?? '';
 
 /** The tauri-cli tag STOCK_ENGLISH was copied from. */
-const STOCK_FROM_CLI = '2.12.3';
+const STOCK_FROM_CLI = '2.12.4';
 
 /**
  * crates/tauri-bundler/src/bundle/windows/nsis/languages/English.nsh at tag
- * tauri-cli-v2.12.3, line for line (LF endings, final newline, no BOM).
+ * tauri-cli-v2.12.4, line for line (LF endings, final newline, no BOM).
  */
 const STOCK_ENGLISH = [
   'LangString addOrReinstall ${LANG_ENGLISH} "Add/Reinstall components"',
@@ -53,7 +53,7 @@ const STOCK_ENGLISH = [
   'LangString appRunning ${LANG_ENGLISH} "{{product_name}} is running! Please close it first then try again."',
   'LangString appRunningOkKill ${LANG_ENGLISH} "{{product_name}} is running!$\\nClick OK to kill it"',
   'LangString chooseMaintenanceOption ${LANG_ENGLISH} "Choose the maintenance option to perform."',
-  'LangString choowHowToInstall ${LANG_ENGLISH} "Choose how you want to install ${PRODUCTNAME}."',
+  'LangString chooseHowToInstall ${LANG_ENGLISH} "Choose how you want to install ${PRODUCTNAME}."',
   'LangString createDesktop ${LANG_ENGLISH} "Create desktop shortcut"',
   'LangString dontUninstall ${LANG_ENGLISH} "Do not uninstall"',
   'LangString dontUninstallDowngrade ${LANG_ENGLISH} "Do not uninstall (Downgrading without uninstall is disabled for this installer)"',

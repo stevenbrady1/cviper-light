@@ -1,10 +1,14 @@
 ; CViper Light's copy of Tauri's NSIS installer template (L-253).
 ;
-; Copied from tauri-cli 2.12.3 (crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi
-; at tag tauri-cli-v2.12.3), used through bundle.windows.nsis.template in tauri.conf.json.
+; Copied from tauri-cli 2.12.4 (crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi
+; at tag tauri-cli-v2.12.4), used through bundle.windows.nsis.template in tauri.conf.json.
 ; Re-diffed for 2.12.3 (L-294): the one stock change, PageLeaveReinstall deleting the old
 ; install's leftover uninstall.exe and empty directory after an in-place uninstall, is taken
 ; as is; it sits after the CVIPER silent-update uninstall and does not touch app data or keys.
+; Re-diffed for 2.12.4 (L-428): every stock change is taken as is. WiX detection moves into
+; FindWixInstall (also used by .onInit's version check), the reinstall header reads
+; chooseHowToInstall with a choowHowToInstall fallback, and file-association paths are
+; quoted. None touches the CVIPER lines, which read $R0/$R1 in PageLeaveReinstall only.
 ; It is the stock file except for the lines marked "; CVIPER:", which are:
 ;
 ;   1. The finish page has no "Create desktop shortcut" action; the shortcut is made in
@@ -222,18 +226,20 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 ;    only if a previous installation was detected
 Var ReinstallPageCheck
 Page custom PageReinstall PageLeaveReinstall
-Function PageReinstall
-  ; Uninstall previous WiX installation if exists.
-  ;
-  ; A WiX installer stores the installation info in registry
-  ; using a UUID and so we have to loop through all keys under
-  ; `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`
-  ; and check if `DisplayName` and `Publisher` keys match ${PRODUCTNAME} and ${MANUFACTURER}
-  ;
-  ; This has a potential issue that there maybe another installation that matches
-  ; our ${PRODUCTNAME} and ${MANUFACTURER} but wasn't installed by our WiX installer,
-  ; however, this should be fine since the user will have to confirm the uninstallation
-  ; and they can chose to abort it if doesn't make sense.
+
+; Find a previous WiX installation and set $R6 to its uninstall registry key, or to "" if none.
+;
+; A WiX installer stores the installation info in registry
+; using a UUID and so we have to loop through all keys under
+; `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`
+; and check if `DisplayName` and `Publisher` keys match ${PRODUCTNAME} and ${MANUFACTURER}
+;
+; This has a potential issue that there maybe another installation that matches
+; our ${PRODUCTNAME} and ${MANUFACTURER} but wasn't installed by our WiX installer,
+; however, this should be fine since the user will have to confirm the uninstallation
+; and they can chose to abort it if doesn't make sense.
+Function FindWixInstall
+  StrCpy $R6 ""
   StrCpy $0 0
   wix_loop:
     EnumRegKey $1 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" $0
@@ -246,10 +252,17 @@ Function PageReinstall
     ${StrCase} $R1 $R0 "L"
     ${StrLoc} $R0 $R1 "msiexec" ">"
     StrCmp $R0 0 0 wix_loop_done
-    StrCpy $WixMode 1
     StrCpy $R6 "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$1"
-    Goto compare_version
   wix_loop_done:
+FunctionEnd
+
+Function PageReinstall
+  ; Uninstall previous WiX installation if exists.
+  Call FindWixInstall
+  ${If} $R6 != ""
+    StrCpy $WixMode 1
+    Goto compare_version
+  ${EndIf}
 
   ; Check if there is an existing installation, if not, abort the reinstall page
   ReadRegStr $R0 SHCTX "${UNINSTKEY}" ""
@@ -269,6 +282,13 @@ Function PageReinstall
 
   nsis_tauri_utils::SemverCompare "${VERSION}" $R0
   Pop $R0
+
+  ; Read the install choice header through $R5 so a custom language file that only
+  ; defines the misspelled `choowHowToInstall` still shows its own text
+  ; TODO: remove the `choowHowToInstall` fallback in a future major version
+  StrCpy $R5 "$(chooseHowToInstall)"
+  ${IfThen} $R5 == "" ${|} StrCpy $R5 "$(choowHowToInstall)" ${|}
+
   ; Reinstalling the same version
   ${If} $R0 = 0
     StrCpy $R1 "$(alreadyInstalledLong)"
@@ -280,7 +300,7 @@ Function PageReinstall
     StrCpy $R1 "$(olderOrUnknownVersionInstalled)"
     StrCpy $R2 "$(uninstallBeforeInstalling)"
     StrCpy $R3 "$(dontUninstall)"
-    !insertmacro MUI_HEADER_TEXT "$(alreadyInstalled)" "$(choowHowToInstall)"
+    !insertmacro MUI_HEADER_TEXT "$(alreadyInstalled)" "$R5"
   ; Downgrading
   ${ElseIf} $R0 = -1
     StrCpy $R1 "$(newerVersionInstalled)"
@@ -290,7 +310,7 @@ Function PageReinstall
     !else
       StrCpy $R3 "$(dontUninstallDowngrade)"
     !endif
-    !insertmacro MUI_HEADER_TEXT "$(alreadyInstalled)" "$(choowHowToInstall)"
+    !insertmacro MUI_HEADER_TEXT "$(alreadyInstalled)" "$R5"
   ${Else}
     Abort
   ${EndIf}
@@ -525,8 +545,15 @@ FunctionEnd
 !insertmacro MUI_UNPAGE_INSTFILES
 
 ;Languages
+; PageReinstall reads the misspelled `choowHowToInstall` as a fallback, and makensis warns
+; about a language string that is read but never set, so default it to an empty string for
+; every language. This runs before the language files are included, so a custom language
+; file that only defines the old spelling overrides the default and the fallback shows its
+; text. `0` as the language id means the language inserted right above.
+; TODO: remove the `choowHowToInstall` fallback in a future major version
 {{#each languages}}
 !insertmacro MUI_LANGUAGE "{{this}}"
+LangString choowHowToInstall 0 ""
 {{/each}}
 !insertmacro MUI_RESERVEFILE_LANGDLL
 {{#each language_files}}
@@ -587,7 +614,13 @@ Function .onInit
   ${If} ${Silent}
   ${OrIf} $PassiveMode = 1
   ${OrIf} $UpdateMode = 1
-    ReadRegStr $R0 SHCTX "${UNINSTKEY}" "DisplayVersion"
+    ; Compare with the same installation the reinstall page would: a WiX one first
+    Call FindWixInstall
+    ${If} $R6 != ""
+      ReadRegStr $R0 HKLM "$R6" "DisplayVersion"
+    ${Else}
+      ReadRegStr $R0 SHCTX "${UNINSTKEY}" "DisplayVersion"
+    ${EndIf}
     nsis_tauri_utils::SemverCompare "${VERSION}" $R0
     Pop $R0
     ; If downgrading
@@ -728,7 +761,7 @@ Section Install
   ; Create file associations
   {{#each file_associations as |association| ~}}
     {{#each association.ext as |ext| ~}}
-       !insertmacro APP_ASSOCIATE "{{ext}}" "{{or association.name ext}}" "{{association-description association.description ext}}" "$INSTDIR\${MAINBINARYNAME}.exe,0" "Open with ${PRODUCTNAME}" "$INSTDIR\${MAINBINARYNAME}.exe $\"%1$\""
+       !insertmacro APP_ASSOCIATE "{{ext}}" "{{or association.name ext}}" "{{association-description association.description ext}}" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\",0" "Open with ${PRODUCTNAME}" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""
     {{/each}}
   {{/each}}
 
