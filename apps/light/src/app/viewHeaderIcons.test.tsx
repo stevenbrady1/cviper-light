@@ -1,11 +1,18 @@
 // @vitest-environment jsdom
 /**
- * The icon at the top of each view, and on the welcome cards, is the SAME
- * duotone drawing the navigation shows for that view (L-254).
+ * The welcome cards wear the SAME duotone drawing the navigation shows for
+ * that view (L-254). The view headers no longer wear one at all (L-431).
  *
- * The new icons reached the sidebar and the phone bar, but every view's header
- * tile and the three welcome cards still drew the old single-colour `Icon` set,
- * so the screen said "Profile" in two different drawings at once.
+ * L-254 put the navigation drawing in a tile beside every view's title, so the
+ * header and the rail could not say "Profile" in two different drawings. But
+ * the tile then said it twice, side by side: the rail's icon, and the same icon
+ * again a few pixels to the right. The rule turned over on purpose:
+ *
+ *   before (L-254)  every view header shows its navigation drawing
+ *   now    (L-431)  no view header shows an icon; the title stands alone
+ *
+ * The welcome cards stand on their own page with no rail beside them, so they
+ * keep the drawing.
  */
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -35,30 +42,26 @@ function navDrawing(id: ViewId): string[] {
   return result;
 }
 
-describe('every view header wears its navigation icon', () => {
+describe('no view header draws an icon (L-431)', () => {
   for (const view of VIEWS) {
     it(view.id, () => {
-      const expected = navDrawing(view.id);
       const { container } = render(
         <ViewHeader view={view.id} title={view.label} summary={view.summary} />,
       );
-      const svg = container.querySelector('header svg');
-      expect(drawing(svg)).toEqual(expected);
-      expect(expected.length).toBeGreaterThan(0);
-      expect(svg?.getAttribute('aria-hidden')).toBe('true');
+      const header = container.querySelector('header');
+      expect(header?.querySelector('h1')?.textContent).toBe(view.label);
+      expect(header?.querySelector('svg')).toBeNull();
+      expect(header?.querySelector('[aria-hidden="true"]')).toBeNull();
     });
   }
 
-  it('negative: a header with no view draws no icon tile', () => {
+  it('negative: a header with no view draws no icon either', () => {
     const { container } = render(<ViewHeader title="Untitled" summary="No view." />);
     expect(container.querySelector('header svg')).toBeNull();
   });
 
-  it('boundary: the header icon is tile-sized, not nav-sized', () => {
-    const { container } = render(<ViewHeader view="profile" title="Profile" summary="x" />);
-    const cls = container.querySelector('header svg')?.getAttribute('class') ?? '';
-    expect(cls).toContain('size-6');
-    expect(cls).not.toContain('h-6 w-6 shrink-0');
+  it('boundary: every view still HAS a navigation drawing, so the header leaves it out by choice', () => {
+    for (const view of VIEWS) expect(navDrawing(view.id).length, view.id).toBeGreaterThan(0);
   });
 });
 
