@@ -88,6 +88,48 @@ describe('nextActionDescription — the chip is never the only telling', () => {
   });
 });
 
+describe('nextActionDescription speaks the words the card shows (L-430)', () => {
+  // WCAG 2.5.3, label in name: a voice-control user says what they see, so the
+  // spoken name must hold the visible due words, not a rewording of them.
+  it('happy path: overdue, tomorrow and N days ahead use the visible words', () => {
+    expect(nextActionDescription('Chase recruiter', '2026-08-17', TODAY)).toBe(
+      'Next action: Chase recruiter — 2 days overdue',
+    );
+    expect(nextActionDescription('Chase recruiter', '2026-08-20', TODAY)).toBe(
+      'Next action: Chase recruiter — due tomorrow',
+    );
+    expect(nextActionDescription('Chase recruiter', '2026-08-22', TODAY)).toBe(
+      'Next action: Chase recruiter — due in 3 days',
+    );
+  });
+
+  it('happy path: with no action text the frame is "Next action <when>"', () => {
+    expect(nextActionDescription(null, '2026-08-17', TODAY)).toBe('Next action 2 days overdue');
+    expect(nextActionDescription('   ', '2026-08-20', TODAY)).toBe('Next action due tomorrow');
+  });
+
+  it('boundary: one day late, today, and one day ahead', () => {
+    expect(nextActionDescription(null, '2026-08-18', TODAY)).toBe('Next action 1 day overdue');
+    expect(nextActionDescription(null, '2026-08-19', TODAY)).toBe('Next action due today');
+    expect(nextActionDescription(null, '2026-08-20', TODAY)).toBe('Next action due tomorrow');
+  });
+
+  it('the when part is always exactly nextActionWhen', () => {
+    for (const date of ['2025-01-01', '2026-08-18', '2026-08-19', '2026-08-20', '2026-09-30']) {
+      const when = nextActionWhen(date, TODAY);
+      expect(nextActionDescription('Call', date, TODAY), date).toBe(`Next action: Call — ${when}`);
+    }
+  });
+
+  it('negative: no date, an unreadable date, or an unreadable today says nothing', () => {
+    expect(nextActionDescription('Chase recruiter', null, TODAY)).toBeNull();
+    for (const junk of ['tomorrow', '', '19/08/2026', '2026-13-45']) {
+      expect(nextActionDescription('Chase recruiter', junk, TODAY), junk).toBeNull();
+    }
+    expect(nextActionDescription('Chase recruiter', '2026-08-19', 'not a date')).toBeNull();
+  });
+});
+
 describe('nextActionWhen — the due date as a card can say it (L-175)', () => {
   it('says today and tomorrow in words', () => {
     expect(nextActionWhen('2026-08-19', TODAY)).toBe('due today');

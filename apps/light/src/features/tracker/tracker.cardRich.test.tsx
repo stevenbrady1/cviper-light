@@ -212,7 +212,7 @@ describe('richer Tracker cards (L-393)', () => {
 
       expect(dots[0]?.getAttribute('aria-hidden')).toBe('true');
       expect(dots[0]?.textContent).toBe('');
-      expect(label).toContain('Next action: Chase the recruiter — overdue by 2 days');
+      expect(label).toContain('Next action: Chase the recruiter — 2 days overdue');
     });
 
     it('the label carries an undated action as "Next action: <words>"', () => {
@@ -302,6 +302,28 @@ describe('words on one line, due on the next (L-409)', () => {
     const { label } = renderCard({ nextAction: words, nextActionDate: '2026-11-10' });
 
     expect(words).toHaveLength(60);
-    expect(label).toContain(`Next action: ${words} — overdue by 2 days`);
+    expect(label).toContain(`Next action: ${words} — 2 days overdue`);
+  });
+
+  // L-430, WCAG 2.5.3 label in name: whatever the due line shows, the card's
+  // accessible name says too — read from the rendered card, so it cannot drift.
+  it.each([
+    ['2026-11-10', 'Chase the recruiter'],
+    ['2026-11-11', null],
+    ['2026-11-12', 'Call back'],
+    ['2026-11-13', 'Call back'],
+    ['2026-11-15', null],
+  ])('regression: the accessible name holds the visible due words (%s, %s)', (date, action) => {
+    renderCard({ nextAction: action, nextActionDate: date });
+    const card = screen.getByRole('button');
+    const name = card.getAttribute('aria-label')?.toLowerCase() ?? '';
+    const when = screen.getByTestId('tracker-card-due-when-a').textContent ?? '';
+
+    expect(when).not.toBe('');
+    expect(name).toContain(when.toLowerCase());
+    if (action !== null) {
+      const shown = screen.getByTestId('tracker-card-due-action-a').textContent ?? '';
+      expect(name).toContain(`${shown} — ${when}`.toLowerCase());
+    }
   });
 });
