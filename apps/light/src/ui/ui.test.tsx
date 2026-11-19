@@ -243,11 +243,51 @@ describe('PageHeader', () => {
     expect(container.querySelector('[data-slot="actions"]')).toBeNull();
   });
 
-  it('shows an icon tile when given one', () => {
-    const { container } = render(
-      <PageHeader title="Search" subtitle="Find roles." icon="search" />,
+  /*
+   * L-431: the title stands alone. The grey tile beside it repeated the menu
+   * icon the rail already shows for the same screen, so it went, and the title
+   * took the room: 30px on a 32px line, the same line as the old 24px title, so
+   * the header bar stays 85px tall (the real-browser cap in
+   * `e2e/contrast-webkit.spec.ts`).
+   */
+  it('the page title is 30px on a 32px line (L-431)', () => {
+    render(<PageHeader title="Tracker" subtitle="Every application." />);
+    const title = screen.getByRole('heading', { level: 1 }).className;
+    expect(title).toMatch(/(^|\s)text-3xl(\s|$)/);
+    expect(title).toMatch(/(^|\s)leading-8(\s|$)/);
+    expect(title).not.toMatch(/(^|\s)text-2xl(\s|$)/);
+  });
+
+  it('negative: a header draws no svg and no tile, whatever it is given (L-431)', () => {
+    // The props the bar used to take, passed the only way the type still allows.
+    const legacy = { icon: 'search', glyph: () => <svg data-testid="glyph" /> } as object;
+    const { container } = render(<PageHeader title="Search" subtitle="Find roles." {...legacy} />);
+    const header = container.querySelector('header');
+    expect(header).toBeTruthy();
+    expect(header?.querySelector('svg')).toBeNull();
+    expect(header?.querySelector('[aria-hidden="true"]')).toBeNull();
+    expect(header?.querySelector('.rounded-control')).toBeNull();
+  });
+
+  it('boundary: the page title sits between a section title (20px) and the welcome title from md (36px)', () => {
+    const PX: Record<string, number> = { xl: 20, '2xl': 24, '3xl': 30, '4xl': 36 };
+    const base = (cls: string) => PX[/(?:^|\s)text-(xl|2xl|3xl|4xl)(?=\s|$)/.exec(cls)?.[1] ?? ''];
+    render(
+      <>
+        <PageHeader title="Tracker" subtitle="x" />
+        <SectionHeading title="Your CVs" />
+      </>,
     );
-    expect(container.querySelector('svg')).toBeTruthy();
+    const page = base(screen.getByRole('heading', { level: 1 }).className);
+    const section = base(screen.getByRole('heading', { level: 2 }).className);
+    cleanup();
+    render(<PageHeader variant="hero" title="CViper Light" subtitle="x" />);
+    const heroMd = /(?:^|\s)md:text-(4xl)(?=\s|$)/.exec(
+      screen.getByRole('heading', { level: 1 }).className,
+    )?.[1];
+    expect(section).toBe(20);
+    expect(page).toBeGreaterThan(section ?? Infinity);
+    expect(page).toBeLessThan(PX[heroMd ?? ''] ?? -Infinity);
   });
 });
 
@@ -263,11 +303,11 @@ function expectSansSemibold(className: string): void {
 }
 
 describe('title ladder (L-382, L-405)', () => {
-  it('PageHeader title is the sans face, semibold, 24px', () => {
+  it('PageHeader title is the sans face, semibold, 30px (L-431; 24px before)', () => {
     render(<PageHeader title="Tracker" subtitle="Every application." />);
     const title = screen.getByRole('heading', { level: 1 }).className;
     expectSansSemibold(title);
-    expect(title).toMatch(/(^|\s)text-2xl(\s|$)/);
+    expect(title).toMatch(/(^|\s)text-3xl(\s|$)/);
   });
 
   it('the welcome hero title is the sans face, semibold, 30px then 36px', () => {
