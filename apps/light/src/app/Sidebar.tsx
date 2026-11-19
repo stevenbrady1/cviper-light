@@ -81,7 +81,7 @@ function NavButtonBody({
       {view.shortcut === null ? null : (
         // Teaching the shortcut in place costs nothing and saves the user
         // finding it in a menu that does not exist.
-        <span aria-hidden="true" className="font-mono text-[11px] tabular-nums opacity-60">
+        <span aria-hidden="true" className="text-xs tabular-nums opacity-60">
           {`Ctrl ${view.shortcut}`}
         </span>
       )}
