@@ -15,8 +15,8 @@ import { type TrackerEntry } from './model';
  * The board answers "where do I stand" one card at a time. Over a months-long
  * campaign the user also needs the one-line version — how much has gone out,
  * how much of it turned into a conversation — and that is a glance, not a
- * screen. So: a single row, bordered like the error strip above it, eyebrow
- * labels in the same mono style every section heading in the app uses, and
+ * screen. So: a single row, bordered like the error strip above it, small
+ * labels in plain words (Inter, not mono capitals: L-432), and
  * the figures in tabular mono so a 9 becoming a 10 does not shove the row
  * sideways. Nothing here is clickable but one hint's "i", and nothing is coloured. The rates are
  * plain ink, never teal: teal means "ready" in this app, and "Interview rate
@@ -56,7 +56,7 @@ interface FunnelStripProps {
   readonly entries: readonly TrackerEntry[];
 }
 
-const EYEBROW = 'font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase';
+const EYEBROW = 'text-xs text-ink-faint';
 
 export function FunnelStrip({ entries }: FunnelStripProps) {
   const funnel = funnelFrom(entries);

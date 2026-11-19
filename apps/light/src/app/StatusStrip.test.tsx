@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type EnvironmentStatus, NO_AI_KEYS } from '../status/environment';
 
+import { Sidebar } from './Sidebar';
 import { StatusStrip } from './StatusStrip';
 
 afterEach(() => {
@@ -149,5 +150,48 @@ describe('the set-up list shows only what is configured (L-191)', () => {
 
     expect(screen.getByTestId('status-none')).toBeTruthy();
     expect(screen.queryByTestId('status-none-settings')).toBeNull();
+  });
+});
+
+describe('the side menu labels are words in Inter, not small mono capitals (L-432)', () => {
+  function classesOf(element: Element): string[] {
+    return element.className.split(/\s+/);
+  }
+
+  it('happy: the footer heading reads "Set up" in Inter, text-xs, with no CSS capitals', () => {
+    render(<StatusStrip status={status()} />);
+
+    const heading = screen.getByRole('heading', { name: 'Set up' });
+    expect(heading.textContent).toBe('Set up');
+    expect(classesOf(heading)).toEqual(expect.arrayContaining(['text-xs', 'font-medium']));
+    expect(classesOf(heading)).not.toContain('font-mono');
+    expect(classesOf(heading)).not.toContain('uppercase');
+  });
+
+  it('happy: each "Ctrl N" hint is in the menu font, text-xs, and still shown', () => {
+    render(<Sidebar activeView="tracker" onSelect={() => undefined} status={null} />);
+
+    const hints = [...screen.getByTestId('sidebar').querySelectorAll('button span')].filter(
+      (span) => /^Ctrl \d$/.test(span.textContent),
+    );
+    expect(hints.length).toBeGreaterThanOrEqual(5);
+    for (const hint of hints) {
+      expect(classesOf(hint), hint.textContent).toContain('text-xs');
+      expect(classesOf(hint), hint.textContent).not.toContain('font-mono');
+      // Owner decision: the hints stay visible; only the font changes.
+      expect(classesOf(hint), hint.textContent).not.toEqual(
+        expect.arrayContaining([expect.stringMatching(/^(hidden|sr-only|invisible)$/)]),
+      );
+    }
+  });
+
+  it('negative: the logo keeps its "LIGHT" in mono capitals, untouched', () => {
+    render(<Sidebar activeView="tracker" onSelect={() => undefined} status={null} />);
+
+    const light = [...screen.getByTestId('sidebar').querySelectorAll('p')].find(
+      (p) => p.textContent === 'Light',
+    );
+    expect(light).toBeDefined();
+    expect(classesOf(light as Element)).toEqual(expect.arrayContaining(['font-mono', 'uppercase']));
   });
 });

@@ -9,8 +9,9 @@
  * the first screen to need it (the `.json` in "Your data"), and it worked out
  * where to scroll for "Manage job boards" before the face had arrived. Job
  * boards then moved by the difference: 0.5px on Windows, about 2px on Linux.
- * The desktop layout was never affected, because the side menu's "Ctrl N"
- * labels draw Plex Mono 400 at startup; it draws 500 there too.
+ * The desktop layout was never affected, because the side menu drew Plex Mono
+ * 400 at startup (its "Ctrl N" labels, Inter since L-432) and 500 (the logo's
+ * "LIGHT"). This file no longer leans on what the menu happens to draw.
  *
  * So both faces the app uses are asked for here, once, when the shell mounts.
  * They are the app's own files, named by family in `styles/fonts.css`: this
