@@ -80,22 +80,18 @@ export function nextActionUrgency(
  *
  * A coloured chip says nothing to a screen reader and nothing on a greyscale
  * display, so the colour is always a second telling.
+ *
+ * The "when" is `nextActionWhen`'s words, exactly as the card shows them
+ * (L-430, WCAG 2.5.3 label in name): a voice-control user says what they see.
+ * It is null in exactly the cases `nextActionUrgency` is `none`.
  */
 export function nextActionDescription(
   nextAction: string | null,
   nextActionDate: IsoDate | null,
   today: IsoDate,
 ): string | null {
-  const urgency = nextActionUrgency(nextActionDate, today);
-  if (urgency === 'none' || nextActionDate === null) return null;
-
-  const days = daysBetweenDates(today, nextActionDate) ?? 0;
-  const when =
-    days < 0
-      ? `overdue by ${Math.abs(days)} ${Math.abs(days) === 1 ? 'day' : 'days'}`
-      : days === 0
-        ? 'due today'
-        : `due in ${days} ${days === 1 ? 'day' : 'days'}`;
+  const when = nextActionWhen(nextActionDate, today);
+  if (when === null) return null;
 
   return nextAction === null || nextAction.trim() === ''
     ? `Next action ${when}`
