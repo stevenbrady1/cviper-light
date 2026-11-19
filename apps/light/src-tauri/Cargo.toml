@@ -85,8 +85,10 @@ tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 # The plugin's own pool, used directly by `src/sql_gate.rs` (L-243), which runs
 # only approved statements. Already in the tree through tauri-plugin-sql; named
 # here at the same major versions because we call them directly. `time` decodes
-# DATE/TIME/DATETIME exactly as the plugin does.
-sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "time", "json"] }
+# DATE/TIME/DATETIME exactly as the plugin does. sqlx MUST be the version
+# tauri-plugin-sql is built on (0.8 for 2.6.0), or the plugin's `Pool` is a
+# different type from ours and sql_gate.rs does not compile (L-429).
+sqlx = { version = "0.8",default-features = false, features = ["sqlite", "runtime-tokio", "time", "json"] }
 indexmap = { version = "2", features = ["serde"] }
 time = "0.3"
 tauri-plugin-store = "2"
