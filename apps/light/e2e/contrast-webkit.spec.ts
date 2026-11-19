@@ -2454,13 +2454,17 @@ describe('the Search button stays on screen on short windows (L-342)', () => {
         if (part === null) throw new Error(`no ${id}`);
         return part.getBoundingClientRect();
       };
+      // The line of buttons: since L-433 one row holds them all, reasons under it.
+      const buttons = document.querySelector('[data-testid="search-submit-row"] > div');
+      if (buttons === null) throw new Error('no line of buttons');
+      const line = buttons.getBoundingClientRect();
       return {
-        above: box('search-reason-area').top - box('search-where').bottom,
-        below: box('search-open-boards-row').top - box('search-reason-area').bottom,
+        above: line.top - box('search-where').bottom,
+        reasons: box('search-reason-area').top - line.bottom,
       };
     });
-    // `mt-4` and `mt-3`, as they were before the row had a background to paint.
-    assert.deepEqual(gaps, { above: 16, below: 12 });
+    // `mt-4`, as it was before the row had a background to paint; `mt-2` to the reasons.
+    assert.deepEqual(gaps, { above: 16, reasons: 8 });
     await page.context().close();
   });
 
@@ -2675,6 +2679,170 @@ describe('the Search button stays on screen on short windows (L-342)', () => {
     assert.ok(report.range > 0, 'the results did not make the area scroll');
     assert.deepEqual(report.overlaps, [], 'the row covered a result at these scroll positions');
     assert.ok(report.rowBottom < report.areaTop, 'the row did not scroll away');
+    await page.context().close();
+  });
+});
+
+/**
+ * Search has ONE action row (L-433): Search, "Also open", a divider, "Save this
+ * search" and "Found one? Bring it in", with any reason on a line under the
+ * buttons inside the same sticky box. jsdom draws no layout, so whether that
+ * line is really on screen, and whether the row wraps on a phone, is only
+ * knowable here.
+ */
+const ROW_BUTTONS = ['search-submit', 'search-open-boards', 'saved-search-open', 'search-bring-in'];
+const ROW_REASONS = ['search-reason', 'search-open-boards-reason'];
+
+/** The tallest form at 1000×700 with every tick off, so both buttons are grey. */
+async function openTallestBothGrey(): Promise<Page> {
+  const page = await openTallestSearch(SMALLEST_WINDOW);
+  const ticked = page.locator('[data-testid="search-where"] input:checked');
+  while ((await ticked.count()) > 0) await ticked.first().uncheck();
+  await page.waitForSelector('[data-testid="search-reason"]');
+  await page.waitForSelector('[data-testid="search-open-boards-reason"]');
+  await scrollAreaTo(page, 0);
+  return page;
+}
+
+/**
+ * How many lines the buttons take. By centre line, not top: the secondary
+ * button has a border, so it is 2px taller and starts 1px higher on the same line.
+ */
+function lineCountScript(ids: readonly string[]): number {
+  const centres = ids
+    .map((id) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect())
+    .map((box) => (box === undefined ? -1 : box.top + box.height / 2))
+    .sort((a, b) => a - b);
+  return centres.filter((centre, i) => i === 0 || centre - (centres[i - 1] ?? 0) > 4).length;
+}
+
+/** What is wrong with the row on a phone. Empty means all is well. */
+async function phoneRowProblems(page: Page, mustWrap: boolean): Promise<string[]> {
+  const lines = await page.evaluate(lineCountScript, ROW_BUTTONS);
+  const problems = await page.evaluate((ids) => {
+    const row = document.querySelector('[data-testid="search-submit-row"]');
+    const column = document.querySelector('[data-content-column]')?.getBoundingClientRect();
+    if (row === null || column === undefined) return ['no row or column'];
+    const found: string[] = [];
+    for (const id of ids) {
+      const box = document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect();
+      if (box === undefined) {
+        found.push(`${id}: not drawn`);
+        continue;
+      }
+      if (box.height < 44) found.push(`${id}: ${String(box.height)}px tall`);
+      if (box.left < column.left || box.right > column.right) {
+        found.push(`${id}: ${String(box.left)}–${String(box.right)} is outside the column`);
+      }
+    }
+    const divider = document.querySelector('[data-testid="search-row-divider"]');
+    if (divider !== null && getComputedStyle(divider).display !== 'none') {
+      found.push('the divider is drawn');
+    }
+    return found;
+  }, ROW_BUTTONS);
+  const unwrapped = mustWrap && lines < 2 ? ['the row did not wrap'] : [];
+  return [...problems, ...unwrapped, ...(await sidewaysOverflow(page))];
+}
+
+describe('Search has one action row (L-433)', () => {
+  // HAPPY — the tallest form at the smallest window, both buttons grey.
+  it('at 1000×700, tallest form, every button and both reasons are wholly on screen, nothing on top', async () => {
+    const page = await openTallestBothGrey();
+    assert.deepEqual(await submitRowProblems(page, [...ROW_BUTTONS, ...ROW_REASONS]), []);
+    await page.context().close();
+  });
+
+  // TRAP — the row is taller since L-433 (both reasons are in it), so the scroll
+  // padding that keeps a focused tick clear of it (L-342) must still cover it.
+  // At 768px the buttons and the reasons wrap, so the row is tallest there.
+  for (const viewport of [SMALLEST_WINDOW, NARROWEST_STICKY]) {
+    const size = `${String(viewport.width)}×${String(viewport.height)}`;
+
+    it(`at ${size} the tallest row, Reed fix and both reasons showing, fits in the 256px scroll padding`, async () => {
+      const page = await openTypedSearch(viewport);
+      await pressMoreBoards(page);
+      await page.waitForSelector('[data-testid="search-open-boards-reason"]');
+      const seen = await page.evaluate(
+        ({ areaSelector, rowSelector }) => {
+          const area = document.querySelector(areaSelector);
+          const row = document.querySelector(rowSelector);
+          if (area === null || row === null) throw new Error('no area or row');
+          return {
+            row: row.getBoundingClientRect().height,
+            padding: parseFloat(getComputedStyle(area).scrollPaddingBottom),
+          };
+        },
+        { areaSelector: SEARCH_AREA, rowSelector: SUBMIT_ROW },
+      );
+      console.log(`tallest row at ${size}: ${JSON.stringify(seen)}`);
+      assert.equal(seen.padding, 256);
+      assert.ok(seen.row <= seen.padding, JSON.stringify(seen));
+      await page.context().close();
+    });
+  }
+
+  it('at 1000×700 the four buttons share one line, and the divider is drawn between them', async () => {
+    const page = await openTypedSearch(SMALLEST_WINDOW);
+    const lines = await page.evaluate(lineCountScript, ROW_BUTTONS);
+    const divider = await page.evaluate(() => {
+      const box = document
+        .querySelector('[data-testid="search-row-divider"]')
+        ?.getBoundingClientRect();
+      return [box?.width, box?.height];
+    });
+    assert.deepEqual({ lines, divider }, { lines: 1, divider: [1, 20] });
+    await page.context().close();
+  });
+
+  // BOUNDARY — phones: every button is a thumb target inside the column, no divider.
+  // At 375px the four cannot share a line, so the row wraps; at 767px they fit.
+  for (const [width, mustWrap] of [
+    [375, true],
+    [767, false],
+  ] as const) {
+    it(`at ${String(width)}px nothing spills over or scrolls sideways, every button is 44px+, no divider${mustWrap ? ', and the row wraps' : ''}`, async () => {
+      const page = await openTypedSearch({ width, height: 700 });
+      assert.deepEqual(await phoneRowProblems(page, mustWrap), []);
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a reason pushed out of the sticky box is reported', async () => {
+    const page = await openTallestBothGrey();
+    await page.evaluate(() => {
+      // The L-335 bug: the reason drawn below the row, past the bottom of the window.
+      const line = document.querySelector('[data-testid="search-reason-area"]');
+      document.querySelector('[data-testid="search-saved"]')?.after(line ?? '');
+    });
+    const report = await submitRowProblems(page, ROW_REASONS);
+    assert.ok(
+      report.some((line) => line.startsWith('search-open-boards-reason')),
+      `a reason below the window was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+
+  it('the check can fail: a short button, a dangling divider and an unwrapped row are reported', async () => {
+    const page = await openTypedSearch({ width: 375, height: 700 });
+    await page.evaluate(() => {
+      const bring = document.querySelector<HTMLElement>('[data-testid="search-bring-in"]');
+      if (bring !== null) bring.style.minHeight = '0';
+      const divider = document.querySelector<HTMLElement>('[data-testid="search-row-divider"]');
+      if (divider !== null) divider.style.display = 'block';
+      const buttons = document.querySelector<HTMLElement>(
+        '[data-testid="search-submit-row"] > div',
+      );
+      if (buttons !== null) buttons.style.flexWrap = 'nowrap';
+    });
+    const report = await phoneRowProblems(page, true);
+    for (const expected of ['search-bring-in: ', 'the divider is drawn', 'the row did not wrap']) {
+      assert.ok(
+        report.some((line) => line.startsWith(expected)),
+        `"${expected}" was not flagged: ${JSON.stringify(report)}`,
+      );
+    }
     await page.context().close();
   });
 });

@@ -28,7 +28,6 @@ import { readJobKeyStates, type KeyState } from '../../status/environment';
 import {
   chooseBoards,
   openBoards,
-  openBoardsDisabledReason,
   readBoardChoice,
   tickedBoards,
   toggleBoard,
@@ -78,9 +77,9 @@ import { SearchFields } from './SearchFields';
 import { SearchRecent } from './SearchRecent';
 import { SearchResults } from './SearchResults';
 import { SearchResultsHeader } from './SearchResultsHeader';
-import { SearchSaved } from './SearchSaved';
+import { SearchSaved, useSaveSearchBox } from './SearchSaved';
 import { SearchSubmitRow } from './SearchSubmitRow';
-import { OpenBoardsRow, WhereToLook } from './SearchWhere';
+import { WhereToLook } from './SearchWhere';
 import { useSearchRanking } from './useSearchRanking';
 import { useSearchSaving } from './useSearchSaving';
 
@@ -243,6 +242,7 @@ export function Search({
   /** Saved searches (L-309), newest first, and what happened to them last. */
   const [saved, setSaved] = useState<readonly SavedSearch[]>(() => readSavedSearches());
   const [savedNote, setSavedNote] = useState<string | null>(null);
+  const saveBox = useSaveSearchBox();
 
   // ── Loading ──────────────────────────────────────────────────────────────
 
@@ -339,7 +339,6 @@ export function Search({
   const disabledReason = locked
     ? CHOOSE_COUNTRY_REASON
     : searchDisabledReason(usableChosen.length + keylessWanted.length, { ukWithoutKey });
-  const openBoardsReason = openBoardsDisabledReason(boardsToOpen.length);
 
   const reedVerdict = quotaVerdict(quota, 'reed', utcDateOf(clock) ?? quota.date);
 
@@ -641,7 +640,7 @@ export function Search({
       <ViewHeader view={view.id} title={view.label} summary={view.summary} />
 
       {/* `scroll-pb`: a focused tick stays clear of the pinned row at its tallest (L-342). */}
-      <div className={`min-h-0 flex-1 overflow-y-auto ${SIDE_PADDING} py-5 md:scroll-pb-40`}>
+      <div className={`min-h-0 flex-1 overflow-y-auto ${SIDE_PADDING} py-5 md:scroll-pb-64`}>
         <div data-content-column className={`${CONTENT_COLUMN} space-y-5`}>
           <form data-testid="search-form" onSubmit={(event) => void onSubmit(event)}>
             <SearchFields
@@ -685,32 +684,25 @@ export function Search({
               summary={whereToLookSummary(usableChosen, keylessWanted, boardsToOpen.length)}
             />
 
-            {/* The blue button, and why it is grey right beside it (L-335). */}
+            {/*
+              The one action row (L-433): Search, "Also open" (L-329), then
+              "Save this search" and "Found one?"; any reason on a line under them.
+            */}
             <SearchSubmitRow
               running={running}
               disabledReason={disabledReason}
               fix={reedFix ?? feedFix}
-            />
-
-            {/*
-              The ticked boards, in the browser, with the same filters (L-329).
-              A second action, so not blue, and after the blue one. Disabled —
-              never hidden — with nothing ticked, and the reason beside it.
-            */}
-            <OpenBoardsRow
-              running={running || locked}
-              openBoardsReason={openBoardsReason}
-              onOpenTicked={onOpenTicked}
+              locked={locked}
               boardsToOpen={boardsToOpen}
+              onOpenTicked={onOpenTicked}
               boardsProblem={boardsProblem}
+              saveBox={saveBox}
+              suggestedName={suggestedName(form)}
               onBringJobIn={onBringJobIn}
             />
           </form>
 
-          {/*
-            Straight after the button: it saves the same fields and ticks.
-            Outside the form, because its name box is a form of its own.
-          */}
+          {/* The chips, and the name box: a form of its own, so outside this one. */}
           <SearchSaved
             saved={saved}
             suggestedName={suggestedName(form)}
@@ -719,6 +711,7 @@ export function Search({
             onSave={onSaveSearch}
             onRun={onRunSaved}
             onDelete={onDeleteSaved}
+            box={saveBox}
           />
 
           <SearchRecent recent={recent} onPick={setForm} />

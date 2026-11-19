@@ -1,11 +1,8 @@
 import { type JobProviderId, type KeylessSourceId } from '@cviper/job-apis';
 
-import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { type Board } from '../boards/model';
 import { type KeyState } from '../../status/environment';
-import { ErrorBox } from '../../ui';
 
-import { openBoardsLabel } from './boardChoice';
 import { KeylessBar } from './KeylessBar';
 import { type FeedChoice } from './feedDefaults';
 import { KeylessFeedToggles } from './KeylessFeedToggles';
@@ -13,9 +10,10 @@ import { ProviderToggles } from './ProviderToggles';
 import { hasAnyJobBoardKey } from './model';
 
 /*
-  Two parts of the Search form, moved here word for word so `Search.tsx` stays
+  A part of the Search form, moved here word for word so `Search.tsx` stays
   under the 800-line limit (L-389). Search still owns every piece of state and
-  draws both exactly where they were; these only draw what they are handed.
+  draws it exactly where it was; this only draws what it is handed. The other
+  part, "Also open", is in Search's one action row since L-433.
 */
 
 export interface WhereToLookProps {
@@ -131,72 +129,5 @@ export function WhereToLook({
         </div>
       </details>
     </section>
-  );
-}
-
-export interface OpenBoardsRowProps {
-  readonly running: boolean;
-  /** Why the boards' button cannot be pressed, or `null` when it can. */
-  readonly openBoardsReason: string | null;
-  readonly onOpenTicked: () => Promise<void>;
-  readonly boardsToOpen: readonly Board[];
-  /** Boards that would not open on the last press. */
-  readonly boardsProblem: readonly string[];
-  /** Tracker with the paste pane open (L-324). Left undefined, nothing is drawn. */
-  readonly onBringJobIn?: (() => void) | undefined;
-}
-
-/** "Also open in N boards", its reason, and the boards that did not open. */
-export function OpenBoardsRow({
-  running,
-  openBoardsReason,
-  onOpenTicked,
-  boardsToOpen,
-  boardsProblem,
-  onBringJobIn,
-}: OpenBoardsRowProps) {
-  return (
-    <>
-      <div data-testid="search-open-boards-row" className="mt-3 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          data-testid="search-open-boards"
-          disabled={running || openBoardsReason !== null}
-          onClick={() => void onOpenTicked()}
-          className={SECONDARY_BUTTON}
-        >
-          {openBoardsLabel(boardsToOpen.length)}
-        </button>
-
-        {openBoardsReason === null ? null : (
-          <p data-testid="search-open-boards-reason" className="text-ink-muted">
-            {openBoardsReason}
-          </p>
-        )}
-      </div>
-
-      {boardsProblem.length === 0 ? null : (
-        <ErrorBox variant="box" gapAbove="mt-2" testId="search-boards-problem">
-          {`${boardsProblem.join(', ')} did not open in your browser. Check that a default browser is set, then try again.`}
-        </ErrorBox>
-      )}
-
-      {/*
-        The way back for a job found on a board in the browser (L-324). Always
-        enabled: boards also open from saved searches and the few-results panel.
-      */}
-      {onBringJobIn === undefined ? null : (
-        <div className="mt-2">
-          <button
-            type="button"
-            data-testid="search-bring-in"
-            onClick={onBringJobIn}
-            className={QUIET_BUTTON}
-          >
-            Found one? Bring it in
-          </button>
-        </div>
-      )}
-    </>
   );
 }

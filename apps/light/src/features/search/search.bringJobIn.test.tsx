@@ -51,9 +51,11 @@ describe('"Found one? Bring it in"', () => {
   it('pressing it asks the shell once', async () => {
     const open = vi.fn();
     const { user } = renderSearch(open);
-    await screen.findByTestId('search-open-boards-row');
+    const row = await screen.findByTestId('search-submit-row');
 
     expect(bringIn().textContent).toBe('Found one? Bring it in');
+    // In Search's one action row since L-433.
+    expect(row.contains(bringIn())).toBe(true);
     await user.click(bringIn());
     expect(open).toHaveBeenCalledTimes(1);
   });
@@ -92,7 +94,9 @@ describe('"Found one? Bring it in"', () => {
 
   it('negative: with no handler, nothing is drawn — never a button that does nothing', async () => {
     renderSearch(undefined);
-    await screen.findByTestId('search-open-boards-row');
+    // The row is drawn (L-433: "Also open" is in it), only this button is not.
+    const row = await screen.findByTestId('search-submit-row');
+    expect(row.contains(screen.getByTestId('search-open-boards'))).toBe(true);
     expect(screen.queryByTestId('search-bring-in')).toBeNull();
     expect(screen.queryByText('Found one? Bring it in')).toBeNull();
   });
