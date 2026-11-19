@@ -6277,6 +6277,10 @@ describe('a suggestion priority label stays on one line, inside its card (L-378)
  * step bar and the ATS table fully on screen. On main before L-382 every
  * screen's header measured 85px at 1000×700 in this harness; that is the cap.
  *
+ * L-431 took the icon tile out and grew the title to 30px, on the SAME 32px
+ * line, so the cap still holds with no change to it. The check below proves a
+ * taller title line would be caught.
+ *
  * One line is measured, not written down: the title's height must be its own
  * line height. jsdom does no layout and loads no fonts, so only a real engine
  * can say either.
@@ -6355,10 +6359,10 @@ describe('page titles stay on one line in Inter, and the header does not grow (L
         size: style?.fontSize ?? '',
         // A family name in the computed style proves nothing if the file never
         // arrived: the browser would draw a system fallback under that name.
-        loaded: document.fonts.check('600 24px Inter'),
+        loaded: document.fonts.check('600 30px Inter'),
       };
     });
-    assert.deepEqual(seen, { family: 'Inter', weight: '600', size: '24px', loaded: true });
+    assert.deepEqual(seen, { family: 'Inter', weight: '600', size: '30px', loaded: true });
     await page.context().close();
   });
 
@@ -6378,6 +6382,27 @@ describe('page titles stay on one line in Inter, and the header does not grow (L
     assert.ok(
       problems.some((line) => line.startsWith('settings: header is')),
       `the taller header was not flagged: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+
+  // NEGATIVE — Tailwind's own line for 30px is 36px. Without `leading-8` the
+  // header grows 4px past the cap, and that is caught (L-431).
+  it('the check can fail: a title on a 36px line is reported as over the cap', async () => {
+    const page = await open('?seen=1', TITLE_WINDOWS.smallest);
+    await goTo(page, 'settings');
+    await page.evaluate(() => {
+      const title = document.querySelector<HTMLElement>('[data-testid="view-settings"] h1');
+      if (title !== null) title.style.lineHeight = '36px';
+    });
+    const problems = await titleProblems(page, 'settings', HEADER_CAP_PX);
+    assert.ok(
+      problems.some((line) => line.startsWith('settings: header is')),
+      `the 36px line was not flagged: ${JSON.stringify(problems)}`,
+    );
+    assert.ok(
+      !problems.some((line) => line.startsWith('settings: title is')),
+      `a one-line title was reported as wrapped: ${JSON.stringify(problems)}`,
     );
     await page.context().close();
   });
