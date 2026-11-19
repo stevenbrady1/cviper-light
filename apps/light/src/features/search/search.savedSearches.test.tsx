@@ -367,6 +367,8 @@ describe('the remove button on a saved search is drawn, not typed (L-369)', () =
     const list = screen.getByTestId('search-saved');
     expect(within(list).queryAllByRole('button', { name: /^Delete saved search:/ })).toEqual([]);
     expect(readSavedSearches()).toEqual([]);
-    expect(within(list).getByTestId('saved-search-open')).toBeTruthy();
+    // The opener lives in Search's one action row since L-433, not in this list.
+    const row = screen.getByTestId('search-submit-row');
+    expect(within(row).getByTestId('saved-search-open')).toBeTruthy();
   });
 });

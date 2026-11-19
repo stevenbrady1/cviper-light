@@ -47,7 +47,7 @@ describe('the pinned submit row (L-342)', () => {
     );
     const form = await screen.findByTestId('search-form');
     const area = form.closest('.overflow-y-auto');
-    expect(area?.className.split(' ')).toContain('md:scroll-pb-40');
+    expect(area?.className.split(' ')).toContain('md:scroll-pb-48');
     expect(area?.className).not.toMatch(/(^|\s)scroll-pb-/);
   });
 
