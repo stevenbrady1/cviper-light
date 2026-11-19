@@ -8,7 +8,17 @@ All notable changes to CViper Light are recorded here. The format follows
 
 Changes waiting for the next release are in [`changes/unreleased/`](changes/unreleased/), one file per change, so two pull requests never edit the same lines here (L-303). `pnpm changelog:preview` shows them as they will appear; `pnpm changelog:release <version> <date>` writes them in below. See [CONTRIBUTING.md](CONTRIBUTING.md#the-changelog).
 
+## [0.13.1] — 2026-11-19
+
+A small fix release for Windows. The uninstaller now shows the CViper icon, and the message you see when CViper Light is still open now says plainly what OK does. This version also carries everything listed under 0.13.0, which was never published.
+
+### Fixed
+
+- Windows: the uninstaller now shows the CViper icon, not the plain default one. When CViper Light is still open during an install or uninstall, the message now says what OK does: "CViper Light is still open. Click OK to close it now (anything not saved will be lost), or Cancel to stop." It used to say "Click OK to kill it" (L-426).
+
 ## [0.13.0] — 2026-11-18
+
+Tagged but never published. Everything here ships in 0.13.1.
 
 The biggest change is that CViper Light no longer assumes you are in the United Kingdom. Search has a "Country" picker with the 19 countries Adzuna covers and "Another country"; if you already use the app it stays on United Kingdom and your searches are as before, and a new install is asked to choose before its first search. The distance is in kilometres outside the United Kingdom and the United States, Adzuna's salaries are shown in the chosen country's currency, the job boards you can open in your browser follow the country, and the app's own words, and the instructions it sends to an AI with a pasted advert, no longer assume the UK; Reed lists UK jobs only, so it stays a United Kingdom board. The screens have been reworked too: the menu is in a new order (Tracker, Search, Analysis, Tailor, then Profile and Settings) and the Ctrl+1 to Ctrl+5 shortcuts moved with it, Profile starts with a checklist and lets you rename or delete a saved CV, a job's status on the Tracker is five choices side by side, Settings gains "On this PC" and "What I have agreed to", and titles and scores are in the same typeface as the rest of the app. On Tailor the tailored CV is shown as a page and a saved CV has your name and contact details at the top, and an advert you checked on Analysis can be saved straight to the tracker. Two fixes worth knowing: an Adzuna search "within 25 miles" now looks 25 miles out, and "Withdraw" now appears for every AI provider you agreed to send your CV to. 0.12.0 was prepared but never tagged or released, and 0.11.0 was tagged but never published, so this release also brings everything listed under 0.12.0 and 0.11.0 below.
 
@@ -695,7 +705,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.13.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.13.1...main
+[0.13.1]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.13.0...light-v0.13.1
 [0.13.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.11.0...light-v0.13.0
 [0.12.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.11.0...light-v0.13.0
 [0.11.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.10.6...light-v0.11.0
