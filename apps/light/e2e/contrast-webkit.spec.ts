@@ -6998,6 +6998,111 @@ describe('Rename and Delete for a saved CV (L-408)', () => {
 });
 
 /**
+ * Each saved CV is one row (L-436). `Profile.cvManage.test.tsx` proves the
+ * row's shape; jsdom lays nothing out, so this measures where it lands, using
+ * L-408's real "Your CV" section, whose second CV has a 100-character name
+ * with no spaces. At 1000×700 Rename and Delete sit to the right of the name;
+ * on a phone they sit under it. At both, nothing scrolls sideways, every
+ * button is wholly on screen, and the long name wraps inside its row.
+ */
+const CV_ROW_WINDOWS = [
+  { name: '1000×700', width: 1000, height: 700, phone: false },
+  { name: '375×812', width: 375, height: 812, phone: true },
+] as const;
+
+/** What is wrong with where each row's name, facts and buttons land. */
+async function cvRowProblems(page: Page, phone: boolean): Promise<string[]> {
+  return page.evaluate(
+    ({ root, phone }) => {
+      const rows = document.querySelectorAll(`${root} [data-testid="profile-cv-list"] > li`);
+      if (rows.length !== 2) return [`${String(rows.length)} rows, not 2`];
+      const problems: string[] = [];
+      for (const row of rows) {
+        const name = row.querySelector<HTMLElement>('[data-testid="profile-cv-name"]');
+        const facts = row.querySelector('[data-testid="profile-cv-facts"]');
+        const buttons = [...row.querySelectorAll('button')];
+        if (name === null || facts === null || buttons.length !== 2) {
+          problems.push('a row is missing its name, facts or buttons');
+          continue;
+        }
+        const label = name.textContent ?? '';
+        const nameBox = name.getBoundingClientRect();
+        const text = [nameBox, facts.getBoundingClientRect()];
+        const textRight = Math.max(...text.map((box) => box.right));
+        const textBottom = Math.max(...text.map((box) => box.bottom));
+        const frame = row.getBoundingClientRect();
+
+        if (name.scrollWidth > name.clientWidth + 1)
+          problems.push(`${label}: name runs off its line`);
+        if (label.length === 100) {
+          const line = parseFloat(getComputedStyle(name).lineHeight);
+          if (!(nameBox.height > line * 1.5)) {
+            problems.push(`${label}: the long name did not wrap`);
+          }
+        }
+
+        for (const button of buttons) {
+          const box = button.getBoundingClientRect();
+          const which = `${label}: ${button.textContent ?? ''}`;
+          if (box.left < 0 || box.right > window.innerWidth + 0.5) {
+            problems.push(`${which}: not wholly on screen`);
+          }
+          if (box.left < frame.left - 0.5 || box.right > frame.right + 0.5) {
+            problems.push(`${which}: outside its row`);
+          }
+          if (phone) {
+            if (box.top < textBottom - 0.5) problems.push(`${which}: not under the name`);
+          } else if (
+            box.left < textRight - 0.5 ||
+            box.top >= textBottom ||
+            box.bottom <= nameBox.top
+          ) {
+            problems.push(`${which}: not beside the name`);
+          }
+        }
+      }
+      return problems;
+    },
+    { root: YOUR_CV, phone },
+  );
+}
+
+describe('each saved CV is one row (L-436)', () => {
+  for (const size of CV_ROW_WINDOWS) {
+    it(`at ${size.name} the buttons sit ${size.phone ? 'under' : 'beside'} the name, wholly on screen, and the 100-character name wraps`, async () => {
+      const page = await profileWithCvs(size);
+      const problems = await cvRowProblems(page, size.phone);
+      console.log(`CV rows (L-436) at ${size.name}: ${JSON.stringify(problems)}`);
+      assert.deepEqual(problems, []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: stacked buttons at 1000 and a name that will not wrap are reported', async () => {
+    const page = await profileWithCvs(CV_ROW_WINDOWS[0]);
+    await page.evaluate((root) => {
+      for (const row of document.querySelectorAll<HTMLElement>(
+        `${root} [data-testid="profile-cv-list"] > li`,
+      )) {
+        row.style.flexDirection = 'column';
+      }
+      const name = document.querySelector<HTMLElement>(`${root} [data-testid="profile-cv-name"]`);
+      if (name !== null) name.style.cssText = 'white-space:nowrap;overflow:hidden;width:200px';
+    }, YOUR_CV);
+    const problems = await cvRowProblems(page, false);
+    assert.ok(
+      problems.some((line) => line.endsWith(': not beside the name')) &&
+        problems.some((line) => line.endsWith(': name runs off its line')) &&
+        problems.some((line) => line.endsWith(': the long name did not wrap')),
+      `the broken rows were not flagged: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
  * Profile's checklist (L-413). jsdom lays nothing out, so
  * `Profile.progress.test.tsx` proves what is counted and said, and not where
  * anything lands. The harness's `?profile=` gives the real Profile, in the
