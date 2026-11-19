@@ -161,3 +161,33 @@ describe('every column header is title, then count, and nothing else (L-332)', (
     expect(screen.getByTestId('tracker-count-interviewing').textContent).toBe('3');
   });
 });
+
+/** The element's classes, one per entry. */
+function classesOf(element: Element): string[] {
+  return element.className.split(/\s+/);
+}
+
+describe('column titles are words in Inter, not small mono capitals (L-432)', () => {
+  it('happy: every column title is text-xs font-semibold, with no mono face, no capitals and no wide spacing', async () => {
+    await board([entry('a', 'saved'), entry('b', 'interviewing')]);
+    for (const status of TRACKER_COLUMNS) {
+      const classes = classesOf(within(headerOf(status)).getByRole('heading'));
+      expect(classes, status).toEqual(expect.arrayContaining(['text-xs', 'font-semibold']));
+      expect(classes, status).not.toContain('font-mono');
+      expect(classes, status).not.toContain('uppercase');
+      expect(
+        classes.filter((name) => name.startsWith('tracking-')),
+        status,
+      ).toEqual([]);
+    }
+  });
+
+  it('negative: the count beside each title keeps the mono face, so the digits line up', async () => {
+    await board([entry('a', 'saved')]);
+    for (const status of TRACKER_COLUMNS) {
+      expect(classesOf(screen.getByTestId(`tracker-count-${status}`)), status).toEqual(
+        expect.arrayContaining(['font-mono', 'tabular-nums']),
+      );
+    }
+  });
+});

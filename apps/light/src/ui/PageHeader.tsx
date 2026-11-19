@@ -1,8 +1,7 @@
-import { type ComponentType, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
 import { type IconName } from './Icon';
 import { IconTile } from './IconTile';
-import { type NavIconProps } from './NavIcons';
 
 /**
  * The top of a screen: what it is, one muted line on what it is for, and —
@@ -19,13 +18,14 @@ import { type NavIconProps } from './NavIcons';
  */
 
 /*
- * The title ladder: 24px page titles, 20px section titles, 30px (36px from md)
- * on the welcome page (sizes from L-382). Since L-405 they are in the app's one
- * typeface, not the serif: no font family is named, so they draw in the body's
+ * The title ladder: 30px page titles on a 32px line (L-431; 24px before),
+ * 20px section titles, 30px (36px from md) on the welcome page (L-382). The
+ * page title keeps the old title's 32px line, so the header bar is no taller.
+ * Since L-405 they are in the app's one typeface, not the serif: no font family is named, so they draw in the body's
  * Inter, semibold and slightly tight. `heading-ladder.contract.test.ts` holds
  * the sizes and forbids the serif.
  */
-export const PAGE_TITLE = 'text-2xl font-semibold tracking-tight text-ink';
+export const PAGE_TITLE = 'text-3xl leading-8 font-semibold tracking-tight text-ink';
 export const SECTION_TITLE = 'text-xl font-semibold tracking-tight text-ink';
 export const HERO_TITLE = 'text-3xl font-semibold tracking-tight text-ink md:text-4xl';
 
@@ -33,9 +33,6 @@ export interface PageHeaderProps {
   readonly title: string;
   readonly subtitle: ReactNode;
   readonly actions?: ReactNode;
-  readonly icon?: IconName | undefined;
-  /** A view's duotone navigation drawing, used in place of `icon` (L-254). */
-  readonly glyph?: ComponentType<NavIconProps> | undefined;
   readonly variant?: 'bar' | 'hero';
   /** Above the title in `hero`: the brand row. */
   readonly eyebrow?: ReactNode;
@@ -49,8 +46,6 @@ export function PageHeader({
   title,
   subtitle,
   actions = null,
-  icon,
-  glyph,
   variant = 'bar',
   eyebrow = null,
   column = '',
@@ -81,16 +76,10 @@ export function PageHeader({
       <div
         className={`flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4 ${column}`}
       >
-        <div className="flex min-w-0 items-center gap-3">
-          {glyph !== undefined ? (
-            <IconTile glyph={glyph} />
-          ) : icon !== undefined ? (
-            <IconTile icon={icon} />
-          ) : null}
-          <div className="min-w-0">
-            <h1 className={PAGE_TITLE}>{title}</h1>
-            <p className="text-ink-muted">{subtitle}</p>
-          </div>
+        {/* No icon tile: it repeated the rail's icon for the same screen (L-431). */}
+        <div className="min-w-0">
+          <h1 className={PAGE_TITLE}>{title}</h1>
+          <p className="text-ink-muted">{subtitle}</p>
         </div>
         {actionsBox}
       </div>

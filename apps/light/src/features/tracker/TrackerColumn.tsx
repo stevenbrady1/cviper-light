@@ -110,9 +110,7 @@ export function TrackerColumn({
         order. `contrast-webkit.spec.ts` measures the heading in a real engine.
       */}
       <header className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 px-2 pt-2 pb-1.5">
-        <h2 className="min-w-0 font-mono text-[11px] font-medium tracking-[0.12em] text-ink-muted uppercase">
-          {STATUS_LABELS[status]}
-        </h2>
+        <h2 className="min-w-0 text-xs font-semibold text-ink-muted">{STATUS_LABELS[status]}</h2>
         <span className="ml-auto flex items-baseline gap-2">
           <span
             data-testid={`tracker-count-${status}`}
