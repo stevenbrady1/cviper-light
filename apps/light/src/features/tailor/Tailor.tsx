@@ -726,10 +726,10 @@ export function Tailor({
               </>
             }
             notices={
-              <div className="space-y-2">
+              <>
                 <CvUploadNotes idPrefix="tailor" {...upload} />
                 <TailorCvPreview {...cvPicker} />
-              </div>
+              </>
             }
             editor={<TailorAdvertBox {...advert} />}
             barStart={<TailorJobChip {...advert} />}

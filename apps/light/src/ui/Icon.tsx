@@ -156,9 +156,9 @@ const PATHS = {
 
 /**
  * The Settings section icons (L-256): the owner's duotone drawings, under the
- * names the Settings headings already used, so every `SectionHeading` that
- * asked for `data`, `boards`, … now draws the new icon. The old single-colour
- * drawings for these eight names were removed — nothing else referenced them.
+ * names the Settings headings used (`data`, `boards`, …). No `SectionHeading`
+ * draws an icon since L-440; any `<Icon name="…">` still draws these (Hint's
+ * `info`). The old single-colour drawings for these eight names were removed.
  * See `SettingsIcons.tsx`.
  */
 const DUOTONE = {

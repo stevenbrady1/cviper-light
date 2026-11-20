@@ -8,7 +8,7 @@ import { Composer } from '../../app/Composer';
 import { CONTENT_COLUMN, SCROLL_GUTTER, SIDE_PADDING } from '../../app/layout';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
-import { ErrorBox, IconTile } from '../../ui';
+import { EmptyState, ErrorBox } from '../../ui';
 import { createTauriTransport } from '../../ai/transport';
 import {
   createTauriFilePort,
@@ -672,38 +672,31 @@ export function Analysis({
 
             {/* ── 5. The result ─────────────────────────────────────────── */}
             {result === null ? (
-              <div
-                data-testid="analysis-empty"
-                className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
-              >
-                <div className="mb-3 flex justify-center">
-                  <IconTile icon="analysis" />
-                </div>
-                <p className="font-medium text-ink">Nothing checked yet.</p>
-                {/* cviper-allow-absolute-privacy-claim: the sentence names its own
-                    subject — "The basic match" — which is the keyword scorer in
-                    packages/keyword-scoring and reaches no network at all. */}
-                <p className="mt-1 text-ink-muted">
-                  Pick a CV, paste an advert, and press the button. The basic match needs no account
-                  and no set-up, and nothing leaves this machine.
-                </p>
-                {/*
-                  L-277: before the user has a CV, one click shows what a check
-                  gives back. Secondary, so the view keeps its one blue button.
-                  Only while there is no CV: after that the real thing is right
-                  there and a sample would be in the way.
-                */}
-                {cvsLoaded && cvs.length === 0 && sample === null ? (
-                  <button
-                    type="button"
-                    data-testid="analysis-try-sample"
-                    onClick={() => setSample(runSample())}
-                    className={`${SECONDARY_BUTTON} mt-4`}
-                  >
-                    Try it with a sample CV
-                  </button>
-                ) : null}
-              </div>
+              <EmptyState
+                testId="analysis-empty"
+                icon="analysis"
+                title="Nothing checked yet."
+                // cviper-allow-absolute-privacy-claim: the sentence names its own
+                // subject — "The basic match" — which is the keyword scorer in
+                // packages/keyword-scoring and reaches no network at all.
+                body="Pick a CV, paste an advert, and press the button. The basic match needs no account and no set-up, and nothing leaves this machine."
+                // L-277: before the user has a CV, one click shows what a check
+                // gives back. Secondary, so the view keeps its one blue button.
+                // Only while there is no CV: after that the real thing is right
+                // there and a sample would be in the way.
+                action={
+                  cvsLoaded && cvs.length === 0 && sample === null ? (
+                    <button
+                      type="button"
+                      data-testid="analysis-try-sample"
+                      onClick={() => setSample(runSample())}
+                      className={SECONDARY_BUTTON}
+                    >
+                      Try it with a sample CV
+                    </button>
+                  ) : undefined
+                }
+              />
             ) : (
               <>
                 {/* Before the score, never in it — see `GateNotice.tsx`. */}

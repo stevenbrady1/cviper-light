@@ -13,8 +13,11 @@
  *                 wraps on a phone;
  *   * `footnotes` everything under the box.
  *
- * An empty slot draws nothing. `barEnd` is required: the bar closes the box,
- * and the main button is always there (disabled, never hidden).
+ * An empty slot draws nothing. A notices slot whose every child is `hidden`
+ * takes no row either (L-447): Tailor's folded CV text stays mounted, because
+ * Show CV's `aria-controls` names it, and must not leave a 12px gap.
+ * `barEnd` is required: the bar closes the box, and the main button is always
+ * there (disabled, never hidden).
  */
 import { type ReactNode } from 'react';
 
@@ -51,7 +54,11 @@ export function Composer({
           {sentence}
         </div>
       ) : null}
-      {filled(notices) ? <div data-slot="notices">{notices}</div> : null}
+      {filled(notices) ? (
+        <div data-slot="notices" className="space-y-2 [&:not(:has(>:not([hidden])))]:hidden">
+          {notices}
+        </div>
+      ) : null}
       <div data-slot="box" className="flex flex-col">
         {editor}
         <div
