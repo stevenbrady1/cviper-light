@@ -9066,3 +9066,83 @@ describe('Analysis: one line of choices, and the advert box as the hero (L-446)'
     await page.context().close();
   });
 });
+
+/**
+ * No empty notices row above the advert box (L-447).
+ *
+ * Tailor's folded CV text stays mounted (Show CV's `aria-controls` names it),
+ * so the composer's notices slot is there with nothing showing in it. As one
+ * of the composer's rows it took a second 12px gap between the line of choices
+ * and the box. The composer hides a slot whose every child is `hidden`, so the
+ * line and the box are one gap apart, as on Analysis, whose slot is not drawn.
+ */
+async function lineToBoxGap(
+  page: Page,
+  scope: string,
+): Promise<{ between: number; gap: number; problems: string[] }> {
+  return page.evaluate((scope) => {
+    const sentence = document.querySelector(`${scope} [data-slot="sentence"]`);
+    const box = document.querySelector(`${scope} [data-slot="box"]`);
+    const column = sentence?.parentElement;
+    if (!sentence || !box || !column) return { between: NaN, gap: NaN, problems: ['no composer'] };
+    const gap = Number.parseFloat(getComputedStyle(column).rowGap);
+    const between = box.getBoundingClientRect().top - sentence.getBoundingClientRect().bottom;
+    return {
+      between,
+      gap,
+      problems:
+        Math.abs(between - gap) > 0.5
+          ? [`${String(between)}px between the line and the box, not one ${String(gap)}px gap`]
+          : [],
+    };
+  }, scope);
+}
+
+describe('Tailor: no empty gap above the advert box (L-447)', () => {
+  it('with the CV folded, the line and the box are one composer gap apart, as on Analysis', async () => {
+    const tailor = await tailorComposer({ width: 1000, height: 700 });
+    // The case that matters: the slot is in the page, holding the mounted, folded CV text.
+    assert.equal(
+      await tailor.evaluate(
+        () =>
+          document
+            .querySelector('[data-testid="tailor-scroll"] [data-slot="notices"]')
+            ?.contains(document.querySelector('[data-testid="tailor-cv-preview"][hidden]')) ===
+          true,
+      ),
+      true,
+      'the folded CV text is not mounted in the notices slot',
+    );
+    const t = await lineToBoxGap(tailor, '[data-testid="tailor-scroll"]');
+    await tailor.context().close();
+
+    const analysis = await analysisComposer({ width: 1000, height: 700 });
+    const a = await lineToBoxGap(analysis, '[data-testid="view-analysis"]');
+    await analysis.context().close();
+
+    console.log(
+      `line to box: Tailor ${String(t.between)}px, Analysis ${String(a.between)}px, gap ${String(t.gap)}px`,
+    );
+    assert.equal(t.gap, 12);
+    assert.deepEqual([...t.problems, ...a.problems], []);
+    assert.equal(t.between, a.between);
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: the empty slot drawn again adds a second gap, and it is reported', async () => {
+    const page = await tailorComposer({ width: 1000, height: 700 });
+    await page.evaluate(() => {
+      const slot = document.querySelector<HTMLElement>(
+        '[data-testid="tailor-scroll"] [data-slot="notices"]',
+      );
+      if (slot === null) throw new Error('no notices slot');
+      slot.style.display = 'block';
+    });
+    const { problems } = await lineToBoxGap(page, '[data-testid="tailor-scroll"]');
+    assert.ok(
+      problems.some((line) => line.includes('not one 12px gap')),
+      `the second gap went unreported: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+});

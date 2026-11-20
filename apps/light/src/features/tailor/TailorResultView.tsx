@@ -2,7 +2,7 @@ import { type DraftReview } from '@cviper/core-types';
 
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { MoreMenu } from '../../app/MoreMenu';
-import { IconTile } from '../../ui';
+import { EmptyState } from '../../ui';
 
 import { AtsStep } from './AtsStep';
 import { type AtsComparison } from './atsComparison';
@@ -54,19 +54,12 @@ export function TailorResultView({
 }: TailorResultViewProps) {
   if (result === null) {
     return (
-      <div
-        data-testid="tailor-empty"
-        className="rounded-card border border-line border-dashed bg-card px-6 py-8 text-center"
-      >
-        <div className="mb-3 flex justify-center">
-          <IconTile icon="tailor" />
-        </div>
-        <p className="font-medium text-ink">Nothing tailored yet.</p>
-        <p className="mt-1 text-ink-muted">
-          Pick a CV and an advert, then press the button. Every employer, date, figure and
-          certification in the result is checked against your original CV before you see it.
-        </p>
-      </div>
+      <EmptyState
+        testId="tailor-empty"
+        icon="tailor"
+        title="Nothing tailored yet."
+        body="Pick a CV and an advert, then press the button. Every employer, date, figure and certification in the result is checked against your original CV before you see it."
+      />
     );
   }
 

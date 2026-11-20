@@ -7,9 +7,10 @@
  * token, decorative (`aria-hidden`, not focusable).
  *
  * They are reached through the shared `Icon` component by the names the
- * Settings headings already use (`data`, `boards`, `refresh`, `start`,
- * `shield`, `info`, `flag`, `trash`), so `SectionHeading icon="…"` draws them
- * with no change at the call site. See `DUOTONE` in `Icon.tsx`.
+ * Settings headings used (`data`, `boards`, `refresh`, `start`, `shield`,
+ * `info`, `flag`, `trash`). No heading draws an icon since L-440; the names
+ * stay, so `<Icon name="…">` still draws them (Hint's `info`). See `DUOTONE`
+ * in `Icon.tsx`.
  *
  * Their accent is `--color-section-icon-accent`, NOT the nav icons' token:
  * these sit on light tiles, where the nav icons' teal measured under 3:1, so
