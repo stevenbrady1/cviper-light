@@ -1,24 +1,18 @@
 // @vitest-environment jsdom
 /**
- * Every Settings section heading shows its own duotone icon (L-256), in the
- * heading's tile, beside its label — and the heading's accessible name is still
- * just the label.
+ * No Settings section heading draws an icon (L-440), and each heading's
+ * accessible name is still just its label.
+ *
+ * Until L-440 every heading had its own duotone icon in a small tile beside it
+ * (L-256, the owner's choice on 2026-10-16). A tile beside a title is the same
+ * template tell L-431 took off the page titles, one level down, so the owner
+ * chose to remove these too (2026-11-19). Delete everything loses its red tile;
+ * its red Delete button and its warning words stay.
  */
 import { cleanup, render, screen } from '@testing-library/react';
-import { type ComponentType } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import {
-  AboutIcon,
-  DeleteEverythingIcon,
-  GettingStartedIcon,
-  JobBoardsIcon,
-  PrivacyIcon,
-  ReportProblemIcon,
-  UpdatesIcon,
-  YourDataIcon,
-  type SettingsIconProps,
-} from '../../ui/SettingsIcons';
+import { DESTRUCTIVE_BUTTON } from '../../app/buttons';
 import { createFakeFilePort } from '../../platform/test/fakeFilePort';
 
 import { Settings } from './Settings';
@@ -26,84 +20,61 @@ import { createFakeBackupPort } from './test/fakePort';
 
 afterEach(() => cleanup());
 
-const SECTIONS: ReadonlyArray<readonly [string, ComponentType<SettingsIconProps>]> = [
-  ['Your data', YourDataIcon],
-  ['Job boards', JobBoardsIcon],
-  ['Updates', UpdatesIcon],
-  ['Getting started', GettingStartedIcon],
-  ['Privacy', PrivacyIcon],
-  ['About', AboutIcon],
-  ['Report a problem', ReportProblemIcon],
-  ['Delete everything', DeleteEverythingIcon],
-];
-
-/**
- * What the icon draws on its own, at the section tile's size. Delete
- * everything sits in a danger tile, which draws it in one colour (L-256).
- */
-function expected(Icon: ComponentType<SettingsIconProps>, monochrome = false): string {
-  const { container, unmount } = render(
-    <Icon size={16} className="shrink-0" monochrome={monochrome} />,
-  );
-  const html = container.querySelector('svg')?.outerHTML ?? '';
-  unmount();
-  return html;
-}
+/** The headings that had a tile until L-440. Each must still be there. */
+const SECTIONS = [
+  'AI provider keys',
+  'What I have agreed to',
+  'Your data',
+  'Job boards',
+  'API keys',
+  'Updates',
+  'Getting started',
+  'Privacy',
+  'About',
+  'Report a problem',
+  'Delete everything',
+] as const;
 
 function renderSettings() {
-  render(<Settings port={createFakeBackupPort()} filePort={createFakeFilePort()} />);
+  return render(<Settings port={createFakeBackupPort()} filePort={createFakeFilePort()} />);
 }
 
-describe('the Settings section icons', () => {
-  it.each(SECTIONS)('%s shows its own icon in the heading tile', (label, Icon) => {
-    const markup = expected(Icon, label === 'Delete everything');
-    renderSettings();
+/** Every svg or hidden tile in the heading's section that comes BEFORE the heading. */
+function marksBefore(heading: Element): Element[] {
+  const section = heading.closest('section');
+  expect(section, heading.textContent ?? '').not.toBeNull();
+  return [...(section?.querySelectorAll('svg, span[aria-hidden="true"]') ?? [])].filter(
+    (mark) => (mark.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+  );
+}
 
-    const heading = screen.getByRole('heading', { name: label, level: 2 });
-    // SectionHeading: [tile][text block containing the heading].
-    const row = heading.closest('div.flex.items-start');
-    const tile = row?.querySelector(':scope > span[aria-hidden="true"]');
-    expect(tile, label).not.toBeNull();
-    expect(tile?.querySelector('svg')?.outerHTML, label).toBe(markup);
+describe('the Settings section headings (L-440)', () => {
+  it('every heading that had a tile is still there, as a level-2 heading', () => {
+    const { container } = renderSettings();
+    const names = [...container.querySelectorAll('h2')].map((h) => h.textContent);
+    for (const label of SECTIONS) expect(names, label).toContain(label);
   });
 
-  it('no section heading still draws a single-colour line icon', () => {
-    renderSettings();
-    for (const [label] of SECTIONS) {
-      const heading = screen.getByRole('heading', { name: label, level: 2 });
-      const svg = heading.closest('div.flex.items-start')?.querySelector('svg');
-      // The old drawings had stroke-width 2.
-      expect(svg?.getAttribute('stroke-width'), label).toBe('1.75');
+  it('no Settings section heading draws an icon or a tile in front of it', () => {
+    const { container } = renderSettings();
+    const headings = [...container.querySelectorAll('h2')];
+    expect(headings.length).toBeGreaterThanOrEqual(SECTIONS.length);
+    for (const heading of headings) {
+      expect(marksBefore(heading), heading.textContent ?? '').toEqual([]);
     }
   });
 
-  it('the seven non-danger headings draw their accent through the token', () => {
+  it('Delete everything keeps its red Delete button', () => {
     renderSettings();
-    for (const [label] of SECTIONS.filter(([name]) => name !== 'Delete everything')) {
-      const heading = screen.getByRole('heading', { name: label, level: 2 });
-      const svg = heading.closest('div.flex.items-start')?.querySelector('svg');
-      expect(svg?.innerHTML, label).toContain('var(--color-section-icon-accent)');
-    }
+    expect(screen.getByTestId('settings-erase').className).toBe(`mt-3 ${DESTRUCTIVE_BUTTON}`);
   });
 
-  it('Delete everything draws the whole bin in the danger colour — no teal accent', () => {
+  it('each heading’s name is still just its label', () => {
     renderSettings();
-    const heading = screen.getByRole('heading', { name: 'Delete everything', level: 2 });
-    const svg = heading.closest('div.flex.items-start')?.querySelector('svg');
-    expect(svg).not.toBeNull();
-    expect(svg?.querySelector('[stroke="var(--color-section-icon-accent)"]')).toBeNull();
-    expect(svg?.innerHTML).not.toContain('--color-section-icon-accent');
-    const lines = [...(svg?.querySelectorAll('line') ?? [])];
-    expect(lines).toHaveLength(2);
-    for (const line of lines) expect(line.getAttribute('stroke')).toBe('currentColor');
-    // The tile is the danger tone, so currentColor is the danger colour.
-    expect(svg?.closest('span')?.className).toContain('text-danger');
-  });
-
-  it('the headings’ accessible names are still just the labels', () => {
-    renderSettings();
-    for (const [label] of SECTIONS) {
-      expect(screen.getByRole('heading', { name: label, level: 2 }).textContent).toBe(label);
+    for (const label of SECTIONS) {
+      // `hidden`: "API keys" sits in a closed <details>.
+      const heading = screen.getByRole('heading', { name: label, level: 2, hidden: true });
+      expect(heading.textContent, label).toBe(label);
     }
   });
 });

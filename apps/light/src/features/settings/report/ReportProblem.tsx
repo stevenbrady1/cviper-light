@@ -59,7 +59,7 @@ export function ReportProblem({ browser, port }: ReportProblemProps = {}) {
 
   return (
     <section data-testid="settings-report">
-      <SectionHeading icon="flag" title="Report a problem" />
+      <SectionHeading title="Report a problem" />
       <p className="mt-1 text-ink-muted">
         Opens a new issue on this app’s public GitHub page, in your own browser, with the box
         already headed. You write what happened and press submit — or close the tab, and nothing has
