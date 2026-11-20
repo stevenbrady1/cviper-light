@@ -24,8 +24,9 @@ export const FIELD_INVALID = 'rounded-control border border-danger bg-card px-2.
 
 /**
  * The smaller box (L-376): a picker that sits on one line beside its label or
- * button. The tracked-job pickers on Analysis and Tailor, and Tailor's
- * application picker. Same edge, fill and text as FIELD; only the vertical
+ * button: Tailor's application picker. (Tailor's tracked-job picker is a chip
+ * since L-445; Analysis's wears this until it becomes one.) Same edge, fill
+ * and text as FIELD; only the vertical
  * padding is smaller (`py-1`, not `py-1.5`). Never put `py-1` after FIELD to
  * get this: two padding classes on one box leave the winner to the stylesheet.
  */

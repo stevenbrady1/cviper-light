@@ -11,7 +11,8 @@ import { uploadCv, type CvStorePort } from './ingestCv';
 /**
  * "Upload a CV", for a screen that is not Analysis (L-240).
  *
- * Tailor and Profile draw this; Analysis keeps its own layout around the same
+ * Profile draws this, and Tailor its two halves (`useCvUpload`, `CvUploadNotes`,
+ * L-445); Analysis keeps its own layout around the same
  * `uploadCv`, because its button shares a row with "Save as JSON Resume" and
  * its problem line is shared with the share-sheet path. Either way it is one
  * parser and one store, so a CV uploaded here is on every screen.
@@ -33,7 +34,12 @@ export interface CvUploadProps {
   readonly onUploaded: (cv: Cv) => void;
 }
 
-export function CvUpload({ idPrefix, files, saveCv, now, onUploaded }: CvUploadProps) {
+/**
+ * The upload and what it has to say (L-445): Tailor draws the button in its
+ * line of choices and these words under the line, so the two halves live
+ * apart. `CvUpload` below puts them back together for Profile.
+ */
+export function useCvUpload({ files, saveCv, now, onUploaded }: Omit<CvUploadProps, 'idPrefix'>) {
   const [problem, setProblem] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<readonly string[]>([]);
 
@@ -52,17 +58,21 @@ export function CvUpload({ idPrefix, files, saveCv, now, onUploaded }: CvUploadP
     onUploaded(uploaded.value.cv);
   }, [files, now, onUploaded, saveCv]);
 
-  return (
-    <div>
-      <button
-        type="button"
-        data-testid={`${idPrefix}-upload`}
-        onClick={() => void onUpload()}
-        className={SECONDARY_BUTTON}
-      >
-        Upload a CV
-      </button>
+  return { problem, warnings, onUpload };
+}
 
+/** The upload's problem line and the warnings for a CV that only partly read. */
+export function CvUploadNotes({
+  idPrefix,
+  problem,
+  warnings,
+}: {
+  readonly idPrefix: string;
+  readonly problem: string | null;
+  readonly warnings: readonly string[];
+}) {
+  return (
+    <>
       {problem === null ? null : (
         <ErrorBox variant="box" gapAbove="mt-2" testId={`${idPrefix}-upload-problem`}>
           {problem}
@@ -79,6 +89,25 @@ export function CvUpload({ idPrefix, files, saveCv, now, onUploaded }: CvUploadP
           ))}
         </ul>
       )}
+    </>
+  );
+}
+
+export function CvUpload({ idPrefix, files, saveCv, now, onUploaded }: CvUploadProps) {
+  const { problem, warnings, onUpload } = useCvUpload({ files, saveCv, now, onUploaded });
+
+  return (
+    <div>
+      <button
+        type="button"
+        data-testid={`${idPrefix}-upload`}
+        onClick={() => void onUpload()}
+        className={SECONDARY_BUTTON}
+      >
+        Upload a CV
+      </button>
+
+      <CvUploadNotes idPrefix={idPrefix} problem={problem} warnings={warnings} />
     </div>
   );
 }

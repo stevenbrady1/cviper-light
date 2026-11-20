@@ -255,14 +255,15 @@ describe('the word count’s wording (L-343)', () => {
     ['happy: many', 185, '185 words'],
     ['boundary: two', 2, '2 words'],
     ['boundary: one', 1, '1 word'],
-  ])('%s reads the same folded and open', async (_label, count, phrase) => {
+  ])('%s reads the same in the CV chip and the open panel', async (_label, count, phrase) => {
     await renderWith([
       cv('cv-1', 'Count.txt', Array.from({ length: count }, () => 'word').join(' ')),
     ]);
     await vi.waitFor(() => expect(previewText()).toBeTruthy());
 
-    expect(screen.getByTestId('tailor-cv-preview-summary').textContent).toBe(
-      `: Count.txt · ${phrase}`,
+    // L-445: the folded summary line is gone; the CV chip's item carries the count.
+    expect(screen.getByTestId<HTMLSelectElement>('tailor-cv-pick').selectedOptions[0]?.label).toBe(
+      `Count.txt · ${phrase}`,
     );
     expect(screen.getByTestId('tailor-cv-preview-meta').textContent).toBe(`Count.txt · ${phrase}`);
   });
@@ -275,7 +276,9 @@ describe('the word count’s wording (L-343)', () => {
     await renderWith([cv('cv-1', 'Blank.docx', text)]);
     await screen.findByTestId('tailor-cv-preview-empty');
 
-    expect(screen.queryByTestId('tailor-cv-preview-summary')).toBeNull();
+    expect(screen.getByTestId<HTMLSelectElement>('tailor-cv-pick').selectedOptions[0]?.label).toBe(
+      'Blank.docx',
+    );
     expect(screen.queryByTestId('tailor-cv-preview-meta')).toBeNull();
     expect(screen.getByTestId('view-tailor').textContent).not.toMatch(/\b0 words?\b/);
   });

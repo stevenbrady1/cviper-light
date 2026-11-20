@@ -3,8 +3,9 @@
  * The chosen CV starts folded on the Tailor screen (L-340).
  *
  * Open, the CV text pushed "The job advert" below the fold at 1500×810. So
- * the preview starts folded to one line — the heading, the file name, the
- * word count and the toggle — and the user opens it if they want to read it.
+ * the preview starts folded, and the user opens it if they want to read it.
+ * Folded, nothing of it is drawn: the CV chip's item names the CV and its word
+ * count, and the toggle sits in the chip row (L-445).
  *
  * Two rules from L-192 still hold: the user's open/fold choice is not reset
  * when the CV changes, and no CV draws nothing. One is new: a CV with no text
@@ -98,28 +99,31 @@ async function renderWith(cvs: readonly Cv[]): Promise<ReturnType<typeof userEve
 const panel = () => screen.getByTestId('tailor-cv-preview');
 const toggle = () => screen.getByTestId('tailor-cv-preview-toggle');
 const summary = () => screen.queryByTestId('tailor-cv-preview-summary');
-const pick = () => screen.getByTestId('tailor-cv-pick');
+const pick = () => screen.getByTestId<HTMLSelectElement>('tailor-cv-pick');
+/** What the CV chip shows for the chosen CV (L-445). */
+const chipItem = () => pick().selectedOptions[0]?.label;
+const row = () => document.querySelector('[data-slot="sentence"]');
 
 describe('folded on a fresh mount', () => {
-  it('happy: one line — heading, file name, word count and the toggle; the text is hidden', async () => {
+  it('happy: no summary line — the chip names the CV and its word count, the toggle is in the chip row; the text is hidden', async () => {
     await renderWith([cv('cv-1', 'Risk CV.docx', RISK_TEXT), cv('cv-2', 'Data CV.pdf', DATA_TEXT)]);
-    await vi.waitFor(() => expect(summary()).not.toBeNull());
+    await screen.findByTestId('tailor-cv-preview-toggle');
 
     expect(panel().hidden).toBe(true);
     expect(toggle().getAttribute('aria-expanded')).toBe('false');
     expect(toggle().getAttribute('aria-controls')).toBe(panel().id);
     expect(toggle().textContent).toBe('Show CV');
 
-    const line = toggle().parentElement?.textContent ?? '';
-    expect(line).toContain('Your CV as the rewrite reads it');
-    expect(summary()?.textContent).toBe(': Risk CV.docx · 27 words');
+    expect(row()?.contains(toggle())).toBe(true);
+    expect(summary()).toBeNull();
+    expect(chipItem()).toBe('Risk CV.docx · 27 words');
     // The CV text itself is folded away, inside the hidden section.
     expect(panel().contains(screen.getByTestId('tailor-cv-preview-text'))).toBe(true);
   });
 
   it('keeps exactly one primary button when folded; the toggle is not one', async () => {
     await renderWith([cv('cv-1', 'Risk CV.docx', RISK_TEXT)]);
-    await vi.waitFor(() => expect(summary()).not.toBeNull());
+    await screen.findByTestId('tailor-cv-preview-toggle');
 
     expect(document.querySelectorAll('[data-primary="true"]')).toHaveLength(1);
     expect(toggle().hasAttribute('data-primary')).toBe(false);
@@ -127,19 +131,19 @@ describe('folded on a fresh mount', () => {
 
   it('boundary: a one-word CV counts as it does in the open panel', async () => {
     await renderWith([cv('cv-1', 'One.txt', 'Jamie')]);
-    await vi.waitFor(() => expect(summary()).not.toBeNull());
+    await screen.findByTestId('tailor-cv-preview-toggle');
 
     // The same `wordCount` the open panel's meta line uses, and its wording.
     const meta = screen.getByTestId('tailor-cv-preview-meta').textContent ?? '';
     expect(meta).toContain('1 word');
-    expect(summary()?.textContent).toBe(': One.txt · 1 word');
+    expect(chipItem()).toBe('One.txt · 1 word');
   });
 });
 
 describe('the toggle', () => {
   it('interaction: opens the text, then folds it again', async () => {
     const user = await renderWith([cv('cv-1', 'Risk CV.docx', RISK_TEXT)]);
-    await vi.waitFor(() => expect(summary()).not.toBeNull());
+    await screen.findByTestId('tailor-cv-preview-toggle');
 
     await user.click(toggle());
     expect(panel().hidden).toBe(false);
@@ -152,7 +156,8 @@ describe('the toggle', () => {
     await user.click(toggle());
     expect(panel().hidden).toBe(true);
     expect(toggle().getAttribute('aria-expanded')).toBe('false');
-    expect(summary()?.textContent).toBe(': Risk CV.docx · 27 words');
+    expect(summary()).toBeNull();
+    expect(chipItem()).toBe('Risk CV.docx · 27 words');
   });
 });
 
@@ -162,7 +167,7 @@ describe('the choice survives a change of CV (L-192)', () => {
       cv('cv-1', 'Risk CV.docx', RISK_TEXT),
       cv('cv-2', 'Data CV.pdf', DATA_TEXT),
     ]);
-    await vi.waitFor(() => expect(summary()).not.toBeNull());
+    await screen.findByTestId('tailor-cv-preview-toggle');
     await user.click(toggle());
 
     await user.selectOptions(pick(), 'cv-2');
@@ -177,13 +182,13 @@ describe('the choice survives a change of CV (L-192)', () => {
       cv('cv-1', 'Risk CV.docx', RISK_TEXT),
       cv('cv-2', 'Data CV.pdf', DATA_TEXT),
     ]);
-    await vi.waitFor(() => expect(summary()).not.toBeNull());
+    await screen.findByTestId('tailor-cv-preview-toggle');
 
     await user.selectOptions(pick(), 'cv-2');
 
     expect(panel().hidden).toBe(true);
     expect(toggle().getAttribute('aria-expanded')).toBe('false');
-    expect(summary()?.textContent).toContain('Data CV.pdf');
+    expect(chipItem()).toContain('Data CV.pdf');
   });
 });
 
@@ -228,6 +233,6 @@ describe('when there is nothing to fold', () => {
 
     expect(panel().hidden).toBe(true);
     expect(toggle().getAttribute('aria-expanded')).toBe('false');
-    expect(summary()?.textContent).toBe(': Data CV.pdf · 24 words');
+    expect(chipItem()).toBe('Data CV.pdf · 24 words');
   });
 });
