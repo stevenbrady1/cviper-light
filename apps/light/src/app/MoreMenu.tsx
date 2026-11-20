@@ -13,7 +13,12 @@
  *   * Tab past the last item closes it, and focus goes on as usual;
  *   * choosing an item closes it, puts focus back on the trigger, then runs it;
  *   * a press anywhere else closes it — so opening a second menu closes the first.
- * An item that cannot be used now is shown disabled, never left out.
+ * An item that cannot be used now is shown disabled, never left out. It may
+ * say why with a `hint` (L-442): the existing Hint with its "i", which is the
+ * Tab stop, since a disabled button takes no focus and no tap (L-387). With
+ * only disabled items, opening leaves focus on the trigger, and Tab reaches
+ * the "i". Escape on the "i" first shuts its tip (the Hint's rule), then the
+ * list.
  *
  * The trigger is the drawn "…" icon named by `label` for a screen reader, or,
  * with `showLabel`, the words of `label` themselves ("More formats").
@@ -31,11 +36,14 @@ import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from
 import { Icon } from '../ui/Icon';
 
 import { QUIET_BUTTON } from './buttons';
+import { Hint } from './Hint';
 
 export interface MoreMenuItem {
   readonly label: string;
   readonly onSelect: () => void;
   readonly disabled?: boolean | undefined;
+  /** Why a disabled item cannot be used now, behind an "i". Ignored while it can be. */
+  readonly hint?: string | undefined;
   readonly testId?: string | undefined;
 }
 
@@ -100,22 +108,31 @@ export function MoreMenu({ label, items, showLabel = false, testId }: MoreMenuPr
       </button>
       {open ? (
         <div className="absolute top-full right-0 z-10 mt-1 flex w-max min-w-40 flex-col gap-0.5 rounded-card border border-line bg-card p-1 shadow-overlay">
-          {items.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              data-more-item=""
-              data-testid={item.testId}
-              disabled={item.disabled}
-              onClick={() => {
-                closeToTrigger();
-                item.onSelect();
-              }}
-              className={`${QUIET_BUTTON} justify-start`}
-            >
-              {item.label}
-            </button>
-          ))}
+          {items.map((item) => {
+            const button = (
+              <button
+                key={item.label}
+                type="button"
+                data-more-item=""
+                data-testid={item.testId}
+                disabled={item.disabled}
+                onClick={() => {
+                  closeToTrigger();
+                  item.onSelect();
+                }}
+                className={`${QUIET_BUTTON} justify-start`}
+              >
+                {item.label}
+              </button>
+            );
+            return item.disabled === true && item.hint !== undefined ? (
+              <Hint key={item.label} text={item.hint} className="flex items-center">
+                {button}
+              </Hint>
+            ) : (
+              button
+            );
+          })}
         </div>
       ) : null}
     </div>

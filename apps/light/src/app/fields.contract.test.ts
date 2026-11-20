@@ -54,7 +54,14 @@ import { describe, expect, it } from 'vitest';
 import { displayPath, walk } from '../lib/repo-scan';
 
 import * as fields from './fields';
-import { FIELD, FIELD_COMPACT, FIELD_INVALID } from './fields';
+import {
+  COMPOSER_BAR,
+  COMPOSER_EDITOR,
+  FIELD,
+  FIELD_CHIP,
+  FIELD_COMPACT,
+  FIELD_INVALID,
+} from './fields';
 
 /** `apps/light/src`. */
 const SRC = fileURLToPath(new URL('../', import.meta.url));
@@ -214,7 +221,14 @@ function shipped(): SourceFile[] {
 
 describe('the shared text-box styles hold exactly what the boxes carried (L-365)', () => {
   it('exports these constants and no others, so a new one arrives with a pin', () => {
-    expect(Object.keys(fields).sort()).toEqual(['FIELD', 'FIELD_COMPACT', 'FIELD_INVALID']);
+    expect(Object.keys(fields).sort()).toEqual([
+      'COMPOSER_BAR',
+      'COMPOSER_EDITOR',
+      'FIELD',
+      'FIELD_CHIP',
+      'FIELD_COMPACT',
+      'FIELD_INVALID',
+    ]);
   });
 
   it('FIELD is the standard box, class for class', () => {
@@ -265,6 +279,49 @@ describe('the shared text-box styles hold exactly what the boxes carried (L-365)
     const compact = new Set(classesOf(FIELD_COMPACT));
     expect([...standard].filter((name) => !compact.has(name))).toEqual(['py-1.5']);
     expect([...compact].filter((name) => !standard.has(name))).toEqual(['py-1']);
+  });
+
+  it('FIELD_CHIP is the chip drop-down, class for class (L-442)', () => {
+    expect(classesOf(FIELD_CHIP)).toEqual([
+      'appearance-none',
+      'field-sizing-content',
+      'rounded-control',
+      'border',
+      'border-field-line',
+      'bg-sunken',
+      'py-1.5',
+      'pr-8',
+      'pl-3',
+      'text-ink',
+      'disabled:cursor-not-allowed',
+      'disabled:bg-line',
+      'disabled:text-ink-faint',
+    ]);
+  });
+
+  it('COMPOSER_EDITOR is the composer text box: edge on top and sides, round top (L-442)', () => {
+    expect(classesOf(COMPOSER_EDITOR)).toEqual([
+      'rounded-t-card',
+      'border-x',
+      'border-t',
+      'border-field-line',
+      'bg-card',
+      'px-3.5',
+      'py-3',
+      'text-ink',
+    ]);
+  });
+
+  it('COMPOSER_BAR is the bar under it: edge all round, a hairline on top, round bottom (L-442)', () => {
+    expect(classesOf(COMPOSER_BAR)).toEqual([
+      'rounded-b-card',
+      'border',
+      'border-field-line',
+      'border-t-line',
+      'bg-card',
+      'px-3',
+      'py-2.5',
+    ]);
   });
 
   it.each(SHARED)('%s carries no layout, which stays at the call site', (_name, style) => {
@@ -344,6 +401,9 @@ describe('no box in a shared folder copies the style by hand (L-365)', () => {
       expect(SHAPES.map((shape) => shape.names)).toEqual([
         'FIELD / FIELD_INVALID',
         'FIELD_COMPACT',
+        'FIELD_CHIP',
+        'COMPOSER_EDITOR',
+        'COMPOSER_BAR',
       ]);
     });
 
