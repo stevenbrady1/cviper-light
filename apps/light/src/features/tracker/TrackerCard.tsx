@@ -1,3 +1,5 @@
+import { type ReactNode } from 'react';
+
 import { daysSinceTimestamp } from '../../lib/dates';
 
 import {
@@ -46,6 +48,17 @@ import { STALENESS_BANDS, stalenessBand, stalenessDescription } from './stalenes
  * words, because a coloured stripe says nothing on a greyscale screen, nothing
  * to a screen reader, and very little to the one man in twelve with a colour
  * vision deficiency.
+ *
+ * ============================================================================
+ * THE FRAME IS THE LIST ITEM (L-438)
+ * ============================================================================
+ * The border, the left edge, the shadow, the round corners, the blue edge when
+ * selected and the arrival movement are drawn on the `<li>`, not the button. The
+ * button is the frame's top part; a started job's step row (`children`) is its
+ * bottom part, under a hairline, so the row no longer hangs below the card. The
+ * row cannot go INSIDE the button: it has its own Continue, and a button inside
+ * a button is not a thing a keyboard or a screen reader can use. A card with no
+ * step row is the button alone in its frame, and looks as it always did.
  */
 
 /** The drag payload's type. Namespaced so nothing else can be dropped here. */
@@ -60,6 +73,8 @@ interface TrackerCardProps {
   /** The name of the interview sub-stage this card is in (L-205), or null. */
   readonly substage?: string | null | undefined;
   readonly onSelect: (applicationId: string) => void;
+  /** Drawn in the card's frame, under the card button: a started job's step row. */
+  readonly children?: ReactNode;
 }
 
 export function TrackerCard({
@@ -70,6 +85,7 @@ export function TrackerCard({
   settling,
   substage = null,
   onSelect,
+  children,
 }: TrackerCardProps) {
   const { application, job } = entry;
 
@@ -93,108 +109,114 @@ export function TrackerCard({
     .join(' · ');
 
   return (
-    <button
-      type="button"
-      draggable
-      data-testid={`tracker-card-${application.id}`}
-      data-staleness={band}
-      data-status={application.status}
-      aria-pressed={selected}
-      aria-label={[
-        job.title,
-        where,
-        substage === null ? null : `Stage: ${substage}`,
-        age,
-        dueDescription,
-        note === null ? null : `Next action: ${note}`,
-      ]
-        .filter((part) => part !== null && part !== '')
-        .join('. ')}
-      onClick={() => onSelect(application.id)}
-      onDragStart={(event) => {
-        event.dataTransfer.setData(CARD_DRAG_TYPE, application.id);
-        event.dataTransfer.effectAllowed = 'move';
-      }}
+    <li
       className={[
-        'block w-full cursor-grab rounded-card border border-line border-l-2 bg-card',
-        'relative px-3 py-2.5 text-left shadow-raised active:cursor-grabbing',
+        'rounded-card border border-line border-l-2 bg-card shadow-raised',
         STALENESS_BANDS[band].edgeClass,
-        selected ? 'border-blue' : 'hover:border-ink-faint',
+        // Selected is read off the button inside, so the whole frame, step row
+        // included, turns blue with it.
+        'hover:border-ink-faint has-[[aria-pressed=true]]:border-blue',
         // The app's ONE motion moment: a card arriving in its new column. See
         // theme.css, where `prefers-reduced-motion` removes it.
         settling ? 'cviper-card-settle' : '',
       ].join(' ')}
     >
-      <p className="line-clamp-3 break-words font-medium text-ink">{job.title}</p>
-      {urgency === 'overdue' ? (
-        // Built like the side bar's status dot: a second telling of the red
-        // "overdue" words below, so it is hidden from screen readers. Not a
-        // StateMark: a mark needs a hint, and nothing can sit inside the card's button.
-        // In the card's right padding, level with the title's first line, and
-        // out of its flow, so the title keeps the card's full width (L-409).
-        <span
-          aria-hidden="true"
-          data-testid={`tracker-card-overdue-${application.id}`}
-          className="absolute top-4.5 right-0.5 size-2 rounded-pill bg-danger"
-        />
-      ) : null}
-      {/*
-        The {' '}s between the lines draw nothing (white space between blocks),
-        but keep the card's text as words: without them it reads "Data
-        AnalystAcme · London3 days…", and axe's label-in-name check (WCAG 2.5.3)
-        finds that run-together text missing from the aria-label (L-428).
-      */}{' '}
-      <p className="line-clamp-2 break-words text-xs text-ink-muted">{where}</p>{' '}
-      {substage === null ? null : (
-        <p
-          data-testid={`tracker-card-substage-${application.id}`}
-          className="mt-1 truncate font-mono text-[11px] tracking-[0.04em] text-ink-muted"
-        >
-          {substage}
-        </p>
-      )}{' '}
-      <p
-        data-testid={`tracker-card-age-${application.id}`}
-        className="mt-1 truncate text-[11px] text-ink-muted"
+      <button
+        type="button"
+        draggable
+        data-testid={`tracker-card-${application.id}`}
+        data-staleness={band}
+        data-status={application.status}
+        aria-pressed={selected}
+        aria-label={[
+          job.title,
+          where,
+          substage === null ? null : `Stage: ${substage}`,
+          age,
+          dueDescription,
+          note === null ? null : `Next action: ${note}`,
+        ]
+          .filter((part) => part !== null && part !== '')
+          .join('. ')}
+        onClick={() => onSelect(application.id)}
+        onDragStart={(event) => {
+          event.dataTransfer.setData(CARD_DRAG_TYPE, application.id);
+          event.dataTransfer.effectAllowed = 'move';
+        }}
+        className="relative block w-full cursor-grab rounded-card px-3 py-2.5 text-left active:cursor-grabbing"
       >
-        {age}
-      </p>{' '}
-      {line === null || urgency === 'none' ? null : (
-        <p
-          data-testid={`tracker-card-due-${application.id}`}
-          data-urgency={urgency}
-          className="mt-2 text-[11px]"
-        >
-          {/*
-            Two lines (L-409). The user's words get the card's full width and
-            clip with "…"; the due sits under them and may wrap, never clip. On
-            one shared row the due held its width and the words were what went:
-            in a narrow column, nothing but "· 2 days overdue".
-          */}
-          {line.action === null ? null : (
-            <span
-              data-testid={`tracker-card-due-action-${application.id}`}
-              className="block truncate text-ink-muted"
-            >
-              {line.action}
-            </span>
-          )}
+        <p className="line-clamp-3 break-words font-medium text-ink">{job.title}</p>
+        {urgency === 'overdue' ? (
+          // Built like the side bar's status dot: a second telling of the red
+          // "overdue" words below, so it is hidden from screen readers. Not a
+          // StateMark: a mark needs a hint, and nothing can sit inside the card's button.
+          // In the card's right padding, level with the title's first line, and
+          // out of its flow, so the title keeps the card's full width (L-409).
           <span
-            data-testid={`tracker-card-due-when-${application.id}`}
-            className={`block ${NEXT_ACTION_TONES[urgency]}`}
+            aria-hidden="true"
+            data-testid={`tracker-card-overdue-${application.id}`}
+            className="absolute top-4.5 right-0.5 size-2 rounded-pill bg-danger"
+          />
+        ) : null}
+        {/*
+          The {' '}s between the lines draw nothing (white space between blocks),
+          but keep the card's text as words: without them it reads "Data
+          AnalystAcme · London3 days…", and axe's label-in-name check (WCAG 2.5.3)
+          finds that run-together text missing from the aria-label (L-428).
+        */}{' '}
+        <p className="line-clamp-2 break-words text-xs text-ink-muted">{where}</p>{' '}
+        {substage === null ? null : (
+          <p
+            data-testid={`tracker-card-substage-${application.id}`}
+            className="mt-1 truncate font-mono text-[11px] tracking-[0.04em] text-ink-muted"
           >
-            {line.when}
-          </span>
-        </p>
-      )}{' '}
-      {note === null ? null : (
+            {substage}
+          </p>
+        )}{' '}
         <p
-          data-testid={`tracker-card-next-${application.id}`}
-          className="mt-2 truncate text-[11px] text-ink-muted"
+          data-testid={`tracker-card-age-${application.id}`}
+          className="mt-1 truncate text-[11px] text-ink-muted"
         >
-          {note}
-        </p>
-      )}
-    </button>
+          {age}
+        </p>{' '}
+        {line === null || urgency === 'none' ? null : (
+          <p
+            data-testid={`tracker-card-due-${application.id}`}
+            data-urgency={urgency}
+            className="mt-2 text-[11px]"
+          >
+            {/*
+              Two lines (L-409). The user's words get the card's full width and
+              clip with "…"; the due sits under them and may wrap, never clip. On
+              one shared row the due held its width and the words were what went:
+              in a narrow column, nothing but "· 2 days overdue".
+            */}
+            {line.action === null ? null : (
+              <span
+                data-testid={`tracker-card-due-action-${application.id}`}
+                className="block truncate text-ink-muted"
+              >
+                {line.action}
+              </span>
+            )}
+            <span
+              data-testid={`tracker-card-due-when-${application.id}`}
+              className={`block ${NEXT_ACTION_TONES[urgency]}`}
+            >
+              {line.when}
+            </span>
+          </p>
+        )}{' '}
+        {note === null ? null : (
+          <p
+            data-testid={`tracker-card-next-${application.id}`}
+            className="mt-2 truncate text-[11px] text-ink-muted"
+          >
+            {note}
+          </p>
+        )}
+      </button>
+      {children}
+    </li>
   );
 }

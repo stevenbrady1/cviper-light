@@ -37,6 +37,8 @@
  *   - `?consent=openai,google` has those providers already agreed to, for
  *     Settings' "What I have agreed to" (L-410); `&consentLate=1` holds the
  *     consent file's answer back until a screen has had time to scroll.
+ *   - `?started=1`, with `?entries=1`, says card a's job has been analysed,
+ *     so the board draws its step row and Continue in the card (L-438);
  *   - `?profile=none|five|six` gives Profile a saved profile with that many of
  *     its six parts filled in, and its own CV list (L-413: the checklist);
  *     `&profileCvsLate=1` holds that list's answer back, so the checklist can
@@ -440,6 +442,11 @@ const profileCvPort =
         }
       : profileCvs;
 const profileLoad = failsToLoad(params.get('profileLoadError'));
+/** `?started=1` (L-438): job a has been analysed, so its card is a started one. */
+const boardProgressPort =
+  params.get('started') === '1'
+    ? { loadAll: () => Promise.resolve(new Map([['job-a', { analysed: true, exported: false }]])) }
+    : undefined;
 
 /** What the spec asks `__mountErrorBox` to draw. */
 interface MountedErrorBox {
@@ -848,6 +855,7 @@ ReactDOM.createRoot(root).render(
         {...(drafted === null ? {} : { workflowPort: drafted.workflowPort })}
         {...(searchPort === undefined ? {} : { searchPort })}
         {...(profileCvPort === undefined ? {} : { profileCvPort })}
+        {...(boardProgressPort === undefined ? {} : { boardProgressPort })}
         now={NOW}
       />
     )}

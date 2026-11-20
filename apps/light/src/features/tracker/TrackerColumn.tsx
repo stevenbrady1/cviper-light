@@ -109,7 +109,7 @@ export function TrackerColumn({
         it takes no width from the count, and comes before the cards in focus
         order. `contrast-webkit.spec.ts` measures the heading in a real engine.
       */}
-      <header className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 px-2 pt-2 pb-1.5">
+      <header className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 px-2 pt-2 pb-0.5">
         <h2 className="min-w-0 text-xs font-semibold text-ink-muted">{STATUS_LABELS[status]}</h2>
         <span className="ml-auto flex items-baseline gap-2">
           <span
@@ -122,7 +122,8 @@ export function TrackerColumn({
       </header>
 
       {status !== 'interviewing' || onEditSubstages === undefined ? null : (
-        <div className="px-2 pb-1.5">
+        // Part of the head (L-438): a quiet row that ends in the head's hairline.
+        <div className="mx-2 mb-1 border-b border-line pt-1 pb-1.5">
           <button
             type="button"
             data-testid="tracker-edit-substages"
@@ -135,24 +136,25 @@ export function TrackerColumn({
         </div>
       )}
 
-      <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-2">
+      {/* `pt-1`: room for the first card's focus ring, which the scrolling list would cut (L-438). */}
+      <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pt-1 pb-2">
         {entries.map((entry) => (
-          <li key={entry.application.id}>
-            <TrackerCard
-              entry={entry}
-              today={today}
-              now={now}
-              selected={entry.application.id === selectedId}
-              settling={entry.application.id === settlingId}
-              substage={
-                status === 'interviewing'
-                  ? substageName(substages, entry.application.interview_substage_id)
-                  : null
-              }
-              onSelect={onSelect}
-            />
+          <TrackerCard
+            key={entry.application.id}
+            entry={entry}
+            today={today}
+            now={now}
+            selected={entry.application.id === selectedId}
+            settling={entry.application.id === settlingId}
+            substage={
+              status === 'interviewing'
+                ? substageName(substages, entry.application.interview_substage_id)
+                : null
+            }
+            onSelect={onSelect}
+          >
             {(() => {
-              // A sibling of the card, never inside it: the card is a button.
+              // In the card's frame, a sibling of the card button, never inside it.
               const progress = progressFor?.(entry) ?? null;
               if (progress === null || onContinue === undefined || !isStarted(progress)) {
                 return null;
@@ -165,7 +167,7 @@ export function TrackerColumn({
                 />
               );
             })()}
-          </li>
+          </TrackerCard>
         ))}
       </ul>
     </section>
