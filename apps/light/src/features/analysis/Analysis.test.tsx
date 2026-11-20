@@ -516,6 +516,60 @@ describe('history', () => {
   });
 });
 
+/**
+ * L-444 — "Past checks" sits in the page header, next to the title, as a
+ * secondary button. The blue "Check this CV" stays by the advert box it acts on.
+ */
+describe('"Past checks" in the page header (L-444)', () => {
+  function pageHeader(): HTMLElement {
+    const header = screen.getByRole('heading', { level: 1, name: 'Analysis' }).closest('header');
+    if (header === null) throw new Error('the page title is not inside a header');
+    return header;
+  }
+
+  it('sits inside the page header and reads "Past checks (N)"', async () => {
+    const user = userEvent.setup();
+    await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
+
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
+    await user.type(screen.getByTestId('analysis-job-text'), ADVERT);
+    await user.click(screen.getByTestId('analysis-run'));
+    await screen.findByTestId('analysis-result');
+
+    const open = within(pageHeader()).getByTestId('analysis-history-open');
+    expect(open.textContent).toBe('Past checks (1)');
+  });
+
+  it('negative: is a secondary button, and the screen keeps exactly one primary', async () => {
+    await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
+
+    const open = within(pageHeader()).getByTestId('analysis-history-open');
+    expect(open.hasAttribute('data-primary')).toBe(false);
+    expect(document.querySelectorAll('[data-primary="true"]')).toHaveLength(1);
+  });
+
+  it('boundary: with no CV chosen it is still there, but disabled', async () => {
+    await renderView();
+
+    const open = within(pageHeader()).getByTestId('analysis-history-open');
+    expect(open).toHaveProperty('disabled', true);
+    expect(open.textContent).toBe('Past checks (0)');
+  });
+
+  it('a click opens the pane, and the button greys out while it is open', async () => {
+    const user = userEvent.setup();
+    await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
+
+    const open = within(pageHeader()).getByTestId('analysis-history-open');
+    await user.click(open);
+
+    expect(await screen.findByTestId('analysis-history-empty')).toBeTruthy();
+    expect(open).toHaveProperty('disabled', true);
+  });
+});
+
 describe('when the database will not open', () => {
   it('says so instead of showing an empty CV list', async () => {
     const port = createFakeAnalysisPort();

@@ -8507,3 +8507,83 @@ describe('an empty column says what goes there, and the age wraps (L-441)', () =
     await page.context().close();
   });
 });
+
+/**
+ * "Past checks" in the Analysis header (L-444).
+ *
+ * The button left the run bar for the page header, as a secondary button. On
+ * the smallest window the header must still fit the 85px cap above (the check
+ * over every title measures the same header; this one also proves the button
+ * is in it). On a phone the header stacks: the button sits under the title, the
+ * page does not scroll sideways, and the button is a thumb target, 44px or more.
+ */
+async function pastChecksProblems(page: Page, headerCap: number | null): Promise<string[]> {
+  const problems = await page.evaluate((headerCap) => {
+    const title = document.querySelector<HTMLElement>('[data-testid="view-analysis"] h1');
+    const header = title?.closest('header');
+    if (title === null || title === undefined || header === null || header === undefined) {
+      return ['no Analysis title in a header'];
+    }
+    const button = header.querySelector<HTMLElement>('[data-testid="analysis-history-open"]');
+    if (button === null) return ['"Past checks" is not in the page header'];
+    const out: string[] = [];
+    if (button.hasAttribute('data-primary')) out.push('"Past checks" is marked primary');
+    const box = button.getBoundingClientRect();
+    const tall = header.getBoundingClientRect().height;
+    if (headerCap !== null) {
+      if (tall > headerCap + 0.5) {
+        out.push(`header is ${String(tall)}px tall, the cap is ${String(headerCap)}px`);
+      }
+    } else {
+      if (box.top < title.getBoundingClientRect().bottom - 0.5) {
+        out.push('"Past checks" is not under the title');
+      }
+      if (box.height < 44) out.push(`"Past checks" is ${String(box.height)}px tall`);
+    }
+    return out;
+  }, headerCap);
+  if (headerCap === null) problems.push(...(await sidewaysOverflow(page)));
+  return problems;
+}
+
+describe('"Past checks" sits in the Analysis header (L-444)', () => {
+  it(`at 1000×700 it is in the header, and the header is no taller than ${String(HEADER_CAP_PX)}px`, async () => {
+    const page = await open('?seen=1', TITLE_WINDOWS.smallest);
+    await goTo(page, 'analysis');
+    assert.deepEqual(await pastChecksProblems(page, HEADER_CAP_PX), []);
+    await page.context().close();
+  });
+
+  it('at 375 wide it sits under the title, 44px or more, with no sideways scroll', async () => {
+    const page = await open('?seen=1', { width: 375, height: 800 });
+    await goTo(page, 'analysis');
+    assert.deepEqual(await pastChecksProblems(page, null), []);
+    await page.context().close();
+  });
+
+  // NEGATIVE — a button squeezed beside the title, and too short, is caught.
+  it('the check can fail: a short button beside the title is reported', async () => {
+    const page = await open('?seen=1', { width: 375, height: 800 });
+    await goTo(page, 'analysis');
+    await page.evaluate(() => {
+      const button = document.querySelector<HTMLElement>('[data-testid="analysis-history-open"]');
+      const row = button?.closest('[data-slot="actions"]')?.parentElement;
+      if (button === null || button === undefined || row === null || row === undefined) {
+        throw new Error('no "Past checks" in the header row');
+      }
+      row.classList.remove('flex-col');
+      row.classList.add('flex-row');
+      button.classList.remove('min-h-11');
+    });
+    const problems = await pastChecksProblems(page, null);
+    assert.ok(
+      problems.some((line) => line.includes('not under the title')),
+      `the button beside the title was not reported: ${JSON.stringify(problems)}`,
+    );
+    assert.ok(
+      problems.some((line) => /px tall$/.test(line)),
+      `the short button was not reported: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+});

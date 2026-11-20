@@ -12,7 +12,9 @@ import { type ViewId } from './views';
  *
  * `action` is where a view's SINGLE blue primary button goes. One per view is
  * the rule — the moment there are two, neither is primary, and the user has to
- * read both to find out which one the screen is for.
+ * read both to find out which one the screen is for. When the blue button sits
+ * beside the input it acts on instead, the slot holds a secondary button:
+ * "Export my data" on Settings (L-321), "Past checks" on Analysis (L-444).
  *
  * Drawn by the shared `PageHeader` (the welcome refresh's styling language):
  * the title, and the summary in muted ink. No icon: the rail already shows the
@@ -30,7 +32,7 @@ import { type ViewId } from './views';
 interface ViewHeaderProps {
   readonly title: string;
   readonly summary: string;
-  /** The view's one primary action, or nothing. */
+  /** The view's one primary action, a secondary one (see above), or nothing. */
   readonly action?: ReactNode;
   /** Which view this heads, for its column width. */
   readonly view?: ViewId | undefined;

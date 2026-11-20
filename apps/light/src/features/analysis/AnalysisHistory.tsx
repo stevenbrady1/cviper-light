@@ -1,8 +1,33 @@
 import { type Analysis as AnalysisRow } from '@cviper/core-types';
 
+import { SECONDARY_BUTTON } from '../../app/buttons';
 import { DetailPane } from '../../app/DetailPane';
 
 import { providerLabel } from './model';
+
+export interface AnalysisHistoryButtonProps {
+  readonly count: number;
+  readonly disabled: boolean;
+  readonly onOpen: () => void;
+}
+
+/**
+ * Opens "Past checks". Secondary, never blue (L-444): it sits in the page
+ * header, and the view's one blue button stays beside the advert box it acts on.
+ */
+export function AnalysisHistoryButton({ count, disabled, onOpen }: AnalysisHistoryButtonProps) {
+  return (
+    <button
+      type="button"
+      data-testid="analysis-history-open"
+      disabled={disabled}
+      onClick={onOpen}
+      className={SECONDARY_BUTTON}
+    >
+      Past checks <span className="font-mono tabular-nums">({count})</span>
+    </button>
+  );
+}
 
 export interface AnalysisHistoryProps {
   /** The CV's name, under the pane's title. */
