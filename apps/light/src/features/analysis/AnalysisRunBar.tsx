@@ -1,4 +1,4 @@
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { PRIMARY_BUTTON } from '../../app/buttons';
 import { LiveStatus } from '../../app/LiveStatus';
 
 export interface AnalysisRunBarProps {
@@ -6,22 +6,16 @@ export interface AnalysisRunBarProps {
   /** Why the check cannot run, or `null` when it can. */
   readonly disabledReason: string | null;
   readonly onRun: () => void;
-  readonly historyCount: number;
-  readonly historyDisabled: boolean;
-  readonly onOpenHistory: () => void;
   /** What a slow run is doing, in words, or `null` (L-299). */
   readonly progressText: string | null;
   readonly elapsed: number;
 }
 
-/** Analysis, step 4: the check button, past checks, and what a run is doing. */
+/** Analysis, step 4: the check button and what a run is doing. */
 export function AnalysisRunBar({
   running,
   disabledReason,
   onRun,
-  historyCount,
-  historyDisabled,
-  onOpenHistory,
   progressText,
   elapsed,
 }: AnalysisRunBarProps) {
@@ -43,16 +37,6 @@ export function AnalysisRunBar({
           className={PRIMARY_BUTTON}
         >
           {running ? 'Checking…' : 'Check this CV'}
-        </button>
-
-        <button
-          type="button"
-          data-testid="analysis-history-open"
-          disabled={historyDisabled}
-          onClick={onOpenHistory}
-          className={SECONDARY_BUTTON}
-        >
-          Past checks <span className="font-mono tabular-nums">({historyCount})</span>
         </button>
 
         {disabledReason === null ? null : (

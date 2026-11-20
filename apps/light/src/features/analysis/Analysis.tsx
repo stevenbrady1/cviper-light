@@ -23,7 +23,7 @@ import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser
 import { AnalysisAdvert } from './AnalysisAdvert';
 import { AnalysisCvPicker } from './AnalysisCvPicker';
 import { AnalysisEngine } from './AnalysisEngine';
-import { AnalysisHistory } from './AnalysisHistory';
+import { AnalysisHistory, AnalysisHistoryButton } from './AnalysisHistory';
 import { AnalysisResult } from './AnalysisResult';
 import { AnalysisRunBar } from './AnalysisRunBar';
 import { AnalysisSample } from './AnalysisSample';
@@ -541,12 +541,24 @@ export function Analysis({
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-analysis">
       {/*
-        No `action` here. The view's one primary button belongs beside the
-        composer it acts on, next to the sentence explaining why it is disabled
-        — a Run button in the corner, four inches from the advert box and from
-        its own reason, is a button nobody connects to anything.
+        The header's `action` is "Past checks", a secondary button (L-444). The
+        view's one blue button stays beside the composer it acts on, next to
+        the sentence explaining why it is disabled — a Run button in the
+        corner, four inches from the advert box and from its own reason, is a
+        button nobody connects to anything.
       */}
-      <ViewHeader view={view.id} title={view.label} summary={view.summary} />
+      <ViewHeader
+        view={view.id}
+        title={view.label}
+        summary={view.summary}
+        action={
+          <AnalysisHistoryButton
+            count={history.length}
+            disabled={selectedCv === null || historyOpen}
+            onOpen={() => setHistoryOpen(true)}
+          />
+        }
+      />
 
       {stepJob === null ? null : (
         <JobStepBar
@@ -635,9 +647,6 @@ export function Analysis({
               running={running}
               disabledReason={disabledReason}
               onRun={() => void onRun()}
-              historyCount={history.length}
-              historyDisabled={selectedCv === null || historyOpen}
-              onOpenHistory={() => setHistoryOpen(true)}
               progressText={progressText}
               elapsed={elapsed}
             />
