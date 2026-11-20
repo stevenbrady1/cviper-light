@@ -93,7 +93,7 @@ export function KeySetup({ port, browser, focused, onFocused }: KeySetupProps = 
 
   return (
     <section data-testid="key-setup">
-      <SectionHeading icon="key" title="API keys" />
+      <SectionHeading title="API keys" />
       <p className="mt-1 text-ink-muted">
         CViper Light works without any of these. The tracker is entirely offline, the analysis
         screen has a keyword match that needs no account, and the search screen can always hand a

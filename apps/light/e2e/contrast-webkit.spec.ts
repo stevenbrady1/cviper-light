@@ -7837,6 +7837,101 @@ describe('the title and the column keep one edge, scrolling or not (L-435)', () 
 });
 
 /**
+ * Menu hints open to the right (L-439). A side-menu item's hint used to open
+ * below the item, over the next one. `Hint.test.tsx` fakes the sizes and pins
+ * the arithmetic; this hovers each item of the real rail WebKit draws at the
+ * smallest window and measures where the tip lands: it starts right of every
+ * menu item, sits level with the one hovered, stays 8px inside the window's
+ * top and bottom, and covers no other menu item.
+ */
+const HINTED_MENU_ITEMS = MENU_ORDER.filter((item) => item !== 'nav-settings');
+
+/** Hover one rail item and measure its tip. `asBelow` moves the tip to where `side="below"` puts it. */
+async function menuHintProblems(page: Page, item: string, asBelow = false): Promise<string[]> {
+  const selector = `[data-testid="sidebar"] [data-testid="${item}"]`;
+  await page.hover(selector);
+  // This item's own tip, open; the one left behind closes on its own.
+  await page.waitForFunction((at) => {
+    const id = document.querySelector(at)?.getAttribute('aria-describedby');
+    return id != null && document.getElementById(id)?.hidden === false;
+  }, selector);
+  return page.evaluate(
+    ({ id, below }) => {
+      const rail = document.querySelector('[data-testid="sidebar"]');
+      const mark = rail?.querySelector(`[data-testid="${id}"]`);
+      const tip = document.getElementById(mark?.getAttribute('aria-describedby') ?? '');
+      if (rail === null || mark == null || tip === null) return [`${id}: no rail, item or tip`];
+      const at = mark.getBoundingClientRect();
+      if (below) {
+        // Where `side="below"` puts it: 6px under the item, centred across it.
+        const width = tip.getBoundingClientRect().width;
+        tip.style.top = `${String(at.bottom + 6)}px`;
+        tip.style.left = `${String(Math.max(8, at.left + at.width / 2 - width / 2))}px`;
+      }
+      const box = tip.getBoundingClientRect();
+      const items = [...rail.querySelectorAll('[data-testid^="nav-"]')];
+      const problems: string[] = [];
+      const menuRight = Math.max(...items.map((other) => other.getBoundingClientRect().right));
+      if (box.left < menuRight - 0.5) {
+        problems.push(
+          `${id}: tip starts at ${String(box.left)}, inside the menu (${String(menuRight)})`,
+        );
+      }
+      if (box.top < 8 - 0.5 || box.bottom > window.innerHeight - 8 + 0.5) {
+        problems.push(`${id}: tip is not 8px inside the window's top and bottom`);
+      } else if (
+        box.top > 8.5 &&
+        box.bottom < window.innerHeight - 8.5 &&
+        Math.abs(box.top + box.height / 2 - (at.top + at.height / 2)) > 1
+      ) {
+        problems.push(`${id}: tip is not level with the item`);
+      }
+      for (const other of items) {
+        if (other === mark) continue;
+        const o = other.getBoundingClientRect();
+        const across = Math.min(box.right, o.right) - Math.max(box.left, o.left);
+        const down = Math.min(box.bottom, o.bottom) - Math.max(box.top, o.top);
+        if (across > 0.5 && down > 0.5) {
+          problems.push(`${id}: tip covers ${other.getAttribute('data-testid') ?? 'an item'}`);
+        }
+      }
+      return problems;
+    },
+    { id: item, below: asBelow },
+  );
+}
+
+describe('menu hints open to the right (L-439)', () => {
+  it('at 1000×700 each menu item’s tip starts right of the menu, level with it, and covers no other item', async () => {
+    const page = await open('?seen=1', { width: 1000, height: 700 });
+    const problems: string[] = [];
+    for (const item of HINTED_MENU_ITEMS) problems.push(...(await menuHintProblems(page, item)));
+    console.log(
+      `menu hints at 1000×700: ${String(HINTED_MENU_ITEMS.length)} hovered, ${JSON.stringify(problems)}`,
+    );
+    assert.equal(HINTED_MENU_ITEMS.length, 5);
+    assert.deepEqual(problems, []);
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: tips placed as side="below" are reported over the next item', async () => {
+    const page = await open('?seen=1', { width: 1000, height: 700 });
+    const problems: string[] = [];
+    for (const item of HINTED_MENU_ITEMS) {
+      problems.push(...(await menuHintProblems(page, item, true)));
+    }
+    for (const item of HINTED_MENU_ITEMS) {
+      assert.ok(
+        problems.some((line) => line.startsWith(`${item}: tip covers `)),
+        `${item}'s tip below it was not flagged: ${JSON.stringify(problems)}`,
+      );
+    }
+    await page.context().close();
+  });
+});
+
+/**
  * Search's boxes are one height, row two shares its width, and "Where to look"
  * draws its own fold mark (L-437).
  *

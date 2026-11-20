@@ -20,7 +20,7 @@ export interface AboutProps {
 export function About({ browser }: AboutProps) {
   return (
     <section data-testid="settings-about">
-      <SectionHeading icon="info" title="About" />
+      <SectionHeading title="About" />
       <p className="mt-1 text-ink-muted">
         Light is free, MIT-licensed, and never sends us anything.
       </p>
