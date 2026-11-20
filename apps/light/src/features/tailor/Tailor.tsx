@@ -21,7 +21,7 @@ import {
   type ConsentPort,
   type ConsentState,
 } from '../analysis/consent';
-import { jobAdvertText, providerInSentence } from '../analysis/model';
+import { jobAdvertText, progressSentence } from '../analysis/model';
 import {
   ollamaHint,
   optionByKey,
@@ -589,15 +589,7 @@ export function Tailor({
   });
   const view = viewById('tailor');
 
-  const progressText =
-    selectedOption === null
-      ? ''
-      : selectedOption.local
-        ? `Asking ${selectedOption.model} on this machine. The first run after starting ` +
-          'your PC loads the model into memory, which takes 5 to 30 seconds. Nothing is ' +
-          'being sent anywhere.'
-        : `Sending your CV and the advert to ${providerInSentence(selectedOption.kind)}. ` +
-          'This usually takes a few seconds.';
+  const progressText = selectedOption === null ? '' : progressSentence(selectedOption);
 
   /**
    * Said by the picker when the chosen AI will not read the whole CV (L-302).
@@ -607,7 +599,7 @@ export function Tailor({
   const cvCut = cvCutNote(cvText, selectedOption?.kind ?? null);
 
   /** The whole progress sentence, shown with a counter and spoken (L-299). */
-  const progressSentence =
+  const fullProgressSentence =
     (phase === 'reviewing'
       ? 'Reading the draft as a hiring manager would. '
       : phase === 'writing'
@@ -721,7 +713,7 @@ export function Tailor({
             disabledReason={disabledReason}
             onRun={() => void gated('tailor')}
             onOpenSettings={onOpenSettings}
-            progressSentence={running && selectedOption !== null ? progressSentence : null}
+            progressSentence={running && selectedOption !== null ? fullProgressSentence : null}
             elapsed={elapsed}
             choosingFile={saving === 'file'}
             saveMessage={saveMessage}

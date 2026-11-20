@@ -40,7 +40,7 @@ import {
   type ConsentProviderKind,
   type ConsentState,
 } from './consent';
-import { jobAdvertText, newAnalysisRecord, providerInSentence, runDisabledReason } from './model';
+import { jobAdvertText, newAnalysisRecord, progressSentence, runDisabledReason } from './model';
 import { createDbAnalysisPort, type AnalysisPort } from './port';
 import { defaultOptionKey, optionByKey, type ProviderOption } from './providers';
 import { runAnalysis } from './runAnalysis';
@@ -535,12 +535,7 @@ export function Analysis({
   /** What the run is doing, in words: shown with a counter, and spoken (L-299). */
   const progressText =
     running && selectedOption !== null && selectedOption.kind !== 'keyword'
-      ? selectedOption.local
-        ? `Asking ${selectedOption.model} on this machine. The first run after starting ` +
-          'your PC loads the model into memory, which takes 5 to 30 seconds. Nothing is ' +
-          'being sent anywhere.'
-        : `Sending your CV and the advert to ${providerInSentence(selectedOption.kind)}. ` +
-          'This usually takes a few seconds.'
+      ? progressSentence(selectedOption)
       : null;
 
   return (

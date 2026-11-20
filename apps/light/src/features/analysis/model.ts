@@ -310,3 +310,19 @@ export function providerLabel(provider: string): string {
 export function providerInSentence(provider: string): string {
   return provider === 'custom' ? 'your AI service' : providerLabel(provider);
 }
+
+/**
+ * What a run says while it works, shown with a counter and spoken (L-299).
+ *
+ * One copy for Analysis and Tailor (L-443): this is privacy-near wording, and
+ * two copies can drift apart. Callers decide WHEN to show it; the basic match
+ * never reaches here.
+ */
+export function progressSentence(option: ProviderOption): string {
+  return option.local
+    ? `Asking ${option.model} on this machine. The first run after starting ` +
+        'your PC loads the model into memory, which takes 5 to 30 seconds. Nothing is ' +
+        'being sent anywhere.'
+    : `Sending your CV and the advert to ${providerInSentence(option.kind)}. ` +
+        'This usually takes a few seconds.';
+}
