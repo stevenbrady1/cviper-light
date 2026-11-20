@@ -20,7 +20,12 @@ export function AnalysisRunBar({
   return (
     <>
       {disabledReason === null ? null : (
-        <p id="analysis-run-reason" data-testid="analysis-run-reason" className="text-ink-muted">
+        // `max-w-md`: a long reason wraps beside the button, not on a line of its own above it.
+        <p
+          id="analysis-run-reason"
+          data-testid="analysis-run-reason"
+          className="max-w-md text-ink-muted"
+        >
           {disabledReason}
         </p>
       )}

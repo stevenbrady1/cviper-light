@@ -8589,6 +8589,221 @@ describe('"Past checks" sits in the Analysis header (L-444)', () => {
 });
 
 /**
+ * Tailor: one line of choices, and the advert box as the hero (L-445).
+ *
+ * "Rewrite [CV] using [AI]", Show CV and Upload a CV on one line; the advert
+ * box under it, with "Tailor CV" and its reason in the box's bar. Measured on
+ * the real screen opened from tracker card c's "Tailor", so a job is chosen
+ * and its step bar shows, with the harness's one CV and its text folded.
+ * Without `ollama`, there is no AI: the reason is the long "needs AI" one and
+ * the no-AI help sits under the box. With `ollama=ready`, the AI chip and the
+ * button can take focus.
+ */
+async function tailorComposer(
+  viewport: { width: number; height: number },
+  ollama: '' | 'ready' = '',
+): Promise<Page> {
+  const ai = ollama === '' ? '' : `&ollama=${ollama}`;
+  const page = await open(`?seen=1&entries=1&cv=short${ai}`, viewport);
+  await goTo(page, 'tracker');
+  await page.waitForSelector('[data-testid="tracker-card-c"]');
+  await page.click('[data-testid="tracker-card-c"]');
+  await page.click('[data-testid="detail-tailor"]');
+  await page.waitForSelector('[data-testid="job-steps"] [data-testid="job-step-tailor"]');
+  await page.waitForSelector('[data-testid="tailor-cv-preview-toggle"][aria-expanded="false"]');
+  await page.waitForSelector(
+    ollama === '' ? '[data-testid="tailor-no-ai"]' : '[data-testid="tailor-run"]:enabled',
+  );
+  return page;
+}
+
+/** "Tailor CV" and its reason, if drawn: each wholly inside the scroll area as it opened. */
+async function runButtonOffScreen(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const area = document.querySelector('[data-testid="tailor-scroll"]');
+    if (area === null) return ['no scroll area'];
+    if (area.scrollTop !== 0)
+      return [`the scroll area opened scrolled by ${String(area.scrollTop)}px`];
+    const room = area.getBoundingClientRect();
+    const bottom = Math.min(room.top + area.clientHeight, window.innerHeight);
+    const problems: string[] = [];
+    for (const id of ['tailor-run', 'tailor-run-reason']) {
+      const element = document.querySelector(`[data-testid="${id}"]`);
+      if (element === null) {
+        if (id === 'tailor-run') problems.push('tailor-run: not drawn');
+        continue;
+      }
+      const box = element.getBoundingClientRect();
+      if (box.height === 0) problems.push(`${id}: drawn with no height`);
+      else if (box.top < room.top || box.bottom > bottom + 0.5) {
+        problems.push(`${id}: off screen, bottom ${String(box.bottom)} below ${String(bottom)}`);
+      } else if (box.left < room.left || box.right > room.right + 0.5) {
+        problems.push(`${id}: off screen sideways`);
+      }
+    }
+    return problems;
+  });
+}
+
+/**
+ * Tab from the CV chip through everything in Tailor's scroll area. Each focus
+ * ring (the 4px box-shadow of `:focus-visible`) must sit wholly inside the
+ * scroll area once focus has landed, and the element must be the top thing at
+ * its own middle. The browser scrolls a focused control only to its own edge,
+ * so Tailor's scroll area keeps `scroll-py-2` (8px) for the ring: without it
+ * the tracked-job chip's ring was cut at 375px.
+ */
+async function focusWalk(page: Page): Promise<{ walked: string[]; problems: string[] }> {
+  await page.focus('[data-testid="tailor-cv-pick"]');
+  const walked: string[] = [];
+  const problems: string[] = [];
+  for (let step = 0; step < 30; step += 1) {
+    const seen = await page.evaluate(async () => {
+      // WebKit brings a focused box into view in a later frame, not during focus.
+      await new Promise((done) => requestAnimationFrame(done));
+      await new Promise((done) => requestAnimationFrame(done));
+      const element = document.activeElement;
+      const area = document.querySelector('[data-testid="tailor-scroll"]');
+      if (!(element instanceof HTMLElement) || area === null || !area.contains(element)) {
+        return null;
+      }
+      const name = element.dataset.testid ?? element.tagName.toLowerCase();
+      const ring = 4;
+      const box = element.getBoundingClientRect();
+      const room = area.getBoundingClientRect();
+      const inside =
+        box.left - ring >= room.left - 0.5 &&
+        box.top - ring >= room.top - 0.5 &&
+        box.right + ring <= room.left + area.clientWidth + 0.5 &&
+        box.bottom + ring <= room.top + area.clientHeight + 0.5;
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      const uncovered = hit !== null && (hit === element || element.contains(hit));
+      const problem = !inside
+        ? `${name}: its ring is not wholly inside the scroll area (${String(box.top)}–${String(box.bottom)} in ${String(room.top)}–${String(room.top + area.clientHeight)})`
+        : !uncovered
+          ? `${name}: covered by ${hit?.getAttribute('data-testid') ?? hit?.tagName ?? 'nothing'}`
+          : null;
+      return { name, problem };
+    });
+    if (seen === null) break;
+    walked.push(seen.name);
+    if (seen.problem !== null) problems.push(seen.problem);
+    await page.keyboard.press('Tab');
+  }
+  return { walked, problems };
+}
+
+/** The line's chips and buttons, the tracked-job chip and "Tailor CV": any under 44px tall. */
+async function shortTargets(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    [
+      'tailor-cv-pick',
+      'tailor-provider',
+      'tailor-cv-preview-toggle',
+      'tailor-upload',
+      'tailor-job-pick',
+      'tailor-run',
+    ].flatMap((id) => {
+      const element = document.querySelector(`[data-testid="${id}"]`);
+      if (element === null) return [`${id}: not drawn`];
+      const height = element.getBoundingClientRect().height;
+      return height < 43.5 ? [`${id}: ${String(height)}px tall`] : [];
+    }),
+  );
+}
+
+describe('Tailor: one line of choices, and the advert box as the hero (L-445)', () => {
+  for (const ollama of ['', 'ready'] as const) {
+    it(`at 1000×700, a job chosen and the CV folded, "Tailor CV" and its reason are on screen (${ollama === '' ? 'no AI' : 'AI ready'})`, async () => {
+      const page = await tailorComposer({ width: 1000, height: 700 }, ollama);
+      const problems = await runButtonOffScreen(page);
+      const bottom = await page.evaluate(
+        () => document.querySelector('[data-testid="tailor-run"]')?.getBoundingClientRect().bottom,
+      );
+      console.log(`Tailor CV at 1000x700 (${ollama || 'no AI'}): bottom ${String(bottom)}px`);
+      assert.deepEqual(problems, []);
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a 900px advert box pushes "Tailor CV" off screen, and it is reported', async () => {
+    const page = await tailorComposer({ width: 1000, height: 700 });
+    await page.evaluate(() => {
+      const box = document.querySelector<HTMLElement>('[data-testid="tailor-job-text"]');
+      if (box === null) throw new Error('no advert box');
+      box.style.height = '900px';
+    });
+    const problems = await runButtonOffScreen(page);
+    assert.ok(
+      problems.some((line) => line.startsWith('tailor-run: off screen')),
+      `the hidden button went unreported: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+
+  for (const width of [375, 768, 1000] as const) {
+    it(`nothing scrolls sideways at ${String(width)}px`, async () => {
+      const page = await tailorComposer({ width, height: 800 });
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      await page.context().close();
+    });
+  }
+
+  for (const [name, viewport] of [
+    ['desktop 1000x700', { width: 1000, height: 700 }],
+    ['phone 375x812', { width: 375, height: 812 }],
+  ] as const) {
+    it(`passes the colour-contrast pass (${name})`, async () => {
+      const page = await tailorComposer(viewport);
+      judge(`tailor composer, job chosen, CV folded (${name})`, await contrast(page));
+      await page.context().close();
+    });
+
+    it(`Tab never hides a focus ring (${name})`, async () => {
+      const page = await tailorComposer(viewport, 'ready');
+      const { walked, problems } = await focusWalk(page);
+      console.log(`Tailor focus walk (${name}): ${walked.join(', ')}`);
+      for (const expected of [
+        'tailor-cv-pick',
+        'tailor-provider',
+        'tailor-cv-preview-toggle',
+        'tailor-upload',
+        'tailor-job-text',
+        'tailor-job-pick',
+        'tailor-run',
+      ]) {
+        assert.ok(walked.includes(expected), `Tab never reached ${expected}: ${walked.join(', ')}`);
+      }
+      assert.deepEqual(problems, []);
+      await page.context().close();
+    });
+  }
+
+  it('at 375px every chip and button on the line and in the bar is at least 44px tall', async () => {
+    const page = await tailorComposer({ width: 375, height: 812 }, 'ready');
+    assert.deepEqual(await shortTargets(page), []);
+    await page.context().close();
+  });
+
+  it('the check can fail: a squashed chip is reported', async () => {
+    const page = await tailorComposer({ width: 375, height: 812 }, 'ready');
+    await page.evaluate(() => {
+      const chip = document.querySelector<HTMLElement>('[data-testid="tailor-cv-pick"]');
+      if (chip === null) throw new Error('no CV chip');
+      chip.style.minHeight = '0';
+      chip.style.height = '20px';
+    });
+    const short = await shortTargets(page);
+    assert.ok(
+      short.some((line) => line.startsWith('tailor-cv-pick: ')),
+      `the squashed chip went unreported: ${JSON.stringify(short)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
  * Analysis: one line of choices, and the advert box as the hero (L-446).
  *
  * "Check [CV] […] using [AI]" and a quiet "Upload a CV" on one line; the

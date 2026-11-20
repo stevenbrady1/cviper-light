@@ -1,4 +1,4 @@
-import { FIELD } from '../../app/fields';
+import { ChipSelect } from '../../app/ChipSelect';
 import { type BrowserPort } from '../../platform/browser';
 import { ConsentStatus } from '../analysis/ConsentGate';
 import { type ConsentProviderKind } from '../analysis/consent';
@@ -20,52 +20,66 @@ export interface TailorEngineProps {
   readonly onWithdrawConsent: (kind: ConsentProviderKind) => void;
 }
 
-/** Tailor, step 3: which AI writes it, and what that means for the CV. */
-export function TailorEngine({
+/** "… using [How to write it]": the AI chip in Tailor's line of choices (L-445). */
+export function TailorEngineChip({
   options,
   optionKey,
-  selectedOption,
   onOptionChange,
   aiAvailable,
   availabilityRead,
+}: Pick<
+  TailorEngineProps,
+  'options' | 'optionKey' | 'onOptionChange' | 'aiAvailable' | 'availabilityRead'
+>) {
+  return (
+    <span className="inline-flex max-w-full min-w-0 items-center gap-2">
+      <span className="text-ink-muted">using</span>
+      <ChipSelect
+        id="tailor-provider"
+        name="How to write it"
+        testId="tailor-provider"
+        value={optionKey}
+        disabled={!aiAvailable}
+        onChange={onOptionChange}
+        empty={
+          aiAvailable
+            ? undefined
+            : availabilityRead
+              ? 'No AI set up yet'
+              : 'Checking what is set up…'
+        }
+        options={options.map((option) => ({ value: option.key, label: option.label }))}
+      />
+    </span>
+  );
+}
+
+/**
+ * Under the advert box: what the chosen AI means for the CV — the gold notes
+ * first, then the AI's own note, then what the user has agreed to (L-445).
+ */
+export function TailorEngineNotes({
+  selectedOption,
   cvCut,
   localModelHint,
   browser,
   grantedConsents,
   onWithdrawConsent,
-}: TailorEngineProps) {
+}: Pick<
+  TailorEngineProps,
+  | 'selectedOption'
+  | 'cvCut'
+  | 'localModelHint'
+  | 'browser'
+  | 'grantedConsents'
+  | 'onWithdrawConsent'
+>) {
   return (
-    <div>
-      <label htmlFor="tailor-provider" className="block text-xs font-medium text-ink-muted">
-        How to write it
-      </label>
-      <select
-        id="tailor-provider"
-        data-testid="tailor-provider"
-        value={optionKey}
-        disabled={!aiAvailable}
-        onChange={(event) => onOptionChange(event.currentTarget.value)}
-        className={`${FIELD} mt-1 w-full`}
-      >
-        {aiAvailable ? null : (
-          <option value="">
-            {availabilityRead ? 'No AI set up yet' : 'Checking what is set up…'}
-          </option>
-        )}
-        {options.map((option) => (
-          <option key={option.key} value={option.key}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <p data-testid="tailor-provider-note" className="mt-1 text-xs text-ink-faint">
-        {selectedOption?.note ??
-          'Writing needs AI. AI on this PC keeps your CV here; AI from a company sends it to that company.'}
-      </p>
+    <>
       {cvCut === null ? null : (
         <p
           data-testid="tailor-cv-cut"
-          className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
+          className="rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
         >
           {cvCut}
         </p>
@@ -74,14 +88,19 @@ export function TailorEngine({
       {localModelHint === null ? null : (
         <p
           data-testid="tailor-ollama-hint"
-          className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
+          className="rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
         >
           {localModelHint}
           <OllamaDownloadLink idPrefix="tailor" browser={browser} />
         </p>
       )}
 
+      <p data-testid="tailor-provider-note" className="text-xs text-ink-faint">
+        {selectedOption?.note ??
+          'Writing needs AI. AI on this PC keeps your CV here; AI from a company sends it to that company.'}
+      </p>
+
       <ConsentStatus granted={grantedConsents} onWithdraw={onWithdrawConsent} />
-    </div>
+    </>
   );
 }

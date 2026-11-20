@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { type ChatTransport, promptKeywordGaps } from '@cviper/ai-providers';
 import { type Application, type Cv, type Job, type Profile } from '@cviper/core-types';
 
+import { Composer } from '../../app/Composer';
 import { CONTENT_COLUMN, SCROLL_GUTTER, SIDE_PADDING } from '../../app/layout';
 import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
@@ -28,6 +29,7 @@ import {
   providerOptions,
   type ProviderOption,
 } from '../analysis/providers';
+import { CvUploadNotes, useCvUpload } from '../cv/CvUpload';
 import { gapsForTailor, type TailorHandoff } from '../flow/handoff';
 import { JobStepBar } from '../flow/JobStepBar';
 import {
@@ -49,12 +51,12 @@ import { compareAts } from './atsComparison';
 import { savedCvText } from './cvContact';
 import { profileNotes, runDisabledReason, tailorOptions } from './model';
 import { createDbTailorPort, type TailorPort } from './port';
-import { TailorAdvert } from './TailorAdvert';
+import { TailorAdvertBox, TailorAdvertNotes, TailorJobChip } from './TailorAdvert';
 import { TailorContactDialog } from './TailorContactDialog';
-import { TailorCvPicker } from './TailorCvPicker';
-import { TailorEngine } from './TailorEngine';
+import { TailorCvActions, TailorCvChip, TailorCvPreview } from './TailorCvPicker';
+import { TailorEngineChip, TailorEngineNotes } from './TailorEngine';
 import { TailorResultView } from './TailorResultView';
-import { TailorRunBar } from './TailorRunBar';
+import { TailorRunButton, TailorRunStatus } from './TailorRunBar';
 import { STEP_ANCHOR, isTailorStep, type TailorStep } from './tailorSteps';
 import { useCvContact } from './useCvContact';
 import { useTailorRuns } from './useTailorRuns';
@@ -99,7 +101,8 @@ export type { TailorStep } from './tailorSteps';
  * WHERE THE PIECES LIVE (L-305)
  * ============================================================================
  * This file owns the state and the loading. Each panel on the page is its own
- * component (`TailorCvPicker`, `TailorAdvert`, `TailorEngine`, `TailorRunBar`,
+ * component's file (`TailorCvPicker`, `TailorAdvert`, `TailorEngine`,
+ * `TailorRunBar`, each split into the parts `Composer` lays out (L-445), and
  * `TailorResultView` and the parts it lays out), the AI runs and the consent
  * gate are `useTailorRuns`, and every save is `useTailorSaving`. Two features
  * on this screen then usually edit two different files, which is the point:
@@ -256,7 +259,7 @@ export function Tailor({
   const shownError = error ?? work.error;
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   /**
-   * A CV uploaded on this screen (L-240): stored by `CvUpload` in the same
+   * A CV uploaded on this screen (L-240): stored by `useCvUpload` in the same
    * table every screen reads, so here it only has to join the list and be
    * chosen — exactly what picking it from the list would do.
    */
@@ -268,6 +271,8 @@ export function Tailor({
     },
     [patchActive],
   );
+  const saveCv = useCallback((cv: Cv) => tailorPort.saveCv(cv), [tailorPort]);
+  const upload = useCvUpload({ files, saveCv, now, onUploaded: onCvUploaded });
   /**
    * Whether the user has opened the chosen CV's text (L-192). Starts folded,
    * so the advert is above the fold (L-340), and is NOT reset when the CV
@@ -608,6 +613,76 @@ export function Tailor({
 
   const grantedConsents = CONSENT_KINDS.filter((kind) => consent[kind]);
 
+  // Each panel's props, once: `Composer` lays its parts out apart (L-445).
+  const cvPicker = {
+    cvs,
+    cvsLoaded,
+    selectedCvId,
+    selectedCv,
+    onPick: (id: string | null) => {
+      // A draft written from another CV is not this CV's draft.
+      patchActive({ cvId: id, result: null, review: null, letter: null, error: null });
+      setSaveMessage(null);
+    },
+    previewOpen: cvPreviewOpen,
+    onTogglePreview: () => setCvPreviewOpen((open) => !open),
+    running,
+    onSaveCv,
+  };
+  const advert = {
+    jobText,
+    onAdvertChange: (text: string) => patchActive({ advert: text }),
+    advertEdited,
+    selectedJob,
+    onRestoreAdvert: (job: Job) => patchActive({ advert: jobAdvertText(job) }),
+    jobs,
+    selectedJobId,
+    onPickJob: (picked: Job) => {
+      // A job seen before comes back as it was left (L-199); a new one starts from its advert,
+      // with the CV and model the user already chose — those are choices, not this job's work.
+      // Another job starts on its own Tailor step. Set HERE, on the user's pick, not on any
+      // change of job: a hand-off from another screen's step bar sets the job too, and must
+      // keep the step it asked for (L-200).
+      if (picked.id !== selectedJobId) setStep('tailor');
+      sessions.open(picked.id, () => ({
+        advert: jobAdvertText(picked),
+        cvId: selectedCvId,
+        optionKey: work.optionKey,
+      }));
+      setError(null);
+      setSaveMessage(null);
+    },
+    keywordGaps,
+    metricPrompts,
+    metricState,
+    onMetricStateChange: (next: typeof metricState) => patchActive({ metricState: next }),
+    running,
+  };
+  const engine = {
+    options,
+    optionKey,
+    selectedOption,
+    onOptionChange: (key: string) => patchActive({ optionKey: key }),
+    aiAvailable,
+    availabilityRead,
+    cvCut,
+    localModelHint,
+    browser: browserPort,
+    grantedConsents,
+    onWithdrawConsent: (kind: (typeof grantedConsents)[number]) => void onWithdrawConsent(kind),
+  };
+  const run = {
+    phase,
+    disabledReason,
+    onRun: () => void gated('tailor'),
+    onOpenSettings,
+    progressSentence: running && selectedOption !== null ? fullProgressSentence : null,
+    elapsed,
+    choosingFile: saving === 'file',
+    saveMessage,
+    hasDraft: result !== null,
+  };
+
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-tailor">
       <ViewHeader view={view.id} title={view.label} summary={view.summary} />
@@ -638,86 +713,34 @@ export function Tailor({
       <div
         ref={scrollArea}
         data-testid="tailor-scroll"
-        className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${SIDE_PADDING} ${SCROLL_GUTTER} py-4 md:py-5`}
+        className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${SIDE_PADDING} ${SCROLL_GUTTER} scroll-py-2 py-4 md:py-5`}
       >
         <div data-content-column className={`${CONTENT_COLUMN} space-y-5`}>
           <span id={STEP_ANCHOR.tailor} aria-hidden="true" />
-          <TailorCvPicker
-            cvs={cvs}
-            cvsLoaded={cvsLoaded}
-            selectedCvId={selectedCvId}
-            selectedCv={selectedCv}
-            onPick={(id) => {
-              // A draft written from another CV is not this CV's draft.
-              patchActive({ cvId: id, result: null, review: null, letter: null, error: null });
-              setSaveMessage(null);
-            }}
-            files={files}
-            saveCv={(cv) => tailorPort.saveCv(cv)}
-            now={now}
-            onUploaded={onCvUploaded}
-            previewOpen={cvPreviewOpen}
-            onTogglePreview={() => setCvPreviewOpen((open) => !open)}
-            running={running}
-            onSaveCv={onSaveCv}
-          />
-
-          <TailorAdvert
-            jobText={jobText}
-            onAdvertChange={(advert) => patchActive({ advert })}
-            advertEdited={advertEdited}
-            selectedJob={selectedJob}
-            onRestoreAdvert={(job) => patchActive({ advert: jobAdvertText(job) })}
-            jobs={jobs}
-            selectedJobId={selectedJobId}
-            onPickJob={(picked) => {
-              // A job seen before comes back as it was left (L-199); a new
-              // one starts from its advert, with the CV and model the user
-              // already chose — those are choices, not this job's work.
-              // Another job starts on its own Tailor step. Set HERE, on
-              // the user's pick, not on any change of job: a hand-off
-              // from another screen's step bar sets the job too, and
-              // must keep the step it asked for (L-200).
-              if (picked.id !== selectedJobId) setStep('tailor');
-              sessions.open(picked.id, () => ({
-                advert: jobAdvertText(picked),
-                cvId: selectedCvId,
-                optionKey: work.optionKey,
-              }));
-              setError(null);
-              setSaveMessage(null);
-            }}
-            keywordGaps={keywordGaps}
-            metricPrompts={metricPrompts}
-            metricState={metricState}
-            onMetricStateChange={(next) => patchActive({ metricState: next })}
-            running={running}
-          />
-
-          <TailorEngine
-            options={options}
-            optionKey={optionKey}
-            selectedOption={selectedOption}
-            onOptionChange={(key) => patchActive({ optionKey: key })}
-            aiAvailable={aiAvailable}
-            availabilityRead={availabilityRead}
-            cvCut={cvCut}
-            localModelHint={localModelHint}
-            browser={browserPort}
-            grantedConsents={grantedConsents}
-            onWithdrawConsent={(kind) => void onWithdrawConsent(kind)}
-          />
-
-          <TailorRunBar
-            phase={phase}
-            disabledReason={disabledReason}
-            onRun={() => void gated('tailor')}
-            onOpenSettings={onOpenSettings}
-            progressSentence={running && selectedOption !== null ? fullProgressSentence : null}
-            elapsed={elapsed}
-            choosingFile={saving === 'file'}
-            saveMessage={saveMessage}
-            hasDraft={result !== null}
+          <Composer
+            sentence={
+              <>
+                <TailorCvChip {...cvPicker} />
+                <TailorEngineChip {...engine} />
+                <TailorCvActions {...cvPicker} onUpload={() => void upload.onUpload()} />
+              </>
+            }
+            notices={
+              <div className="space-y-2">
+                <CvUploadNotes idPrefix="tailor" {...upload} />
+                <TailorCvPreview {...cvPicker} />
+              </div>
+            }
+            editor={<TailorAdvertBox {...advert} />}
+            barStart={<TailorJobChip {...advert} />}
+            barEnd={<TailorRunButton {...run} />}
+            footnotes={
+              <div className="flex flex-col gap-2">
+                <TailorAdvertNotes {...advert} />
+                <TailorRunStatus {...run} />
+                <TailorEngineNotes {...engine} />
+              </div>
+            }
           />
 
           <TailorResultView
