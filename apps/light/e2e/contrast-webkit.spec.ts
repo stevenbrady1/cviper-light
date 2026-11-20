@@ -7837,6 +7837,246 @@ describe('the title and the column keep one edge, scrolling or not (L-435)', () 
 });
 
 /**
+ * The step row joins its card (L-438).
+ *
+ * A started job's "Step 3 of 5 · Tailor ●●○○○ Continue" used to hang under its
+ * card, outside the card's border. The border, edge and shadow now belong to the
+ * list item (the frame); the card button is its top part and the step row its
+ * bottom part, under a hairline. Continue stays a sibling of the card button,
+ * never inside it. Four things only a real engine can say: the row is wholly
+ * inside the frame, Continue still wraps under the dots in a narrow card
+ * (L-319), the card's focus ring is not cut off by the list it scrolls in, and
+ * a selected card's whole frame turns blue (`has-[…]`, which jsdom does not
+ * paint).
+ */
+const STARTED_WINDOWS = [
+  { width: 1000, height: 700 },
+  { width: 1264, height: 800 },
+  PHONE,
+] as const;
+
+/** `--color-blue`. */
+const BLUE = 'rgb(26, 86, 219)';
+
+async function startedBoard(viewport: { width: number; height: number }): Promise<Page> {
+  const page = await open('?seen=1&entries=1&started=1', viewport);
+  await goTo(page, 'tracker');
+  await page.waitForSelector('[data-testid="tracker-card-progress-a"]');
+  return page;
+}
+
+/**
+ * Anything of started card a that is not inside its frame. With `width`, the
+ * frame is first set to that width, as a column at its minimum would make it.
+ */
+async function startedCardProblems(page: Page, width: string | null): Promise<string[]> {
+  return page.evaluate((frameWidth) => {
+    const card = document.querySelector<HTMLElement>('[data-testid="tracker-card-a"]');
+    const row = document.querySelector<HTMLElement>('[data-testid="tracker-card-progress-a"]');
+    const go = document.querySelector<HTMLElement>('[data-testid="tracker-card-continue-a"]');
+    const frame = card?.parentElement;
+    if (!card || !row || !go || !frame) return ['no started card a'];
+    if (frameWidth !== null) frame.style.width = frameWidth;
+    const problems: string[] = [];
+    if (row.parentElement !== frame) problems.push('the step row is not in the card’s frame');
+    if (card.contains(row)) problems.push('the step row is inside the card button');
+    const own = getComputedStyle(frame);
+    const box = frame.getBoundingClientRect();
+    const inner = {
+      left: box.left + parseFloat(own.borderLeftWidth),
+      right: box.right - parseFloat(own.borderRightWidth),
+      top: box.top + parseFloat(own.borderTopWidth),
+      bottom: box.bottom - parseFloat(own.borderBottomWidth),
+    };
+    const inside = (name: string, element: Element) => {
+      const part = element.getBoundingClientRect();
+      if (
+        part.left < inner.left - 0.5 ||
+        part.right > inner.right + 0.5 ||
+        part.top < inner.top - 0.5 ||
+        part.bottom > inner.bottom + 0.5
+      ) {
+        problems.push(`${name}: outside the frame (${JSON.stringify(part)})`);
+      }
+    };
+    inside('the card', card);
+    inside('the step row', row);
+    inside('Continue', go);
+    if (parseFloat(own.borderTopWidth) < 1) problems.push('the frame draws no border');
+    if (parseFloat(getComputedStyle(row).borderTopWidth) !== 1) {
+      problems.push('no hairline between the card and its step row');
+    }
+    if (go.scrollWidth > go.clientWidth) problems.push('Continue: its words overflow it');
+    const marks = [...row.querySelectorAll('[data-mark]')].map((mark) =>
+      mark.getBoundingClientRect(),
+    );
+    if (marks.length !== 5) problems.push(`${String(marks.length)} dots, not 5`);
+    if (new Set(marks.map((mark) => Math.round(mark.top))).size !== 1) {
+      problems.push('the dots are squashed onto more than one line');
+    }
+    return problems;
+  }, width);
+}
+
+/** Whether Continue sits on a line of its own under the dots. */
+async function continueWraps(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const row = document.querySelector('[data-testid="tracker-card-progress-a"]');
+    const go = document.querySelector('[data-testid="tracker-card-continue-a"]');
+    const dots = row?.querySelector('[data-mark]');
+    if (!go || !dots) throw new Error('no Continue or dots on card a');
+    return go.getBoundingClientRect().top >= dots.getBoundingClientRect().bottom - 0.5;
+  });
+}
+
+/**
+ * Card a's focus ring, reached by keyboard, and every way something that clips
+ * cuts it off. The ring is the global `:focus-visible` box shadow: 4px round
+ * the button.
+ */
+async function cardRing(page: Page): Promise<{ readonly ring: string; readonly cut: string[] }> {
+  await page.focus('[data-testid="tracker-card-a"]');
+  // Out and back in with real keys: only a keyboard arrival draws the ring.
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  return page.evaluate(() => {
+    const card = document.querySelector<HTMLElement>('[data-testid="tracker-card-a"]');
+    if (card === null || document.activeElement !== card) return { ring: '', cut: ['not focused'] };
+    const box = card.getBoundingClientRect();
+    const ring = {
+      left: box.left - 4,
+      right: box.right + 4,
+      top: box.top - 4,
+      bottom: box.bottom + 4,
+    };
+    const cut: string[] = [];
+    for (let node = card.parentElement; node !== null; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.overflowX === 'visible' && style.overflowY === 'visible') continue;
+      const outer = node.getBoundingClientRect();
+      const left = outer.left + node.clientLeft;
+      const top = outer.top + node.clientTop;
+      const room = {
+        left: ring.left - left,
+        right: left + node.clientWidth - ring.right,
+        top: ring.top - top,
+        bottom: top + node.clientHeight - ring.bottom,
+      };
+      for (const [side, space] of Object.entries(room)) {
+        // Only the sides the box can actually cut: it scrolls the other way.
+        const clips = side === 'left' || side === 'right' ? style.overflowX : style.overflowY;
+        if (clips !== 'visible' && space < -0.5) {
+          cut.push(`${node.tagName.toLowerCase()} cuts ${String(-space)}px off its ${side}`);
+        }
+      }
+    }
+    return {
+      ring: card.matches(':focus-visible') ? getComputedStyle(card).boxShadow : '',
+      cut,
+    };
+  });
+}
+
+/** The colour of each side of card `id`'s frame. */
+async function frameEdges(page: Page, id: string): Promise<Record<string, string>> {
+  return page.evaluate((card) => {
+    const frame = document.querySelector(`[data-testid="tracker-card-${card}"]`)?.parentElement;
+    if (!frame) throw new Error(`no frame for card ${card}`);
+    const own = getComputedStyle(frame);
+    return {
+      top: own.borderTopColor,
+      right: own.borderRightColor,
+      bottom: own.borderBottomColor,
+      left: own.borderLeftColor,
+    };
+  }, id);
+}
+
+describe('the step row joins its card (L-438)', () => {
+  for (const viewport of STARTED_WINDOWS) {
+    const size = `${String(viewport.width)}×${String(viewport.height)}`;
+
+    it(`at ${size} the card and its step row are wholly inside one frame`, async () => {
+      const page = await startedBoard(viewport);
+      assert.deepEqual(await startedCardProblems(page, null), []);
+      await page.context().close();
+    });
+
+    it(`at ${size} the card's focus ring is drawn and nothing cuts it off`, async () => {
+      const page = await startedBoard(viewport);
+      const { ring, cut } = await cardRing(page);
+      assert.match(ring, /rgb\(26, 86, 219\)/, `no blue ring: ${ring}`);
+      assert.deepEqual(cut, []);
+      await page.context().close();
+    });
+
+    it(`at ${size} a selected card's whole frame is blue, hovered or not; the others are not`, async () => {
+      const page = await startedBoard(viewport);
+      await page.click('[data-testid="tracker-card-a"]');
+      await page.waitForSelector('[data-testid="tracker-card-a"][aria-pressed="true"]');
+      const edges = await frameEdges(page, 'a');
+      console.log(`selected frame at ${size}: ${JSON.stringify(edges)}`);
+      assert.deepEqual(edges, { top: BLUE, right: BLUE, bottom: BLUE, left: BLUE });
+      assert.notEqual((await frameEdges(page, 'b')).top, BLUE, 'an unselected card is blue');
+      // The hover grey must not win over selected. On a phone the open pane covers the board.
+      if (viewport.width !== PHONE.width) {
+        await page.hover('[data-testid="tracker-card-a"]');
+        assert.equal((await frameEdges(page, 'a')).top, BLUE, 'hover took the blue away');
+      }
+      await page.context().close();
+    });
+  }
+
+  it('Continue still wraps under the dots in the narrowest desktop card, 160px (L-319)', async () => {
+    const page = await startedBoard({ width: 1000, height: 700 });
+    assert.deepEqual(await startedCardProblems(page, '160px'), []);
+    assert.equal(await continueWraps(page), true, 'Continue did not wrap under the dots');
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a step row outside the frame is reported', async () => {
+    const page = await startedBoard({ width: 1000, height: 700 });
+    await page.evaluate(() => {
+      const row = document.querySelector('[data-testid="tracker-card-progress-a"]');
+      row?.parentElement?.after(row);
+    });
+    const report = await startedCardProblems(page, null);
+    assert.ok(
+      report.some((line) => line.startsWith('the step row')),
+      `the row outside its frame was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+
+  it('the check can fail: a list with no room above its first card cuts the ring', async () => {
+    const page = await startedBoard({ width: 1000, height: 700 });
+    await page.evaluate(() => {
+      const list = document.querySelector('[data-testid="tracker-card-a"]')?.closest('ul');
+      if (list) list.style.paddingTop = '0px';
+    });
+    const { cut } = await cardRing(page);
+    assert.ok(
+      cut.some((line) => line.startsWith('ul cuts')),
+      `the cut ring went unreported: ${JSON.stringify(cut)}`,
+    );
+    await page.context().close();
+  });
+
+  it('the check can fail: a frame without the selected rule stays grey', async () => {
+    const page = await startedBoard({ width: 1000, height: 700 });
+    await page.evaluate(() => {
+      const frame = document.querySelector('[data-testid="tracker-card-a"]')?.parentElement;
+      frame?.classList.remove('has-[[aria-pressed=true]]:border-blue');
+    });
+    await page.click('[data-testid="tracker-card-a"]');
+    await page.waitForSelector('[data-testid="tracker-card-a"][aria-pressed="true"]');
+    assert.notEqual((await frameEdges(page, 'a')).top, BLUE, 'grey frame read as blue');
+    await page.context().close();
+  });
+});
+
+/**
  * Menu hints open to the right (L-439). A side-menu item's hint used to open
  * below the item, over the next one. `Hint.test.tsx` fakes the sizes and pins
  * the arithmetic; this hovers each item of the real rail WebKit draws at the
