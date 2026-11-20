@@ -10,9 +10,10 @@ import { STEPS, continueStep, stepStates, type JobProgress, type StepId } from '
 /**
  * A tracker card's small step bar (L-200): ●●●○○ and Continue.
  *
- * Sits UNDER the card, not inside it: the card is one big button (select it,
- * drag it), and a button inside a button is not a thing a browser or a screen
- * reader can make sense of. Only shown for a job that has been started — a
+ * Sits in the card's frame, under the card button, not inside it (L-438): the
+ * card is one big button (select it, drag it), and a button inside a button is
+ * not a thing a browser or a screen reader can make sense of. The hairline on
+ * top is what joins the two parts of the frame. Only shown for a job that has been started — a
  * card fresh from Search already has "Check my CV" one click away.
  *
  * Continue goes to the first thing still to do (`continueStep`). Like every
@@ -53,7 +54,7 @@ export function CardProgress({ applicationId, progress, onContinue }: CardProgre
       data-done={done}
       role="group"
       aria-labelledby={lineId}
-      className="mt-1 px-3"
+      className="border-t border-line px-3 py-2"
     >
       <p
         id={lineId}

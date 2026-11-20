@@ -582,15 +582,19 @@ describe('moving a card by dragging it', () => {
     expect(port.entries()[0]?.application.applied_date).not.toBeNull();
   });
 
-  it('plays the one motion moment on the card that moved, and on nothing else', async () => {
+  it('plays the one motion moment on the frame of the card that moved, and on nothing else', async () => {
     await renderBoard([entry('a'), entry('b')]);
 
     dragCardTo('a', 'offer');
 
+    // The frame (the list item) carries it, so a card arrives whole, its step
+    // row included (L-438). The button inside does not play it a second time.
+    const frameOf = (id: string) => screen.getByTestId(`tracker-card-${id}`).parentElement;
     await vi.waitFor(() => {
-      expect(screen.getByTestId('tracker-card-a').className).toContain('cviper-card-settle');
+      expect(frameOf('a')?.className).toContain('cviper-card-settle');
     });
-    expect(screen.getByTestId('tracker-card-b').className).not.toContain('cviper-card-settle');
+    expect(screen.getByTestId('tracker-card-a').className).not.toContain('cviper-card-settle');
+    expect(frameOf('b')?.className).not.toContain('cviper-card-settle');
   });
 
   it('negative: a drop back into the same column writes nothing', async () => {

@@ -133,6 +133,14 @@ describe('every column header is title, then count, and nothing else (L-332)', (
     expect(await screen.findByTestId('substage-editor')).toBeTruthy();
   });
 
+  it('L-438: Interview stages is drawn as part of the head, a quiet row ending in a hairline', async () => {
+    await board([entry('a', 'interviewing')]);
+    const row = screen.getByTestId('tracker-edit-substages').parentElement!;
+    expect(row.className.split(/\s+/)).toEqual(expect.arrayContaining(['border-b', 'border-line']));
+    // Still its own row, not inside the header (L-332).
+    expect(headerOf('interviewing').contains(row)).toBe(false);
+  });
+
   it('negative: no other column draws an Interview stages control', async () => {
     await board([entry('a', 'saved'), entry('b', 'applied'), entry('c', 'offer')]);
     expect(screen.getAllByTestId('tracker-edit-substages')).toHaveLength(1);

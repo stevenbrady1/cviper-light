@@ -7,13 +7,14 @@
  * it, drag it — is the same button it always was.
  */
 import { type Job } from '@cviper/core-types';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type BoardProgressPort, type SavedProgress } from '../flow/progress';
 import { type StepId } from '../flow/steps';
 import { Tracker } from './Tracker';
+import { CARD_DRAG_TYPE } from './TrackerCard';
 import { type TrackerEntry } from './model';
 import { createFakeTrackerPort } from './test/fakePort';
 
@@ -163,5 +164,99 @@ describe('tracker cards say which step the job is on (L-331)', () => {
     const column = screen.getByTestId('tracker-column-saved');
     expect(column.textContent ?? '').not.toMatch(/Step undefined|NaN|undefined/);
     expect(screen.getAllByText(/^Step \d of 5 · /)).toHaveLength(1);
+  });
+});
+
+/** The classes of `element`, one per entry. */
+function classesOf(element: Element): string[] {
+  return element.className.split(/\s+/).filter(Boolean);
+}
+
+/** The card's frame: the list item that holds the card button (L-438). */
+function frameOf(applicationId: string): HTMLElement {
+  const frame = screen.getByTestId(`tracker-card-${applicationId}`).parentElement;
+  if (frame === null) throw new Error(`card ${applicationId} has no frame`);
+  return frame;
+}
+
+const FRAME = ['rounded-card', 'border', 'border-line', 'border-l-2', 'bg-card', 'shadow-raised'];
+
+describe('the step row joins its card (L-438)', () => {
+  it('happy: a started card and its step row share one frame, and the row is not inside the card button', async () => {
+    await renderBoard({ saved: { 'job-a': { analysed: true } } });
+    const row = await screen.findByTestId('tracker-card-progress-a');
+    const card = screen.getByTestId('tracker-card-a');
+    const frame = frameOf('a');
+
+    expect(frame.tagName).toBe('LI');
+    expect(row.parentElement).toBe(frame);
+    expect(card.contains(row)).toBe(false);
+    expect([...frame.children]).toEqual([card, row]);
+    // The frame is drawn once, on the list item, with the age edge (moving: teal).
+    expect(classesOf(frame)).toEqual(expect.arrayContaining([...FRAME, 'border-l-teal']));
+    // The button keeps only the round corners, so its focus ring keeps the card's shape.
+    for (const drawn of ['border', 'border-line', 'border-l-2', 'bg-card', 'shadow-raised']) {
+      expect(classesOf(card), drawn).not.toContain(drawn);
+    }
+    expect(classesOf(card)).not.toContain('border-l-teal');
+    // The row is the frame's bottom part, under a hairline.
+    expect(classesOf(row)).toEqual(expect.arrayContaining(['border-t', 'border-line']));
+    expect(classesOf(row)).not.toContain('mt-1');
+  });
+
+  it('interaction: a click on the top part selects the card; Continue does not', async () => {
+    const { onContinue, user } = await renderBoard({ saved: { 'job-a': { analysed: true } } });
+    const card = screen.getByTestId('tracker-card-a');
+
+    await user.click(await screen.findByTestId('tracker-card-continue-a'));
+    expect(onContinue).toHaveBeenCalledTimes(1);
+    expect(card.getAttribute('aria-pressed')).toBe('false');
+
+    await user.click(card);
+    expect(card.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('interaction: the card button is still what is dragged, with its id as the payload', async () => {
+    await renderBoard({ saved: { 'job-a': { analysed: true } } });
+    await screen.findByTestId('tracker-card-progress-a');
+    const card = screen.getByTestId('tracker-card-a');
+    const setData = vi.fn();
+    const dataTransfer = { setData, effectAllowed: 'none' };
+
+    expect(card.getAttribute('draggable')).toBe('true');
+    fireEvent.dragStart(card, { dataTransfer });
+
+    expect(setData).toHaveBeenCalledWith(CARD_DRAG_TYPE, 'a');
+    expect(dataTransfer.effectAllowed).toBe('move');
+  });
+
+  it('negative: a card with no step row draws no hairline and no empty footer', async () => {
+    await renderBoard({ saved: { 'job-a': { analysed: true } } });
+    await screen.findByTestId('tracker-card-progress-a');
+    const card = screen.getByTestId('tracker-card-b');
+    const frame = frameOf('b');
+
+    expect([...frame.children]).toEqual([card]);
+    expect(frame.querySelector('.border-t')).toBeNull();
+    expect(classesOf(frame)).toEqual(expect.arrayContaining(FRAME));
+  });
+
+  it('boundary: the selected card shows the blue edge on its whole frame, step row included', async () => {
+    const { user } = await renderBoard({ saved: { 'job-a': { analysed: true } } });
+    const row = await screen.findByTestId('tracker-card-progress-a');
+    const card = screen.getByTestId('tracker-card-a');
+    const frame = frameOf('a');
+    const selectedEdge = 'has-[[aria-pressed=true]]:border-blue';
+
+    expect(classesOf(frame)).toContain(selectedEdge);
+    expect(classesOf(card)).not.toContain('border-blue');
+    expect(frame.matches(':has([aria-pressed="true"])')).toBe(false);
+
+    await user.click(card);
+
+    expect(frame.matches(':has([aria-pressed="true"])')).toBe(true);
+    expect(frame.contains(row)).toBe(true);
+    // Only the selected card's frame: the others keep their own edge.
+    expect(frameOf('b').matches(':has([aria-pressed="true"])')).toBe(false);
   });
 });
