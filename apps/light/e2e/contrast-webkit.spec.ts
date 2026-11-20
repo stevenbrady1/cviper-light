@@ -8170,3 +8170,209 @@ describe('menu hints open to the right (L-439)', () => {
     await page.context().close();
   });
 });
+
+/**
+ * Search's boxes are one height, row two shares its width, and "Where to look"
+ * draws its own fold mark (L-437).
+ *
+ * A drop-down is drawn on the font's own line, not the page's, so with the
+ * same classes as a text box it can come out shorter (seen in WebView2 on
+ * Windows; WebKit may not show it, so Smoke picture 4 is the proof there).
+ * Every box now carries its own height: 44px on a phone, 38px from `md` up.
+ * Only a real engine can say whether the
+ * six really come out the same, whether the browser's ▸ is gone (WebKit draws
+ * it its own way, L-390), and whether ours turns.
+ */
+const SEARCH_FIELDS = [
+  'search-country',
+  'search-keywords',
+  'search-location',
+  'search-distance',
+  'search-salary',
+  'search-contract',
+] as const;
+const ROW_TWO = ['search-distance', 'search-salary', 'search-contract'] as const;
+const BOX_WINDOWS = [SMALLEST_WINDOW, { width: 1280, height: 800 }, PHONE] as const;
+
+interface SearchBoxes {
+  readonly heights: Readonly<Record<string, number>>;
+  readonly rowTwo: readonly { readonly id: string; readonly top: number; readonly width: number }[];
+}
+
+async function searchBoxes(page: Page): Promise<SearchBoxes> {
+  return page.evaluate(
+    ({ all, row }) => {
+      const box = (id: string): DOMRect => {
+        const node = document.querySelector(`[data-testid="${id}"]`);
+        if (node === null) throw new Error(`${id} is not in the page`);
+        return node.getBoundingClientRect();
+      };
+      return {
+        heights: Object.fromEntries(all.map((id) => [id, box(id).height])),
+        rowTwo: row.map((id) => ({ id, top: box(id).top, width: box(id).width })),
+      };
+    },
+    { all: SEARCH_FIELDS, row: ROW_TWO },
+  );
+}
+
+/**
+ * What is wrong with the boxes. `height`: what each must measure (44 on a
+ * phone, 38 from `md` up). `oneRow`: row two must share one line in equal widths.
+ */
+function searchBoxProblems(seen: SearchBoxes, oneRow: boolean, height: number): string[] {
+  const problems: string[] = [];
+  const heights = Object.values(seen.heights);
+  if (Math.max(...heights) - Math.min(...heights) > 0.5) {
+    problems.push(`the boxes are not one height: ${JSON.stringify(seen.heights)}`);
+  }
+  if (heights.some((each) => Math.abs(each - height) > 0.5)) {
+    problems.push(`the boxes are not ${String(height)}px: ${JSON.stringify(seen.heights)}`);
+  }
+  if (oneRow) {
+    const tops = seen.rowTwo.map((box) => box.top);
+    const widths = seen.rowTwo.map((box) => box.width);
+    if (Math.max(...tops) - Math.min(...tops) > 0.5) {
+      problems.push(`row two is not one row: ${JSON.stringify(seen.rowTwo)}`);
+    }
+    if (Math.max(...widths) - Math.min(...widths) > 0.5) {
+      problems.push(`row two's boxes are not one width: ${JSON.stringify(seen.rowTwo)}`);
+    }
+  }
+  return problems;
+}
+
+interface FoldMark {
+  readonly height: number;
+  readonly svgs: number;
+  /** How far our mark starts from the summary's own left edge, inside its padding. */
+  readonly indent: number;
+  readonly listStyle: string;
+  readonly rotate: string;
+  readonly transition: string;
+}
+
+async function foldMark(page: Page): Promise<FoldMark> {
+  return page.evaluate((fold) => {
+    const summary = document.querySelector<HTMLElement>(`${fold} > summary`);
+    const mark = summary?.querySelector<HTMLElement>('[data-testid="search-where-mark"]');
+    if (summary === null || summary === undefined) throw new Error('no summary line');
+    if (mark === null || mark === undefined) throw new Error('no drawn mark in the summary');
+    const style = getComputedStyle(summary);
+    const markStyle = getComputedStyle(mark);
+    return {
+      height: summary.getBoundingClientRect().height,
+      svgs: summary.querySelectorAll('svg').length,
+      // Layout offsets, which a turn does not move (a turned box's outline does).
+      indent:
+        mark.offsetLeft -
+        summary.offsetLeft -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.borderLeftWidth),
+      listStyle: style.listStyleType,
+      rotate: markStyle.rotate,
+      transition: markStyle.transitionDuration,
+    };
+  }, WHERE_FOLD);
+}
+
+/** What is wrong with the fold's mark. Empty means one mark, ours, on a 44px line. */
+function foldMarkProblems(seen: FoldMark): string[] {
+  const problems: string[] = [];
+  if (seen.height < 44) problems.push(`the fold line is ${String(seen.height)}px tall`);
+  if (seen.svgs !== 1) problems.push(`the fold line draws ${String(seen.svgs)} drawings`);
+  // A browser mark is drawn before the first thing in the line, so ours moves right.
+  if (Math.abs(seen.indent) > 0.5) {
+    problems.push(`something is drawn before our mark: it starts ${String(seen.indent)}px in`);
+  }
+  if (seen.listStyle !== 'none') problems.push(`the line asks for a "${seen.listStyle}" mark`);
+  return problems;
+}
+
+describe('Search boxes are one height, and "Where to look" draws its own mark (L-437)', () => {
+  for (const viewport of BOX_WINDOWS) {
+    const label = `${String(viewport.width)}×${String(viewport.height)}`;
+    const oneRow = viewport !== PHONE;
+    // A phone's boxes are whole 44px touch targets, like its buttons.
+    const height = oneRow ? 38 : 44;
+    it(`at ${label} every box on Search is ${String(height)}px${oneRow ? ', and row two shares its width' : ''}`, async () => {
+      const page = await openTypedSearchFolded(viewport);
+      const seen = await searchBoxes(page);
+      console.log(`Search boxes at ${label}: ${JSON.stringify(seen)}`);
+      assert.deepEqual(searchBoxProblems(seen, oneRow, height), []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      await page.context().close();
+    });
+  }
+
+  for (const viewport of [SMALLEST_WINDOW, PHONE]) {
+    it(`at ${String(viewport.width)}px the fold line is at least 44px tall and draws one mark, ours`, async () => {
+      const page = await openTypedSearchFolded(viewport);
+      const seen = await foldMark(page);
+      console.log(`fold mark at ${String(viewport.width)}px: ${JSON.stringify(seen)}`);
+      assert.deepEqual(foldMarkProblems(seen), []);
+      await page.context().close();
+    });
+  }
+
+  it('the mark turns when the fold opens, and back when it closes, with no animation', async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    const closed = await foldMark(page);
+    await openWhereToLook(page);
+    const opened = await foldMark(page);
+    await page.click(`${WHERE_FOLD} > summary`);
+    await page.waitForSelector(`${WHERE_FOLD}:not([open])`);
+    const closedAgain = await foldMark(page);
+    console.log(`mark: ${closed.rotate} → ${opened.rotate} → ${closedAgain.rotate}`);
+    assert.equal(closed.rotate, 'none');
+    assert.equal(opened.rotate, '90deg');
+    assert.equal(closedAgain.rotate, 'none');
+    assert.equal(opened.transition, '0s');
+    assert.deepEqual(foldMarkProblems(opened), []);
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a drop-down forced to 30px, and a box squeezed narrow, are reported', async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    await page.evaluate(() => {
+      const contract = document.querySelector<HTMLElement>('[data-testid="search-contract"]');
+      if (contract !== null) contract.style.height = '30px';
+      const salary = document.querySelector<HTMLElement>('[data-testid="search-salary"]');
+      if (salary?.parentElement) salary.parentElement.style.flex = '0 0 120px';
+    });
+    const report = searchBoxProblems(await searchBoxes(page), true, 38);
+    assert.ok(
+      report.some((line) => line.startsWith('the boxes are not one height')),
+      `the 30px drop-down was not reported: ${JSON.stringify(report)}`,
+    );
+    assert.ok(
+      report.some((line) => line.startsWith('the boxes are not 38px')),
+      `the 30px drop-down was not reported as the wrong size: ${JSON.stringify(report)}`,
+    );
+    assert.ok(
+      report.some((line) => line.startsWith("row two's boxes are not one width")),
+      `the narrow box was not reported: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+
+  it("the check can fail: the browser's own mark, put back, is reported", async () => {
+    const page = await openTypedSearchFolded(SMALLEST_WINDOW);
+    await page.evaluate((fold) => {
+      const summary = document.querySelector<HTMLElement>(`${fold} > summary`);
+      if (summary === null) return;
+      summary.className = summary.className
+        .split(' ')
+        .filter((name) => name !== 'list-none' && !name.includes('details-marker'))
+        .join(' ');
+      summary.style.display = 'list-item';
+    }, WHERE_FOLD);
+    const report = foldMarkProblems(await foldMark(page));
+    assert.ok(
+      report.some((line) => line.startsWith('something is drawn before our mark')),
+      `the browser's mark was not reported: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+});

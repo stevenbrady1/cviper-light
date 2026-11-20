@@ -245,7 +245,9 @@ describe('the Search, Settings key and Profile boxes on the shared style (L-379)
     expect(input.classList.contains('border-field-line')).toBe(false);
   });
 
-  it('boundary: the Search boxes keep their own layout: full width, or none for the contract picker', () => {
+  // L-437: every Search box carries its height and width at the call site (44px
+  // on a phone, 38px from `md` up), so the list grows; FIELD itself stays layout-free.
+  it('boundary: the Search boxes keep their own layout: full width, one height', () => {
     render(
       <SearchFields
         form={EMPTY_FORM}
@@ -255,11 +257,12 @@ describe('the Search, Settings key and Profile boxes on the shared style (L-379)
         onCountry={() => undefined}
       />,
     );
+    const layout = ['mt-1', 'h-11', 'md:h-9.5', 'w-full'];
     expect(exactly(screen.getByTestId('search-keywords'))).toEqual(
-      [...classesOf(FIELD), 'mt-1', 'w-full'].sort(),
+      [...classesOf(FIELD), ...layout].sort(),
     );
     expect(exactly(screen.getByTestId('search-contract'))).toEqual(
-      [...classesOf(FIELD), 'mt-1'].sort(),
+      [...classesOf(FIELD), ...layout].sort(),
     );
   });
 

@@ -46,6 +46,21 @@ const COUNTRY_REASON_ID = 'search-country-reason';
  */
 const WAITING = 'opacity-60';
 
+/*
+  Every box on Search carries `h-11 md:h-9.5` (L-437), so all six are one
+  height: 44px on a phone, a whole touch target like the buttons, and 38px
+  (the text box's own height) from `md` up. A drop-down is drawn on the font's
+  own line, not the page's, so with only FIELD's padding it comes out a
+  different height from a text box. Layout, so it sits at each box, after
+  FIELD (see `app/fields.ts`).
+*/
+
+/** Row one: the keywords and the place take what the country leaves. */
+const GROW = 'min-w-0 flex-1';
+
+/** Row two: three equal shares from `md` up; they wrap on a phone (L-437). */
+const SHARE = 'min-w-0 flex-1 basis-40';
+
 export function SearchFields({ form, errors, onField, country, onCountry }: SearchFieldsProps) {
   const locked = country === null;
   const unit = salaryUnit(country);
@@ -68,7 +83,7 @@ export function SearchFields({ form, errors, onField, country, onCountry }: Sear
               const chosen = parseCountry(event.currentTarget.value);
               if (chosen !== null) onCountry(chosen);
             }}
-            className={`${FIELD} mt-1 w-full`}
+            className={`${FIELD} mt-1 h-11 w-full md:h-9.5`}
           >
             {locked ? <option value="">Choose a country</option> : null}
             {COUNTRY_OPTIONS.map((option) => (
@@ -95,7 +110,7 @@ export function SearchFields({ form, errors, onField, country, onCountry }: Sear
           onChange={(value) => onField('keywords', value)}
           placeholder="e.g. Credit risk analyst"
           disabled={locked}
-          grow
+          layout={GROW}
         />
         <Field
           id="search-location"
@@ -106,7 +121,7 @@ export function SearchFields({ form, errors, onField, country, onCountry }: Sear
           // "London" is an example only a United Kingdom search should be shown (L-423).
           placeholder={country === 'gb' ? 'e.g. London' : 'City or town'}
           disabled={locked}
-          grow
+          layout={GROW}
         />
       </div>
 
@@ -119,6 +134,7 @@ export function SearchFields({ form, errors, onField, country, onCountry }: Sear
           onChange={(value) => onField('distanceMiles', value)}
           placeholder="Any"
           disabled={locked}
+          layout={SHARE}
         />
         <Field
           id="search-salary"
@@ -128,9 +144,10 @@ export function SearchFields({ form, errors, onField, country, onCountry }: Sear
           onChange={(value) => onField('salaryMin', value)}
           placeholder="Any"
           disabled={locked}
+          layout={SHARE}
         />
 
-        <div className={locked ? `min-w-0 ${WAITING}` : 'min-w-0'}>
+        <div className={locked ? `${SHARE} ${WAITING}` : SHARE}>
           <label htmlFor="search-contract" className="block text-xs font-medium text-ink-muted">
             Contract type
           </label>
@@ -143,7 +160,7 @@ export function SearchFields({ form, errors, onField, country, onCountry }: Sear
             onChange={(event) =>
               onField('contractType', event.currentTarget.value as ContractChoice)
             }
-            className={`${FIELD} mt-1`}
+            className={`${FIELD} mt-1 h-11 w-full md:h-9.5`}
           >
             {CONTRACT_CHOICES.map((choice) => (
               <option key={choice.value} value={choice.value}>
@@ -166,21 +183,13 @@ interface FieldProps {
   readonly onChange: (value: string) => void;
   /** Waiting for a country (L-417). Still on screen; the reason is under the picker. */
   readonly disabled: boolean;
-  readonly grow?: boolean;
+  /** The wrapper's share of its row: GROW or SHARE. */
+  readonly layout: string;
 }
 
-function Field({
-  id,
-  label,
-  value,
-  error,
-  placeholder,
-  onChange,
-  disabled,
-  grow = false,
-}: FieldProps) {
+function Field({ id, label, value, error, placeholder, onChange, disabled, layout }: FieldProps) {
   return (
-    <div className={`${grow ? 'min-w-0 flex-1' : 'min-w-0'}${disabled ? ` ${WAITING}` : ''}`}>
+    <div className={disabled ? `${layout} ${WAITING}` : layout}>
       <label htmlFor={id} className="block text-xs font-medium text-ink-muted">
         {label}
       </label>
@@ -193,7 +202,7 @@ function Field({
         disabled={disabled}
         aria-describedby={disabled ? COUNTRY_REASON_ID : undefined}
         onChange={(event) => onChange(event.currentTarget.value)}
-        className={`${FIELD} mt-1 w-full`}
+        className={`${FIELD} mt-1 h-11 w-full md:h-9.5`}
       />
       {error === undefined ? null : (
         <p data-testid={`${id}-error`} className="mt-1 text-xs text-danger">

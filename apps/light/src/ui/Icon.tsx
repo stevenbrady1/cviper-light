@@ -136,6 +136,8 @@ const PATHS = {
       <path d="m19 12-7 7-7-7" />
     </>
   ),
+  // A fold's mark (L-437): points right when closed; the fold turns it down.
+  chevron: <path d="m9 6 6 6-6 6" />,
   close: (
     <>
       <path d="M18 6 6 18" />
