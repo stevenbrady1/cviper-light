@@ -12,7 +12,7 @@ import {
   type QuotaState,
 } from '@cviper/job-apis';
 
-import { CONTENT_COLUMN, SIDE_PADDING } from '../../app/layout';
+import { CONTENT_COLUMN, SCROLL_GUTTER, SIDE_PADDING } from '../../app/layout';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
 import { boardsFor } from '../boards/defaults';
@@ -640,7 +640,9 @@ export function Search({
       <ViewHeader view={view.id} title={view.label} summary={view.summary} />
 
       {/* `scroll-pb`: a focused tick stays clear of the pinned row at its tallest (L-342). */}
-      <div className={`min-h-0 flex-1 overflow-y-auto ${SIDE_PADDING} py-5 md:scroll-pb-64`}>
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto ${SIDE_PADDING} ${SCROLL_GUTTER} py-5 md:scroll-pb-64`}
+      >
         <div data-content-column className={`${CONTENT_COLUMN} space-y-5`}>
           <form data-testid="search-form" onSubmit={(event) => void onSubmit(event)}>
             <SearchFields

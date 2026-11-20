@@ -35,3 +35,22 @@ export const CONTENT_COLUMN = 'mx-auto max-w-5xl';
 
 /** The side padding of every screen's scroll area, the same as the header's. */
 export const SIDE_PADDING = 'px-4 md:px-6';
+
+/**
+ * From `md:` up, a screen's scroll area ALWAYS keeps room for its scroll bar
+ * (L-435). theme.css draws a real 10px bar, so without this a screen that
+ * starts to scroll loses 10px and its centred column jumps 5px sideways.
+ * `HEADER_EDGE` gives the header strip the same 10px on its right, so the
+ * title row and the column are always the same width and line up. The two go
+ * together: change the bar's width in theme.css and both must change.
+ *
+ * Both halves are needed. WebKit keeps no room for a styled bar under
+ * `scrollbar-gutter` alone, but always draws the strip under `overflow-y:
+ * scroll`; Chromium (WebView2) keeps it under `scrollbar-gutter`. The track is
+ * transparent and there is no thumb when nothing scrolls, so a short screen
+ * shows an empty strip, not a bar.
+ */
+export const SCROLL_GUTTER = 'md:overflow-y-scroll md:[scrollbar-gutter:stable]';
+
+/** The header strip's right edge: the side padding (24px) plus the bar's 10px. */
+export const HEADER_EDGE = 'md:pr-8.5';

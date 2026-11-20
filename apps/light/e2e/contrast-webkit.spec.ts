@@ -7591,3 +7591,247 @@ describe('the Profile checklist (L-413)', () => {
     await page.context().close();
   });
 });
+
+/**
+ * Slim scroll bars (L-435).
+ *
+ * `styles/theme.css` styles the scroll bar: a 10px strip, no arrow buttons.
+ * `scrollbars.contract.test.ts` holds the rules; only a real engine can say
+ * whether they draw, and how wide. The bar's width is the area's outer width
+ * less its inner width less its side borders (`offsetWidth − clientWidth`).
+ *
+ * A styled bar is a real bar, never an overlay, so it takes 10px from every
+ * scrolling area. So every screen is also checked for sideways scroll, on the
+ * page and inside each vertical scroll area, at the smallest window (1000),
+ * a common laptop (1280) and a phone (375).
+ */
+const SCROLLBAR_WINDOWS = [
+  { width: 1000, height: 700 },
+  { width: 1280, height: 800 },
+  { width: 375, height: 812 },
+] as const;
+
+/** The first vertical scroll area of a screen: its room to scroll and its bar's width. */
+async function scrollBar(page: Page, view: string): Promise<{ room: number; bar: number }> {
+  return page.evaluate((id) => {
+    const area = document.querySelector<HTMLElement>(`[data-testid="view-${id}"] .overflow-y-auto`);
+    if (area === null) throw new Error(`no scroll area on ${id}`);
+    const style = getComputedStyle(area);
+    const borders = parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
+    return {
+      room: area.scrollHeight - area.clientHeight,
+      bar: area.offsetWidth - area.clientWidth - borders,
+    };
+  }, view);
+}
+
+/** Sideways scroll on the page, and inside every vertical scroll area on show. */
+async function sidewaysScroll(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const over: string[] = [];
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) {
+      over.push(`page: ${String(root.scrollWidth - root.clientWidth)}px too wide`);
+    }
+    for (const area of document.querySelectorAll<HTMLElement>('.overflow-y-auto')) {
+      if (area.offsetParent === null) continue;
+      if (area.scrollWidth > area.clientWidth) {
+        const name = area.closest('[data-testid]')?.getAttribute('data-testid') ?? 'an area';
+        over.push(`${name}: scrolls ${String(area.scrollWidth - area.clientWidth)}px sideways`);
+      }
+    }
+    return over;
+  });
+}
+
+describe('slim scroll bars (L-435)', () => {
+  for (const viewport of SCROLLBAR_WINDOWS.slice(0, 2)) {
+    it(`a scrolling area draws a 10px bar at ${String(viewport.width)}px`, async () => {
+      const page = await open('?seen=1', { width: viewport.width, height: 500 });
+      await goTo(page, 'settings');
+      const seen = await scrollBar(page, 'settings');
+      console.log(`Settings at ${String(viewport.width)}px: ${JSON.stringify(seen)}`);
+      // No room to scroll, no bar to measure: the check would prove nothing.
+      assert.ok(seen.room > 0, `Settings has only ${String(seen.room)}px to scroll`);
+      assert.equal(seen.bar, 10, `the scroll bar is ${String(seen.bar)}px wide, not 10`);
+      await page.context().close();
+    });
+  }
+
+  for (const viewport of SCROLLBAR_WINDOWS) {
+    it(`no screen scrolls sideways at ${String(viewport.width)}px`, async () => {
+      const page = await open('?seen=1&entries=1', viewport);
+      const report: string[] = [];
+      for (const view of VIEWS) {
+        await goTo(page, view);
+        report.push(...(await sidewaysScroll(page)).map((line) => `${view} — ${line}`));
+      }
+      assert.deepEqual(report, []);
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: an area with no scroll bar measures 0, not 10', async () => {
+    const page = await open('?seen=1', { width: 1000, height: 500 });
+    await goTo(page, 'settings');
+    await page.evaluate(() => {
+      const area = document.querySelector<HTMLElement>(
+        '[data-testid="view-settings"] .overflow-y-auto',
+      );
+      if (area !== null) area.style.overflowY = 'hidden';
+    });
+    assert.equal((await scrollBar(page, 'settings')).bar, 0);
+    await page.context().close();
+  });
+
+  it('the check can fail: content wider than a scroll area is reported', async () => {
+    const page = await open('?seen=1', { width: 1000, height: 700 });
+    await goTo(page, 'settings');
+    await page.evaluate(() => {
+      const wide = document.createElement('div');
+      wide.style.cssText = 'width:3000px;height:1px';
+      document.querySelector('[data-testid="view-settings"] .overflow-y-auto')?.append(wide);
+    });
+    const report = await sidewaysScroll(page);
+    assert.ok(
+      report.some((line) => line.includes('px sideways')),
+      `the widened area was not flagged: ${JSON.stringify(report)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
+ * The title and the column keep one edge whether a screen scrolls or not (L-435).
+ *
+ * A styled scroll bar is a real 10px bar, so a scroll area that starts to
+ * scroll loses 10px, and a centred column would jump 5px sideways, away from
+ * the page title (which sits outside the scroll area). So from `md:` up the
+ * scroll area always keeps the bar's room (`scrollbar-gutter: stable`), and the
+ * header strip keeps the same room on its right. Here the same screen is
+ * measured scrolling, then with its content hidden so it cannot scroll: the
+ * column's edges must not move, and the title row's must match them.
+ */
+interface TitleColumnEdges {
+  readonly room: number;
+  readonly column: { readonly left: number; readonly right: number };
+  readonly title: { readonly left: number; readonly right: number };
+}
+
+async function titleAndColumnEdges(
+  page: Page,
+  view: string,
+  scrolling: boolean,
+): Promise<TitleColumnEdges> {
+  return page.evaluate(
+    ({ id, scrolls }) => {
+      const section = document.querySelector(`[data-testid="view-${id}"]`);
+      const column = section?.querySelector<HTMLElement>('[data-content-column]');
+      const area = column?.parentElement?.closest<HTMLElement>('.overflow-y-auto');
+      const row = section?.querySelector('header')?.firstElementChild;
+      if (!column || !area || !row) throw new Error(`no column, scroll area or title row on ${id}`);
+      for (const child of column.children) {
+        (child as HTMLElement).style.display = scrolls ? '' : 'none';
+      }
+      const box = column.getBoundingClientRect();
+      const title = row.getBoundingClientRect();
+      return {
+        room: area.scrollHeight - area.clientHeight,
+        column: { left: box.left, right: box.right },
+        title: { left: title.left, right: title.right },
+      };
+    },
+    { id: view, scrolls: scrolling },
+  );
+}
+
+/**
+ * How many different colours the scroll area's bar strip (its right 10px)
+ * paints, read from a real screenshot. One colour: an empty strip, no thumb and
+ * no visible track. More: something is drawn there.
+ */
+async function stripColours(page: Page, view: string): Promise<number> {
+  const strip = await page.evaluate((id) => {
+    const column = document.querySelector(`[data-testid="view-${id}"] [data-content-column]`);
+    const area = column?.parentElement?.closest('.overflow-y-auto');
+    if (!area) throw new Error(`no scroll area on ${id}`);
+    const box = area.getBoundingClientRect();
+    return { x: box.right - 10, y: box.top, width: 10, height: box.height };
+  }, view);
+  const png = (await page.screenshot({ clip: strip })).toString('base64');
+  return page.evaluate(async (data) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${data}`;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext('2d');
+    if (context === null) throw new Error('no 2D canvas');
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, image.width, image.height).data;
+    const seen = new Set<string>();
+    for (let i = 0; i < pixels.length; i += 4) {
+      seen.add(`${String(pixels[i])},${String(pixels[i + 1])},${String(pixels[i + 2])}`);
+    }
+    return seen.size;
+  }, png);
+}
+
+describe('the title and the column keep one edge, scrolling or not (L-435)', () => {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1000, height: 700 },
+  ]) {
+    it(`Settings' column does not jump, and lines up with its title, at ${String(viewport.width)}px`, async () => {
+      const page = await open('?seen=1', viewport);
+      await goTo(page, 'settings');
+      const scrolling = await titleAndColumnEdges(page, 'settings', true);
+      const still = await titleAndColumnEdges(page, 'settings', false);
+      console.log(
+        `Settings at ${String(viewport.width)}px: ${JSON.stringify({ scrolling, still })}`,
+      );
+      assert.ok(scrolling.room > 0, 'Settings did not scroll, so nothing was compared');
+      assert.ok(still.room <= 0, `Settings still scrolls by ${String(still.room)}px`);
+      assert.deepEqual(still.column, scrolling.column, 'the column moved when the bar came');
+      assert.deepEqual(scrolling.title, scrolling.column, 'title and column apart (scrolling)');
+      assert.deepEqual(still.title, still.column, 'title and column apart (not scrolling)');
+      await page.context().close();
+    });
+  }
+
+  it('a short screen at 1440px keeps the strip, and shows no bar in it', async () => {
+    const page = await open('?seen=1', { width: 1440, height: 900 });
+    await goTo(page, 'settings');
+    const still = await titleAndColumnEdges(page, 'settings', false);
+    assert.ok(still.room <= 0, `Settings still scrolls by ${String(still.room)}px`);
+    assert.equal((await scrollBar(page, 'settings')).bar, 10, 'the strip is not kept');
+    const colours = await stripColours(page, 'settings');
+    console.log(`Settings at 1440px, not scrolling: the strip paints ${String(colours)} colour(s)`);
+    assert.equal(colours, 1, 'something is drawn in the empty strip');
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a screen that scrolls shows its thumb in the strip', async () => {
+    const page = await open('?seen=1', { width: 1440, height: 900 });
+    await goTo(page, 'settings');
+    assert.ok((await titleAndColumnEdges(page, 'settings', true)).room > 0);
+    assert.ok((await stripColours(page, 'settings')) > 1, 'the thumb was not seen');
+    await page.context().close();
+  });
+
+  it('the check can fail: without the header’s matching edge the title is reported apart', async () => {
+    const page = await open('?seen=1', { width: 1000, height: 700 });
+    await goTo(page, 'settings');
+    await page.evaluate(() => {
+      const header = document.querySelector<HTMLElement>('[data-testid="view-settings"] header');
+      if (header !== null) header.style.paddingRight = '24px';
+    });
+    const seen = await titleAndColumnEdges(page, 'settings', true);
+    assert.notDeepEqual(seen.title, seen.column, 'a header without the edge still lined up');
+    assert.equal(seen.column.right - seen.title.right, -10);
+    await page.context().close();
+  });
+});

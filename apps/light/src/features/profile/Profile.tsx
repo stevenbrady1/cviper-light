@@ -9,7 +9,7 @@ import {
   type StarExample,
 } from '@cviper/core-types';
 
-import { CONTENT_COLUMN, SIDE_PADDING } from '../../app/layout';
+import { CONTENT_COLUMN, SCROLL_GUTTER, SIDE_PADDING } from '../../app/layout';
 import { scrollWithin } from '../../app/scrollWithin';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
@@ -331,7 +331,7 @@ export function Profile({ port, now, gapsPort, filePort, cvPort }: ProfileProps)
 
       <div
         ref={scrollArea}
-        className={`min-h-0 flex-1 overflow-y-auto ${SIDE_PADDING} py-4 md:py-5`}
+        className={`min-h-0 flex-1 overflow-y-auto ${SIDE_PADDING} ${SCROLL_GUTTER} py-4 md:py-5`}
       >
         <div data-content-column className={CONTENT_COLUMN}>
           {loading ? (

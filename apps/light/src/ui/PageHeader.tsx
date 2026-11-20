@@ -38,6 +38,8 @@ export interface PageHeaderProps {
   readonly eyebrow?: ReactNode;
   /** `bar`: caps and centres the title row, to line up with the content below (L-326). */
   readonly column?: string;
+  /** `bar`: extra classes on the strip, such as a right edge that matches the scroll area's (L-435). */
+  readonly edge?: string;
 }
 
 export function PageHeader({
@@ -47,6 +49,7 @@ export function PageHeader({
   variant = 'bar',
   eyebrow = null,
   column = '',
+  edge = '',
 }: PageHeaderProps) {
   const actionsBox =
     actions === null ? null : (
@@ -69,7 +72,7 @@ export function PageHeader({
   }
 
   return (
-    <header className="border-b border-line bg-card px-4 py-2.5 md:px-6 md:py-3.5">
+    <header className={`border-b border-line bg-card px-4 py-2.5 md:px-6 md:py-3.5 ${edge}`}>
       <div
         className={`flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4 ${column}`}
       >
