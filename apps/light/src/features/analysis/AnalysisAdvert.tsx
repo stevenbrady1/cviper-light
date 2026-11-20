@@ -1,6 +1,7 @@
 import { type Job } from '@cviper/core-types';
 
-import { FIELD, FIELD_COMPACT } from '../../app/fields';
+import { ChipSelect } from '../../app/ChipSelect';
+import { COMPOSER_EDITOR } from '../../app/fields';
 import { LiveStatus } from '../../app/LiveStatus';
 
 export interface AnalysisAdvertProps {
@@ -13,68 +14,72 @@ export interface AnalysisAdvertProps {
   readonly onPickJob: (job: Job) => void;
 }
 
-/** Analysis, step 2: the advert, and a tracked job to take it from. */
+/** The advert box: the top half of the composer, its name spoken, not shown (L-446). */
 export function AnalysisAdvert({
   jobNote,
   jobText,
   onJobTextChange,
-  jobs,
-  onPickJob,
-}: AnalysisAdvertProps) {
+}: Pick<AnalysisAdvertProps, 'jobNote' | 'jobText' | 'onJobTextChange'>) {
   return (
-    <div>
-      {/*
-        What came with a job handed over from Search (L-190) — usually
-        that only a preview of the advert arrived. ABOVE the box, because
-        it is about what is in the box and has to be read first; gold,
-        because it is something to act on, not a failure.
-      */}
+    <>
+      {/* Always drawn, so the note below the line is read out when it arrives (L-299). */}
       <LiveStatus text={jobNote} />
-      {jobNote === null ? null : (
-        <p
-          data-testid="analysis-job-note"
-          className="mb-2 rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
-        >
-          {jobNote}
-        </p>
-      )}
-      <label htmlFor="analysis-job-text" className="block text-xs font-medium text-ink-muted">
+      <label htmlFor="analysis-job-text" className="sr-only">
         The job advert
       </label>
+      {/*
+        About nine lines (~240px): "Check this CV" stays on screen at
+        1000×700, with a job's step bar and its note. `relative` paints the
+        focus ring over the bar below it.
+      */}
       <textarea
         id="analysis-job-text"
         data-testid="analysis-job-text"
-        rows={7}
+        rows={9}
         value={jobText}
         placeholder="Paste the whole advert, including the requirements list."
         onChange={(event) => onJobTextChange(event.currentTarget.value)}
-        className={`${FIELD} mt-1 w-full`}
+        className={`${COMPOSER_EDITOR} relative block w-full`}
       />
+    </>
+  );
+}
 
-      {jobs.length === 0 ? null : (
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <label htmlFor="analysis-job-pick" className="text-xs text-ink-faint">
-            Or use one you are already tracking
-          </label>
-          <select
-            id="analysis-job-pick"
-            data-testid="analysis-job-pick"
-            value=""
-            onChange={(event) => {
-              const job = jobs.find((candidate) => candidate.id === event.currentTarget.value);
-              if (job !== undefined) onPickJob(job);
-            }}
-            className={`${FIELD_COMPACT} min-w-0 flex-1`}
-          >
-            <option value="">Choose a tracked job…</option>
-            {jobs.map((job) => (
-              <option key={job.id} value={job.id}>
-                {job.title} — {job.company}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-    </div>
+/**
+ * What came with a job handed over from Search (L-190) — usually that only a
+ * preview of the advert arrived. ABOVE the box, because it is about what is in
+ * the box and has to be read first; gold, because it is something to act on,
+ * not a failure.
+ */
+export function AnalysisJobNote({ jobNote }: Pick<AnalysisAdvertProps, 'jobNote'>) {
+  return jobNote === null ? null : (
+    <p
+      data-testid="analysis-job-note"
+      className="rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
+    >
+      {jobNote}
+    </p>
+  );
+}
+
+/** The tracked-job chip in the box's bar. Not drawn when nothing is tracked. */
+export function AnalysisJobChip({
+  jobs,
+  onPickJob,
+}: Pick<AnalysisAdvertProps, 'jobs' | 'onPickJob'>) {
+  if (jobs.length === 0) return null;
+  return (
+    <ChipSelect
+      id="analysis-job-pick"
+      name="Or use one you are already tracking"
+      testId="analysis-job-pick"
+      value=""
+      empty="Or use one you are already tracking"
+      options={jobs.map((job) => ({ value: job.id, label: `${job.title} — ${job.company}` }))}
+      onChange={(id) => {
+        const job = jobs.find((candidate) => candidate.id === id);
+        if (job !== undefined) onPickJob(job);
+      }}
+    />
   );
 }

@@ -15,7 +15,7 @@
  * Neither changes a single class name or colour. What the spec measures —
  * which text colour lands on which painted background — is the app's own.
  *
- * The page reads ten switches from the address:
+ * The page reads eleven switches from the address:
  *   - `?seen=1` skips the first-run welcome, as a returning user sees the app;
  *   - `?entries=1` puts three applications on the board, and gives Tailor
  *     their jobs, so a card's "Tailor" opens the real screen with its step
@@ -37,6 +37,9 @@
  *   - `?consent=openai,google` has those providers already agreed to, for
  *     Settings' "What I have agreed to" (L-410); `&consentLate=1` holds the
  *     consent file's answer back until a screen has had time to scroll.
+ *   - `?analysisCv=long` gives Analysis one CV with a 120-character name and
+ *     two tracked jobs, the first two adverts `?results=1` finds (L-446);
+ *     `?analysisCv=short` the same with an everyday name;
  *   - `?started=1`, with `?entries=1`, says card a's job has been analysed,
  *     so the board draws its step row and Continue in the card (L-438);
  *   - `?profile=none|five|six` gives Profile a saved profile with that many of
@@ -442,6 +445,34 @@ const profileCvPort =
         }
       : profileCvs;
 const profileLoad = failsToLoad(params.get('profileLoadError'));
+/**
+ * `?analysisCv=long` (L-446): one CV whose name is 120 characters with nowhere
+ * to break, and two tracked jobs. They are the first two adverts `?results=1`
+ * finds, as if tracked earlier, so "Analyse this job" on one opens Analysis
+ * with its step bar and its "only a preview" note. `short`: an everyday name.
+ */
+const analysisCv = params.get('analysisCv');
+const analysisPort =
+  analysisCv === 'long' || analysisCv === 'short'
+    ? createFakeCvPort({
+        cvs: [
+          {
+            id: 'cv-analysis',
+            name: analysisCv === 'long' ? 'Alex_Morgan_'.repeat(10) : 'Alex_Morgan_Sample_CV.json',
+            file_path: null,
+            extracted_text: 'Data analyst. SQL, Python and Power BI for retail and utilities.',
+            json_resume: null,
+            created_at: '2026-08-03T09:00:00.000Z',
+          },
+        ],
+        jobs: [0, 1].map((index) => ({
+          ...application(String(index), 'saved').job,
+          id: `job-${String(index)}`,
+          title: `Project Coordinator ${String(index)}`,
+          company: `Company ${String(index)}`,
+        })),
+      })
+    : undefined;
 /** `?started=1` (L-438): job a has been analysed, so its card is a started one. */
 const boardProgressPort =
   params.get('started') === '1'
@@ -854,6 +885,7 @@ ReactDOM.createRoot(root).render(
         })}
         {...(drafted === null ? {} : { workflowPort: drafted.workflowPort })}
         {...(searchPort === undefined ? {} : { searchPort })}
+        {...(analysisPort === undefined ? {} : { analysisPort })}
         {...(profileCvPort === undefined ? {} : { profileCvPort })}
         {...(boardProgressPort === undefined ? {} : { boardProgressPort })}
         now={NOW}

@@ -1,10 +1,11 @@
 import { type Cv } from '@cviper/core-types';
 
-import { SECONDARY_BUTTON } from '../../app/buttons';
-import { FIELD } from '../../app/fields';
+import { QUIET_BUTTON } from '../../app/buttons';
+import { ChipSelect } from '../../app/ChipSelect';
 import { Hint } from '../../app/Hint';
 import { JSON_RESUME_HINT, SAVE_JSON_RESUME_HINT } from '../../app/hints';
 import { LiveStatus } from '../../app/LiveStatus';
+import { MoreMenu } from '../../app/MoreMenu';
 import { ErrorBox } from '../../ui';
 
 export interface AnalysisCvPickerProps {
@@ -25,103 +26,95 @@ export interface AnalysisCvPickerProps {
   readonly warnings: readonly string[];
 }
 
-/** Analysis, step 1: which CV, an upload, the JSON Resume export, and what the read found. */
+/**
+ * The CV part of the line (L-446): "Check", the CV chip and its "…", which
+ * holds "Save as JSON Resume". One group, so the "…" never starts a line of
+ * its own: its list hangs leftwards from it, under the chip, and at the left
+ * edge of a phone it would be cut off.
+ */
 export function AnalysisCvPicker({
   cvs,
   cvsLoaded,
   selectedCvId,
   selectedCv,
   onPick,
-  onUpload,
   onSaveJsonResume,
   exporting,
   exportMessage,
-  uploadProblem,
-  warnings,
 }: AnalysisCvPickerProps) {
-  const saveJson = (
+  return (
+    <span className="flex max-w-full min-w-0 items-center gap-2">
+      <span className="text-ink-muted">Check</span>
+      <ChipSelect
+        id="analysis-cv"
+        name="Your CV"
+        testId="analysis-cv"
+        value={selectedCvId ?? ''}
+        options={cvs.map((cv) => ({ value: cv.id, label: cv.name }))}
+        empty={cvs.length > 0 ? undefined : cvsLoaded ? 'No CV uploaded yet' : 'Reading your CVs…'}
+        disabled={cvs.length === 0 || !cvsLoaded}
+        onChange={(id) => onPick(id === '' ? null : id)}
+      />
+      {/*
+        Disabled, never hidden, for a CV that came from a PDF or a .docx:
+        there is no JSON Resume to give back for those, and a control that
+        comes and goes is one the user cannot learn. The reason is the item's
+        "i" (L-387): a disabled button takes no focus and no tap.
+      */}
+      <MoreMenu
+        label="More for this CV"
+        testId="analysis-cv-more"
+        items={[
+          {
+            label: exporting ? 'Saving…' : 'Save as JSON Resume',
+            onSelect: onSaveJsonResume,
+            disabled: selectedCv === null || selectedCv.json_resume === null || exporting,
+            hint:
+              selectedCv !== null && selectedCv.json_resume === null
+                ? SAVE_JSON_RESUME_HINT
+                : undefined,
+            testId: 'analysis-save-json',
+          },
+        ]}
+      />
+      <LiveStatus text={exportMessage} />
+    </span>
+  );
+}
+
+/** "Upload a CV", quiet, at the end of the line. */
+export function AnalysisCvUpload({ onUpload }: Pick<AnalysisCvPickerProps, 'onUpload'>) {
+  return (
     <button
       type="button"
-      data-testid="analysis-save-json"
-      disabled={selectedCv === null || selectedCv.json_resume === null || exporting}
-      onClick={onSaveJsonResume}
-      className={SECONDARY_BUTTON}
+      data-testid="analysis-upload"
+      onClick={onUpload}
+      className={`${QUIET_BUTTON} ml-auto`}
     >
-      {exporting ? 'Saving…' : 'Save as JSON Resume'}
+      Upload a CV
     </button>
   );
+}
 
+/** Between the line and the box, only when there is one: what saving or reading a CV found. */
+export function AnalysisCvNotices({
+  exportMessage,
+  uploadProblem,
+  warnings,
+}: Pick<AnalysisCvPickerProps, 'exportMessage' | 'uploadProblem' | 'warnings'>) {
   return (
-    <div>
-      <label htmlFor="analysis-cv" className="block text-xs font-medium text-ink-muted">
-        Your CV
-      </label>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <select
-          id="analysis-cv"
-          data-testid="analysis-cv"
-          value={selectedCvId ?? ''}
-          disabled={cvs.length === 0 || !cvsLoaded}
-          onChange={(event) => {
-            const id = event.currentTarget.value;
-            onPick(id === '' ? null : id);
-          }}
-          className={`${FIELD} min-w-0 flex-1`}
-        >
-          {cvs.length > 0 ? null : (
-            <option value="">{cvsLoaded ? 'No CV uploaded yet' : 'Reading your CVs…'}</option>
-          )}
-          {cvs.map((cv) => (
-            <option key={cv.id} value={cv.id}>
-              {cv.name}
-            </option>
-          ))}
-        </select>
-
-        <button
-          type="button"
-          data-testid="analysis-upload"
-          onClick={onUpload}
-          className={SECONDARY_BUTTON}
-        >
-          Upload a CV
-        </button>
-
-        {/*
-          Disabled, never hidden, for a CV that came from a PDF or a
-          .docx: there is no JSON Resume to give back for those, and a
-          control that comes and goes is one the user cannot learn.
-          The reason is a Hint with an "i", not the render-function form:
-          a disabled button takes no focus and no tap (L-387).
-        */}
-        {selectedCv !== null && selectedCv.json_resume === null ? (
-          <Hint text={SAVE_JSON_RESUME_HINT}>{saveJson}</Hint>
-        ) : (
-          saveJson
-        )}
-      </div>
-
-      <p data-testid="analysis-cv-note" className="mt-1 text-xs text-ink-faint">
-        PDF, Word (.docx) or{' '}
-        <Hint text={JSON_RESUME_HINT}>
-          <span data-testid="json-resume-hint">JSON Resume</span>
-        </Hint>{' '}
-        (.json). The file is read on this computer. Its text only goes to an AI you choose, and only
-        when you ask it to read your CV.
-      </p>
-
-      <LiveStatus text={exportMessage} />
+    <>
       {exportMessage === null ? null : (
         <p
           data-testid="analysis-export-message"
-          className="mt-2 rounded-control bg-teal/10 px-3 py-2 break-all text-teal-ink"
+          className="rounded-control bg-teal/10 px-3 py-2 break-all text-teal-ink"
         >
           {exportMessage}
         </p>
       )}
 
       {uploadProblem === null ? null : (
-        <ErrorBox variant="box" gapAbove="mt-2" testId="analysis-upload-problem">
+        <ErrorBox variant="box" testId="analysis-upload-problem">
           {uploadProblem}
         </ErrorBox>
       )}
@@ -129,13 +122,27 @@ export function AnalysisCvPicker({
       {warnings.length === 0 ? null : (
         <ul
           data-testid="analysis-cv-warnings"
-          className="mt-2 space-y-1 rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
+          className="space-y-1 rounded-control bg-gold/10 px-3 py-2 text-gold-ink"
         >
           {warnings.map((warning) => (
             <li key={warning}>{warning}</li>
           ))}
         </ul>
       )}
-    </div>
+    </>
+  );
+}
+
+/** Under the box: what files are read, and where their text goes. */
+export function AnalysisCvNote() {
+  return (
+    <p data-testid="analysis-cv-note" className="text-xs text-ink-faint">
+      PDF, Word (.docx) or{' '}
+      <Hint text={JSON_RESUME_HINT}>
+        <span data-testid="json-resume-hint">JSON Resume</span>
+      </Hint>{' '}
+      (.json). The file is read on this computer. Its text only goes to an AI you choose, and only
+      when you ask it to read your CV.
+    </p>
   );
 }

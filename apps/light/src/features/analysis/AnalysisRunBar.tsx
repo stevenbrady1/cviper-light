@@ -11,41 +11,47 @@ export interface AnalysisRunBarProps {
   readonly elapsed: number;
 }
 
-/** Analysis, step 4: the check button and what a run is doing. */
+/** The right of the box's bar (L-446): why the check cannot run, then the button. */
 export function AnalysisRunBar({
   running,
   disabledReason,
   onRun,
-  progressText,
-  elapsed,
-}: AnalysisRunBarProps) {
+}: Pick<AnalysisRunBarProps, 'running' | 'disabledReason' | 'onRun'>) {
   return (
     <>
-      <div className="flex items-center gap-3">
-        {/*
-          The view's ONE blue button. Disabled, never hidden — and the
-          reason is right next to it, because a grey button that says
-          nothing is where a user's session ends.
-        */}
-        <button
-          type="button"
-          data-testid="analysis-run"
-          data-primary="true"
-          disabled={disabledReason !== null}
-          aria-describedby={disabledReason === null ? undefined : 'analysis-run-reason'}
-          onClick={onRun}
-          className={PRIMARY_BUTTON}
-        >
-          {running ? 'Checking…' : 'Check this CV'}
-        </button>
+      {disabledReason === null ? null : (
+        <p id="analysis-run-reason" data-testid="analysis-run-reason" className="text-ink-muted">
+          {disabledReason}
+        </p>
+      )}
 
-        {disabledReason === null ? null : (
-          <p id="analysis-run-reason" data-testid="analysis-run-reason" className="text-ink-muted">
-            {disabledReason}
-          </p>
-        )}
-      </div>
+      {/*
+        The view's ONE blue button. Disabled, never hidden — and the
+        reason is right next to it, because a grey button that says
+        nothing is where a user's session ends.
+      */}
+      <button
+        type="button"
+        data-testid="analysis-run"
+        data-primary="true"
+        disabled={disabledReason !== null}
+        aria-describedby={disabledReason === null ? undefined : 'analysis-run-reason'}
+        onClick={onRun}
+        className={PRIMARY_BUTTON}
+      >
+        {running ? 'Checking…' : 'Check this CV'}
+      </button>
+    </>
+  );
+}
 
+/** First under the box: what a run is doing, while it runs, with its seconds. */
+export function AnalysisRunStatus({
+  progressText,
+  elapsed,
+}: Pick<AnalysisRunBarProps, 'progressText' | 'elapsed'>) {
+  return (
+    <>
       <LiveStatus text={progressText} />
       {progressText === null ? null : (
         <p
