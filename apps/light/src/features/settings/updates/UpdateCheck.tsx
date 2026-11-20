@@ -92,7 +92,7 @@ export function UpdateCheck({ port, version }: UpdateCheckProps = {}) {
 
   return (
     <section>
-      <SectionHeading icon="refresh" title="Updates" />
+      <SectionHeading title="Updates" />
 
       <p data-testid="settings-update-note" className="mt-1 text-ink-muted">
         {updateCheckNote(checksOnLaunch)}

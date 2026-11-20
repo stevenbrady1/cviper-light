@@ -2,10 +2,13 @@
  * The Settings section icons' accent (L-256): its own token, declared once,
  * and at least 3:1 (WCAG 1.4.11) against every tile it is drawn on.
  *
- * The icons sit in `SectionHeading`'s small tile: `bg-navy/10` (or
- * `bg-danger/10` for Delete everything) over the page canvas or a card. The
- * accent is the one stroke the text-contrast check cannot see, so it is
- * measured here against each of those composited backgrounds. The owner's
+ * The icons used to sit in `SectionHeading`'s small tile. Since L-440 the
+ * Settings headings draw no tile and no icon, so this accent is now drawn only
+ * where `Icon` and `IconTile` still reach these drawings. It stays held to the
+ * same tiles — `bg-navy/10` or `bg-danger/10` over the page canvas or a card —
+ * so any tile that draws one again still clears 3:1. The accent is the one
+ * stroke the text-contrast check cannot see, so it is measured here against
+ * each of those composited backgrounds. The owner's
  * first choice, #17a2b8, measured 2.35-2.62:1; on 2026-10-16 the owner chose
  * #148da0, the same hue darkened to clear 3:1 on all four.
  */

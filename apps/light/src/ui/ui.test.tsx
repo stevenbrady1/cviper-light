@@ -332,6 +332,20 @@ describe('title ladder (L-382, L-405)', () => {
     }
   });
 
+  /*
+   * L-440: a section heading stands alone, like the page title (L-431). The
+   * small tile beside it was the same template tell one level down.
+   */
+  it('a section heading draws no tile, whatever it is given (L-440)', () => {
+    // The props the heading used to take, passed the only way the type still allows.
+    const legacy = { icon: 'trash', tone: 'danger' } as object;
+    const { container } = render(<SectionHeading title="Delete everything" {...legacy} />);
+    expect(container.querySelector('svg')).toBeNull();
+    expect(container.querySelector('[aria-hidden="true"]')).toBeNull();
+    expect(container.querySelector('.rounded-control')).toBeNull();
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Delete everything');
+  });
+
   it('negative: a search result card title stays in the body font', () => {
     render(
       <ResultCard

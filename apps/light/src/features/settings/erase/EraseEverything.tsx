@@ -87,7 +87,7 @@ export function EraseEverything({ port, backupPort, onErased }: EraseEverythingP
 
   return (
     <section data-testid="settings-erase-section">
-      <SectionHeading icon="trash" tone="danger" title="Delete everything" />
+      <SectionHeading title="Delete everything" />
       <p className="mt-1 text-ink-muted">
         Removes every trace of CViper Light from this computer except the program itself: the
         database, every API key it saved, and every preference. There is no account to close because

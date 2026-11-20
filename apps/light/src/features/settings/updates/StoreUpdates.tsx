@@ -46,7 +46,7 @@ export interface StoreUpdatesProps {
 export function StoreUpdates({ os, version }: StoreUpdatesProps) {
   return (
     <section>
-      <SectionHeading icon="refresh" title="Updates" />
+      <SectionHeading title="Updates" />
 
       <p data-testid="settings-store-updates" className="mt-1 text-ink-muted">
         On this device, updates come from {STORE_NAME[os]}. CViper Light does not check for them

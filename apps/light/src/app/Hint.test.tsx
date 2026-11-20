@@ -307,3 +307,81 @@ describe('Hint', () => {
     expect(tip().hidden).toBe(false);
   });
 });
+
+// L-439: a menu item's hint opens to its right, so it never covers the next item.
+describe('Hint side="right"', () => {
+  /** A 1000×700 window, a mark of the given box and a 200×40 tip, sizes faked as above. */
+  function place(mark: { top: number; bottom: number }, side?: 'right'): HTMLElement {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1000 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 700 });
+    render(
+      <Hint text="Keyboard shortcut: hold Ctrl and press 1 to open Tracker." side={side}>
+        {(trigger) => (
+          <button type="button" {...trigger}>
+            Tracker
+          </button>
+        )}
+      </Hint>,
+    );
+    const button = screen.getByRole('button', { name: 'Tracker' });
+    button.getBoundingClientRect = () =>
+      ({
+        left: 10,
+        right: 232,
+        top: mark.top,
+        bottom: mark.bottom,
+        width: 222,
+        height: mark.bottom - mark.top,
+      }) as DOMRect;
+    tip().getBoundingClientRect = () =>
+      ({ left: 0, right: 200, top: 0, bottom: 40, width: 200, height: 40 }) as DOMRect;
+    fireEvent.mouseEnter(button);
+    return button;
+  }
+
+  it('happy: the tip starts 6px right of the mark, centred on it', () => {
+    place({ top: 100, bottom: 136 }, 'right');
+    expect(tip().hidden).toBe(false);
+    expect(Number.parseFloat(tip().style.left)).toBe(232 + 6);
+    // The mark's middle is 118; a 40px tip centred on it starts at 98.
+    expect(Number.parseFloat(tip().style.top)).toBe(98);
+  });
+
+  it('negative: with no side the tip still opens below the mark, centred across it', () => {
+    place({ top: 100, bottom: 136 });
+    expect(Number.parseFloat(tip().style.top)).toBe(136 + 6);
+    expect(Number.parseFloat(tip().style.left)).toBe(10 + 222 / 2 - 200 / 2);
+  });
+
+  it('boundary: a mark at the bottom of the window keeps the tip 8px inside it', () => {
+    place({ top: 670, bottom: 700 }, 'right');
+    const top = Number.parseFloat(tip().style.top);
+    expect(top + 40).toBe(700 - 8);
+    expect(Number.parseFloat(tip().style.left)).toBe(238);
+  });
+
+  it('boundary: a mark at the top of the window keeps the tip 8px inside it', () => {
+    place({ top: 0, bottom: 10 }, 'right');
+    expect(Number.parseFloat(tip().style.top)).toBe(8);
+  });
+
+  it('interaction: hover shows it and leaving hides it', () => {
+    const button = place({ top: 100, bottom: 136 }, 'right');
+    expect(tip().hidden).toBe(false);
+    fireEvent.mouseLeave(button);
+    expect(tip().hidden).toBe(true);
+  });
+
+  it('interaction: keyboard focus shows it and Escape hides it, leaving focus on the item', async () => {
+    const user = userEvent.setup();
+    const button = place({ top: 100, bottom: 136 }, 'right');
+    fireEvent.mouseLeave(button);
+    await user.tab();
+    expect(document.activeElement).toBe(button);
+    expect(tip().hidden).toBe(false);
+    expect(Number.parseFloat(tip().style.left)).toBe(238);
+    await user.keyboard('{Escape}');
+    expect(tip().hidden).toBe(true);
+    expect(document.activeElement).toBe(button);
+  });
+});
