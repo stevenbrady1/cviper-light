@@ -8376,3 +8376,134 @@ describe('Search boxes are one height, and "Where to look" draws its own mark (L
     await page.context().close();
   });
 });
+
+/**
+ * An empty column's hint, and an age line that wraps (L-441).
+ *
+ * The board's own ages all read "Changed today", which fits any card, so each
+ * card's age is given a long one in the real format, the kind a job left alone
+ * for years would show. At 1000×700 a column is at its 136px floor and a card
+ * has about 94px for text: the words must wrap inside the card, the number on
+ * one line. `?entries=1` leaves Offer and Rejected empty, so their hints show.
+ */
+const LONG_AGE = '1000 days since last change';
+
+async function ageProblems(page: Page, age: string): Promise<string[]> {
+  return page.evaluate((words) => {
+    const problems: string[] = [];
+    const lines = document.querySelectorAll<HTMLElement>('[data-testid^="tracker-card-age-"]');
+    if (lines.length === 0) problems.push('no age lines drawn');
+    for (const line of lines) {
+      line.textContent = words;
+      const card = line.closest('li');
+      const id = line.dataset.testid ?? '';
+      if (card === null) {
+        problems.push(`${id}: not in a card`);
+        continue;
+      }
+      const box = line.getBoundingClientRect();
+      const frame = card.getBoundingClientRect();
+      if (
+        box.width === 0 ||
+        box.left < frame.left ||
+        box.right > frame.right ||
+        box.top < frame.top ||
+        box.bottom > frame.bottom
+      ) {
+        problems.push(`${id}: the age is not wholly inside the card`);
+      }
+      if (line.scrollWidth > line.clientWidth) {
+        problems.push(`${id}: ${String(line.scrollWidth - line.clientWidth)}px of the age is cut`);
+      }
+      // The number is the first word: one line of glyphs, never split.
+      const text = line.firstChild;
+      if (text !== null) {
+        const range = document.createRange();
+        range.setStart(text, 0);
+        range.setEnd(text, words.indexOf(' '));
+        const rows = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+        if (rows.size !== 1)
+          problems.push(`${id}: the number is split over ${String(rows.size)} lines`);
+      }
+    }
+    return problems;
+  }, age);
+}
+
+async function hintContrast(page: Page): Promise<ContrastReport> {
+  await page.addScriptTag({ path: AXE_SOURCE });
+  return page.evaluate(async () => {
+    const axe = (window as unknown as { axe: typeof axeCore }).axe;
+    const result = await axe.run(
+      { include: [['[data-testid^="tracker-hint-"]']] },
+      {
+        runOnly: { type: 'rule', values: ['color-contrast'] },
+        resultTypes: ['violations', 'incomplete', 'passes'],
+      },
+    );
+    const failures = result.violations.flatMap((v) =>
+      v.nodes.map((n) => `${n.target.join(' ')} — ${n.failureSummary ?? v.help}`),
+    );
+    const checked = result.passes.reduce((sum, p) => sum + p.nodes.length, 0);
+    const incomplete = result.incomplete.reduce((sum, p) => sum + p.nodes.length, 0);
+    return { checked, failures, incomplete };
+  });
+}
+
+describe('an empty column says what goes there, and the age wraps (L-441)', () => {
+  it('at 1000×700 the full age words are on screen inside the card, the number whole', async () => {
+    const page = await openBoard('1', 1000, 700);
+    const problems = await ageProblems(page, LONG_AGE);
+    const rows = await page.evaluate(() => {
+      const line = document.querySelector<HTMLElement>('[data-testid^="tracker-card-age-"]');
+      if (line === null) return 0;
+      const height = parseFloat(getComputedStyle(line).lineHeight);
+      return Math.round(line.getBoundingClientRect().height / height);
+    });
+    console.log(`age line at 1000px: ${String(rows)} lines, problems ${JSON.stringify(problems)}`);
+    assert.deepEqual(problems, []);
+    await page.context().close();
+  });
+
+  it('the check can fail: the age cut short with `truncate`, put back, is reported', async () => {
+    const page = await openBoard('1', 1000, 700);
+    await page.evaluate(() => {
+      for (const line of document.querySelectorAll('[data-testid^="tracker-card-age-"]')) {
+        line.classList.remove('break-words');
+        line.classList.add('truncate');
+      }
+    });
+    const problems = await ageProblems(page, LONG_AGE);
+    assert.ok(
+      problems.some((line) => line.includes('of the age is cut')),
+      `the cut age was not reported: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+
+  it('the empty columns’ hints are measured by the colour-contrast pass', async () => {
+    const page = await openBoard('1', 1000, 700);
+    const shown = await page.locator('[data-testid^="tracker-hint-"]:visible').count();
+    assert.equal(shown, 2, `${String(shown)} hints on screen, not 2 (Offer and Rejected)`);
+    const report = await hintContrast(page);
+    console.log(`column hints: ${JSON.stringify(report)}`);
+    assert.ok(report.checked >= 2, `only ${String(report.checked)} hints measured`);
+    assert.deepEqual(report.failures, [], 'a column hint is below WCAG AA contrast');
+    await page.context().close();
+  });
+
+  it('the check can fail: a hint painted too pale is reported', async () => {
+    const page = await openBoard('1', 1000, 700);
+    await page.evaluate(() => {
+      const hint = document.querySelector<HTMLElement>('[data-testid="tracker-hint-rejected"]');
+      if (hint === null) throw new Error('no Rejected hint');
+      hint.style.color = '#c0c0c0';
+    });
+    const report = await hintContrast(page);
+    assert.ok(
+      report.failures.length > 0,
+      `the pale hint was not flagged: ${JSON.stringify(report.failures)}`,
+    );
+    await page.context().close();
+  });
+});

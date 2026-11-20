@@ -101,3 +101,24 @@ describe('the age line on a Tracker card (L-318)', () => {
     expect(age.textContent).toBe('Last change unknown');
   });
 });
+
+describe('the age line wraps, never cut short (L-441)', () => {
+  // jsdom does no layout, so this pins the classes; `contrast-webkit.spec.ts`
+  // measures a long age wrapping inside a card at 1000×700 in a real engine.
+  it('has no `truncate`, and breaks words instead', () => {
+    const { age } = renderCard(daysAgo(30));
+    const classes = age.className.split(' ');
+
+    expect(age.textContent).toBe('30 days since last change');
+    expect(classes).not.toContain('truncate');
+    expect(classes).toContain('break-words');
+  });
+
+  it('boundary: a four-figure age still reads whole, number first', () => {
+    const { card, age } = renderCard(daysAgo(1000));
+
+    expect(age.textContent).toBe('1000 days since last change');
+    expect(age.className.split(' ')).not.toContain('truncate');
+    expect(card.getAttribute('aria-label')).toContain('1000 days since last change');
+  });
+});
