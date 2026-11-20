@@ -201,6 +201,116 @@ describe('MoreMenu', () => {
     expect(screen.getByRole('button', { name: 'More formats' })).toBe(word);
   });
 
+  describe('a disabled item may say why, with an "i" (L-442)', () => {
+    const REASON = 'Only a CV that arrived as a JSON Resume can be saved as one.';
+
+    it('happy: a disabled item with a hint has an "i" whose words are the hint', async () => {
+      const user = userEvent.setup();
+      render(
+        <MoreMenu
+          label="More for this CV"
+          items={[
+            {
+              label: 'Save as JSON Resume',
+              onSelect: vi.fn(),
+              disabled: true,
+              hint: REASON,
+              testId: 'item-off',
+            },
+            { label: 'Second thing', onSelect: vi.fn(), testId: 'item-second' },
+          ]}
+        />,
+      );
+      await user.click(trigger('More for this CV'));
+
+      const off = screen.getByTestId<HTMLButtonElement>('item-off');
+      expect(off.disabled).toBe(true);
+      const info = screen.getByRole('button', { name: 'What this means' });
+      const tip = document.getElementById(info.getAttribute('aria-describedby') ?? '');
+      expect(tip?.textContent).toBe(REASON);
+      // The "i" belongs to the disabled item, not to another one.
+      expect(off.parentElement?.contains(info)).toBe(true);
+    });
+
+    it('negative: an item with no hint draws no "i", disabled or not', async () => {
+      const user = userEvent.setup();
+      render(
+        <MoreMenu
+          label="More for this CV"
+          items={[
+            { label: 'Cannot do this now', onSelect: vi.fn(), disabled: true, testId: 'item-off' },
+            { label: 'Second thing', onSelect: vi.fn(), testId: 'item-second' },
+          ]}
+        />,
+      );
+      await user.click(trigger('More for this CV'));
+
+      expect(screen.getByTestId('item-off')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'What this means' })).toBeNull();
+      expect(screen.queryByTestId('hint')).toBeNull();
+    });
+
+    it('negative: a hint on an item that can be pressed draws no "i", and the item still runs', async () => {
+      const user = userEvent.setup();
+      const onFirst = vi.fn();
+      render(
+        <MoreMenu
+          label="More for this CV"
+          items={[
+            { label: 'Save as JSON Resume', onSelect: onFirst, hint: REASON, testId: 'item-on' },
+          ]}
+        />,
+      );
+      await user.click(trigger('More for this CV'));
+
+      expect(screen.queryByRole('button', { name: 'What this means' })).toBeNull();
+      await user.click(screen.getByTestId('item-on'));
+      expect(onFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it('boundary: with only a disabled item, focus stays on the "…", Tab reaches the "i", and Escape closes and returns focus', async () => {
+      const user = userEvent.setup();
+      const onOnly = vi.fn();
+      render(
+        <MoreMenu
+          label="More for this CV"
+          items={[
+            {
+              label: 'Save as JSON Resume',
+              onSelect: onOnly,
+              disabled: true,
+              hint: REASON,
+              testId: 'item-off',
+            },
+          ]}
+        />,
+      );
+      await user.click(trigger('More for this CV'));
+
+      expect(trigger('More for this CV').getAttribute('aria-expanded')).toBe('true');
+      expect(document.activeElement).toBe(trigger('More for this CV'));
+
+      await user.tab();
+      const info = screen.getByRole('button', { name: 'What this means' });
+      expect(document.activeElement).toBe(info);
+      // Still open: the "i" is inside the list.
+      expect(screen.getByTestId('item-off')).toBeTruthy();
+      const tip = document.getElementById(info.getAttribute('aria-describedby') ?? '');
+      expect(tip?.hidden).toBe(false);
+
+      // The first Escape shuts the tip the focus opened (the Hint's own rule),
+      // the next one closes the list and puts focus back on the "…".
+      await user.keyboard('{Escape}');
+      expect(tip?.hidden).toBe(true);
+      expect(screen.getByTestId('item-off')).toBeTruthy();
+      await user.keyboard('{Escape}');
+
+      expect(screen.queryByTestId('item-off')).toBeNull();
+      expect(document.activeElement).toBe(trigger('More for this CV'));
+      expect(onOnly).not.toHaveBeenCalled();
+    });
+  });
+
   it('has no axe problems with the list open, and makes no pop-up window', async () => {
     const user = userEvent.setup();
     const { container } = render(<MoreMenu label="More actions: A job" items={items()} />);

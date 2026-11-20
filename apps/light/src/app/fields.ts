@@ -31,3 +31,31 @@ export const FIELD_INVALID = 'rounded-control border border-danger bg-card px-2.
  */
 export const FIELD_COMPACT =
   'rounded-control border border-field-line bg-card px-2.5 py-1 text-ink';
+
+/**
+ * A real drop-down drawn as a chip, inside a sentence of choices (L-442):
+ * "Check [Your CV] using [Ollama]". `app/ChipSelect.tsx` wears it. The browser's
+ * own look is switched off (`appearance-none`), so the chip is the grey fill,
+ * the field edge (3:1, L-212) and a drawn chevron, which needs the room on the
+ * right. `field-sizing-content` makes it as wide as the chosen item, not the
+ * longest one, where the browser supports it. Disabled is greyed, never hidden.
+ */
+export const FIELD_CHIP =
+  'appearance-none field-sizing-content rounded-control border border-field-line bg-sunken py-1.5 pr-8 pl-3 text-ink disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-faint';
+
+/**
+ * The big text box of the composer (L-442): the top half of one box whose
+ * bottom half is COMPOSER_BAR. The field edge on top, left and right, round top
+ * corners, and roomy padding. The screen writes the `<textarea>` itself, so
+ * the field-edge check can read its className.
+ */
+export const COMPOSER_EDITOR =
+  'rounded-t-card border-x border-t border-field-line bg-card px-3.5 py-3 text-ink';
+
+/**
+ * The bar under the composer's text box (L-442), holding the main button: the
+ * field edge on left, right and bottom, round bottom corners, and a hairline
+ * in the divider colour between it and the text box above.
+ */
+export const COMPOSER_BAR =
+  'rounded-b-card border border-field-line border-t-line bg-card px-3 py-2.5';

@@ -10,6 +10,8 @@
  *   1. any hex colour literal                     `#0f2044`
  *   2. any arbitrary radius or elevation          `rounded-[10px]`, `shadow-[...]`
  *   3. any radius outside the three in `@theme`   `rounded-lg`, bare `rounded`
+ *      (on one side or corner too: `rounded-t-card` is allowed, `rounded-t-lg`
+ *      is not — L-442)
  *   4. any elevation outside the two in `@theme`  `shadow-sm`, `shadow-2xl`
  *   5. any of Tailwind's numeric colour scales    `bg-slate-700`, `text-blue-500`
  *
@@ -53,6 +55,24 @@ const SRC = fileURLToPath(new URL('..', import.meta.url));
 
 /** The only three radii that exist. See `--radius-*` in theme.css. */
 const ALLOWED_RADII = ['control', 'card', 'pill'];
+
+/**
+ * The sides and corners one of those radii may be given on (L-442). A box made
+ * of two parts (a text box with a bar under it) rounds the top of one and the
+ * bottom of the other. The corner is still one of the three: no new radius.
+ */
+const RADIUS_SIDES = ['t', 'r', 'b', 'l', 's', 'e', 'tl', 'tr', 'br', 'bl', 'ss', 'se', 'es', 'ee'];
+
+/** `card`, or `t-card`: one of the three radii, on the whole box or on one side. */
+function allowedRadius(suffix: string): boolean {
+  if (ALLOWED_RADII.includes(suffix)) return true;
+  const dash = suffix.indexOf('-');
+  return (
+    dash > 0 &&
+    RADIUS_SIDES.includes(suffix.slice(0, dash)) &&
+    ALLOWED_RADII.includes(suffix.slice(dash + 1))
+  );
+}
 
 /** The only two elevations that exist. See `--shadow-*` in theme.css. */
 const ALLOWED_SHADOWS = ['raised', 'overlay'];
@@ -114,7 +134,7 @@ const RULES: ReadonlyArray<{ rule: string; pattern: RegExp; offends: (match: str
     {
       rule: `radius outside the three tokens (${ALLOWED_RADII.join(', ')})`,
       pattern: /(?<![\w\-/])rounded(-[a-z0-9-]+)?(?![\w-])/g,
-      offends: (match) => !ALLOWED_RADII.includes(match.slice('rounded-'.length)),
+      offends: (match) => !allowedRadius(match.slice('rounded-'.length)),
     },
     {
       rule: `elevation outside the two tokens (${ALLOWED_SHADOWS.join(', ')})`,
@@ -185,6 +205,12 @@ describe('token contract — the rules can actually fail', () => {
     ['bare shadow', 'const c = <div className="shadow p-2" />;'],
     ['numeric colour scale', 'const c = <div className="bg-slate-700" />;'],
     ['numeric colour scale on text', 'const c = <div className="hover:text-blue-500" />;'],
+    // L-442: a side or corner may take one of the three radii, and nothing else.
+    ['fourth radius on one side', 'const c = <div className="rounded-t-lg" />;'],
+    ['fourth radius on one corner', 'const c = <div className="rounded-bl-xl" />;'],
+    ['arbitrary radius on one side', 'const c = <div className="rounded-t-[10px]" />;'],
+    ['bare one-side radius', 'const c = <div className="rounded-t border" />;'],
+    ['made-up side', 'const c = <div className="rounded-x-card" />;'],
   ];
 
   it.each(violations)('catches a %s', (_name, source) => {
@@ -197,6 +223,19 @@ describe('token contract — the rules can actually fail', () => {
         <div className="rounded-card bg-card shadow-raised border border-line text-ink-muted">
           <span className="rounded-pill bg-teal/10 text-teal">saved</span>
           <button className="rounded-control bg-blue text-ink-inverse shadow-overlay">Add</button>
+        </div>
+      );
+    `;
+    expect(findOffences(clean)).toEqual([]);
+  });
+
+  it('accepts the three radii on one side or corner, which a box of two parts needs (L-442)', () => {
+    const clean = `
+      const Box = () => (
+        <div>
+          <textarea className="rounded-t-card border-x border-t" />
+          <div className="rounded-b-card border-x border-b" />
+          <span className="rounded-l-pill rounded-tr-control rounded-ee-card md:rounded-s-control" />
         </div>
       );
     `;
