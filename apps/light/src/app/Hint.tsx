@@ -35,7 +35,9 @@
  * The tip is drawn in a portal with fixed positioning, below the mark (above
  * it when there is no room), and kept 8px inside the window at both sides —
  * so a hint on the last column of a table on a 375px phone does not run off
- * the screen.
+ * the screen. `side="right"` opens it beside the mark instead, level with it
+ * and kept 8px inside the window's top and bottom: the side menu's hints, so
+ * a tip never covers the next menu item (L-439).
  *
  * ============================================================================
  * WHY A TAP DOES NOT SHUT WHAT IT JUST OPENED
@@ -99,6 +101,8 @@ export interface HintProps {
    * where a Tab stop on every card would only slow a keyboard user down.
    */
   readonly focusable?: boolean | undefined;
+  /** Where the tip opens: `below` the mark (the default), or to its `right` (the side menu). */
+  readonly side?: 'below' | 'right' | undefined;
 }
 
 /** Space kept between the tip and the edge of the window, and the mark. */
@@ -108,7 +112,14 @@ const GAP = 6;
 /** Shown by a hover or focus, pinned by a click; `null` when hidden. */
 type Shown = 'shown' | 'pinned' | null;
 
-export function Hint({ text, children, className, label, focusable = true }: HintProps) {
+export function Hint({
+  text,
+  children,
+  className,
+  label,
+  focusable = true,
+  side = 'below',
+}: HintProps) {
   const id = useId();
   const [shown, setShown] = useState<Shown>(null);
   const open = shown !== null;
@@ -122,12 +133,20 @@ export function Hint({ text, children, className, label, focusable = true }: Hin
     const box = tip.current.getBoundingClientRect();
     const width = window.innerWidth;
     const height = window.innerHeight;
+    if (side === 'right') {
+      const level = mark.top + mark.height / 2 - box.height / 2;
+      setPlace({
+        top: Math.max(EDGE, Math.min(level, height - box.height - EDGE)),
+        left: mark.right + GAP,
+      });
+      return;
+    }
     const centred = mark.left + mark.width / 2 - box.width / 2;
     const left = Math.max(EDGE, Math.min(centred, width - box.width - EDGE));
     const below = mark.bottom + GAP;
     const top = below + box.height > height - EDGE ? mark.top - box.height - GAP : below;
     setPlace({ top: Math.max(EDGE, top), left });
-  }, [open]);
+  }, [open, side]);
 
   const show = useCallback(() => setShown((was) => was ?? 'shown'), []);
   const hide = useCallback(() => setShown(null), []);

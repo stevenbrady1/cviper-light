@@ -42,7 +42,8 @@ function NavButton({ view, active, onSelect }: NavButtonProps) {
     return <NavButtonBody view={view} active={active} onSelect={onSelect} />;
   }
   return (
-    <Hint text={shortcutHint(view.label, String(view.shortcut))}>
+    // To the right, so the tip never covers the next menu item (L-439).
+    <Hint text={shortcutHint(view.label, String(view.shortcut))} side="right">
       {(trigger) => (
         <NavButtonBody view={view} active={active} onSelect={onSelect} trigger={trigger} />
       )}
