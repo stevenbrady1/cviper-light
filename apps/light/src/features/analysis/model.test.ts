@@ -19,11 +19,12 @@ import {
   jobAdvertText,
   newAnalysisRecord,
   newCvRecord,
+  progressSentence,
   providerLabel,
   runDisabledReason,
   type RunState,
 } from './model';
-import { KEYWORD_KEY, providerOptions } from './providers';
+import { KEYWORD_KEY, providerOptions, type ProviderOption } from './providers';
 
 const NOW = '2026-08-19T09:00:00.000Z';
 
@@ -311,6 +312,41 @@ describe('runDisabledReason — the count of what could be read (L-344)', () => 
     expect(reasonFor('')).toBe(
       'That CV has no readable text, so there is nothing to compare. It is almost certainly a ' +
         'scan or a photo — upload the original .docx, or a PDF you exported from Word.',
+    );
+  });
+});
+
+describe('progressSentence: what a run says while it works (L-443)', () => {
+  // One copy for Analysis and Tailor. Privacy-near wording: exact matches only.
+  const option = (kind: ProviderOption['kind'], local: boolean, model: string): ProviderOption => ({
+    key: `${kind}:${model}`,
+    kind,
+    label: kind,
+    note: '',
+    model,
+    local,
+    needsKey: !local,
+  });
+
+  it('happy: a local model runs on this machine and sends nothing, word for word', () => {
+    expect(progressSentence(option('ollama', true, 'llama3.2:latest'))).toBe(
+      'Asking llama3.2:latest on this machine. The first run after starting your PC loads the ' +
+        'model into memory, which takes 5 to 30 seconds. Nothing is being sent anywhere.',
+    );
+  });
+
+  it('negative: a company AI is named, and is never said to be on this machine', () => {
+    const sentence = progressSentence(option('anthropic', false, 'claude-x'));
+    expect(sentence).toBe(
+      'Sending your CV and the advert to Anthropic. This usually takes a few seconds.',
+    );
+    expect(sentence).not.toContain('on this machine');
+    expect(sentence).not.toContain('Nothing is being sent');
+  });
+
+  it('boundary: a custom service gets its own wording, as providerInSentence gives it', () => {
+    expect(progressSentence(option('custom', false, 'my-model'))).toBe(
+      'Sending your CV and the advert to your AI service. This usually takes a few seconds.',
     );
   });
 });
