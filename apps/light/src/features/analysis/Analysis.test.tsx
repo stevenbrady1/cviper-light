@@ -723,3 +723,209 @@ describe('while the CV list is still being read', () => {
     expect(picker.textContent).toContain('No CV uploaded yet');
   });
 });
+
+/**
+ * L-446 — one line of choices, and the advert box as the hero. "Check [CV] […]
+ * using [AI]" and a quiet "Upload a CV" on one line; the advert box under it,
+ * with the tracked-job chip and "Check this CV" in the box's bar; the AI's note
+ * and the CV sentence under the box. The drop-downs keep their words as hidden
+ * names.
+ */
+describe('one line of choices, and the advert box as the hero (L-446)', () => {
+  const SECOND_CV: Cv = { ...EXISTING_CV, id: 'cv-2', name: 'Second CV.docx' };
+  const SAVE_WORDS = 'Only a CV that arrived as a JSON Resume can be saved as one.';
+
+  /** `a` comes before `b` in the page. */
+  function expectBefore(a: Element, b: Element): void {
+    expect(
+      a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING,
+      `${a.textContent ?? ''} before ${b.textContent ?? ''}`,
+    ).toBeTruthy();
+  }
+
+  function sentence(): HTMLElement {
+    const row = screen.getByTestId('analysis-cv').closest<HTMLElement>('[data-slot="sentence"]');
+    if (row === null) throw new Error('the CV chip is not in the sentence row');
+    return row;
+  }
+
+  function bar(): HTMLElement {
+    return screen.getByTestId('composer-bar');
+  }
+
+  it('happy: the line reads "Check", the CV chip, "…", "using", the AI chip, then Upload a CV', async () => {
+    await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
+
+    const row = sentence();
+    const order = [
+      within(row).getByText('Check'),
+      screen.getByTestId('analysis-cv'),
+      screen.getByTestId('analysis-cv-more'),
+      within(row).getByText('using'),
+      screen.getByTestId('analysis-provider'),
+      screen.getByTestId('analysis-upload'),
+    ];
+    for (const part of order) expect(row.contains(part)).toBe(true);
+    for (let i = 1; i < order.length; i += 1) expectBefore(order[i - 1]!, order[i]!);
+    // Upload a CV is quiet now: the bordered things on the line are the chips.
+    expect(screen.getByTestId('analysis-upload').classList.contains('border')).toBe(false);
+  });
+
+  it('happy: each control keeps its words as a spoken name, and none is shown as a label', async () => {
+    await renderView({
+      port: createFakeAnalysisPort({ cvs: [EXISTING_CV], jobs: [TRACKED_JOB] }),
+    });
+    await screen.findByTestId('analysis-job-pick');
+
+    const named: [string, string, string][] = [
+      ['combobox', 'Your CV', 'analysis-cv'],
+      ['combobox', 'How to check it', 'analysis-provider'],
+      ['textbox', 'The job advert', 'analysis-job-text'],
+      ['combobox', 'Or use one you are already tracking', 'analysis-job-pick'],
+      ['button', 'More for this CV', 'analysis-cv-more'],
+    ];
+    for (const [role, name, testId] of named) {
+      expect(screen.getByRole(role, { name }), name).toBe(screen.getByTestId(testId));
+    }
+    const composer = sentence().parentElement!;
+    for (const label of composer.querySelectorAll('label')) {
+      expect(label.classList.contains('sr-only'), label.textContent ?? '').toBe(true);
+    }
+    // The tracked-job chip says its name when nothing is chosen; the old words are gone.
+    const pick = screen.getByTestId<HTMLSelectElement>('analysis-job-pick');
+    expect(pick.options[0]?.textContent).toBe('Or use one you are already tracking');
+    expect(screen.queryByText('Choose a tracked job…')).toBeNull();
+  });
+
+  it('happy: "Check this CV" and its reason sit in the box’s bar, the reason first, one primary on screen', async () => {
+    await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('analysis-run-reason').textContent).toBe('Paste the job advert.'),
+    );
+
+    const run = screen.getByTestId('analysis-run');
+    const reason = screen.getByTestId('analysis-run-reason');
+    expect(bar().contains(run)).toBe(true);
+    expect(bar().contains(reason)).toBe(true);
+    expectBefore(reason, run);
+    // The box is the text box and its bar, one under the other.
+    expect(screen.getByTestId('analysis-job-text').nextElementSibling).toBe(bar());
+    expect(document.querySelectorAll('[data-primary="true"]')).toHaveLength(1);
+  });
+
+  it('interaction: choosing another CV in the chip clears the old result', async () => {
+    const user = userEvent.setup();
+    await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV, SECOND_CV] }) });
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
+    await user.type(screen.getByTestId('analysis-job-text'), ADVERT);
+    await user.click(screen.getByTestId('analysis-run'));
+    await screen.findByTestId('analysis-result');
+
+    const chip = screen.getByRole('combobox', { name: 'Your CV' });
+    expect(sentence().contains(chip)).toBe(true);
+    await user.selectOptions(chip, 'cv-2');
+
+    expect(screen.queryByTestId('analysis-result')).toBeNull();
+    expect(screen.getByTestId('analysis-empty')).toBeTruthy();
+  });
+
+  it('interaction: "Save as JSON Resume" waits behind the "…", and opens with it', async () => {
+    const user = userEvent.setup();
+    await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
+
+    const more = screen.getByTestId('analysis-cv-more');
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByTestId('analysis-save-json')).toBeNull();
+
+    await user.click(more);
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByTestId('analysis-save-json').textContent).toBe('Save as JSON Resume');
+  });
+
+  it('interaction: choosing a tracked job from the chip in the bar fills the box', async () => {
+    const user = userEvent.setup();
+    await renderView({
+      port: createFakeAnalysisPort({ cvs: [EXISTING_CV], jobs: [TRACKED_JOB] }),
+    });
+
+    const pick = await screen.findByTestId('analysis-job-pick');
+    expect(bar().contains(pick)).toBe(true);
+    await user.selectOptions(pick, 'job-1');
+
+    expect(screen.getByTestId<HTMLTextAreaElement>('analysis-job-text').value).toContain(
+      'Credit Risk Analyst',
+    );
+  });
+
+  it('negative: no CV, so the CV chip is greyed and says so, and the button says why beside it', async () => {
+    await renderView();
+
+    const chip = screen.getByRole<HTMLSelectElement>('combobox', { name: 'Your CV' });
+    expect(chip.disabled).toBe(true);
+    expect(chip.selectedOptions[0]?.textContent).toBe('No CV uploaded yet');
+    expect(screen.getByTestId('analysis-run')).toHaveProperty('disabled', true);
+    const reason = screen.getByTestId('analysis-run-reason');
+    expect(reason.textContent).toBe('Choose a CV first.');
+    expect(reason.parentElement).toBe(screen.getByTestId('analysis-run').parentElement);
+    expect(bar().contains(reason)).toBe(true);
+  });
+
+  it('negative: for a PDF CV the item is greyed in the "…" list, and its "i" says why', async () => {
+    const user = userEvent.setup();
+    await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
+
+    await user.click(screen.getByTestId('analysis-cv-more'));
+    const save = screen.getByTestId<HTMLButtonElement>('analysis-save-json');
+    expect(save.disabled).toBe(true);
+    const info = screen
+      .getAllByRole('button', { name: 'What this means' })
+      .find(
+        (button) =>
+          document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent ===
+          SAVE_WORDS,
+      );
+    expect(info).toBeDefined();
+  });
+
+  it('boundary: a 120-character CV name is chosen whole, and the chip may not grow past its line', async () => {
+    const long = 'Alex_Morgan_'.repeat(10);
+    expect(long).toHaveLength(120);
+    await renderView({
+      port: createFakeAnalysisPort({ cvs: [{ ...EXISTING_CV, name: long }] }),
+    });
+    const chip = await screen.findByDisplayValue(long);
+
+    expect(chip).toBe(screen.getByTestId('analysis-cv'));
+    for (const element of [chip, chip.parentElement!]) {
+      expect([...element.classList]).toEqual(expect.arrayContaining(['min-w-0', 'max-w-full']));
+    }
+  });
+
+  it('boundary: with nothing tracked there is no tracked-job chip, and the button keeps the right of the bar', async () => {
+    await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
+    await screen.findByDisplayValue('Jordan Lewis CV.pdf');
+
+    expect(screen.queryByTestId('analysis-job-pick')).toBeNull();
+    expect(bar().querySelector('[data-slot="bar-start"]')).toBeNull();
+    const end = screen.getByTestId('analysis-run').closest('[data-slot="bar-end"]');
+    expect(end?.parentElement).toBe(bar());
+    expect(end?.classList.contains('ml-auto')).toBe(true);
+  });
+
+  it('privacy words, word for word, under the box: the AI’s note, then the CV sentence', async () => {
+    await renderView();
+
+    const aiNote = screen.getByTestId('analysis-provider-note');
+    const cvNote = screen.getByTestId('analysis-cv-note');
+    expectBefore(bar(), aiNote);
+    expectBefore(aiNote, cvNote);
+    expect(cvNote.textContent).toBe(
+      'PDF, Word (.docx) or JSON Resume (.json). The file is read on this computer. Its text only goes to an AI you choose, and only when you ask it to read your CV.',
+    );
+    expect(aiNote.closest('[data-slot="footnotes"]')).not.toBeNull();
+    expect(cvNote.closest('[data-slot="footnotes"]')).not.toBeNull();
+  });
+});

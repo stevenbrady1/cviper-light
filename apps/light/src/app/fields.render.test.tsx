@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { emptyProfile, type Application, type Cv, type Job } from '@cviper/core-types';
 
-import { AnalysisAdvert } from '../features/analysis/AnalysisAdvert';
+import { AnalysisAdvert, AnalysisJobChip } from '../features/analysis/AnalysisAdvert';
 import { AnalysisSaveToTracker } from '../features/analysis/AnalysisSaveToTracker';
 import { ProfileForm } from '../features/profile/ProfileForm';
 import { EMPTY_FORM } from '../features/search/model';
@@ -30,7 +30,7 @@ import { TailorSaveApplication } from '../features/tailor/TailorSaveApplication'
 import { NewApplicationForm } from '../features/tracker/NewApplicationForm';
 import { createFakeBrowserPort } from '../platform/test/fakeBrowserPort';
 
-import { FIELD, FIELD_COMPACT, FIELD_INVALID } from './fields';
+import { COMPOSER_EDITOR, FIELD, FIELD_CHIP, FIELD_COMPACT, FIELD_INVALID } from './fields';
 
 afterEach(cleanup);
 
@@ -148,21 +148,21 @@ describe('the Analysis and Tailor boxes on the shared style (L-376)', () => {
     expect(title.classList.contains('border-field-line')).toBe(false);
   });
 
-  it('boundary: the compact job picker wears exactly FIELD_COMPACT and its row layout, no standard padding', () => {
+  // Changed on purpose (L-446): the tracked-job picker is a chip in the box's
+  // bar, and the advert box is the top half of the composer.
+  it('boundary: the tracked-job chip wears exactly FIELD_CHIP, and the advert box COMPOSER_EDITOR', () => {
     render(
-      <AnalysisAdvert
-        jobNote={null}
-        jobText=""
-        onJobTextChange={() => undefined}
-        jobs={[JOB]}
-        onPickJob={() => undefined}
-      />,
+      <>
+        <AnalysisAdvert jobNote={null} jobText="" onJobTextChange={() => undefined} />
+        <AnalysisJobChip jobs={[JOB]} onPickJob={() => undefined} />
+      </>,
     );
     const picker = screen.getByTestId('analysis-job-pick');
-    expect(exactly(picker)).toEqual([...classesOf(FIELD_COMPACT), 'min-w-0', 'flex-1'].sort());
-    expect(picker.classList.contains('py-1.5')).toBe(false);
+    expect(exactly(picker)).toEqual(
+      [...classesOf(FIELD_CHIP), 'min-h-11', 'max-w-full', 'min-w-0', 'md:min-h-0'].sort(),
+    );
     expect(exactly(screen.getByTestId('analysis-job-text'))).toEqual(
-      [...classesOf(FIELD), 'mt-1', 'w-full'].sort(),
+      [...classesOf(COMPOSER_EDITOR), 'relative', 'block', 'w-full'].sort(),
     );
   });
 

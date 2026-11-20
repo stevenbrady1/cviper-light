@@ -87,7 +87,12 @@ async function renderWith(cvs: readonly Cv[]) {
   return { port, filePort };
 }
 
-const saveButton = () => screen.getByTestId('analysis-save-json') as HTMLButtonElement;
+/** Changed on purpose (L-446): Save waits in the "…" list beside the CV chip, so open it first. */
+function saveButton(): HTMLButtonElement {
+  const more = screen.getByTestId('analysis-cv-more');
+  if (more.getAttribute('aria-expanded') !== 'true') fireEvent.click(more);
+  return screen.getByTestId('analysis-save-json') as HTMLButtonElement;
+}
 
 describe('Save as JSON Resume', () => {
   it('is disabled, never hidden, for a CV that came from a PDF', async () => {

@@ -4,6 +4,7 @@ import { type Analysis as AnalysisRow, type Cv, type Job, type Result } from '@c
 import { runGates } from '@cviper/keyword-scoring';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { Composer } from '../../app/Composer';
 import { CONTENT_COLUMN, SCROLL_GUTTER, SIDE_PADDING } from '../../app/layout';
 import { ViewHeader } from '../../app/ViewHeader';
 import { viewById } from '../../app/views';
@@ -20,12 +21,17 @@ import { createDbProfilePort, type ProfilePort } from '../profile/port';
 
 import { createTauriBrowserPort, type BrowserPort } from '../../platform/browser';
 
-import { AnalysisAdvert } from './AnalysisAdvert';
-import { AnalysisCvPicker } from './AnalysisCvPicker';
-import { AnalysisEngine } from './AnalysisEngine';
+import { AnalysisAdvert, AnalysisJobChip, AnalysisJobNote } from './AnalysisAdvert';
+import {
+  AnalysisCvNote,
+  AnalysisCvNotices,
+  AnalysisCvPicker,
+  AnalysisCvUpload,
+} from './AnalysisCvPicker';
+import { AnalysisEngine, AnalysisEngineConsents, AnalysisEngineNotes } from './AnalysisEngine';
 import { AnalysisHistory, AnalysisHistoryButton } from './AnalysisHistory';
 import { AnalysisResult } from './AnalysisResult';
-import { AnalysisRunBar } from './AnalysisRunBar';
+import { AnalysisRunBar, AnalysisRunStatus } from './AnalysisRunBar';
 import { AnalysisSample } from './AnalysisSample';
 import { AnalysisSaveToTracker } from './AnalysisSaveToTracker';
 import { ConsentGate } from './ConsentGate';
@@ -89,8 +95,8 @@ import { type ChatTransport } from '@cviper/ai-providers';
  * WHERE THE PIECES LIVE (L-306)
  * ============================================================================
  * This file owns the run, the consent gate in front of it and the result. Each
- * input panel is its own component (`AnalysisCvPicker`, `AnalysisAdvert`,
- * `AnalysisEngine`, `AnalysisRunBar`), as are the sample and past checks; what
+ * input panel has its own file (`AnalysisCvPicker`, `AnalysisAdvert`, ...), in
+ * parts that `Composer` lays out (L-446), as do the sample and past checks; what
  * the screen reads on opening is `useAnalysisLibrary`, CV files in and out are
  * `useAnalysisCvFiles`, and the step bar is `useAnalysisStepBar`. The run stays
  * HERE on purpose: `ai-call-sites-consent.contract.test.ts` names this file as
@@ -529,24 +535,68 @@ export function Analysis({
     onJobStep,
   });
 
-  /** Said by the picker when the chosen AI will not read the whole CV (L-302). */
-  const cvCut = cvCutNote(selectedCv?.extracted_text ?? null, selectedOption?.kind ?? null);
-
   /** What the run is doing, in words: shown with a counter, and spoken (L-299). */
   const progressText =
     running && selectedOption !== null && selectedOption.kind !== 'keyword'
       ? progressSentence(selectedOption)
       : null;
 
+  // Each panel's props, once: `Composer` lays its parts out apart (L-446).
+  const cvPicker = {
+    cvs,
+    cvsLoaded,
+    selectedCvId,
+    selectedCv,
+    onPick: (id: string | null) => {
+      // A run still in flight was for the CV being left: dropped.
+      session.supersede();
+      session.update({ selectedCvId: id, result: null, runError: null, warnings: [] });
+      clearCvMessages();
+      // Picked once, for the job (L-200).
+      if (stepJob !== null) onJobChoice?.(stepJob, { cvId: id });
+    },
+    onUpload: () => void onUpload(),
+    onSaveJsonResume: () => void onSaveJsonResume(),
+    exporting,
+    exportMessage,
+    uploadProblem,
+    warnings,
+  };
+  const advert = {
+    jobNote,
+    jobText,
+    onJobTextChange: (value: string) =>
+      // Still that job while there is an advert in the box — pasting the full
+      // advert over a preview is the edit the note asks for. An empty box
+      // belongs to nothing.
+      session.update(
+        value === '' ? { jobText: '', jobId: null, jobNote: null } : { jobText: value },
+      ),
+    jobs,
+    onPickJob: (job: Job) =>
+      session.update({ jobText: jobAdvertText(job), jobId: job.id, jobNote: null }),
+  };
+  const engine = {
+    options,
+    optionKey,
+    selectedOption,
+    onOptionChange: (picked: string) => {
+      session.update({ optionKey: picked });
+      // Picked once, for the job (L-200).
+      if (stepJob !== null) onJobChoice?.(stepJob, { optionKey: picked });
+    },
+    // Said when the chosen AI will not read the whole CV (L-302).
+    cvCut: cvCutNote(selectedCv?.extracted_text ?? null, selectedOption?.kind ?? null),
+    localModelHint,
+    browser: browserPort,
+    grantedConsents,
+    onWithdrawConsent: (kind: ConsentProviderKind) => void onWithdrawConsent(kind),
+  };
+  const run = { running, disabledReason, onRun: () => void onRun(), progressText, elapsed };
+
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="view-analysis">
-      {/*
-        The header's `action` is "Past checks", a secondary button (L-444). The
-        view's one blue button stays beside the composer it acts on, next to
-        the sentence explaining why it is disabled — a Run button in the
-        corner, four inches from the advert box and from its own reason, is a
-        button nobody connects to anything.
-      */}
+      {/* "Past checks" (L-444). The one blue button stays in the advert box's bar, by its reason. */}
       <ViewHeader
         view={view.id}
         title={view.label}
@@ -589,66 +639,35 @@ export function Analysis({
           className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${SIDE_PADDING} ${SCROLL_GUTTER} py-4 md:py-5`}
         >
           <div data-content-column className={`${CONTENT_COLUMN} space-y-5`}>
-            <AnalysisCvPicker
-              cvs={cvs}
-              cvsLoaded={cvsLoaded}
-              selectedCvId={selectedCvId}
-              selectedCv={selectedCv}
-              onPick={(id) => {
-                // A run still in flight was for the CV being left: dropped.
-                session.supersede();
-                session.update({ selectedCvId: id, result: null, runError: null, warnings: [] });
-                clearCvMessages();
-                // Picked once, for the job (L-200).
-                if (stepJob !== null) onJobChoice?.(stepJob, { cvId: id });
-              }}
-              onUpload={() => void onUpload()}
-              onSaveJsonResume={() => void onSaveJsonResume()}
-              exporting={exporting}
-              exportMessage={exportMessage}
-              uploadProblem={uploadProblem}
-              warnings={warnings}
-            />
-
-            <AnalysisAdvert
-              jobNote={jobNote}
-              jobText={jobText}
-              onJobTextChange={(value) =>
-                // Still that job while there is an advert in the box — pasting
-                // the full advert over a preview is the edit the note asks for.
-                // An empty box belongs to nothing.
-                session.update(
-                  value === '' ? { jobText: '', jobId: null, jobNote: null } : { jobText: value },
+            <Composer
+              sentence={
+                <>
+                  <AnalysisCvPicker {...cvPicker} />
+                  <AnalysisEngine {...engine} />
+                  <AnalysisCvUpload {...cvPicker} />
+                </>
+              }
+              // Only when there is something to say: an empty slot still takes a gap.
+              notices={
+                (uploadProblem ?? exportMessage ?? jobNote ?? warnings[0] ?? null) ===
+                null ? null : (
+                  <div className="space-y-2">
+                    <AnalysisCvNotices {...cvPicker} />
+                    <AnalysisJobNote jobNote={jobNote} />
+                  </div>
                 )
               }
-              jobs={jobs}
-              onPickJob={(job) =>
-                session.update({ jobText: jobAdvertText(job), jobId: job.id, jobNote: null })
+              editor={<AnalysisAdvert {...advert} />}
+              barStart={jobs.length === 0 ? null : <AnalysisJobChip {...advert} />}
+              barEnd={<AnalysisRunBar {...run} />}
+              footnotes={
+                <div className="flex flex-col gap-2">
+                  <AnalysisRunStatus {...run} />
+                  <AnalysisEngineNotes {...engine} />
+                  <AnalysisCvNote />
+                  <AnalysisEngineConsents {...engine} />
+                </div>
               }
-            />
-
-            <AnalysisEngine
-              options={options}
-              optionKey={optionKey}
-              selectedOption={selectedOption}
-              onOptionChange={(picked) => {
-                session.update({ optionKey: picked });
-                // Picked once, for the job (L-200).
-                if (stepJob !== null) onJobChoice?.(stepJob, { optionKey: picked });
-              }}
-              cvCut={cvCut}
-              localModelHint={localModelHint}
-              browser={browserPort}
-              grantedConsents={grantedConsents}
-              onWithdrawConsent={(kind) => void onWithdrawConsent(kind)}
-            />
-
-            <AnalysisRunBar
-              running={running}
-              disabledReason={disabledReason}
-              onRun={() => void onRun()}
-              progressText={progressText}
-              elapsed={elapsed}
             />
 
             {/* ── 5. The result ─────────────────────────────────────────── */}

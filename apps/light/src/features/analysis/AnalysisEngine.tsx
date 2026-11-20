@@ -1,4 +1,4 @@
-import { FIELD } from '../../app/fields';
+import { ChipSelect } from '../../app/ChipSelect';
 import { type BrowserPort } from '../../platform/browser';
 
 import { ConsentStatus } from './ConsentGate';
@@ -19,43 +19,43 @@ export interface AnalysisEngineProps {
   readonly onWithdrawConsent: (kind: ConsentProviderKind) => void;
 }
 
-/** Analysis, step 3: how to check it, and what that means for the CV. */
+/** The AI part of the line (L-446): "using" and the AI chip. */
 export function AnalysisEngine({
   options,
   optionKey,
-  selectedOption,
   onOptionChange,
+}: Pick<AnalysisEngineProps, 'options' | 'optionKey' | 'onOptionChange'>) {
+  return (
+    <span className="flex max-w-full min-w-0 items-center gap-2">
+      <span className="text-ink-muted">using</span>
+      <ChipSelect
+        id="analysis-provider"
+        name="How to check it"
+        testId="analysis-provider"
+        value={optionKey}
+        options={options.map((option) => ({ value: option.key, label: option.label }))}
+        onChange={onOptionChange}
+      />
+    </span>
+  );
+}
+
+/**
+ * Under the box: when the chosen AI will not read the whole CV, when Ollama has
+ * no chat model, and what the chosen AI means for the CV, in its own words.
+ */
+export function AnalysisEngineNotes({
+  selectedOption,
   cvCut,
   localModelHint,
   browser,
-  grantedConsents,
-  onWithdrawConsent,
-}: AnalysisEngineProps) {
+}: Pick<AnalysisEngineProps, 'selectedOption' | 'cvCut' | 'localModelHint' | 'browser'>) {
   return (
-    <div>
-      <label htmlFor="analysis-provider" className="block text-xs font-medium text-ink-muted">
-        How to check it
-      </label>
-      <select
-        id="analysis-provider"
-        data-testid="analysis-provider"
-        value={optionKey}
-        onChange={(event) => onOptionChange(event.currentTarget.value)}
-        className={`${FIELD} mt-1 w-full`}
-      >
-        {options.map((option) => (
-          <option key={option.key} value={option.key}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <p data-testid="analysis-provider-note" className="mt-1 text-xs text-ink-faint">
-        {selectedOption?.note ?? 'Choose how to run this.'}
-      </p>
+    <>
       {cvCut === null ? null : (
         <p
           data-testid="analysis-cv-cut"
-          className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
+          className="rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
         >
           {cvCut}
         </p>
@@ -71,20 +71,29 @@ export function AnalysisEngine({
       {localModelHint === null ? null : (
         <p
           data-testid="analysis-ollama-hint"
-          className="mt-2 rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
+          className="rounded-control bg-gold/10 px-3 py-2 text-xs text-gold-ink"
         >
           {localModelHint}
           <OllamaDownloadLink idPrefix="analysis" browser={browser} />
         </p>
       )}
 
-      {/*
-        Reachable regardless of which option is currently picked — a
-        consent granted earlier must stay visible and revocable even
-        after switching to Ollama or the basic match. See
-        `ConsentGate.tsx` for why this lives here and not in Settings.
-      */}
-      <ConsentStatus granted={grantedConsents} onWithdraw={onWithdrawConsent} />
-    </div>
+      <p data-testid="analysis-provider-note" className="text-xs text-ink-faint">
+        {selectedOption?.note ?? 'Choose how to run this.'}
+      </p>
+    </>
   );
+}
+
+/**
+ * Last under the box: every AI the user has agreed to, with Withdraw. Reachable
+ * regardless of which option is currently picked — a consent granted earlier
+ * must stay visible and revocable even after switching to Ollama or the basic
+ * match. See `ConsentGate.tsx` for why this lives here and not in Settings.
+ */
+export function AnalysisEngineConsents({
+  grantedConsents,
+  onWithdrawConsent,
+}: Pick<AnalysisEngineProps, 'grantedConsents' | 'onWithdrawConsent'>) {
+  return <ConsentStatus granted={grantedConsents} onWithdraw={onWithdrawConsent} />;
 }

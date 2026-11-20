@@ -45,6 +45,8 @@ function renderPicker(selected: Cv | null) {
       warnings={[]}
     />,
   );
+  // Changed on purpose (L-446): Save waits in the "…" list beside the CV chip.
+  fireEvent.click(screen.getByTestId('analysis-cv-more'));
 }
 
 const saveButton = () => screen.getByTestId('analysis-save-json');
