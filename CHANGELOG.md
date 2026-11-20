@@ -8,6 +8,38 @@ All notable changes to CViper Light are recorded here. The format follows
 
 Changes waiting for the next release are in [`changes/unreleased/`](changes/unreleased/), one file per change, so two pull requests never edit the same lines here (L-303). `pnpm changelog:preview` shows them as they will appear; `pnpm changelog:release <version> <date>` writes them in below. See [CONTRIBUTING.md](CONTRIBUTING.md#the-changelog).
 
+## [0.14.0] — 2026-11-20
+
+A quieter, cleaner look across the app. Titles stand on their own without the grey icon tiles, labels are in the app's normal font, scroll bars are slim, empty screens share one simple "nothing here yet" look, and Search's buttons sit in one row. Analysis and Tailor now open on one line of choices, "Check [your CV] using [how to check it]" and "Rewrite [your CV] using [your AI]", above a big job advert box with the main button in the bar at its bottom, and "Past checks" moved up next to the Analysis title.
+
+### Added
+
+- Shared parts for the coming Analysis and Tailor layout: a drop-down drawn as a small chip, one big box with a bar for the main button, and a reason beside a greyed-out item in a "…" list. Nothing on screen changes yet (L-442).
+
+### Changed
+
+- Tailor no longer leaves an empty gap above the job advert box when your CV text is folded. Analysis, Tailor and the empty Tracker board now show their "nothing here yet" message the same way as Search: a small grey icon, the same words and buttons as before, and no dashed box (L-447).
+- Analysis reads as one line: "Check [your CV] … using [how to check it]", with a quiet "Upload a CV" at the end. Under it, the job advert box is the biggest thing on the screen, with "Or use one you are already tracking" and "Check this CV" (and why it is greyed out) in the bar at the bottom of the box. "Save as JSON Resume" moved into the "…" beside your CV, still greyed out with its reason for a PDF or Word CV. The AI's note and the line about how your CV file is read now sit in small grey text under the box, word for word as before (L-446).
+- Tailor now opens on one line of choices — "Rewrite [your CV] using [your AI]", with Show CV and Upload a CV at its end — above a big advert box. The box's bar holds the tracked-job choice on the left and "Tailor CV", with its reason, on the right; the quieter notes (what the AI means for your CV, what you have agreed to) sit under the box. Each CV in the list shows its word count, and the separate summary line under the picker is gone (L-445).
+- "Past checks" on Analysis moved from beside "Check this CV" to the top of the screen, next to the "Analysis" title, as a white button. On a phone it sits under the title. It is greyed out while no CV is chosen or the list is open, as before (L-444).
+- The sentence Analysis and Tailor show while the AI works now comes from one place, so the two screens cannot drift apart on what is sent where. Nothing on screen changes (L-443).
+- An empty Tracker column now says, in one small line, what goes there, such as "Move a job here once you apply." The lines step aside while you search the board, and a card's "days since last change" now wraps onto a second line instead of being cut short (L-441).
+- Section headings in Settings, Job boards and the API-keys card now stand on their own, without the small icon tile beside them, and the list under "AI provider keys" lines up with the text. "Delete everything" keeps its red button and its warning (L-440).
+- Pointing at a side-menu item shows its keyboard shortcut to the right of the menu, level with the item, instead of over the next item (L-439).
+- On the Tracker, a started job's "Step 3 of 5 · Continue" row now sits inside its card, under a thin line, instead of hanging below it. A selected card now shows its blue edge all round, row included (before, only the age edge showed), and a moved card arrives whole. "Interview stages" now ends the Interviewing column's head with a thin line. Cards with no steps look as before (L-438).
+- On Search, every box is now the same height, "Contract type" included, and Within, Minimum salary and Contract type share their row in equal widths. "Where to look" shows a small drawn arrow that turns when it opens, instead of the browser's own mark (L-437).
+- Profile shows each saved CV as one row: the name, its word count and date in small grey text, and Rename and Delete on the right, with a thin line between rows. On a phone the buttons sit under the name (L-436).
+- Scroll bars are now slim and rounded, with no arrow buttons, and turn a little darker when you point at them. They are still wide enough to grab (L-435).
+- Before a search, the results area now shows a small grey search icon over the same words, with no dashed box round it. It uses a new shared empty state that other screens can move onto later (L-434).
+- Search's buttons now sit in one row: Search, "Also open in N boards", then "Save this search" and "Found one? Bring it in" as quiet buttons. If a button is greyed out, the reason is on one line just under the row, and it stays on screen on short windows (L-433).
+- Labels read as plain words in the app's own font, not small spaced-out capitals: the Tracker's column heads and stats labels, the side menu's "Ctrl 1" hints and the menu footer's "Set up" (L-432). Numbers and dates keep their fixed-width digits.
+- Every screen's title now stands on its own, larger, without the grey icon tile beside it. The menu already shows that icon, and the header is no taller (L-431).
+- CViper Light now runs on Tauri 2.12.5, with updated file-dialog, settings, link-opening and update plugins (L-429). The database library stays on sqlx 0.8: the database plugin is still built on 0.8, and the app's only route to the database (L-243) runs on that plugin's own connection, so both must match. Dependabot no longer proposes sqlx 0.9 until the plugin moves, and a test fails if that hold is removed early. No change to your data.
+
+### Fixed
+
+- Screen readers now hear the same due-date words a Tracker card shows, such as "2 days overdue" instead of "overdue by 2 days", and "due tomorrow" instead of "due in 1 day". Nothing on screen changes (L-430).
+
 ## [0.13.1] — 2026-11-19
 
 A small fix release for Windows. The uninstaller now shows the CViper icon, and the message you see when CViper Light is still open now says plainly what OK does. This version also carries everything listed under 0.13.0, which was never published.
@@ -705,7 +737,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.13.1...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.14.0...main
+[0.14.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.13.1...light-v0.14.0
 [0.13.1]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.13.0...light-v0.13.1
 [0.13.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.11.0...light-v0.13.0
 [0.12.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.11.0...light-v0.13.0
