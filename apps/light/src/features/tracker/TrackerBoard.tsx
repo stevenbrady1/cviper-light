@@ -116,6 +116,7 @@ export function TrackerBoard({
             onSelect={(applicationId) => setPane({ kind: 'entry', applicationId })}
             onDropCard={onStatusChange}
             progressFor={progressFor}
+            showHint={normalizedQuery === ''}
             onContinue={
               onContinue === undefined ? undefined : (entry, step) => onContinue(entry.job, step)
             }

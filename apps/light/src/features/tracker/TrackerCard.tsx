@@ -175,7 +175,7 @@ export function TrackerCard({
         )}{' '}
         <p
           data-testid={`tracker-card-age-${application.id}`}
-          className="mt-1 truncate text-[11px] text-ink-muted"
+          className="mt-1 break-words text-[11px] text-ink-muted"
         >
           {age}
         </p>{' '}

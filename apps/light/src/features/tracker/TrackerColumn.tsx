@@ -49,7 +49,21 @@ interface TrackerColumnProps {
   readonly progressFor?: ((entry: TrackerEntry) => JobProgress | null) | undefined;
   /** "Continue" under a started job's card. Left out, no row is drawn. */
   readonly onContinue?: ((entry: TrackerEntry, step: StepId) => void) | undefined;
+  /**
+   * Say what goes in the column while it is empty (L-441). The board turns it
+   * off while its search has text: an empty column then means "no match".
+   */
+  readonly showHint?: boolean | undefined;
 }
+
+/** The owner's words (L-441). "Move", not "Drag": the keyboard moves a job with the status choice. */
+const COLUMN_HINTS: Record<ApplicationStatus, string> = {
+  saved: 'Jobs you might apply for.',
+  applied: 'Move a job here once you apply.',
+  interviewing: 'Move a job here when you get an interview.',
+  offer: 'Move a job here when you get an offer.',
+  rejected: 'Jobs that did not work out go here.',
+};
 
 export function TrackerColumn({
   status,
@@ -64,6 +78,7 @@ export function TrackerColumn({
   onDropCard,
   progressFor,
   onContinue,
+  showHint = false,
 }: TrackerColumnProps) {
   const [over, setOver] = useState(false);
 
@@ -135,6 +150,12 @@ export function TrackerColumn({
           </button>
         </div>
       )}
+
+      {showHint && entries.length === 0 ? (
+        <p data-testid={`tracker-hint-${status}`} className="px-2 pt-1 text-xs text-ink-faint">
+          {COLUMN_HINTS[status]}
+        </p>
+      ) : null}
 
       {/* `pt-1`: room for the first card's focus ring, which the scrolling list would cut (L-438). */}
       <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pt-1 pb-2">
