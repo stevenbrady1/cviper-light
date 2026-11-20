@@ -1,7 +1,8 @@
 import { type Job } from '@cviper/core-types';
 
 import { QUIET_BUTTON } from '../../app/buttons';
-import { FIELD, FIELD_COMPACT } from '../../app/fields';
+import { ChipSelect } from '../../app/ChipSelect';
+import { COMPOSER_EDITOR } from '../../app/fields';
 
 import { MetricPromptBoxes } from './MetricPromptBoxes';
 import { type MetricPrompt, type MetricState } from './metricPrompts';
@@ -26,31 +27,24 @@ export interface TailorAdvertProps {
   readonly running: boolean;
 }
 
-/** Tailor, step 2: the advert, a tracked job to take it from, and the gaps to fill. */
-export function TailorAdvert({
+/** The advert box: the top half of the composer, its name spoken, not shown (L-445). */
+export function TailorAdvertBox({
   jobText,
   onAdvertChange,
-  advertEdited,
-  selectedJob,
-  onRestoreAdvert,
-  jobs,
-  selectedJobId,
-  onPickJob,
-  keywordGaps,
-  metricPrompts,
-  metricState,
-  onMetricStateChange,
-  running,
-}: TailorAdvertProps) {
+}: Pick<TailorAdvertProps, 'jobText' | 'onAdvertChange'>) {
   return (
-    <div>
-      <label htmlFor="tailor-job-text" className="block text-xs font-medium text-ink-muted">
+    <>
+      <label htmlFor="tailor-job-text" className="sr-only">
         The job advert
       </label>
+      {/*
+       * About nine lines (~240px): the button stays on screen at 1000×700
+       * (L-445). `relative` paints the focus ring over the bar below it.
+       */}
       <textarea
         id="tailor-job-text"
         data-testid="tailor-job-text"
-        rows={7}
+        rows={9}
         value={jobText}
         placeholder="Paste the whole advert, including the requirements list."
         onChange={(event) => {
@@ -59,13 +53,55 @@ export function TailorAdvert({
           // the text is the user's version of its advert.
           onAdvertChange(event.currentTarget.value);
         }}
-        className={`${FIELD} mt-1 w-full`}
+        className={`${COMPOSER_EDITOR} relative block w-full`}
       />
+    </>
+  );
+}
 
+/**
+ * The tracked-job chip in the box's bar: the chosen job, or "Or use one you are
+ * already tracking". Not drawn when nothing is tracked.
+ */
+export function TailorJobChip({
+  jobs,
+  selectedJobId,
+  onPickJob,
+}: Pick<TailorAdvertProps, 'jobs' | 'selectedJobId' | 'onPickJob'>) {
+  if (jobs.length === 0) return null;
+  return (
+    <ChipSelect
+      id="tailor-job-pick"
+      name="Or use one you are already tracking"
+      testId="tailor-job-pick"
+      value={selectedJobId ?? ''}
+      empty="Or use one you are already tracking"
+      onChange={(id) => {
+        const picked = jobs.find((candidate) => candidate.id === id);
+        if (picked !== undefined) onPickJob(picked);
+      }}
+      options={jobs.map((job) => ({ value: job.id, label: `${job.title} — ${job.company}` }))}
+    />
+  );
+}
+
+/** Under the box, first: the edited-advert marker, the gaps to fill, and their questions. */
+export function TailorAdvertNotes({
+  advertEdited,
+  selectedJob,
+  onRestoreAdvert,
+  keywordGaps,
+  metricPrompts,
+  metricState,
+  onMetricStateChange,
+  running,
+}: Omit<TailorAdvertProps, 'jobText' | 'onAdvertChange' | 'jobs' | 'selectedJobId' | 'onPickJob'>) {
+  return (
+    <>
       {!advertEdited || selectedJob === null ? null : (
         <div
           data-testid="tailor-advert-edited"
-          className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-muted"
+          className="flex flex-wrap items-center gap-2 text-xs text-ink-muted"
         >
           <span>Advert edited — the tailoring uses your version.</span>
           <button
@@ -79,33 +115,8 @@ export function TailorAdvert({
         </div>
       )}
 
-      {jobs.length === 0 ? null : (
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <label htmlFor="tailor-job-pick" className="text-xs text-ink-faint">
-            Or use one you are already tracking
-          </label>
-          <select
-            id="tailor-job-pick"
-            data-testid="tailor-job-pick"
-            value={selectedJobId ?? ''}
-            onChange={(event) => {
-              const picked = jobs.find((candidate) => candidate.id === event.currentTarget.value);
-              if (picked !== undefined) onPickJob(picked);
-            }}
-            className={`${FIELD_COMPACT} min-w-0 flex-1`}
-          >
-            <option value="">Choose a tracked job…</option>
-            {jobs.map((job) => (
-              <option key={job.id} value={job.id}>
-                {job.title} — {job.company}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {keywordGaps === null ? null : (
-        <p data-testid="tailor-keyword-gaps-note" className="mt-1 text-xs text-ink-faint">
+        <p data-testid="tailor-keyword-gaps-note" className="text-xs text-ink-faint">
           From your analysis: {keywordGaps.length} {keywordGaps.length === 1 ? 'word' : 'words'} in
           the advert that your CV does not use yet. The draft uses them only where your CV already
           shows the experience.
@@ -117,6 +128,6 @@ export function TailorAdvert({
         onChange={onMetricStateChange}
         disabled={running}
       />
-    </div>
+    </>
   );
 }

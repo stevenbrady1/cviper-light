@@ -927,3 +927,184 @@ describe('while a save window is open (L-217)', () => {
     );
   });
 });
+
+/**
+ * One line of choices above the advert box (L-445): "Rewrite [CV] using [AI]",
+ * then Show CV and Upload a CV; the advert box with the main button in its
+ * bar; the quiet notes under it.
+ */
+describe('one line of choices, and the advert box as the hero (L-445)', () => {
+  const sentence = () => document.querySelector('[data-slot="sentence"]');
+  const footnotes = () => document.querySelector('[data-slot="footnotes"]');
+  /** True when every element comes after the one before it in the page. */
+  const inOrder = (elements: readonly Element[]) =>
+    elements.every(
+      (element, index) =>
+        index === 0 ||
+        Boolean(
+          elements[index - 1]!.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ),
+    );
+
+  it('happy: the line reads "Rewrite", the CV chip, "using", the AI chip, Show CV, Upload a CV', async () => {
+    await renderReady([]);
+    const row = sentence();
+    expect(row).not.toBeNull();
+    const parts = [
+      within(row as HTMLElement).getByText('Rewrite'),
+      screen.getByTestId('tailor-cv-pick'),
+      within(row as HTMLElement).getByText('using'),
+      screen.getByTestId('tailor-provider'),
+      screen.getByTestId('tailor-cv-preview-toggle'),
+      screen.getByTestId('tailor-upload'),
+    ];
+    for (const part of parts) expect(row?.contains(part)).toBe(true);
+    expect(inOrder(parts)).toBe(true);
+    expect(screen.getByTestId('tailor-cv-preview-toggle').textContent).toBe('Show CV');
+    expect(screen.getByTestId('tailor-upload').textContent).toBe('Upload a CV');
+  });
+
+  it('happy: each choice keeps its name, spoken but not shown', async () => {
+    await renderReady([]);
+    const names: ReadonlyArray<readonly [string, string, string]> = [
+      ['combobox', 'Your CV', 'tailor-cv-pick'],
+      ['combobox', 'How to write it', 'tailor-provider'],
+      ['textbox', 'The job advert', 'tailor-job-text'],
+      ['combobox', 'Or use one you are already tracking', 'tailor-job-pick'],
+    ];
+    for (const [role, name, testId] of names) {
+      const control = screen.getByRole(role, { name });
+      expect(control.getAttribute('data-testid')).toBe(testId);
+      const label = document.querySelector(`label[for="${control.id}"]`);
+      expect(label?.className.split(/\s+/)).toContain('sr-only');
+    }
+    // Nothing chosen yet: the tracked-job chip shows its own invitation.
+    const jobPick = screen.getByTestId<HTMLSelectElement>('tailor-job-pick');
+    expect(jobPick.selectedOptions[0]?.textContent).toBe('Or use one you are already tracking');
+    expect(screen.queryByText('Choose a tracked job…')).toBeNull();
+  });
+
+  it('happy: Tailor CV, its reason and the tracked-job chip sit in the box’s bar, the reason first', async () => {
+    await renderReady([]);
+    const bar = screen.getByTestId('composer-bar');
+    const run = screen.getByTestId('tailor-run');
+    const reason = screen.getByTestId('tailor-run-reason');
+    expect(bar.contains(run)).toBe(true);
+    expect(bar.contains(reason)).toBe(true);
+    expect(bar.contains(screen.getByTestId('tailor-job-pick'))).toBe(true);
+    const box = screen.getByTestId('tailor-job-text');
+    expect(inOrder([box, screen.getByTestId('tailor-job-pick'), reason, run])).toBe(true);
+    expect(run.textContent).toBe('Tailor CV');
+    expect(document.querySelectorAll('[data-primary="true"]')).toHaveLength(1);
+  });
+
+  it('happy: the AI’s note sits under the box, not in the line', async () => {
+    await renderReady([]);
+    const note = screen.getByTestId('tailor-provider-note');
+    expect(footnotes()?.contains(note)).toBe(true);
+    expect(sentence()?.contains(note)).toBe(false);
+    expect(note.textContent).toBe('Private but weaker — your CV stays on your PC.');
+  });
+
+  it('interaction: a chosen job shows on the chip; editing its advert puts that line first under the box', async () => {
+    const { user } = await renderReady([]);
+    await user.selectOptions(screen.getByTestId('tailor-job-pick'), 'job-1');
+    const jobPick = screen.getByTestId<HTMLSelectElement>('tailor-job-pick');
+    expect(jobPick.selectedOptions[0]?.textContent).toBe('Credit Risk Analyst — Lloyds');
+
+    await user.type(screen.getByTestId('tailor-job-text'), ' More.');
+    const edited = screen.getByTestId('tailor-advert-edited');
+    const note = screen.getByTestId('tailor-provider-note');
+    expect(footnotes()?.contains(edited)).toBe(true);
+    expect(inOrder([screen.getByTestId('composer-bar'), edited, note])).toBe(true);
+  });
+
+  it('interaction: Show CV opens the CV text between the line and the box, and Hide CV folds it', async () => {
+    const { user } = await renderReady([]);
+    const toggle = screen.getByTestId('tailor-cv-preview-toggle');
+    const panel = screen.getByTestId('tailor-cv-preview');
+    expect(panel.hidden).toBe(true);
+
+    await user.click(toggle);
+    expect(panel.hidden).toBe(false);
+    expect(toggle.textContent).toBe('Hide CV');
+    const box = screen.getByTestId('tailor-job-text');
+    expect(inOrder([sentence() as Element, panel, box])).toBe(true);
+    expect(sentence()?.contains(panel)).toBe(false);
+
+    await user.click(toggle);
+    expect(panel.hidden).toBe(true);
+  });
+
+  it('interaction: an upload problem shows under the line, not inside it', async () => {
+    const filePort = createFakeFilePort();
+    render(
+      <Tailor
+        port={createFakeTailorPort({ cvs: [CV], jobs: [JOB] })}
+        filePort={filePort}
+        createTransport={() => queuedTransport([])}
+        consentPort={createFakeConsentPort()}
+        now={NOW}
+      />,
+    );
+    await screen.findByDisplayValue('CV.docx');
+    filePort.failCv('CViper cannot read that kind of file. Pick a PDF or a Word (.docx) CV.');
+    await userEvent.setup().click(screen.getByTestId('tailor-upload'));
+
+    const problem = await screen.findByTestId('tailor-upload-problem');
+    const box = screen.getByTestId('tailor-job-text');
+    expect(sentence()?.contains(problem)).toBe(false);
+    expect(inOrder([sentence() as Element, problem, box])).toBe(true);
+  });
+
+  it('negative: no AI → the AI chip is greyed and says so, Tailor CV is disabled with its reason, and the help is under the box', async () => {
+    tauri.invoke.mockImplementation(async (command) => {
+      if (command === 'ollama_probe') return null;
+      if (command === 'secret_status') return false;
+      throw new Error(`unexpected command: ${command}`);
+    });
+    render(
+      <Tailor
+        port={createFakeTailorPort({ cvs: [CV], jobs: [JOB] })}
+        filePort={createFakeFilePort()}
+        consentPort={createFakeConsentPort()}
+        now={NOW}
+        onOpenSettings={vi.fn()}
+      />,
+    );
+    const help = await screen.findByTestId('tailor-no-ai');
+    const provider = screen.getByTestId<HTMLSelectElement>('tailor-provider');
+    expect(provider.disabled).toBe(true);
+    expect(provider.selectedOptions[0]?.textContent).toBe('No AI set up yet');
+    expect(screen.getByTestId('tailor-run')).toHaveProperty('disabled', true);
+    const bar = screen.getByTestId('composer-bar');
+    expect(bar.contains(screen.getByTestId('tailor-run-reason'))).toBe(true);
+    expect(footnotes()?.contains(help)).toBe(true);
+    // The order under the box: the help, then the AI's note.
+    expect(inOrder([help, screen.getByTestId('tailor-provider-note')])).toBe(true);
+  });
+
+  it('boundary: a 120-character CV name with 1240 words stays a chip that can shrink within the line', async () => {
+    const name = `${'Senior_Credit_Risk_Analyst_'.repeat(5).slice(0, 115)}.docx`;
+    expect(name).toHaveLength(120);
+    const long: Cv = {
+      ...CV,
+      name,
+      extracted_text: Array.from({ length: 1240 }, () => 'word').join(' '),
+    };
+    render(
+      <Tailor
+        port={createFakeTailorPort({ cvs: [long] })}
+        filePort={createFakeFilePort()}
+        createTransport={() => queuedTransport([])}
+        consentPort={createFakeConsentPort()}
+        now={NOW}
+      />,
+    );
+    await screen.findByDisplayValue(name);
+    const chip = screen.getByTestId<HTMLSelectElement>('tailor-cv-pick');
+    expect(chip.selectedOptions[0]?.label).toBe(`${name} · 1240 words`);
+    expect(chip.className.split(/\s+/)).toEqual(expect.arrayContaining(['min-w-0', 'max-w-full']));
+    expect(sentence()?.className.split(/\s+/)).toContain('flex-wrap');
+  });
+});

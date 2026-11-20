@@ -21,42 +21,89 @@ export interface TailorRunBarProps {
 }
 
 /**
- * Tailor, step 4: the run button, what to do when there is no AI, and what is
- * happening now — the run in progress, the save window, the last save.
+ * The right of the advert box's bar (L-445): why the button is off, then the
+ * button. Disabled, never hidden.
  */
-export function TailorRunBar({
+export function TailorRunButton({
   phase,
   disabledReason,
   onRun,
+  hasDraft,
+}: Pick<TailorRunBarProps, 'phase' | 'disabledReason' | 'onRun' | 'hasDraft'>) {
+  return (
+    <>
+      {disabledReason === null ? null : (
+        // `max-w-md`: a long reason wraps beside the button, not on a line of its own above it.
+        <p
+          id="tailor-run-reason"
+          data-testid="tailor-run-reason"
+          className="max-w-md text-ink-muted"
+        >
+          {disabledReason}
+        </p>
+      )}
+      {/* Once there is a draft, Save as PDF is the one blue button (L-400). */}
+      <button
+        type="button"
+        data-testid="tailor-run"
+        data-primary={hasDraft ? undefined : 'true'}
+        disabled={disabledReason !== null}
+        aria-describedby={disabledReason === null ? undefined : 'tailor-run-reason'}
+        onClick={onRun}
+        className={hasDraft ? SECONDARY_BUTTON : PRIMARY_BUTTON}
+      >
+        {phase === 'tailoring' ? 'Tailoring…' : hasDraft ? 'Tailor again' : 'Tailor CV'}
+      </button>
+    </>
+  );
+}
+
+/**
+ * Under the advert box: what is happening now — the run in progress, the save
+ * window, the last save — and what to do when there is no AI.
+ */
+export function TailorRunStatus({
+  disabledReason,
   onOpenSettings,
   progressSentence,
   elapsed,
   choosingFile,
   saveMessage,
-  hasDraft,
-}: TailorRunBarProps) {
+}: Omit<TailorRunBarProps, 'phase' | 'onRun' | 'hasDraft'>) {
   return (
     <>
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Once there is a draft, Save as PDF is the one blue button (L-400). */}
-        <button
-          type="button"
-          data-testid="tailor-run"
-          data-primary={hasDraft ? undefined : 'true'}
-          disabled={disabledReason !== null}
-          aria-describedby={disabledReason === null ? undefined : 'tailor-run-reason'}
-          onClick={onRun}
-          className={hasDraft ? SECONDARY_BUTTON : PRIMARY_BUTTON}
+      <LiveStatus text={progressSentence} />
+      {progressSentence === null ? null : (
+        <p
+          data-testid="tailor-progress"
+          className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
         >
-          {phase === 'tailoring' ? 'Tailoring…' : hasDraft ? 'Tailor again' : 'Tailor CV'}
-        </button>
+          {progressSentence}{' '}
+          <span aria-hidden="true" className="font-mono tabular-nums">
+            {elapsed}s
+          </span>
+        </p>
+      )}
 
-        {disabledReason === null ? null : (
-          <p id="tailor-run-reason" data-testid="tailor-run-reason" className="text-ink-muted">
-            {disabledReason}
-          </p>
-        )}
-      </div>
+      <LiveStatus text={choosingFile ? 'Choose where to save it in the save window.' : null} />
+      {choosingFile ? (
+        <p
+          data-testid="tailor-save-choosing"
+          className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
+        >
+          Choose where to save it in the save window.
+        </p>
+      ) : null}
+
+      <LiveStatus text={saveMessage} />
+      {saveMessage === null ? null : (
+        <p
+          data-testid="tailor-save-message"
+          className="rounded-control bg-teal/10 px-3 py-2 break-all text-teal-ink"
+        >
+          {saveMessage}
+        </p>
+      )}
 
       {/*
         Not a dead end (L-175, L-240). Tailoring writes new text, so it
@@ -94,39 +141,6 @@ export function TailorRunBar({
           </ul>
         </div>
       ) : null}
-
-      <LiveStatus text={progressSentence} />
-      {progressSentence === null ? null : (
-        <p
-          data-testid="tailor-progress"
-          className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
-        >
-          {progressSentence}{' '}
-          <span aria-hidden="true" className="font-mono tabular-nums">
-            {elapsed}s
-          </span>
-        </p>
-      )}
-
-      <LiveStatus text={choosingFile ? 'Choose where to save it in the save window.' : null} />
-      {choosingFile ? (
-        <p
-          data-testid="tailor-save-choosing"
-          className="rounded-control bg-sunken px-3 py-2 text-ink-muted"
-        >
-          Choose where to save it in the save window.
-        </p>
-      ) : null}
-
-      <LiveStatus text={saveMessage} />
-      {saveMessage === null ? null : (
-        <p
-          data-testid="tailor-save-message"
-          className="rounded-control bg-teal/10 px-3 py-2 break-all text-teal-ink"
-        >
-          {saveMessage}
-        </p>
-      )}
     </>
   );
 }

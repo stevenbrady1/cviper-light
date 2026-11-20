@@ -21,6 +21,13 @@ import { FIELD_CHIP } from './fields';
 export interface ChipSelectOption {
   readonly value: string;
   readonly label: string;
+  /**
+   * What the chip shows and says for this item when it is more than `label`:
+   * Tailor's "CV.docx · 185 words" (L-445). Drawn as the `<option>`'s own
+   * `label` attribute, so its text stays `label` and the item is still found
+   * by its name alone.
+   */
+  readonly shown?: string | undefined;
 }
 
 export interface ChipSelectProps {
@@ -62,7 +69,7 @@ export function ChipSelect({
       >
         {empty === undefined ? null : <option value="">{empty}</option>}
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} label={option.shown}>
             {option.label}
           </option>
         ))}

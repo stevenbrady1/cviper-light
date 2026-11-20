@@ -1,10 +1,7 @@
 import { wordCount, type Cv } from '@cviper/core-types';
 
 import { QUIET_BUTTON } from '../../app/buttons';
-import { FIELD } from '../../app/fields';
-import { type FilePort } from '../../platform/files';
-import { CvUpload } from '../cv/CvUpload';
-import { type CvStorePort } from '../cv/ingestCv';
+import { ChipSelect } from '../../app/ChipSelect';
 
 import { CvTextPanel } from './CvTextPanel';
 
@@ -15,10 +12,6 @@ export interface TailorCvPickerProps {
   readonly selectedCv: Cv | null;
   /** A CV picked from the list, or `null` for none. */
   readonly onPick: (id: string | null) => void;
-  readonly files: Pick<FilePort, 'pickCv'>;
-  readonly saveCv: CvStorePort['saveCv'];
-  readonly now?: Date | undefined;
-  readonly onUploaded: (cv: Cv) => void;
   /** Whether the user has opened the CV text. A CV with no text shows anyway. */
   readonly previewOpen: boolean;
   readonly onTogglePreview: () => void;
@@ -27,149 +20,121 @@ export interface TailorCvPickerProps {
   readonly onSaveCv: (next: Cv) => Promise<string | null>;
 }
 
-/** Tailor, step 1: which CV, an upload, and the CV as the rewrite reads it. */
-export function TailorCvPicker({
+/** "185 words", "1 word" — and nothing for a CV with no text, never "0 words" (L-343). */
+function withWordCount(cv: Cv): string | undefined {
+  const count = wordCount(cv.extracted_text ?? '');
+  return count === 0
+    ? undefined
+    : `${cv.name} · ${String(count)} ${count === 1 ? 'word' : 'words'}`;
+}
+
+/** Tailor's line of choices starts "Rewrite [Your CV]" (L-445). */
+export function TailorCvChip({
   cvs,
   cvsLoaded,
   selectedCvId,
-  selectedCv,
   onPick,
-  files,
-  saveCv,
-  now,
-  onUploaded,
-  previewOpen,
-  onTogglePreview,
-  running,
-  onSaveCv,
-}: TailorCvPickerProps) {
+}: Pick<TailorCvPickerProps, 'cvs' | 'cvsLoaded' | 'selectedCvId' | 'onPick'>) {
   return (
-    <div>
-      <label htmlFor="tailor-cv-pick" className="block text-xs font-medium text-ink-muted">
-        Your CV
-      </label>
-      <select
+    <span className="inline-flex max-w-full min-w-0 items-center gap-2">
+      <span className="text-ink-muted">Rewrite</span>
+      <ChipSelect
         id="tailor-cv-pick"
-        data-testid="tailor-cv-pick"
+        name="Your CV"
+        testId="tailor-cv-pick"
         value={selectedCvId ?? ''}
         disabled={cvs.length === 0 || !cvsLoaded}
-        onChange={(event) => {
-          const id = event.currentTarget.value;
-          onPick(id === '' ? null : id);
-        }}
-        className={`${FIELD} mt-1 w-full`}
-      >
-        {cvs.length > 0 ? null : (
-          <option value="">{cvsLoaded ? 'No CV uploaded yet' : 'Reading your CVs…'}</option>
-        )}
-        {cvs.map((cv) => (
-          <option key={cv.id} value={cv.id}>
-            {cv.name}
-          </option>
-        ))}
-      </select>
-      {/*
-       * Here too, not only on Analysis (L-240) — and never disabled for
-       * want of a model: a first run with nothing set up can still get
-       * its CV ready, and it lands in the one store every screen reads.
-       */}
-      <div className="mt-2">
-        <CvUpload
-          idPrefix="tailor"
-          files={files}
-          saveCv={saveCv}
-          now={now}
-          onUploaded={onUploaded}
-        />
-      </div>
-
-      {/*
-       * The chosen CV, as the rewrite will read it (L-192): the stored
-       * `extracted_text` — the same `cvText` every run is sent — not the
-       * file, so anything the parser dropped is visible BEFORE the run.
-       * Read-only by look until the user chooses "Correct the text"; a
-       * correction is kept on the CV, so every screen and job uses it
-       * (L-218, `CvTextPanel`). No CV at all draws nothing: the picker
-       * says so.
-       */}
-      {selectedCv === null ? null : (
-        <CvPreview
-          cv={selectedCv}
-          open={previewOpen}
-          onToggle={onTogglePreview}
-          running={running}
-          onSaveCv={onSaveCv}
-        />
-      )}
-    </div>
+        onChange={(id) => onPick(id === '' ? null : id)}
+        empty={cvs.length > 0 ? undefined : cvsLoaded ? 'No CV uploaded yet' : 'Reading your CVs…'}
+        options={cvs.map((cv) => ({ value: cv.id, label: cv.name, shown: withWordCount(cv) }))}
+      />
+    </span>
   );
 }
 
-interface CvPreviewProps {
-  readonly cv: Cv;
-  readonly open: boolean;
-  readonly onToggle: () => void;
-  readonly running: boolean;
-  readonly onSaveCv: (next: Cv) => Promise<string | null>;
+/**
+ * The end of the line: Show CV and Upload a CV, both quiet.
+ *
+ * Upload is here too, not only on Analysis (L-240), and never disabled for want
+ * of a model: a first run with nothing set up can still get its CV ready, and
+ * it lands in the one store every screen reads. Its problem and warning lines
+ * sit under the line (`CvUploadNotes`).
+ *
+ * A CV with no text has no Show CV: its panel always shows, so "Type or paste
+ * your CV text" is never behind a toggle, and a toggle that cannot fold the
+ * panel would lie. No CV has none either: the chip says so.
+ */
+export function TailorCvActions({
+  selectedCv,
+  previewOpen,
+  onTogglePreview,
+  onUpload,
+}: Pick<TailorCvPickerProps, 'selectedCv' | 'previewOpen' | 'onTogglePreview'> & {
+  readonly onUpload: () => void;
+}) {
+  const hasText = (selectedCv?.extracted_text ?? '').trim() !== '';
+  return (
+    <span className="ml-auto flex flex-wrap items-center gap-2">
+      {!hasText ? null : (
+        <button
+          type="button"
+          data-testid="tailor-cv-preview-toggle"
+          aria-expanded={previewOpen}
+          aria-controls="tailor-cv-preview"
+          onClick={onTogglePreview}
+          className={QUIET_BUTTON}
+        >
+          {previewOpen ? 'Hide CV' : 'Show CV'}
+        </button>
+      )}
+      <button type="button" data-testid="tailor-upload" onClick={onUpload} className={QUIET_BUTTON}>
+        Upload a CV
+      </button>
+    </span>
+  );
 }
 
 /**
- * Folded to one line until the user opens it (L-340), so the advert is above
- * the fold: the heading, the file name, the word count and the toggle.
+ * The chosen CV, as the rewrite will read it (L-192): the stored
+ * `extracted_text` — the same `cvText` every run is sent — not the file, so
+ * anything the parser dropped is visible BEFORE the run. Read-only by look
+ * until the user chooses "Correct the text"; a correction is kept on the CV,
+ * so every screen and job uses it (L-218, `CvTextPanel`). No CV at all draws
+ * nothing: the chip says so.
  *
- * A CV with no text is always shown, so "Type or paste your CV text" is never
- * behind a toggle. That is derived from the CV, not a reset of the user's
- * choice: a normal CV picked next is back to whatever they chose (L-192). It
- * has no toggle, because one that cannot fold the panel would lie.
+ * Folded until the user opens it (L-340), so the advert is above the fold;
+ * folded, nothing of it shows, because the CV chip already names the CV and
+ * its word count (L-445). A CV with no text is always shown. That is derived
+ * from the CV, not a reset of the user's choice: a normal CV picked next is
+ * back to whatever they chose (L-192).
  */
-function CvPreview({ cv, open, onToggle, running, onSaveCv }: CvPreviewProps) {
-  const text = cv.extracted_text ?? '';
-  const noText = text.trim() === '';
-  const shown = open || noText;
+export function TailorCvPreview({
+  selectedCv,
+  previewOpen,
+  running,
+  onSaveCv,
+}: Pick<TailorCvPickerProps, 'selectedCv' | 'previewOpen' | 'running' | 'onSaveCv'>) {
+  if (selectedCv === null) return null;
+  const shown = previewOpen || (selectedCv.extracted_text ?? '').trim() === '';
   return (
-    <div className="mt-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-ink-muted">
-          <span id="tailor-cv-preview-heading" className="font-medium">
-            Your CV as the rewrite reads it
-          </span>
-          {shown ? null : (
-            // Open, the panel's own line says this: no repeat.
-            <span data-testid="tailor-cv-preview-summary" className="text-xs text-ink-faint">
-              : {cv.name} · <span className="font-mono tabular-nums">{wordCount(text)}</span>{' '}
-              {wordCount(text) === 1 ? 'word' : 'words'}
-            </span>
-          )}
-        </p>
-        {noText ? null : (
-          <button
-            type="button"
-            data-testid="tailor-cv-preview-toggle"
-            aria-expanded={open}
-            aria-controls="tailor-cv-preview"
-            onClick={onToggle}
-            className={QUIET_BUTTON}
-          >
-            {open ? 'Hide CV' : 'Show CV'}
-          </button>
-        )}
-      </div>
-      <section
-        id="tailor-cv-preview"
-        data-testid="tailor-cv-preview"
-        aria-labelledby="tailor-cv-preview-heading"
-        hidden={!shown}
-        className="mt-1"
-      >
-        <CvTextPanel
-          // A fresh panel per CV: an edit in progress never follows the
-          // picker to another CV.
-          key={cv.id}
-          cv={cv}
-          disabled={running}
-          onSave={onSaveCv}
-        />
-      </section>
-    </div>
+    <section
+      id="tailor-cv-preview"
+      data-testid="tailor-cv-preview"
+      aria-labelledby="tailor-cv-preview-heading"
+      hidden={!shown}
+    >
+      {/* No longer shown (L-445), but still the panel's spoken name. */}
+      <span id="tailor-cv-preview-heading" className="sr-only">
+        Your CV as the rewrite reads it
+      </span>
+      <CvTextPanel
+        // A fresh panel per CV: an edit in progress never follows the
+        // picker to another CV.
+        key={selectedCv.id}
+        cv={selectedCv}
+        disabled={running}
+        onSave={onSaveCv}
+      />
+    </section>
   );
 }
