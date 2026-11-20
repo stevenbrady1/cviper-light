@@ -2,6 +2,7 @@ import { type JobProviderId, type KeylessSourceId } from '@cviper/job-apis';
 
 import { type Board } from '../boards/model';
 import { type KeyState } from '../../status/environment';
+import { Icon } from '../../ui';
 
 import { KeylessBar } from './KeylessBar';
 import { type FeedChoice } from './feedDefaults';
@@ -42,12 +43,16 @@ export interface WhereToLookProps {
  * The "Where to look" box: the keyed boards, the free feeds and the board
  * ticks, folded behind one line that says what is ticked (L-398).
  *
- * The browser's own fold, like the others in the app. Closed on every visit and
- * never remembered: a stored open/closed setting would be one more thing Search
- * keeps, which the privacy page would then have to list. Nothing in the summary
- * line is a button ("Manage job boards" stays inside), and it keeps
- * `display: list-item` so the browser draws its own mark; `marker:text-sm`
- * keeps the line a whole 44px in WebKit (see `KeyRow`).
+ * The browser's own fold. Closed on every visit and never remembered: a stored
+ * open/closed setting would be one more thing Search keeps, which the privacy
+ * page would then have to list. Nothing in the summary line is a button
+ * ("Manage job boards" stays inside).
+ *
+ * The mark is ours, a drawn chevron that turns down when the fold opens
+ * (L-437), not the browser's ▸. `list-none` switches off the browser's mark;
+ * WebKit ignores that and needs its `::-webkit-details-marker` hidden too. No
+ * transition: the motion budget has no room for it. The app's other folds
+ * keep the browser's mark for now.
  */
 export function WhereToLook({
   keyStates,
@@ -72,8 +77,15 @@ export function WhereToLook({
       data-testid="search-where"
       className="mt-4 rounded-card border border-line bg-sunken px-4"
     >
-      <details data-testid="search-where-fold">
-        <summary className="min-h-11 cursor-pointer py-2.5 marker:text-sm">
+      <details data-testid="search-where-fold" className="group">
+        <summary className="min-h-11 cursor-pointer list-none py-2.5 [&::-webkit-details-marker]:hidden">
+          <span
+            aria-hidden="true"
+            data-testid="search-where-mark"
+            className="mr-2 inline-flex h-lh items-center align-top text-ink-muted group-open:rotate-90"
+          >
+            <Icon name="chevron" size={16} />
+          </span>
           <h2 id="search-where-heading" className="inline font-medium text-ink">
             Where to look
           </h2>

@@ -176,6 +176,50 @@ describe('"Where to look" is a fold (L-398)', () => {
   });
 });
 
+/*
+  L-437: the fold draws its own chevron instead of the browser's ▸. jsdom has
+  no layout, so whether the browser's mark is really gone, and whether ours
+  turns, is measured in WebKit (`e2e/contrast-webkit.spec.ts`).
+*/
+describe('"Where to look" draws its own fold mark (L-437)', () => {
+  const mark = () => fold().querySelector('summary [data-testid="search-where-mark"]');
+
+  it('the summary holds one drawn mark, hidden from screen readers', async () => {
+    renderSearch();
+    await screen.findByTestId('search-empty');
+    expect(mark()?.getAttribute('aria-hidden')).toBe('true');
+    expect(mark()?.querySelectorAll('svg')).toHaveLength(1);
+    expect(fold().querySelectorAll('summary svg')).toHaveLength(1);
+  });
+
+  it("the browser's own mark is switched off, in WebKit too", async () => {
+    renderSearch();
+    await screen.findByTestId('search-empty');
+    const classes = fold().querySelector('summary')?.className.split(' ') ?? [];
+    expect(classes).toEqual(
+      expect.arrayContaining(['list-none', '[&::-webkit-details-marker]:hidden']),
+    );
+    // The old way of sizing the browser's mark has nothing left to size.
+    expect(classes).not.toContain('marker:text-sm');
+  });
+
+  it('turns when the fold opens, with no animation', async () => {
+    renderSearch();
+    await screen.findByTestId('search-empty');
+    expect(fold().classList.contains('group')).toBe(true);
+    const classes = mark()?.getAttribute('class') ?? '';
+    expect(classes.split(' ')).toContain('group-open:rotate-90');
+    expect(classes).not.toMatch(/transition|duration|animate/);
+  });
+
+  it('negative: the heading is still named "Where to look" — the mark adds no words', async () => {
+    renderSearch();
+    expect(await screen.findByRole('heading', { name: 'Where to look' })).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'Where to look' })).toBeTruthy();
+    expect(mark()?.textContent).toBe('');
+  });
+});
+
 describe('whereToLookSummary (L-398)', () => {
   it('happy: the free feed and two boards', () => {
     expect(whereToLookSummary([], ['arbeitnow'], 2)).toBe('Arbeitnow · 2 job boards ticked');
