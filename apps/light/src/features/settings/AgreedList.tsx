@@ -99,7 +99,7 @@ export function AgreedList({ port, onDrawn }: AgreedListProps = {}) {
 
   return (
     <section data-testid="settings-agreed">
-      <SectionHeading icon="shield" title="What I have agreed to" />
+      <SectionHeading title="What I have agreed to" />
 
       {problem === null ? null : (
         <ErrorBox variant="box" gapAbove="mt-2" testId="settings-agreed-error">

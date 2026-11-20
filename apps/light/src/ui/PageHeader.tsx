@@ -1,8 +1,5 @@
 import { type ReactNode } from 'react';
 
-import { type IconName } from './Icon';
-import { IconTile } from './IconTile';
-
 /**
  * The top of a screen: what it is, one muted line on what it is for, and —
  * optionally — the screen's actions.
@@ -90,8 +87,6 @@ export function PageHeader({
 export interface SectionHeadingProps {
   readonly title: ReactNode;
   readonly description?: ReactNode;
-  readonly icon?: IconName | undefined;
-  readonly tone?: 'navy' | 'danger';
   readonly level?: 2 | 3;
   /** Right-hand side of the heading row: a pill, a count, a quiet control. */
   readonly aside?: ReactNode;
@@ -99,31 +94,27 @@ export interface SectionHeadingProps {
 }
 
 /**
- * The head of a section inside a screen: an icon tile, the heading, and one
- * muted line under it. The in-page counterpart of `PageHeader`.
+ * The head of a section inside a screen: the heading, and one muted line under
+ * it. The in-page counterpart of `PageHeader`. No icon tile: like the page
+ * title's (L-431), it was a template tell (L-440).
  */
 export function SectionHeading({
   title,
   description,
-  icon,
-  tone = 'navy',
   level = 2,
   aside = null,
   id,
 }: SectionHeadingProps) {
   const Heading = level === 2 ? 'h2' : 'h3';
   return (
-    <div className="flex items-start gap-3">
-      {icon === undefined ? null : <IconTile icon={icon} tone={tone} size="sm" />}
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Heading id={id} className={SECTION_TITLE}>
-            {title}
-          </Heading>
-          {aside}
-        </div>
-        {description === undefined ? null : <p className="mt-0.5 text-ink-muted">{description}</p>}
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Heading id={id} className={SECTION_TITLE}>
+          {title}
+        </Heading>
+        {aside}
       </div>
+      {description === undefined ? null : <p className="mt-0.5 text-ink-muted">{description}</p>}
     </div>
   );
 }

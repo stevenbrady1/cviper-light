@@ -200,7 +200,7 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
       aria-labelledby="boards-settings-heading"
       tabIndex={-1}
     >
-      <SectionHeading id="boards-settings-heading" icon="boards" title="Job boards" />
+      <SectionHeading id="boards-settings-heading" title="Job boards" />
       <p className="mt-1 text-ink-muted">
         The buttons under the search box send whatever you have typed to one of these sites, opened
         in your own browser. No key and no account is needed for any of them. Untick the ones you

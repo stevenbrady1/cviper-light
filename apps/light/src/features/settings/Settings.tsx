@@ -422,7 +422,7 @@ export function Settings({
           <AgreedList port={consentPort} onDrawn={onAgreedDrawn} />
 
           <section>
-            <SectionHeading icon="data" title="Your data" />
+            <SectionHeading title="Your data" />
             {/*
               `leading-none` on the `.json` (L-364): this line sits above Job
               boards, where "Manage job boards" scrolls to. At the line's own
@@ -570,7 +570,7 @@ export function Settings({
           )}
 
           <section>
-            <SectionHeading icon="start" title="Getting started" />
+            <SectionHeading title="Getting started" />
             <p className="mt-1 text-ink-muted">
               The short introduction that appears the first time you open CViper Light.
             </p>
@@ -596,7 +596,7 @@ export function Settings({
             claim checkable rather than merely written down.
           */}
           <section>
-            <SectionHeading icon="shield" title="Privacy" />
+            <SectionHeading title="Privacy" />
 
             {/*
               The owner's own paragraph, first, before the switch and before the
