@@ -12,10 +12,6 @@ Changes waiting for the next release are in [`changes/unreleased/`](changes/unre
 
 A quieter, cleaner look across the app. Titles stand on their own without the grey icon tiles, labels are in the app's normal font, scroll bars are slim, empty screens share one simple "nothing here yet" look, and Search's buttons sit in one row. Analysis and Tailor now open on one line of choices, "Check [your CV] using [how to check it]" and "Rewrite [your CV] using [your AI]", above a big job advert box with the main button in the bar at its bottom, and "Past checks" moved up next to the Analysis title.
 
-### Added
-
-- Shared parts for the coming Analysis and Tailor layout: a drop-down drawn as a small chip, one big box with a bar for the main button, and a reason beside a greyed-out item in a "…" list. Nothing on screen changes yet (L-442).
-
 ### Changed
 
 - Tailor no longer leaves an empty gap above the job advert box when your CV text is folded. Analysis, Tailor and the empty Tracker board now show their "nothing here yet" message the same way as Search: a small grey icon, the same words and buttons as before, and no dashed box (L-447).
@@ -30,7 +26,7 @@ A quieter, cleaner look across the app. Titles stand on their own without the gr
 - On Search, every box is now the same height, "Contract type" included, and Within, Minimum salary and Contract type share their row in equal widths. "Where to look" shows a small drawn arrow that turns when it opens, instead of the browser's own mark (L-437).
 - Profile shows each saved CV as one row: the name, its word count and date in small grey text, and Rename and Delete on the right, with a thin line between rows. On a phone the buttons sit under the name (L-436).
 - Scroll bars are now slim and rounded, with no arrow buttons, and turn a little darker when you point at them. They are still wide enough to grab (L-435).
-- Before a search, the results area now shows a small grey search icon over the same words, with no dashed box round it. It uses a new shared empty state that other screens can move onto later (L-434).
+- Before a search, the results area now shows a small grey search icon over the same words, with no dashed box round it (L-434).
 - Search's buttons now sit in one row: Search, "Also open in N boards", then "Save this search" and "Found one? Bring it in" as quiet buttons. If a button is greyed out, the reason is on one line just under the row, and it stays on screen on short windows (L-433).
 - Labels read as plain words in the app's own font, not small spaced-out capitals: the Tracker's column heads and stats labels, the side menu's "Ctrl 1" hints and the menu footer's "Set up" (L-432). Numbers and dates keep their fixed-width digits.
 - Every screen's title now stands on its own, larger, without the grey icon tile beside it. The menu already shows that icon, and the header is no taller (L-431).
