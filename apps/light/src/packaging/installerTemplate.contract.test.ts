@@ -144,8 +144,8 @@ describe('fix 1: Finish never blocks the installer window', () => {
 describe('fix 2: an upgrade by hand never shows the old uninstaller', () => {
   const leave = functionBody(TEMPLATE, 'PageLeaveReinstall');
 
-  it('passes /S /UPDATE to the old uninstaller when replacing an older version', () => {
-    expect(leave).toMatch(/StrCpy \$R1 "\$R1 \/S \/UPDATE"/);
+  it('passes /P /UPDATE to the old uninstaller when replacing an older version', () => {
+    expect(leave).toMatch(/StrCpy \$R1 "\$R1 \/P \/UPDATE"/);
     // Only on the flag set for an upgrade (not WiX, not same version, not a downgrade).
     expect(leave).toMatch(/\$\{AndIf\} \$R0 = 1/);
     expect(leave).toMatch(/\$\{IfThen\} \$CviperSilentReplace = 1/);
