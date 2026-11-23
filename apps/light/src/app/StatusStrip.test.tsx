@@ -3,12 +3,13 @@
  * The rail's AI row (L-182): which cloud AI providers this machine has a key
  * for, answered without opening Settings.
  */
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type EnvironmentStatus, NO_AI_KEYS } from '../status/environment';
 
+import { statusDotHint } from './hints';
 import { Sidebar } from './Sidebar';
 import { StatusStrip } from './StatusStrip';
 
@@ -158,12 +159,12 @@ describe('the side menu labels are words in Inter, not small mono capitals (L-43
     return element.className.split(/\s+/);
   }
 
-  it('happy: the footer heading reads "Set up" in Inter, text-xs, with no CSS capitals', () => {
+  it('happy: the footer heading reads "Set up", with no CSS capitals, for screen readers only (S1)', () => {
     render(<StatusStrip status={status()} />);
 
     const heading = screen.getByRole('heading', { name: 'Set up' });
     expect(heading.textContent).toBe('Set up');
-    expect(classesOf(heading)).toEqual(expect.arrayContaining(['text-xs', 'font-medium']));
+    expect(classesOf(heading)).toContain('sr-only');
     expect(classesOf(heading)).not.toContain('font-mono');
     expect(classesOf(heading)).not.toContain('uppercase');
   });
@@ -193,5 +194,113 @@ describe('the side menu labels are words in Inter, not small mono capitals (L-43
     );
     expect(light).toBeDefined();
     expect(classesOf(light as Element)).toEqual(expect.arrayContaining(['font-mono', 'uppercase']));
+  });
+});
+
+/**
+ * S1: a quieter menu footer. A teal dot means "ready" and needs nothing from
+ * the user, so it loses its "i" (its tip still opens on hover and tap). The
+ * "i" stays where it earns its place: "Requests today", a number nobody can
+ * guess, and a gold dot, which needs the user.
+ */
+describe('a quieter footer (S1)', () => {
+  const infoButtons = () =>
+    within(screen.getByTestId('status-strip')).queryAllByRole('button', {
+      name: 'What this means',
+    });
+  const shownTips = () =>
+    screen
+      .getAllByRole('tooltip', { hidden: true })
+      .filter((tip) => !tip.hidden)
+      .map((tip) => tip.textContent);
+
+  it('happy: with Ollama running, the only "i" belongs to "Requests today"', () => {
+    render(<StatusStrip status={{ ...status(), ollama: 'running' }} />);
+
+    const buttons = infoButtons();
+    expect(buttons).toHaveLength(1);
+    expect(screen.getByTestId('status-requests').contains(buttons[0] as Element)).toBe(true);
+  });
+
+  it('negative: an unreadable AI key and a half-entered Adzuna keep their "i"', () => {
+    render(<StatusStrip status={{ ...status({ openai: 'unreadable' }), adzuna: 'incomplete' }} />);
+
+    for (const testId of ['status-ai-openai', 'status-adzuna']) {
+      const mark = screen.getByTestId(testId).parentElement as HTMLElement;
+      expect(
+        within(mark).queryAllByRole('button', { name: 'What this means' }),
+        testId,
+      ).toHaveLength(1);
+    }
+    expect(infoButtons()).toHaveLength(3);
+  });
+
+  it("negative: a gold dot's 'i' is still a Tab stop that opens its tip", async () => {
+    const user = userEvent.setup();
+    render(<StatusStrip status={{ ...status(), adzuna: 'incomplete' }} />);
+
+    await user.tab();
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('What this means');
+    expect(shownTips()).toEqual([statusDotHint('Adzuna', 'needs its second credential')]);
+  });
+
+  it('boundary: five things set up and ready still show exactly one "i"', () => {
+    render(
+      <StatusStrip
+        status={{
+          ...status({ google: 'configured', mistral: 'configured' }),
+          ollama: 'running',
+          adzuna: 'configured',
+          reed: 'configured',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('status-ollama')).toBeTruthy();
+    expect(screen.getByTestId('status-ai-mistral')).toBeTruthy();
+    expect(infoButtons()).toHaveLength(1);
+  });
+
+  it('boundary: nothing set up shows only the "Requests today" "i"', () => {
+    render(<StatusStrip status={status()} />);
+
+    expect(screen.getByTestId('status-none')).toBeTruthy();
+    expect(infoButtons()).toHaveLength(1);
+  });
+
+  it('boundary: before the first read there is still no "Nothing set up yet" line (L-191)', () => {
+    render(<StatusStrip status={null} />);
+
+    expect(screen.queryByTestId('status-none')).toBeNull();
+    expect(infoButtons()).toHaveLength(1);
+  });
+
+  it('interaction: a click on "Ollama" opens its tip and a second click closes it', async () => {
+    const user = userEvent.setup();
+    render(<StatusStrip status={{ ...status(), ollama: 'running' }} />);
+    const tip = statusDotHint('Ollama', 'running on this machine');
+
+    await user.click(screen.getByText('Ollama'));
+    expect(shownTips()).toEqual([tip]);
+    await user.click(screen.getByText('Ollama'));
+    expect(shownTips()).toEqual([]);
+  });
+
+  it('interaction: hovering "Ollama" opens its tip and moving away closes it', async () => {
+    const user = userEvent.setup();
+    render(<StatusStrip status={{ ...status(), ollama: 'running' }} />);
+
+    await user.hover(screen.getByText('Ollama'));
+    expect(shownTips()).toEqual([statusDotHint('Ollama', 'running on this machine')]);
+    await user.unhover(screen.getByText('Ollama'));
+    expect(shownTips()).toEqual([]);
+  });
+
+  it('the heading is still found by its name, and carries sr-only', () => {
+    render(<StatusStrip status={{ ...status(), ollama: 'running' }} />);
+
+    expect(screen.getByRole('heading', { name: 'Set up' }).className.split(/\s+/)).toContain(
+      'sr-only',
+    );
   });
 });
