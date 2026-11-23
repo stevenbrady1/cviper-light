@@ -7749,7 +7749,8 @@ async function titleAndColumnEdges(
 /**
  * How many different colours the scroll area's bar strip (its right 10px)
  * paints, read from a real screenshot. One colour: an empty strip, no thumb and
- * no visible track. More: something is drawn there.
+ * no visible track. More: something is drawn there. The strip stops 12px short
+ * of the bottom: there the panel's round corner shows the navy frame (L-454).
  */
 async function stripColours(page: Page, view: string): Promise<number> {
   const strip = await page.evaluate((id) => {
@@ -7757,7 +7758,7 @@ async function stripColours(page: Page, view: string): Promise<number> {
     const area = column?.parentElement?.closest('.overflow-y-auto');
     if (!area) throw new Error(`no scroll area on ${id}`);
     const box = area.getBoundingClientRect();
-    return { x: box.right - 10, y: box.top, width: 10, height: box.height };
+    return { x: box.right - 10, y: box.top, width: 10, height: box.height - 12 };
   }, view);
   const png = (await page.screenshot({ clip: strip })).toString('base64');
   return page.evaluate(async (data) => {
@@ -9142,6 +9143,200 @@ describe('Tailor: no empty gap above the advert box (L-447)', () => {
     assert.ok(
       problems.some((line) => line.includes('not one 12px gap')),
       `the second gap went unreported: ${JSON.stringify(problems)}`,
+    );
+    await page.context().close();
+  });
+});
+
+/**
+ * One white panel inside the navy frame (L-454).
+ *
+ * From 768px up the shell is navy and every screen sits in one white panel,
+ * the shell's `<main>`: 12px corners, 8px of navy above, right and below, and
+ * none on the rail's side (a left gap would leave the Tracker board 0px spare
+ * at 1000px). The corners are read from a screenshot, not from the style: a
+ * radius with nothing clipping the header's white would still draw a square
+ * corner. On a phone there is no panel: the view is white, edge to edge, above
+ * the bottom bar.
+ */
+const PANEL_WINDOWS = [
+  { width: 1280, height: 800 },
+  { width: 1000, height: 700 },
+  { width: 768, height: 700 },
+] as const;
+const PANEL_GAP = 8;
+const PANEL_WHITE = 'rgb(255, 255, 255)';
+const FRAME_NAVY = 'rgb(15, 32, 68)'; // --color-navy, #0f2044
+
+interface Edges {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+}
+
+interface PanelLayout {
+  readonly panel: Edges;
+  readonly frame: Edges;
+  readonly rail: number | null;
+  readonly bar: number | null;
+  readonly radius: string;
+  readonly fill: string;
+  readonly frameFill: string;
+}
+
+async function panelLayout(page: Page): Promise<PanelLayout> {
+  return page.evaluate(() => {
+    const main = document.querySelector('[data-testid="shell"] > main');
+    const shell = document.querySelector('[data-testid="shell"]');
+    if (main === null || shell === null) throw new Error('no shell or no <main>');
+    const box = (element: Element) => {
+      const { left, top, right, bottom } = element.getBoundingClientRect();
+      return { left, top, right, bottom };
+    };
+    const style = getComputedStyle(main);
+    return {
+      panel: box(main),
+      frame: box(shell),
+      rail:
+        document.querySelector('[data-testid="sidebar"]')?.getBoundingClientRect().right ?? null,
+      bar:
+        document.querySelector('[data-testid="bottom-nav"]')?.getBoundingClientRect().top ?? null,
+      radius: [
+        style.borderTopLeftRadius,
+        style.borderTopRightRadius,
+        style.borderBottomRightRadius,
+        style.borderBottomLeftRadius,
+      ].join(' '),
+      fill: style.backgroundColor,
+      frameFill: getComputedStyle(shell).backgroundColor,
+    };
+  });
+}
+
+/** The colour of one screen pixel, as `rgb(r, g, b)`, read from a real screenshot. */
+async function pixelAt(page: Page, x: number, y: number): Promise<string> {
+  const png = (await page.screenshot({ clip: { x, y, width: 1, height: 1 } })).toString('base64');
+  return page.evaluate(async (data) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${data}`;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext('2d');
+    if (context === null) throw new Error('no 2D canvas');
+    context.drawImage(image, 0, 0);
+    const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+    return `rgb(${String(r)}, ${String(g)}, ${String(b)})`;
+  }, png);
+}
+
+/** What is wrong with the desktop panel, one line per problem. */
+async function desktopPanelProblems(page: Page): Promise<string[]> {
+  const seen = await panelLayout(page);
+  const { panel, frame } = seen;
+  const problems: string[] = [];
+  const gaps = {
+    top: panel.top - frame.top,
+    right: frame.right - panel.right,
+    bottom: frame.bottom - panel.bottom,
+  };
+  for (const [side, gap] of Object.entries(gaps)) {
+    if (gap < 0.5) problems.push(`panel touches the window edge (${side})`);
+    else if (Math.abs(gap - PANEL_GAP) > 0.5) problems.push(`${side} gap ${String(gap)}px, not 8`);
+  }
+  if (seen.rail === null) problems.push('no rail');
+  else if (Math.abs(panel.left - seen.rail) > 0.5) {
+    problems.push(
+      `panel starts at ${String(panel.left)}px, the rail ends at ${String(seen.rail)}px`,
+    );
+  }
+  if (seen.radius !== '12px 12px 12px 12px') problems.push(`corner radius ${seen.radius}`);
+  if (seen.fill !== PANEL_WHITE) problems.push(`panel fill ${seen.fill}`);
+  if (seen.frameFill !== FRAME_NAVY) problems.push(`frame fill ${seen.frameFill}`);
+  // Each corner's outermost pixel lies outside a 12px arc: navy if it is clipped.
+  const corners: Record<string, readonly [number, number]> = {
+    'top left': [panel.left, panel.top],
+    'top right': [panel.right - 1, panel.top],
+    'bottom right': [panel.right - 1, panel.bottom - 1],
+    'bottom left': [panel.left, panel.bottom - 1],
+  };
+  for (const [corner, [x, y]] of Object.entries(corners)) {
+    const colour = await pixelAt(page, Math.round(x), Math.round(y));
+    if (colour !== FRAME_NAVY) problems.push(`no round corner (${corner}: ${colour})`);
+  }
+  return problems;
+}
+
+describe('one white panel inside the navy frame (L-454)', () => {
+  for (const viewport of PANEL_WINDOWS) {
+    it(`at ${String(viewport.width)}×${String(viewport.height)} every screen is one white panel: 12px corners, 8px of navy above, right and below, none beside the menu`, async () => {
+      const page = await open('?seen=1&entries=1', viewport);
+      const report: string[] = [];
+      for (const view of VIEWS) {
+        await goTo(page, view);
+        report.push(...(await desktopPanelProblems(page)).map((line) => `${view} — ${line}`));
+      }
+      console.log(
+        `panel at ${String(viewport.width)}x${String(viewport.height)}: ${JSON.stringify(await panelLayout(page))}`,
+      );
+      assert.deepEqual(report, []);
+      await page.context().close();
+    });
+  }
+
+  it('at 375×812 there is no panel: the view is white, edge to edge, above the bar, and nothing scrolls sideways', async () => {
+    const page = await open('?seen=1&entries=1', { width: 375, height: 812 });
+    const report: string[] = [];
+    for (const view of VIEWS) {
+      await goTo(page, view);
+      const seen = await panelLayout(page);
+      const problems: string[] = [];
+      if (seen.panel.left !== seen.frame.left || seen.panel.right !== seen.frame.right) {
+        problems.push(`panel ${String(seen.panel.left)}–${String(seen.panel.right)}px`);
+      }
+      if (seen.radius !== '0px 0px 0px 0px') problems.push(`corner radius ${seen.radius}`);
+      if (seen.fill !== PANEL_WHITE) problems.push(`view fill ${seen.fill}`);
+      if (seen.frameFill === FRAME_NAVY) problems.push('the frame is navy on a phone');
+      if (seen.rail !== null) problems.push('a rail on a phone');
+      if (seen.bar === null || seen.bar < seen.panel.bottom - 0.5) problems.push('no bar below');
+      problems.push(...(await sidewaysScroll(page)));
+      report.push(...problems.map((line) => `${view} — ${line}`));
+    }
+    assert.deepEqual(report, []);
+    await page.context().close();
+  });
+
+  it('at 1000×700 all five Tracker columns still fit inside the panel', async () => {
+    const page = await openBoard('1', 1000, 700);
+    const fit = await boardFit(page);
+    console.log(`board in the panel at 1000px: ${JSON.stringify(fit)}`);
+    assert.deepEqual(fit.problems, []);
+    for (const column of fit.columns)
+      assert.ok(column >= COLUMN_FLOOR - 0.5, `${String(column)}px`);
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a panel with no margin, or with no radius, is reported', async () => {
+    const page = await open('?seen=1', { width: 1000, height: 700 });
+    const main = page.locator('[data-testid="shell"] > main');
+    await main.evaluate((element) => {
+      (element as HTMLElement).style.margin = '0';
+    });
+    const flush = await desktopPanelProblems(page);
+    assert.ok(
+      flush.some((line) => line.startsWith('panel touches the window edge')),
+      `a flush panel went unreported: ${JSON.stringify(flush)}`,
+    );
+    await main.evaluate((element) => {
+      (element as HTMLElement).style.cssText = 'border-radius:0';
+    });
+    const square = await desktopPanelProblems(page);
+    assert.ok(
+      square.some((line) => line.startsWith('no round corner')),
+      `a square panel went unreported: ${JSON.stringify(square)}`,
     );
     await page.context().close();
   });

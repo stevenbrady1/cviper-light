@@ -42,7 +42,8 @@ import { LiveStatus } from './LiveStatus';
 
 /**
  * The application shell: a fixed navy rail on the left, one view to the right
- * — or, on a phone, the view on top and a navigation bar along the bottom.
+ * in a white panel inset in the navy frame (L-454) — or, on a phone, the view
+ * on top and a navigation bar along the bottom.
  *
  * ============================================================================
  * WHAT THE SHELL OWNS, AND WHAT IT DOES NOT
@@ -398,11 +399,22 @@ export default function App({
         // Phone: a column, the view above the bar. The bottom inset is the
         // bar's own (`BottomNav`), so it is navy under the home indicator.
         narrow ? 'flex-col pt-safe pl-safe pr-safe' : '',
+        // Desktop: navy round the white panel below (L-454).
+        'md:bg-navy',
       ].join(' ')}
     >
       {narrow ? null : <Sidebar activeView={activeView} onSelect={onSelect} status={status} />}
 
-      <main ref={mainRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
+      {/*
+        One white panel for every screen (L-454): 8px of navy above, right and
+        below, none beside the rail (the board needs that 8px at 1000px), and no
+        shadow. `overflow-clip` rounds what is inside without making a scroll
+        area. A phone gets only the white.
+      */}
+      <main
+        ref={mainRef}
+        className="flex min-h-0 min-w-0 flex-1 flex-col bg-card md:my-2 md:mr-2 md:overflow-clip md:rounded-card"
+      >
         {/*
           A strip above the view, never a modal over it. The app stays usable
           behind it and "Not now" installs nothing — see `UpdateBanner`.
