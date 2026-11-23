@@ -8,7 +8,17 @@ All notable changes to CViper Light are recorded here. The format follows
 
 Changes waiting for the next release are in [`changes/unreleased/`](changes/unreleased/), one file per change, so two pull requests never edit the same lines here (L-303). `pnpm changelog:preview` shows them as they will appear; `pnpm changelog:release <version> <date>` writes them in below. See [CONTRIBUTING.md](CONTRIBUTING.md#the-changelog).
 
+## [0.14.1] — 2026-11-23
+
+A small fix release for Windows. The installer now moves straight on to its Finish page when it is done, and shows its progress while it removes an older version. This version also carries everything listed under 0.14.0, which was never published.
+
+### Fixed
+
+- The Windows installer now moves straight on to its Finish page when it is done, instead of stopping on an "Installation Complete" page with no button to press. When it removes an older version during an upgrade, it shows that step's progress instead of leaving the screen empty (L-449).
+
 ## [0.14.0] — 2026-11-20
+
+Tagged but never published, because the Windows installer fix merged after it. Everything here ships in 0.14.1.
 
 A quieter, cleaner look across the app. Titles stand on their own without the grey icon tiles, labels are in the app's normal font, scroll bars are slim, empty screens share one simple "nothing here yet" look, and Search's buttons sit in one row. Analysis and Tailor now open on one line of choices, "Check [your CV] using [how to check it]" and "Rewrite [your CV] using [your AI]", above a big job advert box with the main button in the bar at its bottom, and "Past checks" moved up next to the Analysis title.
 
@@ -733,7 +743,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.14.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.14.1...main
+[0.14.1]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.14.0...light-v0.14.1
 [0.14.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.13.1...light-v0.14.0
 [0.13.1]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.13.0...light-v0.13.1
 [0.13.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.11.0...light-v0.13.0
