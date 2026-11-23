@@ -111,7 +111,7 @@ export function SearchSubmitRow({
     <>
       <div
         data-testid="search-submit-row"
-        className="mt-4 md:sticky md:-bottom-5 md:mt-0 md:-mb-3 md:bg-canvas md:pt-4 md:pb-3"
+        className="mt-4 md:sticky md:-bottom-5 md:mt-0 md:-mb-3 md:bg-card md:pt-4 md:pb-3"
       >
         <div className="flex flex-wrap items-center gap-3">
           <button

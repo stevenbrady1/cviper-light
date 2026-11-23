@@ -27,10 +27,10 @@ describe('the pinned submit row (L-342)', () => {
     render(<SearchSubmitRow running={false} disabledReason={null} fix={null} />);
     const classes = screen.getByTestId('search-submit-row').className.split(' ');
     expect(classes).toContain('md:sticky');
-    expect(classes).toContain('md:bg-canvas');
+    expect(classes).toContain('md:bg-card');
     // The phone's spacing, as it always was.
     expect(classes).toContain('mt-4');
-    for (const phoneChange of ['sticky', 'bg-canvas', '-bottom-5', 'pt-4', 'pb-3']) {
+    for (const phoneChange of ['sticky', 'bg-card', '-bottom-5', 'pt-4', 'pb-3']) {
       expect(classes).not.toContain(phoneChange);
     }
   });
