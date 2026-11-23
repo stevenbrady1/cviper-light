@@ -5,7 +5,6 @@ import { type EnvironmentStatus } from '../status/environment';
 import { CViperMark } from './CViperMark';
 import { NavIcon } from './NavIcon';
 import { StatusStrip } from './StatusStrip';
-import { APP_VERSION } from '../features/settings/backup';
 
 import { SEQUENCE_VIEWS, YOU_VIEWS, type ViewDefinition, type ViewId } from './views';
 
@@ -125,8 +124,8 @@ export function Sidebar({ activeView, onSelect, status }: SidebarProps) {
       {/*
         "You" (L-402): Profile and Settings, straight under the steps. Words,
         not a control; it names its list, so a screen reader says "You, list,
-        2 items". This list takes the spare height, which keeps the version
-        line and the status strip at the bottom.
+        2 items". This list takes the spare height, which keeps the status
+        strip at the bottom. The version is in Settings → About (L-452).
       */}
       <p id="nav-you-label" className="px-4 pt-4 pb-1 text-xs text-ink-inverse-muted">
         You
@@ -138,15 +137,6 @@ export function Sidebar({ activeView, onSelect, status }: SidebarProps) {
           </li>
         ))}
       </ul>
-
-      {/*
-        Which version this is, without opening Settings → About (L-251). The
-        same constant About shows. Plain text: nothing to press, nothing to
-        tab to.
-      */}
-      <p data-testid="sidebar-version" className="px-4 pb-3 text-xs text-ink-inverse-muted">
-        CViper Light {APP_VERSION}
-      </p>
 
       <StatusStrip status={status} onOpenSettings={() => onSelect('settings')} />
     </nav>
