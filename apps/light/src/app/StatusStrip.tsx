@@ -67,7 +67,9 @@ interface DotProps {
 
 function Dot(props: DotProps) {
   return (
-    <Hint text={statusDotHint(props.label, props.description)}>
+    // A teal dot is "ready" and needs nothing, so no "i" (S1): its tip still opens on
+    // hover and tap. A gold dot needs the user and keeps its "i" as a Tab stop.
+    <Hint text={statusDotHint(props.label, props.description)} focusable={props.tone !== 'bg-teal'}>
       <DotBody {...props} />
     </Hint>
   );
@@ -123,7 +125,8 @@ export function StatusStrip({ status, onOpenSettings }: StatusStripProps) {
       className="border-t border-canvas/10 px-4 py-3 text-xs text-ink-inverse-muted"
       data-testid="status-strip"
     >
-      <h2 className="mb-2 text-xs font-medium">Set up</h2>
+      {/* Hidden from sight to quiet the footer (S1); still read out as a heading. */}
+      <h2 className="sr-only">Set up</h2>
 
       <ul className="space-y-1.5">
         {showOllama ? (
