@@ -18,13 +18,17 @@
 ;   2. "Run CViper Light" starts the app through explorer.exe with Exec, which returns
 ;      at once and starts it as the signed-in user, instead of a ShellExecute that held
 ;      the window until Windows had scanned and started a new, unsigned exe.
-;   3. Installing over an OLDER version by hand runs the old uninstaller silently in
-;      update mode (/S /UPDATE), so its "Delete the application data" box (which since
-;      0.10.1 also deletes saved keys) never appears during an upgrade, and nothing the
-;      user keeps is touched.
-;   4. Before that silent uninstall, a running CViper Light is asked about (OK/Cancel),
+;   3. Installing over an OLDER version by hand runs the old uninstaller passively in
+;      update mode (/P /UPDATE, L-449; /S /UPDATE before), so its "Delete the application
+;      data" box (which since 0.10.1 also deletes saved keys) never appears during an
+;      upgrade, nothing the user keeps is touched, and its own progress window shows
+;      while the installer's window is hidden (a silent one left the screen empty).
+;   4. Before that uninstall, a running CViper Light is asked about (OK/Cancel),
 ;      instead of being closed without asking. Since tauri-cli 2.12 the check takes the
 ;      app's full path and asks Windows' Restart Manager (Win\RestartManager.nsh).
+;   5. No MUI_FINISHPAGE_NOAUTOCLOSE (L-449): a good install moves straight on to the
+;      Finish page instead of waiting on "Installation Complete", whose "Next >" button
+;      was not drawn on the owner's PC. An aborted install still stays on that page.
 ;
 ; The in-app updater path (/UPDATE /P) is unchanged: it never runs the old uninstaller,
 ; and .onInstSuccess's /R relaunch is untouched.
@@ -403,8 +407,8 @@ Function PageLeaveReinstall
 
   reinst_uninstall:
     ; CVIPER: upgrading by hand (an older NSIS install, the pre-selected "uninstall before
-    ; CVIPER: installing") replaces it silently in update mode; first ask about a running app,
-    ; CVIPER: because a silent uninstaller would close it without asking.
+    ; CVIPER: installing") replaces it passively in update mode; first ask about a running app,
+    ; CVIPER: because a passive uninstaller would close it without asking.
     StrCpy $CviperSilentReplace 0
     ${If} $WixMode <> 1
     ${AndIf} $R0 = 1
@@ -425,8 +429,9 @@ Function PageLeaveReinstall
       ReadRegStr $R1 SHCTX "${UNINSTKEY}" "UninstallString"
       ${IfThen} $UpdateMode = 1 ${|} StrCpy $R1 "$R1 /UPDATE" ${|} ; append /UPDATE
       ${IfThen} $PassiveMode = 1 ${|} StrCpy $R1 "$R1 /P" ${|} ; append /P
-      ; CVIPER: no uninstaller window, and update mode skips its app-data and key deletion.
-      ${IfThen} $CviperSilentReplace = 1 ${|} StrCpy $R1 "$R1 /S /UPDATE" ${|}
+      ; CVIPER: passive: only the uninstaller's progress window (no confirm page, so no
+      ; CVIPER: app-data box), and update mode skips its app-data and key deletion.
+      ${IfThen} $CviperSilentReplace = 1 ${|} StrCpy $R1 "$R1 /P /UPDATE" ${|}
       StrCpy $R1 "$R1 _?=$4" ; append uninstall directory
       ExecWait '$R1' $0
     ${EndIf}
@@ -483,9 +488,8 @@ Var AppStartMenuFolder
 
 ; 8. Finish page
 ;
-; Don't auto jump to finish page after installation page,
-; because the installation page has useful info that can be used debug any issues with the installer.
-!define MUI_FINISHPAGE_NOAUTOCLOSE
+; CVIPER: no MUI_FINISHPAGE_NOAUTOCLOSE: go straight on to the finish page after a good
+; CVIPER: install (an aborted one still stays on the installation page with its log).
 ; CVIPER: no "Create desktop shortcut" box here: the install Section creates it (see there).
 ; Show run app after installation.
 !define MUI_FINISHPAGE_RUN
