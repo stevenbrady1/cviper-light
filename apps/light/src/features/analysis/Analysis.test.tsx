@@ -753,18 +753,19 @@ describe('one line of choices, and the advert box as the hero (L-446)', () => {
     return screen.getByTestId('composer-bar');
   }
 
-  it('happy: the line reads "Check", the CV chip, "…", "using", the AI chip, then Upload a CV', async () => {
+  it('happy: the line reads "Check", the CV chip, "using", the AI chip, Upload a CV, then "…"', async () => {
     await renderView({ port: createFakeAnalysisPort({ cvs: [EXISTING_CV] }) });
     await screen.findByDisplayValue('Jordan Lewis CV.pdf');
 
     const row = sentence();
+    // Changed on purpose (L-463): the "…" left the sentence for the end of the line.
     const order = [
       within(row).getByText('Check'),
       screen.getByTestId('analysis-cv'),
-      screen.getByTestId('analysis-cv-more'),
       within(row).getByText('using'),
       screen.getByTestId('analysis-provider'),
       screen.getByTestId('analysis-upload'),
+      screen.getByTestId('analysis-cv-more'),
     ];
     for (const part of order) expect(row.contains(part)).toBe(true);
     for (let i = 1; i < order.length; i += 1) expectBefore(order[i - 1]!, order[i]!);
