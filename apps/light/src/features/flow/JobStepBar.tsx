@@ -60,7 +60,8 @@ export interface JobStepBarProps {
   readonly onTracker?: (() => void) | undefined;
 }
 
-const MARK: Readonly<Record<StepState, StateMarkName>> = {
+/** Each step state's mark. The tracker card draws the same ones (L-464). */
+export const STEP_MARK: Readonly<Record<StepState, StateMarkName>> = {
   done: 'tick',
   current: 'dot',
   skipped: 'skipped',
@@ -188,7 +189,7 @@ export function JobStepBar({
                     className={`${QUIET_BUTTON} min-w-11 md:min-w-0`}
                     {...trigger}
                   >
-                    <StateMark name={MARK[step.state]} />
+                    <StateMark name={STEP_MARK[step.state]} />
                     {/* A phone shows the mark only; the name stays for a screen reader. */}
                     <span
                       className={`sr-only md:not-sr-only ${step.state === 'current' ? 'font-semibold text-ink' : ''}`}

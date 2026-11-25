@@ -5,10 +5,11 @@ import { Hint } from '../../app/Hint';
 import { FLOW_HINT } from '../../app/hints';
 import { StateMark } from '../../ui';
 
+import { STEP_MARK } from './JobStepBar';
 import { STEPS, continueStep, stepStates, type JobProgress, type StepId } from './steps';
 
 /**
- * A tracker card's small step bar (L-200): ●●●○○ and Continue.
+ * A tracker card's small step bar (L-200): ✓✓●○○ and Continue.
  *
  * Sits in the card's frame, under the card button, not inside it (L-438): the
  * card is one big button (select it, drag it), and a button inside a button is
@@ -26,8 +27,10 @@ import { STEPS, continueStep, stepStates, type JobProgress, type StepId } from '
  * row's accessible name, so the words heard and the words read are one.
  *
  * The dots are drawn (`StateMark`, L-360), not typed, so they look the same on
- * every machine: a filled dot for a step done, an empty ring for one not —
- * two shapes, not two colours.
+ * every machine, and they are the big step bar's own marks (`STEP_MARK`,
+ * L-464): a tick for done, the filled dot for the step Continue opens, an
+ * empty ring for still to do, a struck-through ring for skipped. So the filled
+ * dot always sits on the step the line names. Shapes, not colours.
  */
 export interface CardProgressProps {
   readonly applicationId: string;
@@ -70,8 +73,8 @@ export function CardProgress({ applicationId, progress, onContinue }: CardProgre
             aria-hidden="true"
             className="font-mono text-[11px] tracking-[0.2em] text-ink-muted"
           >
-            {states.map((step, index) => (
-              <StateMark key={step.id} name={filled[index] === true ? 'dot' : 'ring'} />
+            {states.map((step) => (
+              <StateMark key={step.id} name={STEP_MARK[step.state]} />
             ))}
           </span>
         </Hint>
