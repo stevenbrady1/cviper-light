@@ -2,7 +2,12 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 
 import { type Cv } from '@cviper/core-types';
 
-import { DESTRUCTIVE_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import {
+  DESTRUCTIVE_BUTTON,
+  QUIET_BUTTON,
+  QUIET_DESTRUCTIVE_BUTTON,
+  SECONDARY_BUTTON,
+} from '../../app/buttons';
 import { FIELD, FIELD_INVALID } from '../../app/fields';
 import { Dialog } from '../../ui';
 
@@ -176,7 +181,7 @@ export function CvRow({ cv, facts, onRename, onDelete }: CvRowProps) {
           aria-label={`Delete ${cv.name}`}
           onClick={() => onDelete(cv)}
           data-testid={`profile-cv-delete-${cv.id}`}
-          className={`${QUIET_BUTTON} text-xs`}
+          className={`${QUIET_DESTRUCTIVE_BUTTON} text-xs`}
         >
           Delete
         </button>

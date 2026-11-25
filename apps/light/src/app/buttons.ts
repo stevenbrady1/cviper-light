@@ -1,5 +1,6 @@
 /**
- * The three kinds of button this app has. There is no fourth.
+ * The kinds of button this app has: primary, secondary, destructive, and two
+ * quiet (text-only) ones, plain and red. There is no sixth.
  *
  * ============================================================================
  * AT MOST ONE BLUE BUTTON PER VIEW
@@ -17,12 +18,12 @@
  * A primary button that is momentarily unavailable is DISABLED, never hidden.
  * A control that comes and goes is a control the user cannot learn.
  *
- * `destructive` is red, and red appears in exactly two places in the whole app:
- * here, and an overdue next action on a tracker card (the `rejected` status
- * pill that used to be the other one left the card in L-175).
+ * Red appears in few places: `destructive` (a filled button), the red WORDS of
+ * `QUIET_DESTRUCTIVE_BUTTON`, and an overdue next action on a tracker card (the
+ * `rejected` status pill that used to be the other one left the card in L-175).
  *
  * A disabled button LOOKS disabled, and in one way: the `line` grey fill, in all
- * four styles (L-315). Greying the text alone left a secondary button looking
+ * five styles (L-315). Greying the text alone left a secondary button looking
  * pressable. `sunken` is too close to the page to see, and it is the hover colour.
  */
 
@@ -39,5 +40,12 @@ export const SECONDARY_BUTTON = `${BASE} border border-line bg-card text-ink hov
 
 export const DESTRUCTIVE_BUTTON = `${BASE} bg-danger text-ink-inverse hover:bg-danger/90 disabled:bg-line disabled:text-ink-faint`;
 
-/** A quiet, text-only button for the third-rank actions. */
-export const QUIET_BUTTON = `${BASE} text-ink-muted hover:bg-sunken hover:text-ink disabled:bg-line disabled:text-ink-faint aria-disabled:bg-line`;
+/**
+ * A quiet, text-only button for the third-rank actions. Blue words say "press
+ * me" (L-458) without a second blue fill: the one-blue rule counts
+ * `data-primary`, which these never carry.
+ */
+export const QUIET_BUTTON = `${BASE} text-blue hover:bg-sunken hover:text-ink active:bg-line disabled:bg-line disabled:text-ink-faint aria-disabled:bg-line`;
+
+/** The quiet button for a step that removes something: red words, same size. */
+export const QUIET_DESTRUCTIVE_BUTTON = `${BASE} text-danger hover:bg-sunken hover:text-danger active:bg-line disabled:bg-line disabled:text-ink-faint aria-disabled:bg-line`;

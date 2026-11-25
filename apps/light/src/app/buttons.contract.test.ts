@@ -12,7 +12,14 @@
 import { describe, expect, it } from 'vitest';
 
 import * as buttons from './buttons';
-import { DESTRUCTIVE_BUTTON, PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from './buttons';
+import {
+  DESTRUCTIVE_BUTTON,
+  PRIMARY_BUTTON,
+  QUIET_BUTTON,
+  QUIET_DESTRUCTIVE_BUTTON,
+  SECONDARY_BUTTON,
+} from './buttons';
+import { lightColours, type Rgb } from '../styles/themeTokens';
 
 function classesOf(style: string): string[] {
   return style.split(/\s+/).filter((name) => name !== '');
@@ -44,11 +51,12 @@ function disabledBackgroundProblem(style: string): string | null {
 const STYLES = Object.entries(buttons);
 
 describe('every button style looks different when disabled (L-315)', () => {
-  it('finds all four styles, so this contract cannot pass by reading nothing', () => {
+  it('finds all five styles, so this contract cannot pass by reading nothing', () => {
     expect(STYLES.map(([name]) => name).sort()).toEqual([
       'DESTRUCTIVE_BUTTON',
       'PRIMARY_BUTTON',
       'QUIET_BUTTON',
+      'QUIET_DESTRUCTIVE_BUTTON',
       'SECONDARY_BUTTON',
     ]);
   });
@@ -75,7 +83,7 @@ describe('every button style looks different when disabled (L-315)', () => {
     );
   });
 
-  it('all four styles use the same grey, so disabled means one thing in the app', () => {
+  it('all five styles use the same grey, so disabled means one thing in the app', () => {
     for (const [, style] of STYLES) {
       expect(inState(style, 'disabled')).toEqual(
         expect.arrayContaining(['disabled:bg-line', 'disabled:text-ink-faint']),
@@ -89,6 +97,7 @@ describe('every button style looks different when disabled (L-315)', () => {
   it.each([
     ['SECONDARY_BUTTON', SECONDARY_BUTTON],
     ['QUIET_BUTTON', QUIET_BUTTON],
+    ['QUIET_DESTRUCTIVE_BUTTON', QUIET_DESTRUCTIVE_BUTTON],
   ])('%s looks the same switched off with aria-disabled', (_name, style) => {
     expect(inState(style, 'aria-disabled')).toEqual(
       expect.arrayContaining(['aria-disabled:bg-line']),
@@ -137,5 +146,81 @@ describe('what L-315 must leave alone', () => {
   it('negative: the enabled quiet button stays text-only, with no background at rest', () => {
     expect(enabledLook(QUIET_BUTTON).filter((name) => name.startsWith('bg-'))).toEqual([]);
     expect(enabledLook(QUIET_BUTTON).filter((name) => name.startsWith('border'))).toEqual([]);
+  });
+});
+
+// --- Quiet buttons look pressable (L-458) ------------------------------------
+
+const QUIET_STYLES = [
+  ['QUIET_BUTTON', QUIET_BUTTON, 'text-blue'],
+  ['QUIET_DESTRUCTIVE_BUTTON', QUIET_DESTRUCTIVE_BUTTON, 'text-danger'],
+] as const;
+
+function luminance([r, g, b]: Rgb): number {
+  const lin = (v: number): number => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function contrast(a: Rgb, b: Rgb): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** The words' contrast on a surface; 0 when the style names no resting `text-<token>`. */
+function wordsContrast(style: string, surface: string): number {
+  const words = classesOf(style).find((name) => /^text-[a-z-]+$/.test(name) && name !== 'text-xs');
+  const colours = lightColours();
+  const ink = words ? colours.get(words.slice('text-'.length)) : undefined;
+  const behind = colours.get(surface);
+  return ink && behind ? contrast(ink.rgb, behind.rgb) : 0;
+}
+
+describe('quiet buttons look pressable (L-458)', () => {
+  it.each(QUIET_STYLES)(
+    '%s has its words in %s, a hover patch and a pressed patch',
+    (_n, style, words) => {
+      expect(enabledLook(style)).toContain(words);
+      expect(enabledLook(style)).toContain('hover:bg-sunken');
+      expect(enabledLook(style)).toContain('active:bg-line');
+    },
+  );
+
+  it('Delete is red words and Rename is blue words, never the other way round', () => {
+    expect(classesOf(QUIET_DESTRUCTIVE_BUTTON)).not.toContain('text-blue');
+    expect(classesOf(QUIET_BUTTON)).not.toContain('text-danger');
+  });
+
+  it.each(QUIET_STYLES)(
+    'negative: %s never gains a fill, a border or data-primary',
+    (_n, style) => {
+      const blueFill = classesOf(style).filter((name) => /(^|:)(bg|border)-blue/.test(name));
+      expect(blueFill).toEqual([]);
+      expect(enabledLook(style).filter((name) => /^(bg|border)(-|$)/.test(name))).toEqual([]);
+      expect(style).not.toContain('data-primary');
+    },
+  );
+
+  it.each(QUIET_STYLES)('boundary: %s still looks disabled, not blue or red', (_n, style) => {
+    expect(inState(style, 'disabled')).toEqual(
+      expect.arrayContaining(['disabled:bg-line', 'disabled:text-ink-faint']),
+    );
+  });
+
+  it.each(QUIET_STYLES)(
+    'boundary: the words of %s clear AA (4.5:1) on every surface',
+    (_n, style) => {
+      for (const surface of ['card', 'canvas', 'sunken']) {
+        expect(wordsContrast(style, surface)).toBeGreaterThanOrEqual(4.5);
+      }
+    },
+  );
+
+  it('negative: the contrast check can fail (faint ink on sunken, and no words at all)', () => {
+    expect(wordsContrast('text-ink-faint', 'sunken')).toBeLessThan(4.8);
+    expect(wordsContrast('text-teal', 'sunken')).toBeLessThan(4.5);
+    expect(wordsContrast('px-3', 'card')).toBe(0);
   });
 });
