@@ -14,8 +14,7 @@
  * `styles/contrast.contract.test.ts` must be able to read every class the
  * drop-down can wear, and it fails by name on one passed in from outside.
  */
-import { Icon } from '../ui/Icon';
-
+import { SelectChevron } from './Chevrons';
 import { FIELD_CHIP } from './fields';
 
 export interface ChipSelectOption {
@@ -74,12 +73,7 @@ export function ChipSelect({
           </option>
         ))}
       </select>
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute top-1/2 right-2.5 inline-flex -translate-y-1/2 rotate-90 text-ink-muted"
-      >
-        <Icon name="chevron" size={16} />
-      </span>
+      <SelectChevron />
     </span>
   );
 }

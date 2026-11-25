@@ -228,6 +228,21 @@ describe('the shared text-box styles hold exactly what the boxes carried (L-365)
       'FIELD_CHIP',
       'FIELD_COMPACT',
       'FIELD_INVALID',
+      'FIELD_SELECT',
+    ]);
+  });
+
+  it('FIELD_SELECT is the real drop-down drawn like a text box, class for class (L-461)', () => {
+    expect(classesOf(fields.FIELD_SELECT)).toEqual([
+      'appearance-none',
+      'rounded-control',
+      'border',
+      'border-field-line',
+      'bg-card',
+      'py-1.5',
+      'pr-8',
+      'pl-2.5',
+      'text-ink',
     ]);
   });
 
@@ -401,6 +416,7 @@ describe('no box in a shared folder copies the style by hand (L-365)', () => {
       expect(SHAPES.map((shape) => shape.names)).toEqual([
         'FIELD / FIELD_INVALID',
         'FIELD_COMPACT',
+        'FIELD_SELECT',
         'FIELD_CHIP',
         'COMPOSER_EDITOR',
         'COMPOSER_BAR',

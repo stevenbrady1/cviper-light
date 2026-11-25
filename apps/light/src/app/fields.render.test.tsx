@@ -30,7 +30,14 @@ import { TailorSaveApplication } from '../features/tailor/TailorSaveApplication'
 import { NewApplicationForm } from '../features/tracker/NewApplicationForm';
 import { createFakeBrowserPort } from '../platform/test/fakeBrowserPort';
 
-import { COMPOSER_EDITOR, FIELD, FIELD_CHIP, FIELD_COMPACT, FIELD_INVALID } from './fields';
+import {
+  COMPOSER_EDITOR,
+  FIELD,
+  FIELD_CHIP,
+  FIELD_COMPACT,
+  FIELD_INVALID,
+  FIELD_SELECT,
+} from './fields';
 
 afterEach(cleanup);
 
@@ -262,7 +269,7 @@ describe('the Search, Settings key and Profile boxes on the shared style (L-379)
       [...classesOf(FIELD), ...layout].sort(),
     );
     expect(exactly(screen.getByTestId('search-contract'))).toEqual(
-      [...classesOf(FIELD), ...layout].sort(),
+      [...classesOf(FIELD_SELECT), 'h-11', 'md:h-9.5', 'w-full'].sort(),
     );
   });
 
