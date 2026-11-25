@@ -285,7 +285,7 @@ function KeyCard({ provider, port, browser, focused, onFocused }: KeyCardProps) 
           type="button"
           data-testid={`key-signup-${provider.id}`}
           onClick={() => void browser.open(provider.signupUrl)}
-          className={`${QUIET_BUTTON} px-0 text-blue hover:bg-card hover:text-navy`}
+          className={`${QUIET_BUTTON} hover:text-navy`}
         >
           {provider.signupLabel} →
         </button>

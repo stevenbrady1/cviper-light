@@ -117,7 +117,7 @@ export function ProviderToggles({
                         type="button"
                         data-testid={`provider-settings-${provider}`}
                         onClick={onOpenSettings}
-                        className={`${QUIET_BUTTON} px-1 text-xs text-blue hover:bg-card hover:text-navy`}
+                        className={`${QUIET_BUTTON} text-xs hover:text-navy`}
                       >
                         set up in Settings
                       </button>

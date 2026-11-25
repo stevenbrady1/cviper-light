@@ -565,7 +565,7 @@ export function PasteJobForm({
               type="button"
               data-testid="paste-job-settings"
               onClick={onOpenSettings}
-              className={`${QUIET_BUTTON} px-0 text-xs text-blue hover:bg-card hover:text-navy`}
+              className={`${QUIET_BUTTON} text-xs hover:text-navy`}
             >
               Open Settings →
             </button>

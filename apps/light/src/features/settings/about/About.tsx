@@ -33,7 +33,7 @@ export function About({ browser }: AboutProps) {
           type="button"
           data-testid="about-open-site"
           onClick={() => void browser.open(LIGHT_PAGE_URL)}
-          className={`${QUIET_BUTTON} px-0 text-blue hover:bg-card hover:text-navy`}
+          className={`${QUIET_BUTTON} hover:text-navy`}
         >
           cviper.ai/light →
         </button>
@@ -41,7 +41,7 @@ export function About({ browser }: AboutProps) {
           type="button"
           data-testid="about-open-source"
           onClick={() => void browser.open(LIGHT_SOURCE_URL)}
-          className={`${QUIET_BUTTON} px-0 text-blue hover:bg-card hover:text-navy`}
+          className={`${QUIET_BUTTON} hover:text-navy`}
         >
           Source and licence on GitHub →
         </button>
@@ -49,7 +49,7 @@ export function About({ browser }: AboutProps) {
           type="button"
           data-testid="about-open-terms"
           onClick={() => void browser.open(CVIPER_TERMS_URL)}
-          className={`${QUIET_BUTTON} px-0 text-blue hover:bg-card hover:text-navy`}
+          className={`${QUIET_BUTTON} hover:text-navy`}
         >
           Terms of use →
         </button>

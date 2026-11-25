@@ -25,7 +25,7 @@ export function SearchRecent({ recent, onPick }: SearchRecentProps) {
             mistake as searching on startup.
           */
           onClick={() => onPick(entry)}
-          className={`${QUIET_BUTTON} rounded-pill border border-line px-2 py-0.5 text-xs`}
+          className={`${QUIET_BUTTON} rounded-pill border border-line text-xs`}
         >
           {[entry.keywords, entry.location].filter((part) => part !== '').join(' · ')}
         </button>
