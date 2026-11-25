@@ -74,8 +74,9 @@ export const FLOW_HINT = {
   choice:
     'The CV and AI engine used for this job. Choose them once: Analysis and Tailor share the choice.',
   cardDots:
-    'How far this job has got: one dot for each step — Find, Analyse, Tailor, ATS Score, ' +
-    'Export. A filled dot is done; an empty one is not.',
+    'How far this job has got: one mark for each step — Find, Analyse, Tailor, ATS Score, ' +
+    'Export. A tick is done, the filled dot is the step Continue opens, an empty ring is ' +
+    'still to do, and a struck-through ring was skipped.',
   diff: 'Green lines are new in the draft. Struck-through lines were in your original CV and are not in the draft.',
 } as const;
 

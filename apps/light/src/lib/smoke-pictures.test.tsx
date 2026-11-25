@@ -156,7 +156,7 @@ describe('the smoke pictures (L-363)', () => {
 });
 
 describe('6-tracker-card-progress: the check before the picture', () => {
-  const DOTS = ['dot', 'dot', 'dot', 'ring', 'ring'];
+  const DOTS = ['tick', 'tick', 'tick', 'dot', 'ring'];
 
   it('happy: passes on the started job card, ●●●○○, wholly on screen', () => {
     renderCard();
@@ -170,7 +170,7 @@ describe('6-tracker-card-progress: the check before the picture', () => {
 
   it('negative: fails when the dots are not the started job’s', () => {
     renderCard({ analysed: true, tailored: false, exported: false });
-    expect(runCheck(CHECK_CARD_PROGRESS, APP_ID, DOTS)).toMatch(/draws dot, dot, ring/);
+    expect(runCheck(CHECK_CARD_PROGRESS, APP_ID, DOTS)).toMatch(/draws tick, tick, dot/);
   });
 
   it('negative: fails when the card is not on screen at all', () => {

@@ -70,8 +70,12 @@ const MARKS = {
   ),
   /** The current step: a solid disc. */
   dot: <circle cx="12" cy="12" r="6" fill="currentColor" />,
-  /** A step still to do: an empty ring, the same size as the disc. */
-  ring: <circle cx="12" cy="12" r="6" />,
+  /**
+   * A step still to do: an empty ring, one size up from the disc (L-464). At
+   * r 6 it was the size of a lower-case "o" beside small text; r 7 is about
+   * 69% of the box, still inside it.
+   */
+  ring: <circle cx="12" cy="12" r="7" />,
   /** Back to an earlier step. A solid triangle, point left. */
   back: <path d="M5.5 12 18.5 4.5v15z" fill="currentColor" />,
 } satisfies Record<string, ReactNode>;

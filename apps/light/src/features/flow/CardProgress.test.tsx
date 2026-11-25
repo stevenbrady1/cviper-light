@@ -35,7 +35,7 @@ describe('CardProgress', () => {
     });
     const row = screen.getByTestId('tracker-card-progress-app-1');
 
-    expect(marksIn(row)).toEqual(['dot', 'dot', 'dot', 'ring', 'ring']);
+    expect(marksIn(row)).toEqual(['tick', 'tick', 'tick', 'dot', 'ring']);
     expect(row.textContent).toContain('3 of 5 steps done. Next: ATS Score.');
     await user.click(screen.getByTestId('tracker-card-continue-app-1'));
     expect(onContinue).toHaveBeenCalledWith('ats');
@@ -68,10 +68,10 @@ describe('CardProgress', () => {
   it('edge: a skipped Analyse is not a dot filled in', () => {
     renderProgress({ analysed: false, tailored: true, exported: false });
     expect(marksIn(screen.getByTestId('tracker-card-progress-app-1'))).toEqual([
+      'tick',
+      'skipped',
+      'tick',
       'dot',
-      'ring',
-      'dot',
-      'ring',
       'ring',
     ]);
   });
@@ -121,7 +121,7 @@ describe('CardProgress says which step the job is on (L-331)', () => {
   it('the dots stay decoration, hidden from a screen reader', () => {
     renderProgress({ analysed: true, tailored: false, exported: false });
     const row = screen.getByTestId('tracker-card-progress-app-1');
-    expect(marksIn(row)).toEqual(['dot', 'dot', 'ring', 'ring', 'ring']);
+    expect(marksIn(row)).toEqual(['tick', 'tick', 'dot', 'ring', 'ring']);
     for (const dot of row.querySelectorAll('[data-mark]')) {
       expect(dot.closest('[aria-hidden="true"]')).not.toBeNull();
     }
@@ -181,7 +181,7 @@ describe('CardProgress draws its dots (L-360)', () => {
   it('negative: a card with no progress has only Find filled in, and says so in words', () => {
     renderProgress({ analysed: false, tailored: false, exported: false });
     const row = screen.getByTestId('tracker-card-progress-app-1');
-    expect(marksIn(row)).toEqual(['dot', 'ring', 'ring', 'ring', 'ring']);
+    expect(marksIn(row)).toEqual(['tick', 'dot', 'ring', 'ring', 'ring']);
     expect(row.getAttribute('data-done')).toBe('1');
     expect(row.textContent).toContain('1 of 5 steps done. Next: Analyse.');
   });
@@ -189,7 +189,7 @@ describe('CardProgress draws its dots (L-360)', () => {
   it('boundary: all five steps done is five filled dots', () => {
     renderProgress({ analysed: true, tailored: true, exported: true });
     const row = screen.getByTestId('tracker-card-progress-app-1');
-    expect(marksIn(row)).toEqual(['dot', 'dot', 'dot', 'dot', 'dot']);
+    expect(marksIn(row)).toEqual(['tick', 'tick', 'tick', 'tick', 'dot']);
     expect(row.textContent).toContain('5 of 5 steps done. Next: Export.');
   });
 

@@ -101,7 +101,7 @@ describe('tracker cards for started jobs (L-200)', () => {
     });
 
     const row = await screen.findByTestId('tracker-card-progress-a');
-    expect(marksIn(row)).toEqual(['dot', 'dot', 'dot', 'ring', 'ring']);
+    expect(marksIn(row)).toEqual(['tick', 'tick', 'tick', 'dot', 'ring']);
     await user.click(screen.getByTestId('tracker-card-continue-a'));
 
     expect(onContinue).toHaveBeenCalledTimes(1);
@@ -116,11 +116,11 @@ describe('tracker cards for started jobs (L-200)', () => {
       'Continue: Tailor',
     );
     expect(marksIn(screen.getByTestId('tracker-card-progress-c'))).toEqual([
+      'tick',
       'dot',
       'ring',
       'ring',
-      'ring',
-      'dot',
+      'tick',
     ]);
   });
 
