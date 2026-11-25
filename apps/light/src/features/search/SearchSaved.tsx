@@ -149,7 +149,7 @@ export function SearchSaved({
               */
               onClick={() => onRun(entry)}
               disabled={disabled}
-              className={`${QUIET_BUTTON} rounded-pill px-2 py-0.5 text-xs`}
+              className={`${QUIET_BUTTON} rounded-pill text-xs`}
             >
               {entry.name}
             </button>
@@ -159,7 +159,7 @@ export function SearchSaved({
               aria-label={`Delete saved search: ${entry.name}`}
               onClick={() => onDelete(entry)}
               disabled={disabled}
-              className={`${QUIET_BUTTON} rounded-pill px-1.5 py-0.5 text-xs`}
+              className={`${QUIET_BUTTON} rounded-pill text-xs`}
             >
               <span className="flex h-lh items-center">
                 <Icon name="close" size={12} />
