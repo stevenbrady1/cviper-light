@@ -10,7 +10,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { AnalysisCvPicker } from './AnalysisCvPicker';
+import { AnalysisCvUpload } from './AnalysisCvPicker';
 
 const WORDS = 'Only a CV that arrived as a JSON Resume can be saved as one.';
 
@@ -29,23 +29,15 @@ const PDF_CV = cv('cv-pdf', null);
 const JSON_CV = cv('cv-json', '{"basics":{}}');
 
 function renderPicker(selected: Cv | null) {
-  const cvs = [PDF_CV, JSON_CV];
   render(
-    <AnalysisCvPicker
-      cvs={cvs}
-      cvsLoaded
-      selectedCvId={selected?.id ?? null}
+    <AnalysisCvUpload
       selectedCv={selected}
-      onPick={() => undefined}
       onUpload={() => undefined}
       onSaveJsonResume={() => undefined}
       exporting={false}
-      exportMessage={null}
-      uploadProblem={null}
-      warnings={[]}
     />,
   );
-  // Changed on purpose (L-446): Save waits in the "…" list beside the CV chip.
+  // Changed on purpose (L-463): Save waits in the "…" list at the end of the line, after Upload a CV.
   fireEvent.click(screen.getByTestId('analysis-cv-more'));
 }
 

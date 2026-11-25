@@ -26,20 +26,12 @@ export interface AnalysisCvPickerProps {
   readonly warnings: readonly string[];
 }
 
-/**
- * The CV part of the line (L-446): "Check", the CV chip and its "…", which
- * holds "Save as JSON Resume". One group, so the "…" never starts a line of
- * its own: its list hangs leftwards from it, under the chip, and at the left
- * edge of a phone it would be cut off.
- */
+/** The CV part of the line (L-446): "Check" and the CV chip. */
 export function AnalysisCvPicker({
   cvs,
   cvsLoaded,
   selectedCvId,
-  selectedCv,
   onPick,
-  onSaveJsonResume,
-  exporting,
   exportMessage,
 }: AnalysisCvPickerProps) {
   return (
@@ -55,6 +47,33 @@ export function AnalysisCvPicker({
         disabled={cvs.length === 0 || !cvsLoaded}
         onChange={(id) => onPick(id === '' ? null : id)}
       />
+      <LiveStatus text={exportMessage} />
+    </span>
+  );
+}
+
+/**
+ * The end of the line (L-463): "Upload a CV", quiet, then the CV's "…", which
+ * holds "Save as JSON Resume". One group, so the "…" never starts a line of
+ * its own: its list hangs leftwards from it, and at the left edge of a phone
+ * it would be cut off.
+ */
+export function AnalysisCvUpload({
+  selectedCv,
+  onUpload,
+  onSaveJsonResume,
+  exporting,
+}: Pick<AnalysisCvPickerProps, 'selectedCv' | 'onUpload' | 'onSaveJsonResume' | 'exporting'>) {
+  return (
+    <span className="ml-auto flex items-center gap-2">
+      <button
+        type="button"
+        data-testid="analysis-upload"
+        onClick={onUpload}
+        className={QUIET_BUTTON}
+      >
+        Upload a CV
+      </button>
       {/*
         Disabled, never hidden, for a CV that came from a PDF or a .docx:
         there is no JSON Resume to give back for those, and a control that
@@ -77,22 +96,7 @@ export function AnalysisCvPicker({
           },
         ]}
       />
-      <LiveStatus text={exportMessage} />
     </span>
-  );
-}
-
-/** "Upload a CV", quiet, at the end of the line. */
-export function AnalysisCvUpload({ onUpload }: Pick<AnalysisCvPickerProps, 'onUpload'>) {
-  return (
-    <button
-      type="button"
-      data-testid="analysis-upload"
-      onClick={onUpload}
-      className={`${QUIET_BUTTON} ml-auto`}
-    >
-      Upload a CV
-    </button>
   );
 }
 
@@ -139,10 +143,10 @@ export function AnalysisCvNote() {
     <p data-testid="analysis-cv-note" className="text-xs text-ink-faint">
       PDF, Word (.docx) or{' '}
       <Hint text={JSON_RESUME_HINT}>
-        <span data-testid="json-resume-hint">JSON Resume</span>
-      </Hint>{' '}
-      (.json). The file is read on this computer. Its text only goes to an AI you choose, and only
-      when you ask it to read your CV.
+        <span data-testid="json-resume-hint">JSON Resume</span> (.json)
+      </Hint>
+      . The file is read on this computer. Its text only goes to an AI you choose, and only when you
+      ask it to read your CV.
     </p>
   );
 }

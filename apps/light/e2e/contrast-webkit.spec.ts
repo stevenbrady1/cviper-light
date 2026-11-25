@@ -9042,11 +9042,12 @@ describe('Analysis: one line of choices, and the advert box as the hero (L-446)'
       await page.waitForSelector('[data-testid="analysis-run"]:enabled');
       const { walked, problems } = await analysisFocusWalk(page);
       console.log(`Analysis focus walk (${name}): ${walked.join(', ')}`);
+      // Changed on purpose (L-463): the "…" follows Upload a CV at the end of the line.
       const expected = [
         'analysis-cv',
-        'analysis-cv-more',
         'analysis-provider',
         'analysis-upload',
+        'analysis-cv-more',
         'analysis-job-text',
         'analysis-job-pick',
         'analysis-run',
@@ -9064,6 +9065,62 @@ describe('Analysis: one line of choices, and the advert box as the hero (L-446)'
   it('at 375px every chip and button on the line and in the bar is at least 44px tall', async () => {
     const page = await analysisComposer({ width: 375, height: 812 });
     assert.deepEqual(await analysisShortTargets(page), []);
+    await page.context().close();
+  });
+});
+
+/**
+ * The "…" ends Analysis's line (L-463): Upload a CV, then the "…", on one row
+ * at the right end of the line, so the "…" never starts a line of its own.
+ */
+async function analysisLineEnd(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const upload = document.querySelector('[data-testid="analysis-upload"]');
+    const more = document.querySelector('[data-testid="analysis-cv-more"]');
+    const row = upload?.closest('[data-slot="sentence"]');
+    if (!upload || !more || !row) return ['the line end is not drawn'];
+    const a = upload.getBoundingClientRect();
+    const b = more.getBoundingClientRect();
+    const line = row.getBoundingClientRect();
+    const problems: string[] = [];
+    if (Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) > 1) {
+      problems.push(`not one row: Upload a CV at ${String(a.top)}, "…" at ${String(b.top)}`);
+    }
+    if (b.left < a.right) problems.push('"…" is not after Upload a CV');
+    if (line.right - b.right > 0.5) {
+      problems.push(`"…" does not end the line: ${String(b.right)} against ${String(line.right)}`);
+    }
+    return problems;
+  });
+}
+
+describe('Analysis: the "…" ends the line, after Upload a CV (L-463)', () => {
+  for (const width of [375, 768, 1280] as const) {
+    it(`at ${String(width)}px, with the 120-character CV name, Upload a CV and its "…" share the line end, and the list stays inside`, async () => {
+      const page = await analysisComposer({ width, height: 800 });
+      assert.deepEqual(await analysisLineEnd(page), []);
+      await page.click('[data-testid="analysis-cv-more"]');
+      await page.waitForSelector('[data-testid="analysis-save-json"]');
+      assert.deepEqual([...(await sidewaysOverflow(page)), ...(await analysisChipSpill(page))], []);
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a "…" pushed under Upload a CV is reported', async () => {
+    const page = await analysisComposer({ width: 375, height: 800 });
+    await page.evaluate(() => {
+      const group = document.querySelector<HTMLElement>(
+        '[data-testid="analysis-upload"]',
+      )?.parentElement;
+      if (!group) throw new Error('no line-end group');
+      group.style.flexDirection = 'column';
+    });
+    const problems = await analysisLineEnd(page);
+    assert.ok(
+      problems.some((line) => line.startsWith('not one row')),
+      `the split went unreported: ${JSON.stringify(problems)}`,
+    );
     await page.context().close();
   });
 });
