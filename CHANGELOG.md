@@ -8,6 +8,15 @@ All notable changes to CViper Light are recorded here. The format follows
 
 Changes waiting for the next release are in [`changes/unreleased/`](changes/unreleased/), one file per change, so two pull requests never edit the same lines here (L-303). `pnpm changelog:preview` shows them as they will appear; `pnpm changelog:release <version> <date>` writes them in below. See [CONTRIBUTING.md](CONTRIBUTING.md#the-changelog).
 
+## [0.17.0] — 2026-11-25
+
+Clearer buttons. Buttons that are just words, like Show CV, Upload a CV, Save this search and Rename, are now blue, so it is clear you can press them, and Delete is red. Behind the scenes, some button settings that never took effect were removed.
+
+### Changed
+
+- Tidied buttons and links behind the scenes: some carried colour and spacing settings that never took effect, and a new check now stops that happening again. Nothing looks different (L-459).
+- Buttons that are just words, like Show CV, Upload a CV, Save this search and Rename, are now blue, so it is clear you can press them; Delete is red (L-458).
+
 ## [0.16.0] — 2026-11-25
 
 Calmer labels. The small headings and labels in Analysis, Tailor, the interview panel, the new-application form and search results now use normal letters in the app's main font, instead of small spaced capitals. Numbers and dates keep their fixed-width digits.
@@ -761,7 +770,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.16.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.17.0...main
+[0.17.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.16.0...light-v0.17.0
 [0.16.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.15.0...light-v0.16.0
 [0.15.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.14.1...light-v0.15.0
 [0.14.1]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.14.0...light-v0.14.1
