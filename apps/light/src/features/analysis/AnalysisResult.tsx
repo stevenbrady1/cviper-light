@@ -79,11 +79,7 @@ const PRIORITY_ORDER: readonly SuggestionPriority[] = ['high', 'medium', 'low'];
  * reads as a missing section (L-297, found by the axe pass).
  */
 function Eyebrow({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase">
-      {children}
-    </h2>
-  );
+  return <h2 className="text-xs font-medium text-ink-faint">{children}</h2>;
 }
 
 /**

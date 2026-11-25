@@ -81,9 +81,7 @@ export function GateNotice({ results }: GateNoticeProps) {
             className={`${cardClasses({ padding: 'none' })} px-3 py-2`}
           >
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase">
-                {labelOf(result)}
-              </h3>
+              <h3 className="text-xs font-medium text-ink-faint">{labelOf(result)}</h3>
               <StatusPill data-testid="analysis-gate-verdict" tone={VERDICT_TONE[result.verdict]}>
                 {VERDICT_LABEL[result.verdict]}
               </StatusPill>

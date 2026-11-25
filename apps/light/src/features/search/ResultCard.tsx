@@ -155,7 +155,7 @@ export function ResultCard({
           {onOpenSource === undefined ? (
             <span
               data-testid={`result-source-${job.id}`}
-              className="rounded-pill bg-sunken px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] text-ink-muted uppercase"
+              className="rounded-pill bg-sunken px-2 py-0.5 text-xs font-medium text-ink-muted"
             >
               {SOURCE_LABEL[job.source]}
             </span>
@@ -167,7 +167,7 @@ export function ResultCard({
               data-testid={`result-source-${job.id}`}
               onClick={onOpenSource}
               title={`Open ${SOURCE_LABEL[job.source]} in your browser`}
-              className="inline-flex min-h-[23px] min-w-[116px] items-center justify-center rounded-pill bg-sunken px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] text-blue uppercase underline underline-offset-2 hover:text-navy"
+              className="inline-flex min-h-[23px] min-w-[116px] items-center justify-center rounded-pill bg-sunken px-2 py-0.5 text-xs font-medium text-blue underline underline-offset-2 hover:text-navy"
             >
               {SOURCE_LABEL[job.source]}
             </button>

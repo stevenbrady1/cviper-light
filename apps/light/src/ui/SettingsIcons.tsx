@@ -12,15 +12,16 @@
  * stay, so `<Icon name="…">` still draws them (Hint's `info`). See `DUOTONE`
  * in `Icon.tsx`.
  *
- * Their accent is `--color-section-icon-accent`, NOT the nav icons' token:
- * these sit on light tiles, where the nav icons' teal measured under 3:1, so
- * the owner chose a darker shade of it for them (see theme.css)
- * (`sectionIconAccent.contract.test.ts` holds it to 3:1).
+ * Their accent is `--color-section-icon-accent`, NOT the nav icons' token: on a
+ * light surface the nav icons' teal measured under 3:1, so the owner chose a
+ * darker shade of it for them (see theme.css; `sectionIconAccent.contract.test.ts`
+ * holds it to 3:1).
  *
- * `monochrome` draws the accent strokes in `currentColor` too. A danger tile
- * asks for it, so Delete everything is one colour — red — rather than red with
- * a teal mark inside the one destructive section (owner decision 2026-10-16).
- * Without it every icon is the owner's two-colour drawing.
+ * `monochrome` draws the accent strokes in `currentColor` too. Hint's `info` and
+ * `EmptyState` pass it, and so does `IconTile` for its `danger` tone, so a
+ * destructive mark is one colour (red) rather than red with a teal mark inside
+ * it (owner decision 2026-10-16). Without it every icon is the owner's
+ * two-colour drawing.
  */
 import { type ReactNode } from 'react';
 

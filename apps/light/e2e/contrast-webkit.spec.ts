@@ -9341,3 +9341,78 @@ describe('one white panel inside the navy frame (L-454)', () => {
     await page.context().close();
   });
 });
+
+/** What the engine drew for each label: its face, its case and its spacing. */
+async function labelStyles(page: Page, selector: string): Promise<string[]> {
+  return page.evaluate((query) => {
+    const found = [...document.querySelectorAll<HTMLElement>(query)];
+    if (found.length === 0) return [`${query}: none drawn`];
+    return found.flatMap((element) => {
+      const style = getComputedStyle(element);
+      const problems: string[] = [];
+      if (/mono/i.test(style.fontFamily)) problems.push(`mono face: ${style.fontFamily}`);
+      if (style.textTransform !== 'none') problems.push(`text-transform ${style.textTransform}`);
+      if (style.letterSpacing !== 'normal') problems.push(`letter-spacing ${style.letterSpacing}`);
+      return problems.map((line) => `${element.textContent ?? ''}: ${line}`);
+    });
+  }, selector);
+}
+
+const BAND_LABELS = '[data-testid^="band-scale-label-"]';
+
+describe('the last labels are Inter in normal case, and still readable (L-456)', () => {
+  it('on a sample result, the band names and headings are Inter, normal case, spaced normally', async () => {
+    const page = await openSample({ width: 1000, height: 700 });
+    assert.deepEqual(await labelStyles(page, BAND_LABELS), []);
+    assert.deepEqual(await labelStyles(page, '[data-testid="analysis-sample"] h2'), []);
+    const words = await page.evaluate((query) => {
+      return [...document.querySelectorAll(query)].map((element) => element.textContent);
+    }, BAND_LABELS);
+    assert.deepEqual(words, ['Weak', 'Possible', 'Strong']);
+    await page.context().close();
+  });
+
+  it('their colours meet WCAG AA contrast at 12px', async () => {
+    const page = await openSample({ width: 1000, height: 700 });
+    const report = await contrast(page);
+    console.log(`labels: ${String(report.checked)} text nodes passed`);
+    assert.ok(report.checked >= 10, `only ${String(report.checked)} text nodes measured`);
+    assert.deepEqual(report.failures, [], 'a label is below WCAG AA contrast');
+    await page.context().close();
+  });
+
+  it('a search result’s source chip is Inter too, and its numbers stay mono', async () => {
+    const page = await openResults({ width: 1000, height: 700 });
+    assert.deepEqual(await labelStyles(page, '[data-testid^="result-source-"]'), []);
+    const salaryFace = await page.evaluate(() => {
+      const salary = document.querySelector('[data-testid^="result-salary-"]');
+      return salary === null ? null : getComputedStyle(salary).fontFamily;
+    });
+    if (salaryFace !== null) assert.match(salaryFace, /mono/i);
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a label put back to mono capitals is reported', async () => {
+    const page = await openSample({ width: 1000, height: 700 });
+    await page.evaluate((query) => {
+      const label = document.querySelector<HTMLElement>(query);
+      if (label === null) throw new Error('no band label');
+      label.style.cssText = 'font-family:monospace;text-transform:uppercase;letter-spacing:0.14em';
+    }, BAND_LABELS);
+    const problems = await labelStyles(page, BAND_LABELS);
+    assert.ok(
+      problems.some((line) => line.includes('mono face')),
+      JSON.stringify(problems),
+    );
+    assert.ok(
+      problems.some((line) => line.includes('text-transform')),
+      JSON.stringify(problems),
+    );
+    assert.ok(
+      problems.some((line) => line.includes('letter-spacing')),
+      JSON.stringify(problems),
+    );
+    await page.context().close();
+  });
+});

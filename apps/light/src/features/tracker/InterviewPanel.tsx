@@ -110,11 +110,7 @@ function latestOfKind(documents: readonly Document[], kind: DocumentKind): Docum
  */
 function Eyebrow({ children, level = 4 }: { children: React.ReactNode; level?: 3 | 4 }) {
   const Heading = level === 3 ? 'h3' : 'h4';
-  return (
-    <Heading className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase">
-      {children}
-    </Heading>
-  );
+  return <Heading className="text-xs font-medium text-ink-faint">{children}</Heading>;
 }
 
 /** A bulleted list, or a sentence saying the list is empty on purpose. */
