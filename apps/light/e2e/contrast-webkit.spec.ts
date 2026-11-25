@@ -9416,3 +9416,160 @@ describe('the last labels are Inter in normal case, and still readable (L-456)',
     await page.context().close();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Quiet buttons look pressable (L-458). Blue words, red Delete, and the focus
+// ring already on them. jsdom paints nothing, so the colour the engine really
+// draws is only knowable here.
+// ---------------------------------------------------------------------------
+const QUIET_BLUE = 'rgb(26, 86, 219)';
+const QUIET_DANGER = 'rgb(181, 51, 42)';
+const QUIET_WHITE: readonly [number, number, number] = [255, 255, 255];
+const QUIET_SUNKEN: readonly [number, number, number] = [237, 240, 245];
+
+function rgbOf(text: string): [number, number, number] {
+  const found = /rgba?\((\d+), (\d+), (\d+)/.exec(text);
+  if (found === null) throw new Error(`not a colour: ${text}`);
+  return [Number(found[1]), Number(found[2]), Number(found[3])];
+}
+
+function wcagRatio(a: readonly number[], b: readonly number[]): number {
+  const light = (rgb: readonly number[]): number => {
+    const [r, g, bl] = rgb.map((v) => {
+      const s = (v ?? 0) / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    }) as [number, number, number];
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [light(a), light(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** One line per quiet button whose drawn words are not the colour it should have. */
+async function quietWordsProblems(
+  page: Page,
+  expected: readonly { selector: string; colour: string }[],
+): Promise<string[]> {
+  const drawn = await page.evaluate(
+    (list) =>
+      list.map(({ selector }) => {
+        const element = document.querySelector<HTMLElement>(selector);
+        return element === null
+          ? null
+          : {
+              colour: getComputedStyle(element).color,
+              fill: getComputedStyle(element).backgroundColor,
+            };
+      }),
+    expected,
+  );
+  return expected.flatMap(({ selector, colour }, index) => {
+    const seen = drawn[index];
+    if (seen === null || seen === undefined) return [`${selector}: not drawn`];
+    const problems: string[] = [];
+    if (seen.colour !== colour) problems.push(`words ${seen.colour}, wanted ${colour}`);
+    if (seen.fill !== 'rgba(0, 0, 0, 0)') problems.push(`resting fill ${seen.fill}`);
+    for (const surface of [QUIET_WHITE, QUIET_SUNKEN]) {
+      if (wcagRatio(rgbOf(seen.colour), surface) < 4.5)
+        problems.push(`words below 4.5:1 on ${surface.join(',')}`);
+    }
+    return problems.map((line) => `${selector}: ${line}`);
+  });
+}
+
+async function tailorQuiet(): Promise<Page> {
+  const page = await open('?seen=1&cv=short', VIEWPORTS.desktop);
+  await goTo(page, 'tailor');
+  await page.waitForSelector('[data-testid="tailor-cv-preview-toggle"]');
+  return page;
+}
+
+describe('quiet buttons read as pressable: blue words, red Delete (L-458)', () => {
+  it('on Tailor and Search the quiet buttons are the blue token, with no fill at rest', async () => {
+    const page = await tailorQuiet();
+    assert.deepEqual(
+      await quietWordsProblems(page, [
+        { selector: '[data-testid="tailor-cv-preview-toggle"]', colour: QUIET_BLUE },
+      ]),
+      [],
+    );
+    await goTo(page, 'search');
+    assert.deepEqual(
+      await quietWordsProblems(page, [
+        { selector: '[data-testid="saved-search-open"]', colour: QUIET_BLUE },
+        { selector: '[data-testid="search-bring-in"]', colour: QUIET_BLUE },
+      ]),
+      [],
+    );
+    await page.context().close();
+  });
+
+  it('on a saved CV Rename is blue and Delete is the danger red', async () => {
+    const page = await profileWithCvs(VIEWPORTS.desktop);
+    const ids = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-testid^="profile-cv-rename-"]')].map((e) =>
+        (e.getAttribute('data-testid') ?? '').replace('profile-cv-rename-', ''),
+      ),
+    );
+    assert.ok(ids.length >= 1, 'no saved CV drawn');
+    const list = ids.flatMap((id) => [
+      { selector: `[data-testid="profile-cv-rename-${id}"]`, colour: QUIET_BLUE },
+      { selector: `[data-testid="profile-cv-delete-${id}"]`, colour: QUIET_DANGER },
+    ]);
+    assert.deepEqual(await quietWordsProblems(page, list), []);
+    await page.context().close();
+  });
+
+  it('Tab onto a quiet button shows the blue focus ring, at 3:1 or better against the page', async () => {
+    const page = await tailorQuiet();
+    const target = '[data-testid="tailor-cv-preview-toggle"]';
+    let reached = false;
+    for (let step = 0; step < 80 && !reached; step += 1) {
+      await page.keyboard.press('Tab');
+      reached = await page.evaluate(
+        (selector) => document.activeElement === document.querySelector(selector),
+        target,
+      );
+    }
+    assert.ok(reached, 'Tab never reached the button');
+    const shadow = await page.evaluate(
+      (selector) => getComputedStyle(document.querySelector(selector) as HTMLElement).boxShadow,
+      target,
+    );
+    assert.ok(shadow.includes(QUIET_BLUE), `no blue ring: ${shadow}`);
+    assert.ok(wcagRatio(rgbOf(QUIET_BLUE), QUIET_WHITE) >= 3, 'the ring is under 3:1');
+    await page.context().close();
+  });
+
+  it('contrast: axe passes on Tailor and on Profile with the quiet buttons drawn', async () => {
+    const tailor = await tailorQuiet();
+    judge('tailor quiet buttons', await contrast(tailor));
+    await tailor.context().close();
+    const profile = await profileWithCvs(VIEWPORTS.desktop);
+    judge('profile quiet buttons', await contrast(profile));
+    await profile.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: grey words, a blue Delete and a filled button are all reported', async () => {
+    const page = await tailorQuiet();
+    const selector = '[data-testid="tailor-cv-preview-toggle"]';
+    await page.evaluate((query) => {
+      const button = document.querySelector<HTMLElement>(query);
+      if (button === null) throw new Error('no button');
+      button.style.cssText = 'color:rgb(70, 83, 106);background-color:rgb(26, 86, 219)';
+    }, selector);
+    const problems = await quietWordsProblems(page, [{ selector, colour: QUIET_BLUE }]);
+    assert.ok(
+      problems.some((line) => line.includes('words rgb(70, 83, 106)')),
+      JSON.stringify(problems),
+    );
+    assert.ok(
+      problems.some((line) => line.includes('resting fill')),
+      JSON.stringify(problems),
+    );
+    const wrongDelete = await quietWordsProblems(page, [{ selector, colour: QUIET_DANGER }]);
+    assert.ok(wrongDelete.length >= 1, 'a wrong colour for Delete went unreported');
+    await page.context().close();
+  });
+});

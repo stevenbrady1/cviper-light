@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ok, type Analysis, type Cv } from '@cviper/core-types';
 
+import { QUIET_BUTTON, QUIET_DESTRUCTIVE_BUTTON } from '../../app/buttons';
 import { type GapsPort } from './gapsPort';
 
 vi.mock('@cviper/cv-parsing', () => ({ extractText: vi.fn() }));
@@ -503,8 +504,11 @@ describe('each saved CV is one row (L-436)', () => {
       const rename = screen.getByTestId(`profile-cv-rename-${cv.id}`);
       const remove = screen.getByTestId(`profile-cv-delete-${cv.id}`);
       expect([...buttons.children]).toEqual([rename, remove]);
-      // Delete is as quiet as Rename: the question asks before anything goes.
-      expect(remove.className).toBe(rename.className);
+      // Delete is quiet like Rename but in red words (L-458): the question asks before anything goes.
+      expect(remove.className).toContain(QUIET_DESTRUCTIVE_BUTTON);
+      expect(rename.className).toContain(QUIET_BUTTON);
+      expect(remove.className).toContain('text-danger');
+      expect(rename.className).not.toContain('text-danger');
       expect(remove.className).not.toContain('bg-danger');
       // Small words, still a 44px thumb target on a phone (L-81).
       expect(rename.className).toContain('text-xs');
