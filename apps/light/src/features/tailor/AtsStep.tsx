@@ -160,10 +160,7 @@ export function AtsStep({ comparison, fabrication }: AtsStepProps) {
       className={`space-y-3 ${cardClasses({ padding: 'none' })} px-4 py-3`}
     >
       <div>
-        <h3
-          id="tailor-ats-heading"
-          className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase"
-        >
+        <h3 id="tailor-ats-heading" className="text-xs font-medium text-ink-faint">
           <Hint text={ATS_HINT.heading}>ATS score</Hint>
         </h3>
         <p className="mt-1 text-xs text-ink-muted">

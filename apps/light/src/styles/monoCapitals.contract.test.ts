@@ -42,7 +42,6 @@ const CAPITALS = /(?<![\w-])uppercase(?![\w-])/;
  * AND the exact class string, so moving a line does not break an entry and a
  * new mono-capital string in the same file is still caught.
  */
-const NEXT = 'Next, after L-432: the same change, in its own pull request (owner decision 4).';
 const ALLOWED: readonly { file: string; classes: string; reason: string }[] = [
   {
     file: 'apps/light/src/app/Sidebar.tsx',
@@ -50,49 +49,6 @@ const ALLOWED: readonly { file: string; classes: string; reason: string }[] = [
     reason:
       'The logo: "LIGHT" under "CViper" is part of the wordmark, not a label, and is kept on ' +
       'purpose.',
-  },
-  {
-    file: 'apps/light/src/features/analysis/AnalysisResult.tsx',
-    classes: 'font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase',
-    reason: `The Analysis result heading. ${NEXT}`,
-  },
-  {
-    file: 'apps/light/src/features/analysis/BandScale.tsx',
-    classes:
-      "absolute top-0 font-mono text-[11px] tracking-[0.14em] whitespace-nowrap uppercase ${ band.verdict === verdict ? VERDICT_INK[verdict] : 'text-ink-faint' }",
-    reason: `The band names under the match scale. ${NEXT}`,
-  },
-  {
-    file: 'apps/light/src/features/analysis/GateNotice.tsx',
-    classes: 'font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase',
-    reason: `The heading inside the notice before a cloud check. ${NEXT}`,
-  },
-  {
-    file: 'apps/light/src/features/tailor/AtsStep.tsx',
-    classes: 'font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase',
-    reason: `The ATS step's table heading. ${NEXT}`,
-  },
-  {
-    file: 'apps/light/src/features/tracker/InterviewPanel.tsx',
-    classes: 'font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase',
-    reason: `The interview panel's heading. ${NEXT}`,
-  },
-  {
-    file: 'apps/light/src/features/tracker/NewApplicationForm.tsx',
-    classes: 'font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase',
-    reason: `A section label in the new-application form. ${NEXT}`,
-  },
-  {
-    file: 'apps/light/src/features/search/ResultCard.tsx',
-    classes:
-      'rounded-pill bg-sunken px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] text-ink-muted uppercase',
-    reason: `A search result's source chip. ${NEXT}`,
-  },
-  {
-    file: 'apps/light/src/features/search/ResultCard.tsx',
-    classes:
-      'inline-flex min-h-[23px] min-w-[116px] items-center justify-center rounded-pill bg-sunken px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] text-blue uppercase underline underline-offset-2 hover:text-navy',
-    reason: `A search result's source chip, as a link. ${NEXT}`,
   },
 ];
 

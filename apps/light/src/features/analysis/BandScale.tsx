@@ -46,9 +46,9 @@ export interface Band {
  * >= 60 possible, everything else weak.
  */
 export const BANDS: readonly Band[] = [
-  { verdict: 'weak', from: 0, to: 59, label: 'weak' },
-  { verdict: 'possible', from: 60, to: 74, label: 'possible' },
-  { verdict: 'strong', from: 75, to: 100, label: 'strong' },
+  { verdict: 'weak', from: 0, to: 59, label: 'Weak' },
+  { verdict: 'possible', from: 60, to: 74, label: 'Possible' },
+  { verdict: 'strong', from: 75, to: 100, label: 'Strong' },
 ];
 
 /**
@@ -189,7 +189,7 @@ export function BandScale({ score, verdict }: BandScaleProps) {
               key={band.verdict}
               data-testid={`band-scale-label-${band.verdict}`}
               style={labelPosition(band)}
-              className={`absolute top-0 font-mono text-[11px] tracking-[0.14em] whitespace-nowrap uppercase ${
+              className={`absolute top-0 text-xs whitespace-nowrap ${
                 band.verdict === verdict ? VERDICT_INK[verdict] : 'text-ink-faint'
               }`}
             >

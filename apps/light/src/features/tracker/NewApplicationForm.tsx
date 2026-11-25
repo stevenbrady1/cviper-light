@@ -241,9 +241,7 @@ export function NewApplicationForm({ onCreate, onCancel, initial }: NewApplicati
       */}
       <fieldset className="space-y-3 border-line border-t pt-3">
         <legend className="sr-only">Advert details</legend>
-        <p className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase">
-          From the advert
-        </p>
+        <p className="text-xs font-medium text-ink-faint">From the advert</p>
 
         <DescriptionField
           value={draft.description}
