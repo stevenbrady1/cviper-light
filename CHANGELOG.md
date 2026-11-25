@@ -8,6 +8,14 @@ All notable changes to CViper Light are recorded here. The format follows
 
 Changes waiting for the next release are in [`changes/unreleased/`](changes/unreleased/), one file per change, so two pull requests never edit the same lines here (L-303). `pnpm changelog:preview` shows them as they will appear; `pnpm changelog:release <version> <date>` writes them in below. See [CONTRIBUTING.md](CONTRIBUTING.md#the-changelog).
 
+## [0.16.0] — 2026-11-25
+
+Calmer labels. The small headings and labels in Analysis, Tailor, the interview panel, the new-application form and search results now use normal letters in the app's main font, instead of small spaced capitals. Numbers and dates keep their fixed-width digits.
+
+### Changed
+
+- Small headings and labels now use normal letters in the app's main font instead of small spaced capitals: the result headings in Analysis, the match scale's Weak, Possible and Strong, the ATS score heading in Tailor, the interview panel, the "From the advert" label in the new-application form, and the board name on search results (L-456). Numbers and dates keep their fixed-width digits.
+
 ## [0.15.0] — 2026-11-23
 
 A calmer frame for the whole app. On a computer, every screen now sits on one white panel inside the navy frame, and the side menu's footer is quieter: the version line is gone from it (Settings → About still shows your version), the "Set up" heading is now only read out by screen readers, and ready items lose their "i" mark while items that need you keep theirs.
@@ -753,7 +761,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.15.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.16.0...main
+[0.16.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.15.0...light-v0.16.0
 [0.15.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.14.1...light-v0.15.0
 [0.14.1]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.14.0...light-v0.14.1
 [0.14.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.13.1...light-v0.14.0
