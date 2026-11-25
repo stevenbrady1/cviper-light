@@ -1551,7 +1551,7 @@ return 'installed';
       await click('[data-testid="nav-tracker"]');
       await checkedShot('6-tracker-card-progress', CHECK_CARD_PROGRESS, [
         STARTED_APPLICATION_ID,
-        ['dot', 'dot', 'dot', 'ring', 'ring'],
+        ['tick', 'tick', 'tick', 'dot', 'ring'],
       ]);
 
       // Continue goes to the first thing still to do: the ATS Score.
