@@ -23,17 +23,6 @@ export const FIELD = 'rounded-control border border-field-line bg-card px-2.5 py
 export const FIELD_INVALID = 'rounded-control border border-danger bg-card px-2.5 py-1.5 text-ink';
 
 /**
- * The smaller box (L-376): a picker that sits on one line beside its label or
- * button: Tailor's application picker. (The tracked-job pickers on Tailor and
- * Analysis are chips since L-445 and L-446.) Same edge, fill and text as FIELD;
- * only the vertical padding is smaller (`py-1`, not `py-1.5`). Never put
- * `py-1` after FIELD to get this: two padding classes on one box leave the
- * winner to the stylesheet.
- */
-export const FIELD_COMPACT =
-  'rounded-control border border-field-line bg-card px-2.5 py-1 text-ink';
-
-/**
  * A real drop-down drawn like a text box (L-461): Search's Country and Contract
  * type. Same edge, fill and text as FIELD; the browser's own arrow is switched
  * off (`appearance-none`) and `pr-8` leaves room for the drawn one
@@ -49,6 +38,16 @@ export const FIELD_SELECT =
  */
 export const FIELD_SELECT_INVALID =
   'appearance-none rounded-control border border-danger bg-card py-1.5 pr-8 pl-2.5 text-ink';
+
+/**
+ * The smaller drop-down (L-468, was FIELD_COMPACT, L-376): a picker on one line
+ * beside its button: Tailor's application picker. FIELD_SELECT with only the
+ * vertical padding smaller (`py-1`, not `py-1.5`). Its own constant, not
+ * FIELD_SELECT then `py-1`: two padding classes on one box leave the winner to
+ * the stylesheet.
+ */
+export const FIELD_SELECT_COMPACT =
+  'appearance-none rounded-control border border-field-line bg-card py-1 pr-8 pl-2.5 text-ink';
 
 /**
  * A real drop-down drawn as a chip, inside a sentence of choices (L-442):

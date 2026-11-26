@@ -34,9 +34,9 @@ import {
   COMPOSER_EDITOR,
   FIELD,
   FIELD_CHIP,
-  FIELD_COMPACT,
   FIELD_INVALID,
   FIELD_SELECT,
+  FIELD_SELECT_COMPACT,
 } from './fields';
 
 afterEach(cleanup);
@@ -173,7 +173,7 @@ describe('the Analysis and Tailor boxes on the shared style (L-376)', () => {
     );
   });
 
-  it('boundary: the application picker wears exactly FIELD_COMPACT and min-w-0', () => {
+  it('boundary: the application picker wears exactly FIELD_SELECT_COMPACT, max-w-full and min-w-0', () => {
     render(
       <TailorSaveApplication
         applications={[APPLICATION]}
@@ -187,7 +187,7 @@ describe('the Analysis and Tailor boxes on the shared style (L-376)', () => {
       />,
     );
     expect(exactly(screen.getByTestId('tailor-application'))).toEqual(
-      [...classesOf(FIELD_COMPACT), 'min-w-0'].sort(),
+      [...classesOf(FIELD_SELECT_COMPACT), 'max-w-full', 'min-w-0'].sort(),
     );
   });
 

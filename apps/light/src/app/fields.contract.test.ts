@@ -59,8 +59,9 @@ import {
   COMPOSER_EDITOR,
   FIELD,
   FIELD_CHIP,
-  FIELD_COMPACT,
   FIELD_INVALID,
+  FIELD_SELECT,
+  FIELD_SELECT_COMPACT,
 } from './fields';
 
 /** `apps/light/src`. */
@@ -226,9 +227,9 @@ describe('the shared text-box styles hold exactly what the boxes carried (L-365)
       'COMPOSER_EDITOR',
       'FIELD',
       'FIELD_CHIP',
-      'FIELD_COMPACT',
       'FIELD_INVALID',
       'FIELD_SELECT',
+      'FIELD_SELECT_COMPACT',
       'FIELD_SELECT_INVALID',
     ]);
   });
@@ -268,6 +269,27 @@ describe('the shared text-box styles hold exactly what the boxes carried (L-365)
     expect([...invalid].filter((name) => !valid.has(name))).toEqual(['border-danger']);
   });
 
+  it('FIELD_SELECT_COMPACT is the smaller drop-down, class for class (L-468)', () => {
+    expect(classesOf(FIELD_SELECT_COMPACT)).toEqual([
+      'appearance-none',
+      'rounded-control',
+      'border',
+      'border-field-line',
+      'bg-card',
+      'py-1',
+      'pr-8',
+      'pl-2.5',
+      'text-ink',
+    ]);
+  });
+
+  it('FIELD_SELECT_COMPACT differs from FIELD_SELECT in the vertical padding only (L-468)', () => {
+    const standard = new Set(classesOf(FIELD_SELECT));
+    const compact = new Set(classesOf(FIELD_SELECT_COMPACT));
+    expect([...standard].filter((name) => !compact.has(name))).toEqual(['py-1.5']);
+    expect([...compact].filter((name) => !standard.has(name))).toEqual(['py-1']);
+  });
+
   it('FIELD is the standard box, class for class', () => {
     expect(classesOf(FIELD)).toEqual([
       'rounded-control',
@@ -297,25 +319,6 @@ describe('the shared text-box styles hold exactly what the boxes carried (L-365)
     const invalid = new Set(classesOf(FIELD_INVALID));
     expect([...valid].filter((name) => !invalid.has(name))).toEqual(['border-field-line']);
     expect([...invalid].filter((name) => !valid.has(name))).toEqual(['border-danger']);
-  });
-
-  it('FIELD_COMPACT is the smaller picker box, class for class (L-376)', () => {
-    expect(classesOf(FIELD_COMPACT)).toEqual([
-      'rounded-control',
-      'border',
-      'border-field-line',
-      'bg-card',
-      'px-2.5',
-      'py-1',
-      'text-ink',
-    ]);
-  });
-
-  it('FIELD_COMPACT differs from FIELD in the vertical padding and nothing else (L-376)', () => {
-    const standard = new Set(classesOf(FIELD));
-    const compact = new Set(classesOf(FIELD_COMPACT));
-    expect([...standard].filter((name) => !compact.has(name))).toEqual(['py-1.5']);
-    expect([...compact].filter((name) => !standard.has(name))).toEqual(['py-1']);
   });
 
   it('FIELD_CHIP is the chip drop-down, class for class (L-442)', () => {
@@ -437,38 +440,40 @@ describe('no box in a shared folder copies the style by hand (L-365)', () => {
     it('reads both constants as one shape, differing only in the edge colour', () => {
       expect(SHAPES.map((shape) => shape.names)).toEqual([
         'FIELD / FIELD_INVALID',
-        'FIELD_COMPACT',
         'FIELD_SELECT / FIELD_SELECT_INVALID',
+        'FIELD_SELECT_COMPACT',
         'FIELD_CHIP',
         'COMPOSER_EDITOR',
         'COMPOSER_BAR',
       ]);
     });
 
-    it('negative: catches the compact base pasted into a className, named as FIELD_COMPACT (L-376)', () => {
-      const source = `export const A = () => <select className="min-w-0 flex-1 ${FIELD_COMPACT}" />;`;
+    it('negative: catches the compact base pasted into a className, named as FIELD_SELECT_COMPACT (L-468)', () => {
+      const source = `export const A = () => <select className="min-w-0 flex-1 ${FIELD_SELECT_COMPACT}" />;`;
       expect(handMadeCopies('a.tsx', source)).toEqual([
-        'a.tsx:1 copies FIELD_COMPACT by hand; import it from app/fields',
+        'a.tsx:1 copies FIELD_SELECT_COMPACT by hand; import it from app/fields',
       ]);
     });
 
-    it('negative: catches a compact copy in another class order (L-376)', () => {
-      const shuffled = [...classesOf(FIELD_COMPACT)].reverse().join(' ');
+    it('negative: catches a compact copy in another class order (L-468)', () => {
+      const shuffled = [...classesOf(FIELD_SELECT_COMPACT)].reverse().join(' ');
       expect(handMadeCopies('a.ts', `const PICK = 'min-w-0 ${shuffled}';`)).toEqual([
-        'a.ts:1 copies FIELD_COMPACT by hand; import it from app/fields',
+        'a.ts:1 copies FIELD_SELECT_COMPACT by hand; import it from app/fields',
       ]);
     });
 
-    it('boundary: the standard base is not read as a compact copy, nor the compact as standard (L-376)', () => {
-      expect(handMadeCopies('a.ts', `const A = '${FIELD}';`)).toEqual([COPY('a.ts')]);
-      expect(handMadeCopies('a.ts', `const A = '${FIELD_COMPACT}';`)).toEqual([
-        'a.ts:1 copies FIELD_COMPACT by hand; import it from app/fields',
+    it('boundary: the standard select is not read as a compact copy, nor the compact as standard (L-468)', () => {
+      expect(handMadeCopies('a.ts', `const A = '${FIELD_SELECT}';`)).toEqual([
+        'a.ts:1 copies FIELD_SELECT / FIELD_SELECT_INVALID by hand; import it from app/fields',
+      ]);
+      expect(handMadeCopies('a.ts', `const A = '${FIELD_SELECT_COMPACT}';`)).toEqual([
+        'a.ts:1 copies FIELD_SELECT_COMPACT by hand; import it from app/fields',
       ]);
     });
 
-    it('boundary: FIELD_COMPACT used at the call site is not a copy (L-376)', () => {
+    it('boundary: FIELD_SELECT_COMPACT used at the call site is not a copy (L-468)', () => {
       const source =
-        'export const A = () => <select className={`${FIELD_COMPACT} min-w-0 flex-1`} />;';
+        'export const A = () => <select className={`${FIELD_SELECT_COMPACT} min-w-0 flex-1`} />;';
       expect(handMadeCopies('a.tsx', source)).toEqual([]);
     });
 

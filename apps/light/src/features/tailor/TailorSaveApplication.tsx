@@ -1,7 +1,8 @@
 import { type Application } from '@cviper/core-types';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
-import { FIELD_COMPACT } from '../../app/fields';
+import { SelectChevron } from '../../app/Chevrons';
+import { FIELD_SELECT_COMPACT } from '../../app/fields';
 
 export interface TailorSaveApplicationProps {
   readonly applications: readonly Application[];
@@ -30,20 +31,23 @@ export function TailorSaveApplication({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {applications.length === 0 ? null : (
-        <select
-          data-testid="tailor-application"
-          aria-label="Application to save into"
-          value={selectedApplicationId ?? ''}
-          onChange={(event) => onSelectApplication(event.currentTarget.value || null)}
-          className={`${FIELD_COMPACT} min-w-0`}
-        >
-          {applications.map((application) => (
-            <option key={application.id} value={application.id}>
-              {application.status}
-              {application.applied_date === null ? '' : ` · applied ${application.applied_date}`}
-            </option>
-          ))}
-        </select>
+        <span className="relative inline-flex max-w-full min-w-0">
+          <select
+            data-testid="tailor-application"
+            aria-label="Application to save into"
+            value={selectedApplicationId ?? ''}
+            onChange={(event) => onSelectApplication(event.currentTarget.value || null)}
+            className={`${FIELD_SELECT_COMPACT} max-w-full min-w-0`}
+          >
+            {applications.map((application) => (
+              <option key={application.id} value={application.id}>
+                {application.status}
+                {application.applied_date === null ? '' : ` · applied ${application.applied_date}`}
+              </option>
+            ))}
+          </select>
+          <SelectChevron />
+        </span>
       )}
       <button
         type="button"
