@@ -33,7 +33,8 @@
  *   - `?marks=1` draws, instead of the app, the three components that put a
  *     drawn mark beside words (L-370: is any row taller for its mark).
  *   - `?draft=1` opens Tailor's job on a finished tailored CV, and
- *     `?draft=contact` with confirmed details on top (L-400: the CV as a page).
+ *     `?draft=contact` with confirmed details on top (L-400: the CV as a page);
+ *     `?draft=applied` also gives that job an application (L-468: its picker).
  *   - `?consent=openai,google` has those providers already agreed to, for
  *     Settings' "What I have agreed to" (L-410); `&consentLate=1` holds the
  *     consent file's answer back until a screen has had time to scroll.
@@ -285,7 +286,8 @@ const cvs =
  * `?draft=1` (L-400): Tailor opens on a finished draft — a job, its CV, a local
  * model, and the tailored CV the last run left, brought back the way a restart
  * brings it (`workflowPort`). `?draft=contact` also has the user's confirmed
- * name and contact details, so the page has them on top.
+ * name and contact details, so the page has them on top. `?draft=applied` gives
+ * the job an application, so "Save to an application" draws its picker (L-468).
  */
 const draft = params.get('draft');
 async function draftWork() {
@@ -881,7 +883,10 @@ ReactDOM.createRoot(root).render(
             ...entries.map((tracked) => tracked.job),
             ...(drafted === null ? [] : [drafted.job]),
           ],
-          applications: entries.map((tracked) => tracked.application),
+          applications: [
+            ...entries.map((tracked) => tracked.application),
+            ...(draft === 'applied' ? [application('draft', 'interviewing').application] : []),
+          ],
         })}
         {...(drafted === null ? {} : { workflowPort: drafted.workflowPort })}
         {...(searchPort === undefined ? {} : { searchPort })}

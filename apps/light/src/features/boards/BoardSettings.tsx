@@ -4,7 +4,8 @@ import { buildBoardUrl } from '@cviper/job-apis';
 import { BOARD_ENCODINGS, type BoardEncoding } from '@cviper/core-types';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
-import { FIELD } from '../../app/fields';
+import { SelectChevron } from '../../app/Chevrons';
+import { FIELD, FIELD_SELECT } from '../../app/fields';
 import { cardClasses, ErrorBox, Icon, SectionHeading, StatusPill } from '../../ui';
 import { COUNTRY_OPTIONS, OTHER_COUNTRY, readCountry } from '../search/country';
 
@@ -334,29 +335,32 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
             >
               A space in the search becomes
             </label>
-            <select
-              id="boards-new-encoding"
-              data-testid="boards-new-encoding"
-              value={draft.encoding}
-              onChange={(event) => {
-                /*
-                  Read EAGERLY, before `setDraft`. A lazy updater runs during
-                  the next render, by which time React has finished dispatching
-                  the event and `currentTarget` is null — reading it in there
-                  throws, and it throws in front of the user rather than in a
-                  test that never touched this control.
-                */
-                const encoding = event.currentTarget.value as BoardEncoding;
-                setDraft((current) => ({ ...current, encoding }));
-              }}
-              className={`${FIELD} mt-1`}
-            >
-              {BOARD_ENCODINGS.map((encoding) => (
-                <option key={encoding} value={encoding}>
-                  {ENCODING_LABEL[encoding]}
-                </option>
-              ))}
-            </select>
+            <span className="relative mt-1 inline-flex max-w-full">
+              <select
+                id="boards-new-encoding"
+                data-testid="boards-new-encoding"
+                value={draft.encoding}
+                onChange={(event) => {
+                  /*
+                    Read EAGERLY, before `setDraft`. A lazy updater runs during
+                    the next render, by which time React has finished dispatching
+                    the event and `currentTarget` is null — reading it in there
+                    throws, and it throws in front of the user rather than in a
+                    test that never touched this control.
+                  */
+                  const encoding = event.currentTarget.value as BoardEncoding;
+                  setDraft((current) => ({ ...current, encoding }));
+                }}
+                className={`${FIELD_SELECT} max-w-full`}
+              >
+                {BOARD_ENCODINGS.map((encoding) => (
+                  <option key={encoding} value={encoding}>
+                    {ENCODING_LABEL[encoding]}
+                  </option>
+                ))}
+              </select>
+              <SelectChevron />
+            </span>
           </div>
 
           {preview === null ? null : (

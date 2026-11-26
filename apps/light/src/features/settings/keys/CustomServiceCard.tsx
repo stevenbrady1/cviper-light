@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type ModelInfo } from '@cviper/ai-providers';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
-import { FIELD, FIELD_INVALID } from '../../../app/fields';
+import { SelectChevron } from '../../../app/Chevrons';
+import { FIELD, FIELD_INVALID, FIELD_SELECT } from '../../../app/fields';
 import { ErrorBox, StatusPill } from '../../../ui';
 import { type KeyState } from '../../../status/environment';
 import {
@@ -406,22 +407,25 @@ function CustomModelPicker({
           <label htmlFor="custom-service-model-select" className="sr-only">
             Choose a model from the service’s list
           </label>
-          <select
-            id="custom-service-model-select"
-            data-testid="custom-service-model-select"
-            value={model !== null && models.some((entry) => entry.id === model) ? model : ''}
-            onChange={(event) => void use(event.currentTarget.value)}
-            className={`${FIELD} mt-2 w-full`}
-          >
-            <option value="" disabled>
-              Choose a model from the service’s list
-            </option>
-            {models.map((entry) => (
-              <option key={entry.id} value={entry.id}>
-                {entry.label}
+          <span className="relative mt-2 block">
+            <select
+              id="custom-service-model-select"
+              data-testid="custom-service-model-select"
+              value={model !== null && models.some((entry) => entry.id === model) ? model : ''}
+              onChange={(event) => void use(event.currentTarget.value)}
+              className={`${FIELD_SELECT} w-full`}
+            >
+              <option value="" disabled>
+                Choose a model from the service’s list
               </option>
-            ))}
-          </select>
+              {models.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+            <SelectChevron />
+          </span>
         </>
       )}
 

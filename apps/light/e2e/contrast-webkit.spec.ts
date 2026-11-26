@@ -10202,3 +10202,141 @@ describe('The remaining folds draw the shared mark, with whole-pixel titles (L-4
     await page.context().close();
   });
 });
+
+/**
+ * The Settings, job-board and Tailor drop-downs draw the same arrow as Search
+ * (L-468). Measured as the Tracker's are (L-467): `appearance: none`, one arrow,
+ * a press on the arrow reaches the select, and as tall as the text box above it
+ * in whole pixels. "A space in the search becomes" keeps its natural width, and
+ * Tailor's small picker stays inside its row. With an AI key row open, every
+ * closed key row is still a whole 44px or more (L-364).
+ */
+async function settingsWithKeyOpen(viewport: { width: number; height: number }): Promise<Page> {
+  const page = await settingsWithRows(viewport);
+  await toggleRow(page, 'ai-key-row-openai', true);
+  await page.waitForSelector('#ai-model-openai');
+  await page.click('[data-testid="boards-add-open"]');
+  await page.waitForSelector('#boards-new-encoding');
+  return page;
+}
+
+const SETTINGS_SELECTS: readonly SelectPair[] = [
+  ['ai-model-openai', 'ai-key-input-openai'],
+  ['boards-new-encoding', 'boards-new-label'],
+];
+
+/**
+ * "A space in the search becomes" keeps its natural width: never past the text
+ * box above it, and on a wide window (`roomy`) narrower than it, not stretched.
+ * On a phone its long option fills the column, and `max-w-full` stops it there.
+ */
+async function encodingWidthProblems(page: Page, roomy: boolean): Promise<string[]> {
+  return page.evaluate((wide) => {
+    const select = document.getElementById('boards-new-encoding')!.getBoundingClientRect();
+    const box = document.getElementById('boards-new-label')!.getBoundingClientRect();
+    const problems: string[] = [];
+    if (select.right > box.right + 0.5) {
+      problems.push(`boards-new-encoding reaches ${String(select.right)}px, past its text box`);
+    }
+    if (wide && select.width >= box.width) {
+      problems.push(
+        `boards-new-encoding is stretched: ${String(select.width)}px, its text box's width`,
+      );
+    }
+    return problems;
+  }, roomy);
+}
+
+/** Tailor on a finished draft whose job has an application, so its picker is drawn. */
+async function tailorPicker(viewport: { width: number; height: number }): Promise<Page> {
+  const page = await open('?seen=1&draft=applied', viewport);
+  await goTo(page, 'tailor');
+  await page.waitForSelector('[data-testid="tailor-application"]');
+  // The picker has a test id but no id, and the measure reads ids.
+  await page.evaluate(() => {
+    document.querySelector('[data-testid="tailor-application"]')!.id = 'tailor-application';
+  });
+  return page;
+}
+
+/** The small picker against its row: nothing past the row's right edge. */
+async function pickerRowProblems(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const select = document.getElementById('tailor-application')!;
+    const row = select.parentElement!.parentElement!.getBoundingClientRect();
+    const box = select.getBoundingClientRect();
+    return box.right <= row.right + 0.5
+      ? []
+      : [
+          `tailor-application reaches ${String(box.right)}px, past its row at ${String(row.right)}px`,
+        ];
+  });
+}
+
+describe('Settings, job-board and Tailor drop-downs draw the same arrow as Search (L-468)', () => {
+  for (const viewport of [PHONE, { width: 768, height: 1024 }, { width: 1280, height: 800 }]) {
+    const label = `${String(viewport.width)}×${String(viewport.height)}`;
+
+    it(`at ${label} "AI model" and "A space in the search becomes" draw one arrow, as tall as a text box, and the key rows stay whole`, async () => {
+      const page = await settingsWithKeyOpen(viewport);
+      const seen = await trackerSelects(page, SETTINGS_SELECTS);
+      console.log(`Settings drop-downs at ${label}: ${JSON.stringify(seen)}`);
+      assert.deepEqual(trackerSelectProblems(seen), []);
+      assert.deepEqual(await encodingWidthProblems(page, viewport.width === 1280), []);
+      assert.deepEqual(settingsFoldMarkProblems(await settingsFoldMarks(page)), []);
+      await page.context().close();
+    });
+
+    it(`at ${label} Tailor's small picker draws one arrow, in whole pixels, inside its row`, async () => {
+      const page = await tailorPicker(viewport);
+      // Its own pair: it is smaller than a text box on purpose (FIELD_SELECT_COMPACT).
+      const seen = await trackerSelects(page, [['tailor-application', 'tailor-application']]);
+      console.log(`Tailor application picker at ${label}: ${JSON.stringify(seen)}`);
+      assert.deepEqual(trackerSelectProblems(seen), []);
+      assert.ok(seen[0]!.height < 38, `the small picker is ${String(seen[0]!.height)}px tall`);
+      assert.deepEqual(await pickerRowProblems(page), []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: the browser look, a full-width encoding picker, a half-pixel picker and one past its row are reported', async () => {
+    const settings = await settingsWithKeyOpen({ width: 1280, height: 800 });
+    await settings.evaluate(() => {
+      document.getElementById('ai-model-openai')!.style.appearance = 'auto';
+      document.getElementById('boards-new-encoding')!.style.width = '2000px';
+    });
+    const problems = [
+      ...trackerSelectProblems(await trackerSelects(settings, SETTINGS_SELECTS)),
+      ...(await encodingWidthProblems(settings, true)),
+    ];
+    await settings.context().close();
+
+    const tailor = await tailorPicker({ width: 1280, height: 800 });
+    await tailor.evaluate(() => {
+      const picker = document.getElementById('tailor-application')!;
+      picker.style.height = '30.5px';
+      picker.style.minWidth = '2000px';
+    });
+    problems.push(
+      ...trackerSelectProblems(
+        await trackerSelects(tailor, [['tailor-application', 'tailor-application']]),
+      ),
+      ...(await pickerRowProblems(tailor)),
+    );
+    await tailor.context().close();
+
+    for (const expected of [
+      "ai-model-openai draws the browser's own look",
+      'boards-new-encoding is stretched',
+      'tailor-application is 30.5px tall, not a whole pixel',
+      'tailor-application reaches',
+    ]) {
+      assert.ok(
+        problems.some((line) => line.startsWith(expected)),
+        `"${expected}" was not reported: ${JSON.stringify(problems)}`,
+      );
+    }
+  });
+});

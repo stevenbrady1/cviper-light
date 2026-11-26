@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../../app/buttons';
-import { FIELD, FIELD_INVALID } from '../../../app/fields';
+import { SelectChevron } from '../../../app/Chevrons';
+import { FIELD, FIELD_INVALID, FIELD_SELECT } from '../../../app/fields';
 import { createTauriBrowserPort, type BrowserPort } from '../../../platform/browser';
 import { combineKeyState, type KeyState } from '../../../status/environment';
 import { cardClasses, ErrorBox, SectionHeading, StatusPill } from '../../../ui';
@@ -494,24 +495,27 @@ function ModelPicker({
       <label htmlFor={selectId} className="block text-xs font-medium text-ink-muted">
         AI model
       </label>
-      <select
-        id={selectId}
-        data-testid={selectId}
-        value={model}
-        onChange={(event) => {
-          const next = event.currentTarget.value;
-          // Shown only once it is kept: a selection that silently fails to
-          // save would run a different model from the one on screen.
-          if (chooseModel(providerId, next)) onChange(next);
-        }}
-        className={`${FIELD} mt-1 w-full`}
-      >
-        {AI_MODEL_CHOICES[providerId].map((choice) => (
-          <option key={choice.id} value={choice.id}>
-            {choice.id === fallback ? `${choice.id} (default)` : choice.id}
-          </option>
-        ))}
-      </select>
+      <span className="relative mt-1 block">
+        <select
+          id={selectId}
+          data-testid={selectId}
+          value={model}
+          onChange={(event) => {
+            const next = event.currentTarget.value;
+            // Shown only once it is kept: a selection that silently fails to
+            // save would run a different model from the one on screen.
+            if (chooseModel(providerId, next)) onChange(next);
+          }}
+          className={`${FIELD_SELECT} w-full`}
+        >
+          {AI_MODEL_CHOICES[providerId].map((choice) => (
+            <option key={choice.id} value={choice.id}>
+              {choice.id === fallback ? `${choice.id} (default)` : choice.id}
+            </option>
+          ))}
+        </select>
+        <SelectChevron />
+      </span>
       <p className="mt-1 text-xs text-ink-faint">
         Used for everything this provider does here: analysis, tailoring, pasted adverts, follow-ups
         and interview packs.
