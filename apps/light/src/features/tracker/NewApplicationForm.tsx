@@ -3,7 +3,8 @@ import { useState, type FormEvent } from 'react';
 import { type ApplicationStatus, type SalaryPeriod } from '@cviper/core-types';
 
 import { PRIMARY_BUTTON, QUIET_BUTTON } from '../../app/buttons';
-import { FIELD, FIELD_INVALID } from '../../app/fields';
+import { SelectChevron } from '../../app/Chevrons';
+import { FIELD, FIELD_INVALID, FIELD_SELECT, FIELD_SELECT_INVALID } from '../../app/fields';
 import { readCountry } from '../search/country';
 
 import {
@@ -213,24 +214,27 @@ export function NewApplicationForm({ onCreate, onCancel, initial }: NewApplicati
         <label htmlFor="new-status" className="block text-xs font-medium text-ink-muted">
           Status
         </label>
-        <select
-          id="new-status"
-          value={draft.status}
-          onChange={(event) => {
-            // Read the value NOW. React nulls `currentTarget` once the handler
-            // returns, and the updater passed to `setDraft` runs afterwards —
-            // so reading it in there throws on `null`.
-            const status = event.currentTarget.value as ApplicationStatus;
-            setDraft((current) => ({ ...current, status }));
-          }}
-          className={`${FIELD} mt-1 w-full`}
-        >
-          {TRACKER_COLUMNS.map((status) => (
-            <option key={status} value={status}>
-              {STATUS_LABELS[status]}
-            </option>
-          ))}
-        </select>
+        <span className="relative mt-1 block">
+          <select
+            id="new-status"
+            value={draft.status}
+            onChange={(event) => {
+              // Read the value NOW. React nulls `currentTarget` once the handler
+              // returns, and the updater passed to `setDraft` runs afterwards —
+              // so reading it in there throws on `null`.
+              const status = event.currentTarget.value as ApplicationStatus;
+              setDraft((current) => ({ ...current, status }));
+            }}
+            className={`${FIELD_SELECT} w-full`}
+          >
+            {TRACKER_COLUMNS.map((status) => (
+              <option key={status} value={status}>
+                {STATUS_LABELS[status]}
+              </option>
+            ))}
+          </select>
+          <SelectChevron />
+        </span>
       </div>
 
       {/*
@@ -284,24 +288,27 @@ export function NewApplicationForm({ onCreate, onCancel, initial }: NewApplicati
           <label htmlFor="new-salary-period" className="block text-xs font-medium text-ink-muted">
             Pay period
           </label>
-          <select
-            id="new-salary-period"
-            value={draft.salaryPeriod}
-            aria-invalid={visible.salaryPeriod === undefined ? undefined : true}
-            aria-describedby={
-              visible.salaryPeriod === undefined ? undefined : 'new-salary-period-error'
-            }
-            onChange={(event) => {
-              const salaryPeriod = event.currentTarget.value as SalaryPeriod | '';
-              setDraft((current) => ({ ...current, salaryPeriod }));
-            }}
-            className={`${visible.salaryPeriod === undefined ? FIELD : FIELD_INVALID} mt-1 w-full`}
-          >
-            <option value="">Not stated</option>
-            <option value="year">Year</option>
-            <option value="day">Day</option>
-            <option value="hour">Hour</option>
-          </select>
+          <span className="relative mt-1 block">
+            <select
+              id="new-salary-period"
+              value={draft.salaryPeriod}
+              aria-invalid={visible.salaryPeriod === undefined ? undefined : true}
+              aria-describedby={
+                visible.salaryPeriod === undefined ? undefined : 'new-salary-period-error'
+              }
+              onChange={(event) => {
+                const salaryPeriod = event.currentTarget.value as SalaryPeriod | '';
+                setDraft((current) => ({ ...current, salaryPeriod }));
+              }}
+              className={`${visible.salaryPeriod === undefined ? FIELD_SELECT : FIELD_SELECT_INVALID} w-full`}
+            >
+              <option value="">Not stated</option>
+              <option value="year">Year</option>
+              <option value="day">Day</option>
+              <option value="hour">Hour</option>
+            </select>
+            <SelectChevron />
+          </span>
           {visible.salaryPeriod === undefined ? null : (
             <p id="new-salary-period-error" className="mt-1 text-xs text-danger">
               {visible.salaryPeriod}

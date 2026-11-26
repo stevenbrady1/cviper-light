@@ -229,6 +229,7 @@ describe('the shared text-box styles hold exactly what the boxes carried (L-365)
       'FIELD_COMPACT',
       'FIELD_INVALID',
       'FIELD_SELECT',
+      'FIELD_SELECT_INVALID',
     ]);
   });
 
@@ -244,6 +245,27 @@ describe('the shared text-box styles hold exactly what the boxes carried (L-365)
       'pl-2.5',
       'text-ink',
     ]);
+  });
+
+  it('FIELD_SELECT_INVALID is the drop-down with the danger edge, class for class (L-467)', () => {
+    expect(classesOf(fields.FIELD_SELECT_INVALID)).toEqual([
+      'appearance-none',
+      'rounded-control',
+      'border',
+      'border-danger',
+      'bg-card',
+      'py-1.5',
+      'pr-8',
+      'pl-2.5',
+      'text-ink',
+    ]);
+  });
+
+  it('FIELD_SELECT_INVALID differs from FIELD_SELECT in the edge colour only (L-467)', () => {
+    const valid = new Set(classesOf(fields.FIELD_SELECT));
+    const invalid = new Set(classesOf(fields.FIELD_SELECT_INVALID));
+    expect([...valid].filter((name) => !invalid.has(name))).toEqual(['border-field-line']);
+    expect([...invalid].filter((name) => !valid.has(name))).toEqual(['border-danger']);
   });
 
   it('FIELD is the standard box, class for class', () => {
@@ -416,7 +438,7 @@ describe('no box in a shared folder copies the style by hand (L-365)', () => {
       expect(SHAPES.map((shape) => shape.names)).toEqual([
         'FIELD / FIELD_INVALID',
         'FIELD_COMPACT',
-        'FIELD_SELECT',
+        'FIELD_SELECT / FIELD_SELECT_INVALID',
         'FIELD_CHIP',
         'COMPOSER_EDITOR',
         'COMPOSER_BAR',
