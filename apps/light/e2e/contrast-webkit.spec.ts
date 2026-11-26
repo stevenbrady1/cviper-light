@@ -9738,3 +9738,144 @@ describe('Search drop-downs draw the chips’ arrow (L-461)', () => {
     await page.context().close();
   });
 });
+
+/**
+ * Settings' folds draw the shared mark (L-462). Settings nests folds: the Reed
+ * and Adzuna rows sit inside "Job-board keys". Only a real engine can say that
+ * the built CSS turns the mark of an open fold and NOT the marks of the closed
+ * rows inside it, that the browser's own mark is gone, and that every key row
+ * is still a whole 44px or more (the L-364 half-pixel rule).
+ */
+const KEYS_FOLD = '[data-testid="settings-advanced"]';
+
+interface SettingsFoldMark {
+  readonly id: string;
+  readonly open: boolean;
+  readonly rotate: string;
+  readonly svgs: number;
+  readonly listStyle: string;
+  readonly height: number;
+  /** How far a closed fold's mark starts inside its title's padding. A browser mark pushes it right. */
+  readonly indent: number;
+}
+
+async function settingsFoldMarks(page: Page): Promise<SettingsFoldMark[]> {
+  return page.evaluate(
+    (selector) =>
+      [...document.querySelectorAll<HTMLDetailsElement>(selector)].map((fold) => {
+        const summary = fold.querySelector<HTMLElement>(':scope > summary');
+        const mark = summary?.firstElementChild;
+        if (summary === null || !(mark instanceof HTMLElement)) {
+          throw new Error(`${fold.dataset.testid ?? '?'} has no title mark`);
+        }
+        const style = getComputedStyle(summary);
+        return {
+          id: fold.dataset.testid ?? '?',
+          open: fold.open,
+          rotate: getComputedStyle(mark).rotate,
+          svgs: summary.querySelectorAll(':scope > span[aria-hidden="true"] svg').length,
+          listStyle: style.listStyleType,
+          height: summary.getBoundingClientRect().height,
+          indent:
+            mark.getBoundingClientRect().left -
+            summary.getBoundingClientRect().left -
+            parseFloat(style.paddingLeft) -
+            parseFloat(style.borderLeftWidth),
+        };
+      }),
+    `${KEYS_FOLD}, ${KEY_ROWS}`,
+  );
+}
+
+/** What is wrong with Settings' fold marks. Empty means each turns with its own fold only. */
+function settingsFoldMarkProblems(seen: readonly SettingsFoldMark[]): string[] {
+  const problems: string[] = [];
+  if (seen.length !== 10) problems.push(`${String(seen.length)} folds drawn, not 10`);
+  for (const each of seen) {
+    const want = each.open ? '90deg' : 'none';
+    if (each.rotate !== want) {
+      problems.push(
+        `${each.id} is ${each.open ? 'open' : 'closed'} but its mark is turned ${each.rotate}`,
+      );
+    }
+    if (each.svgs !== 1) problems.push(`${each.id} draws ${String(each.svgs)} marks`);
+    if (each.listStyle !== 'none') problems.push(`${each.id} asks for a "${each.listStyle}" mark`);
+    if (!each.open && Math.abs(each.indent) > 0.5) {
+      problems.push(`${each.id}: something is drawn before our mark, ${String(each.indent)}px in`);
+    }
+    if (each.id !== 'settings-advanced' && !each.open) {
+      if (each.height < 44) problems.push(`${each.id}: title is ${String(each.height)}px tall`);
+      if (Math.abs(each.height - Math.round(each.height)) > 0.01) {
+        problems.push(`${each.id}: title is ${String(each.height)}px, not a whole pixel`);
+      }
+    }
+  }
+  return problems;
+}
+
+async function toggleRow(page: Page, testId: string, open: boolean): Promise<void> {
+  await page.click(`[data-testid="${testId}"] > summary`);
+  await page.waitForSelector(`[data-testid="${testId}"]${open ? '[open]' : ':not([open])'}`);
+}
+
+describe('Settings folds draw the shared mark, and only an open fold turns it (L-462)', () => {
+  for (const viewport of [PHONE, { width: 768, height: 1024 }, { width: 1280, height: 800 }]) {
+    const label = `${String(viewport.width)}×${String(viewport.height)}`;
+    it(`at ${label} "Job-board keys" open turns its mark only; Reed turns when it opens`, async () => {
+      const page = await settingsWithRows(viewport);
+      const keysOpen = await settingsFoldMarks(page);
+      console.log(`Settings fold marks at ${label}: ${JSON.stringify(keysOpen)}`);
+      assert.deepEqual(settingsFoldMarkProblems(keysOpen), []);
+      assert.equal(keysOpen.find((each) => each.id === 'settings-advanced')?.rotate, '90deg');
+      assert.equal(keysOpen.find((each) => each.id === 'key-row-reed')?.rotate, 'none');
+
+      await toggleRow(page, 'key-row-reed', true);
+      const reedOpen = await settingsFoldMarks(page);
+      assert.equal(reedOpen.find((each) => each.id === 'key-row-reed')?.rotate, '90deg');
+      assert.equal(reedOpen.find((each) => each.id === 'key-row-adzuna')?.rotate, 'none');
+      assert.deepEqual(settingsFoldMarkProblems(reedOpen), []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      await page.context().close();
+    });
+  }
+
+  it("an AI row's mark turns when it opens, and back when it closes", async () => {
+    const page = await settingsWithRows({ width: 1280, height: 800 });
+    const openai = async (): Promise<string | undefined> =>
+      (await settingsFoldMarks(page)).find((each) => each.id === 'ai-key-row-openai')?.rotate;
+    assert.equal(await openai(), 'none');
+    await toggleRow(page, 'ai-key-row-openai', true);
+    assert.equal(await openai(), '90deg');
+    await toggleRow(page, 'ai-key-row-openai', false);
+    assert.equal(await openai(), 'none');
+    assert.deepEqual(settingsFoldMarkProblems(await settingsFoldMarks(page)), []);
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a closed row turned with the open fold, the browser mark and a half-pixel row are reported', async () => {
+    const page = await settingsWithRows({ width: 1280, height: 800 });
+    await page.evaluate(() => {
+      const reed = document.querySelector<HTMLElement>('[data-testid="key-row-reed"] > summary');
+      const adzuna = document.querySelector<HTMLElement>(
+        '[data-testid="key-row-adzuna"] > summary',
+      );
+      if (reed === null || adzuna === null) throw new Error('no job-board rows');
+      (reed.firstElementChild as HTMLElement).style.rotate = '90deg';
+      adzuna.style.listStyleType = 'disclosure-closed';
+      adzuna.style.minHeight = '44.5px';
+    });
+    const problems = settingsFoldMarkProblems(await settingsFoldMarks(page));
+    for (const expected of [
+      'key-row-reed is closed but its mark is turned 90deg',
+      'key-row-adzuna asks for a "disclosure-closed" mark',
+      'key-row-adzuna: title is 44.5px, not a whole pixel',
+    ]) {
+      assert.ok(
+        problems.some((line) => line.startsWith(expected)),
+        `"${expected}" was not reported: ${JSON.stringify(problems)}`,
+      );
+    }
+    await page.context().close();
+  });
+});

@@ -1,19 +1,19 @@
 import { useId, useState, type ReactNode, type Ref } from 'react';
 
+import { FoldMark } from '../../../app/Chevrons';
 import { cardClasses } from '../../../ui';
 
 /**
  * One key card as a short row that opens on click (L-390).
  *
  * The browser's own fold (`<details>`), like every other fold in the app: the
- * keyboard, the open/closed mark and "expanded/collapsed" for a screen reader
- * come with it. The title is one line: the name (still the card's heading), the
+ * keyboard and "expanded/collapsed" for a screen reader come with it. The
+ * open/closed mark is the app's drawn one (`FoldMark`, L-462). The title is one line: the name (still the card's heading), the
  * chosen model when there is one, and the status pill. Nothing in the title is
  * a button or a link — the whole title is the button.
  *
- * The title stays `display: list-item`, so the browser draws its own mark. A
- * flex title would lose it, so the pill is pinned right instead, with room kept
- * for the widest pill ("Could not be read").
+ * The title stays a line of text rather than a flex row, so the pill is pinned
+ * right instead, with room kept for the widest pill ("Could not be read").
  */
 export interface KeyRowProps {
   /** The card's test id, as before rows. */
@@ -54,13 +54,13 @@ export function KeyRow({
     >
       <details data-testid={rowTestId} open={open}>
         {/*
-          `marker:text-sm`: at 16px WebKit's fold mark makes the line half a
-          pixel taller (44.5px), and seven rows above Job boards leave that
-          section on a half pixel, which a scroll cannot land on (L-364). At
-          14px every title is a whole 44px in WebKit and Chromium alike; the
-          metric prompts fold already draws its mark at this size.
+          The browser's mark is off; the drawn one is one line high (`h-lh`), so
+          with `py-2.5` every title is a whole 44px in WebKit and Chromium alike.
+          Half a pixel more and the rows above Job boards leave that section on
+          a half pixel, which a scroll cannot land on (L-364).
         */}
-        <summary className="relative min-h-11 cursor-pointer py-2.5 pr-36 pl-4 marker:text-sm">
+        <summary className="relative min-h-11 cursor-pointer list-none py-2.5 pr-36 pl-4 [&::-webkit-details-marker]:hidden">
+          <FoldMark />
           <h3 id={headingId} className="inline font-medium text-ink">
             {name}
           </h3>

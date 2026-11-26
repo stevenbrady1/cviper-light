@@ -8,6 +8,7 @@ import {
   type BackupPayload,
 } from '@cviper/core-types';
 
+import { FoldMark } from '../../app/Chevrons';
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { CONTENT_COLUMN, SCROLL_GUTTER, SIDE_PADDING } from '../../app/layout';
 import { scrollWithin } from '../../app/scrollWithin';
@@ -535,8 +536,9 @@ export function Settings({
             its keys with `job_test_credentials`, a command that REFUSES an AI
             credential by design — see the note in `aiKeyModel.ts`.
           */}
-          <details data-testid="settings-advanced" className="group" open={keysUnfolded}>
-            <summary className="cursor-pointer font-medium text-ink">
+          <details data-testid="settings-advanced" open={keysUnfolded}>
+            <summary className="cursor-pointer list-none font-medium text-ink [&::-webkit-details-marker]:hidden">
+              <FoldMark />
               Job-board keys (optional)
             </summary>
             <div className="mt-4">

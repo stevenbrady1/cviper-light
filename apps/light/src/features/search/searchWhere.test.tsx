@@ -206,9 +206,9 @@ describe('"Where to look" draws its own fold mark (L-437)', () => {
   it('turns when the fold opens, with no animation', async () => {
     renderSearch();
     await screen.findByTestId('search-empty');
-    expect(fold().classList.contains('group')).toBe(true);
+    expect(fold().classList.contains('group')).toBe(false);
     const classes = mark()?.getAttribute('class') ?? '';
-    expect(classes.split(' ')).toContain('group-open:rotate-90');
+    expect(classes.split(' ')).toContain('[details[open]>summary>&]:rotate-90');
     expect(classes).not.toMatch(/transition|duration|animate/);
   });
 
