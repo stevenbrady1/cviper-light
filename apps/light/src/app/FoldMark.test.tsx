@@ -39,7 +39,7 @@ function markOf(fold: HTMLElement): HTMLElement {
 /** Whether the turn's own selector picks this mark, as the built CSS would. */
 function turned(mark: HTMLElement): boolean {
   const variant = /^\[(.+)\]:rotate-90$/.exec(TURN)?.[1] ?? '';
-  return mark.matches(variant.replace('&', '*'));
+  return mark.matches(variant.replaceAll('&', '*'));
 }
 
 function renderSettings() {
