@@ -6,8 +6,9 @@
  * inside the sentence, "Check [CV] … using [AI]". It now ends the line, after
  * "Upload a CV", in one group with it, so it never starts a line of its own.
  *
- * 6b: the note read "JSON Resume ⓘ (.json)". The ⓘ now follows "(.json)", and
- * the words are the same.
+ * 6b: the note read "JSON Resume ⓘ (.json). The file …". It now reads
+ * "JSON Resume (.json). ⓘ The file …": the full stop comes before the ⓘ, so it
+ * never floats after the icon's padding. The words are the same.
  */
 import { type Cv } from '@cviper/core-types';
 import { cleanup, render, screen, within } from '@testing-library/react';
@@ -155,24 +156,56 @@ describe('6a: the "…" ends the line, after Upload a CV (L-463)', () => {
   });
 });
 
-describe('6b: the ⓘ follows "(.json)" (L-463)', () => {
-  /** The text node holding "(.json)" inside the note. */
-  function jsonText(note: HTMLElement): Text {
+describe('6b: "(.json)." then the ⓘ (L-463)', () => {
+  /** The note's text nodes, in page order. */
+  function texts(note: HTMLElement): Text[] {
     const walker = document.createTreeWalker(note, NodeFilter.SHOW_TEXT);
+    const found: Text[] = [];
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-      if (node.textContent?.includes('(.json)') === true) return node as Text;
+      found.push(node as Text);
     }
-    throw new Error('no "(.json)" in the note');
+    return found;
   }
 
-  it('happy: the ⓘ comes after "(.json)" in the note', () => {
-    render(<AnalysisCvNote />);
-    const note = screen.getByTestId('analysis-cv-note');
-    const infos = within(note).getAllByRole('button', { name: 'What this means' });
+  function info(): HTMLElement {
+    const infos = within(screen.getByTestId('analysis-cv-note')).getAllByRole('button', {
+      name: 'What this means',
+    });
     expect(infos).toHaveLength(1);
-    expect(
-      jsonText(note).compareDocumentPosition(infos[0]!) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    return infos[0]!;
+  }
+
+  /** All the note's text before the ⓘ, and all after it. */
+  function split(): { before: string; after: string } {
+    const icon = info();
+    const parts = texts(screen.getByTestId('analysis-cv-note'));
+    const isBefore = (node: Text) =>
+      (node.compareDocumentPosition(icon) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    return {
+      before: parts
+        .filter(isBefore)
+        .map((node) => node.data)
+        .join(''),
+      after: parts
+        .filter((node) => !isBefore(node))
+        .map((node) => node.data)
+        .join(''),
+    };
+  }
+
+  it('happy: "(.json)" and its full stop come before the ⓘ, then one space and "The file"', () => {
+    render(<AnalysisCvNote />);
+    const { before, after } = split();
+    expect(before.endsWith('JSON Resume (.json).')).toBe(true);
+    expect(after.startsWith(' The file is read on this computer.')).toBe(true);
+  });
+
+  it('negative: no full stop after the ⓘ, and never a space before a full stop', () => {
+    render(<AnalysisCvNote />);
+    const { after } = split();
+    expect(after.trimStart().startsWith('.')).toBe(false);
+    expect(after.startsWith('  ')).toBe(false);
+    expect(screen.getByTestId('analysis-cv-note').textContent).not.toMatch(/\s\./);
   });
 
   it('negative: the marked words are still exactly "JSON Resume", before the ⓘ', () => {

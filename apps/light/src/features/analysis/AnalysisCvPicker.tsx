@@ -143,9 +143,9 @@ export function AnalysisCvNote() {
     <p data-testid="analysis-cv-note" className="text-xs text-ink-faint">
       PDF, Word (.docx) or{' '}
       <Hint text={JSON_RESUME_HINT}>
-        <span data-testid="json-resume-hint">JSON Resume</span> (.json)
-      </Hint>
-      . The file is read on this computer. Its text only goes to an AI you choose, and only when you
+        <span data-testid="json-resume-hint">JSON Resume</span> (.json).
+      </Hint>{' '}
+      The file is read on this computer. Its text only goes to an AI you choose, and only when you
       ask it to read your CV.
     </p>
   );
