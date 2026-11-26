@@ -9,6 +9,7 @@ import {
 } from '@cviper/core-types';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
+import { FoldMark } from '../../app/Chevrons';
 import { FIELD } from '../../app/fields';
 import { todayIsoDate } from '../../lib/dates';
 
@@ -489,7 +490,8 @@ export function InterviewPanel({
           data-testid="detail-interview-saved"
           className="rounded-control bg-sunken px-3 py-2"
         >
-          <summary className="cursor-pointer text-xs font-medium text-ink-muted">
+          <summary className="cursor-pointer list-none text-xs font-medium text-ink-muted [&::-webkit-details-marker]:hidden">
+            <FoldMark />
             Last saved pack · {saved.title}
           </summary>
           <pre className="mt-2 font-sans text-sm whitespace-pre-wrap text-ink">{saved.text}</pre>

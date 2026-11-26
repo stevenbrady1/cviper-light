@@ -1,5 +1,6 @@
 import { type FabricationFlag } from '@cviper/ai-providers';
 
+import { FoldMark } from '../../app/Chevrons';
 import { FLOW_HINT } from '../../app/hints';
 import { cardClasses } from '../../ui';
 import { providerInSentence } from '../analysis/model';
@@ -72,7 +73,8 @@ export function TailorDraft({ result, cvText, contact }: TailorDraftProps) {
       <CvPage cv={result.cv} contact={contact} />
 
       <details className={`${cardClasses({ padding: 'none' })} px-4 py-3`}>
-        <summary className="cursor-pointer font-medium text-ink">
+        <summary className="cursor-pointer list-none font-medium text-ink [&::-webkit-details-marker]:hidden">
+          <FoldMark />
           What changed against your original
         </summary>
         <p data-testid="tailor-diff-legend" className="mt-2 text-xs text-ink-muted">

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { FoldMark } from '../../app/Chevrons';
 import { FIELD } from '../../app/fields';
 import { cardClasses } from '../../ui';
 
@@ -48,7 +49,8 @@ export function MetricPromptBoxes({
   return (
     <div data-testid="tailor-metric-prompts" className="mt-2">
       <details className={`${cardClasses({ padding: 'none' })} px-4 py-3`}>
-        <summary className="cursor-pointer text-sm font-medium text-ink">
+        <summary className="cursor-pointer list-none text-sm font-medium text-ink [&::-webkit-details-marker]:hidden">
+          <FoldMark />
           {`Add a number or result for your gaps (optional, ${added} of ${prompts.length} added)`}
         </summary>
         <p className="mt-2 text-sm text-ink-muted">

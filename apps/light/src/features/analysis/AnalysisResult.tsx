@@ -7,6 +7,7 @@ import {
   type KeywordConfidence,
 } from '@cviper/keyword-scoring';
 
+import { FoldMark } from '../../app/Chevrons';
 import { Hint } from '../../app/Hint';
 import { cardClasses, StatusPill, type PillTone } from '../../ui';
 import { ATS_BAND_HINT, VERDICT_HINT } from '../../app/hints';
@@ -139,7 +140,10 @@ function MatchProof({ skills, cvText }: { skills: readonly string[]; cvText: str
 
   return (
     <details data-testid="analysis-proof" className="mt-2 text-xs">
-      <summary className="cursor-pointer text-ink-muted">Show where your CV says this</summary>
+      <summary className="cursor-pointer list-none text-ink-muted [&::-webkit-details-marker]:hidden">
+        <FoldMark />
+        Show where your CV says this
+      </summary>
       <ul className="mt-1.5 space-y-1">
         {rows.map((row) => (
           <li key={row.skill}>
