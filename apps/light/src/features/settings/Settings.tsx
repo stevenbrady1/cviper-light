@@ -610,14 +610,14 @@ export function Settings({
               {PRIVACY_SUMMARY}
             </p>
 
-            <label className="mt-2 flex items-start gap-2">
+            <label className="mt-2 flex min-h-11 items-start gap-2 md:min-h-0">
               <input
                 type="checkbox"
                 data-testid="settings-telemetry"
                 checked={TELEMETRY_ENABLED}
                 disabled
                 readOnly
-                className="mt-1"
+                className="mt-1 size-4 accent-blue"
               />
               <span data-testid="settings-telemetry-note" className="text-ink-muted">
                 {TELEMETRY_NOTE}

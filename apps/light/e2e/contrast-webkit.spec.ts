@@ -10340,3 +10340,184 @@ describe('Settings, job-board and Tailor drop-downs draw the same arrow as Searc
     }
   });
 });
+
+/**
+ * The last four tick boxes wear the house look (L-469): each job board's tick,
+ * "This runs on my own computer or network", the telemetry tick and the
+ * update-on-launch tick. Only a real engine can say that the built CSS draws a
+ * 16px blue box, that each label is a whole 44px on a phone and shrinks back on
+ * a wider window (`md:min-h-0`), and that Settings' key rows stay whole pixels
+ * with the taller labels above them (L-364).
+ */
+const LONG_BOARD_NAME = 'A board with a very long name that goes on and on past the edge';
+
+interface SeenTick {
+  readonly id: string;
+  readonly box: string;
+  readonly accent: string;
+  readonly label: number;
+  /** The board row around a board's tick, else 0. */
+  readonly row: number;
+}
+
+async function settingsTicks(page: Page): Promise<SeenTick[]> {
+  return page.evaluate(() =>
+    [
+      ...document.querySelectorAll<HTMLInputElement>(
+        '[data-testid="boards-settings"] input[type="checkbox"], [data-testid="custom-service-own-network"], [data-testid="settings-telemetry"], [data-testid="settings-update-on-launch"]',
+      ),
+    ].map((input) => {
+      const box = input.getBoundingClientRect();
+      const label = input.closest('label');
+      if (label === null) throw new Error(`${input.dataset.testid ?? '?'} has no label`);
+      return {
+        id: input.dataset.testid ?? '?',
+        box: `${String(box.width)}×${String(box.height)}`,
+        accent: getComputedStyle(input).accentColor,
+        label: label.getBoundingClientRect().height,
+        row: input.closest('li')?.getBoundingClientRect().height ?? 0,
+      };
+    }),
+  );
+}
+
+/** What is wrong with the tick boxes. Empty means the house look, in whole pixels. */
+function tickProblems(seen: readonly SeenTick[], phone: boolean): string[] {
+  const problems: string[] = [];
+  const whole = (value: number): boolean => Math.abs(value - Math.round(value)) <= 0.01;
+  for (const id of [
+    'custom-service-own-network',
+    'settings-telemetry',
+    'settings-update-on-launch',
+  ]) {
+    if (!seen.some((each) => each.id === id)) problems.push(`${id} is not drawn`);
+  }
+  if (!seen.some((each) => each.id.startsWith('board-toggle-'))) {
+    problems.push('no board tick drawn');
+  }
+  for (const each of seen) {
+    if (each.box !== '16×16') problems.push(`${each.id} box is ${each.box}, not 16×16`);
+    if (each.accent === 'auto' || each.accent === '') {
+      problems.push(`${each.id} has the browser's own colour`);
+    }
+    if (!whole(each.label)) {
+      problems.push(`${each.id}: label is ${String(each.label)}px, not a whole pixel`);
+    }
+    if (each.row !== 0 && !whole(each.row)) {
+      problems.push(`${each.id}: row is ${String(each.row)}px, not a whole pixel`);
+    }
+    if (phone && each.label < 44) {
+      problems.push(`${each.id}: label is ${String(each.label)}px tall on a phone, under 44`);
+    }
+    // One-line labels shrink back on a wider window (`md:min-h-0`).
+    if (!phone && each.id !== 'settings-telemetry' && each.label >= 44) {
+      problems.push(`${each.id}: label is still ${String(each.label)}px on a wide window`);
+    }
+  }
+  return problems;
+}
+
+/** Settings with Job-board keys and the custom service open, so every tick is drawn. */
+async function settingsWithTicks(viewport: { width: number; height: number }): Promise<Page> {
+  const page = await settingsWithRows(viewport);
+  await toggleRow(page, 'custom-service-row', true);
+  await page.locator('[data-testid="custom-service-own-network"]:visible').waitFor();
+  return page;
+}
+
+/** A board with a long name, added the way a user adds one. */
+async function addLongBoard(page: Page): Promise<string> {
+  await page.click('[data-testid="boards-add-open"]');
+  await page.fill('[data-testid="boards-new-label"]', LONG_BOARD_NAME);
+  await page.fill(
+    '[data-testid="boards-new-template"]',
+    'https://www.example.com/jobs?q={keyword}',
+  );
+  await page.click('[data-testid="boards-add-submit"]');
+  const row = page.locator('[data-testid="boards-list"] li', { hasText: LONG_BOARD_NAME });
+  await row.waitFor();
+  return (await row.getAttribute('data-testid')) ?? '?';
+}
+
+/** The long-named row holds its tick, its name and both arrows, nothing past its edge. */
+async function longRowProblems(page: Page, rowId: string): Promise<string[]> {
+  return page.evaluate((id) => {
+    const row = document.querySelector<HTMLElement>(`[data-testid="${id}"]`)!;
+    const edge = row.getBoundingClientRect();
+    const problems: string[] = [];
+    const parts = {
+      tick: row.querySelector('input[type="checkbox"]'),
+      name: row.querySelector('label span'),
+      up: row.querySelector('[data-testid^="board-up-"]'),
+      down: row.querySelector('[data-testid^="board-down-"]'),
+    };
+    for (const [name, part] of Object.entries(parts)) {
+      if (part === null) {
+        problems.push(`${id}: no ${name}`);
+        continue;
+      }
+      const box = part.getBoundingClientRect();
+      if (box.width === 0) problems.push(`${id}: its ${name} is squeezed to nothing`);
+      if (box.left < edge.left - 0.5 || box.right > edge.right + 0.5) {
+        problems.push(`${id}: its ${name} reaches past the row`);
+      }
+    }
+    return problems;
+  }, rowId);
+}
+
+describe('The last tick boxes wear the house look, 44px on a phone (L-469)', () => {
+  for (const viewport of [PHONE, { width: 768, height: 1024 }, { width: 1280, height: 800 }]) {
+    const label = `${String(viewport.width)}×${String(viewport.height)}`;
+
+    it(`at ${label} every Settings tick is a blue 16px box in a whole-pixel label, and the key rows stay whole`, async () => {
+      const page = await settingsWithTicks(viewport);
+      const seen = await settingsTicks(page);
+      console.log(`Settings ticks at ${label}: ${JSON.stringify(seen)}`);
+      assert.deepEqual(tickProblems(seen, viewport.width < 768), []);
+      assert.deepEqual(settingsFoldMarkProblems(await settingsFoldMarks(page)), []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      await page.context().close();
+    });
+  }
+
+  it('boundary: at 375 a board with a 60-character name keeps its tick, name and both arrows in the row', async () => {
+    const page = await settingsWithRows(PHONE);
+    const rowId = await addLongBoard(page);
+    assert.deepEqual(await longRowProblems(page, rowId), []);
+    const boards = tickProblems(await settingsTicks(page), true).filter((line) =>
+      line.startsWith('board-'),
+    );
+    assert.deepEqual(boards, []);
+    assert.deepEqual(await sidewaysOverflow(page), []);
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: a short phone label, a grey box, a small box and a half-pixel row are reported', async () => {
+    const page = await settingsWithTicks(PHONE);
+    await page.evaluate(() => {
+      const pick = (id: string): HTMLElement =>
+        document.querySelector<HTMLElement>(`[data-testid="${id}"]`)!;
+      pick('board-toggle-linkedin').closest('label')!.style.minHeight = '0';
+      pick('settings-telemetry').style.accentColor = 'auto';
+      pick('custom-service-own-network').style.width = '13px';
+      document.querySelector<HTMLElement>(
+        '[data-testid="boards-list"] li:last-child',
+      )!.style.height = '50.5px';
+    });
+    const problems = tickProblems(await settingsTicks(page), true);
+    for (const expected of [
+      'board-toggle-linkedin: label is 24px tall on a phone, under 44',
+      "settings-telemetry has the browser's own colour",
+      'custom-service-own-network box is 13×16, not 16×16',
+      ': row is 50.5px, not a whole pixel',
+    ]) {
+      assert.ok(
+        problems.some((line) => line.includes(expected)),
+        `"${expected}" was not reported: ${JSON.stringify(problems)}`,
+      );
+    }
+    await page.context().close();
+  });
+});
