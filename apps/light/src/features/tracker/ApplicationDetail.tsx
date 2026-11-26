@@ -8,7 +8,8 @@ import {
 } from '@cviper/core-types';
 
 import { DESTRUCTIVE_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
-import { FIELD } from '../../app/fields';
+import { SelectChevron } from '../../app/Chevrons';
+import { FIELD, FIELD_SELECT } from '../../app/fields';
 import { daysSinceTimestamp } from '../../lib/dates';
 import { useDebouncedField } from '../../lib/useDebouncedField';
 import { isOpenableUrl, type BrowserPort } from '../../platform/browser';
@@ -289,24 +290,28 @@ export function ApplicationDetail({
             Interview stage
           </label>
           <div className="mt-1 flex items-center gap-2">
-            <select
-              id="detail-substage"
-              data-testid="detail-substage"
-              value={
-                substages.some((substage) => substage.id === application.interview_substage_id)
-                  ? (application.interview_substage_id ?? '')
-                  : ''
-              }
-              onChange={(event) => onSubstageChange(orNull(event.currentTarget.value))}
-              className={`${FIELD} min-w-0 flex-1`}
-            >
-              <option value="">No stage</option>
-              {substages.map((substage) => (
-                <option key={substage.id} value={substage.id}>
-                  {substage.name}
-                </option>
-              ))}
-            </select>
+            {/* The flex rules are on the wrapper, so the drawn arrow centres on the box (L-467). */}
+            <span className="relative min-w-0 flex-1">
+              <select
+                id="detail-substage"
+                data-testid="detail-substage"
+                value={
+                  substages.some((substage) => substage.id === application.interview_substage_id)
+                    ? (application.interview_substage_id ?? '')
+                    : ''
+                }
+                onChange={(event) => onSubstageChange(orNull(event.currentTarget.value))}
+                className={`${FIELD_SELECT} w-full`}
+              >
+                <option value="">No stage</option>
+                {substages.map((substage) => (
+                  <option key={substage.id} value={substage.id}>
+                    {substage.name}
+                  </option>
+                ))}
+              </select>
+              <SelectChevron />
+            </span>
             {onEditSubstages === undefined ? null : (
               <button
                 type="button"

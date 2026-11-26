@@ -9740,6 +9740,186 @@ describe('Search drop-downs draw the chips’ arrow (L-461)', () => {
 });
 
 /**
+ * The Tracker's drop-downs draw the same arrow as Search (L-467). Only a real
+ * engine can say whether `appearance: none` took, whether the drawn arrow is
+ * the only one, whether a press on it still lands on the `<select>`, and
+ * whether each drop-down is as tall as the text box on its screen, in whole
+ * pixels. `?ollama=ready&results=1` gives the AI pickers more than one option,
+ * so they are drawn at all.
+ */
+const TRACKER_AI = '?seen=1&entries=1&ollama=ready&results=1';
+
+/** A drop-down by its id, and the text box on the same screen it must match. */
+type SelectPair = readonly [select: string, textBox: string];
+
+interface TrackerSelect {
+  readonly id: string;
+  readonly appearance: string;
+  readonly svgs: number;
+  /** The id of what a press at the arrow's centre reaches. */
+  readonly hit: string | null;
+  readonly height: number;
+  readonly textBoxHeight: number;
+}
+
+async function trackerSelects(page: Page, pairs: readonly SelectPair[]): Promise<TrackerSelect[]> {
+  return page.evaluate((each) => {
+    return each.map(([id, boxId]) => {
+      const select = document.getElementById(id);
+      const box = document.getElementById(boxId);
+      if (select === null || box === null) throw new Error(`${id} or ${boxId} is not in the page`);
+      // A press is only measurable on screen: elementFromPoint answers null outside the window.
+      select.scrollIntoView({ block: 'center' });
+      const wrapper = select.parentElement!;
+      const mark = wrapper.querySelector('svg')?.getBoundingClientRect();
+      const hit =
+        mark === undefined
+          ? null
+          : document.elementFromPoint(mark.left + mark.width / 2, mark.top + mark.height / 2);
+      return {
+        id,
+        appearance: getComputedStyle(select).appearance,
+        svgs: wrapper.querySelectorAll('svg').length,
+        hit: hit?.closest('[id]')?.id ?? null,
+        height: select.getBoundingClientRect().height,
+        textBoxHeight: box.getBoundingClientRect().height,
+      };
+    });
+  }, pairs);
+}
+
+/** What is wrong with the drop-downs. Empty means one arrow each, a press passes, a text box's height. */
+function trackerSelectProblems(seen: readonly TrackerSelect[]): string[] {
+  const problems: string[] = [];
+  for (const each of seen) {
+    if (each.appearance !== 'none') {
+      problems.push(`${each.id} draws the browser's own look (appearance ${each.appearance})`);
+    }
+    if (each.svgs !== 1) problems.push(`${each.id} draws ${String(each.svgs)} arrows`);
+    if (each.hit !== each.id) {
+      problems.push(`a press on ${each.id}'s arrow reaches ${String(each.hit)}`);
+    }
+    if (!Number.isInteger(each.height)) {
+      problems.push(`${each.id} is ${String(each.height)}px tall, not a whole pixel`);
+    }
+    if (each.height !== each.textBoxHeight) {
+      problems.push(
+        `${each.id} is ${String(each.height)}px tall, its text box ${String(each.textBoxHeight)}px`,
+      );
+    }
+  }
+  return problems;
+}
+
+/** Tracker with the interviewing card open: its stage and both AI pickers. */
+async function openInterviewingCard(viewport: { width: number; height: number }): Promise<Page> {
+  const page = await open(TRACKER_AI, viewport);
+  await goTo(page, 'tracker');
+  await page.click('[data-testid="tracker-card-c"]');
+  for (const id of ['detail-substage', 'detail-followup-provider', 'detail-interview-provider']) {
+    await page.waitForSelector(`[data-testid="${id}"]`);
+  }
+  return page;
+}
+
+const DETAIL_SELECTS: readonly SelectPair[] = [
+  ['detail-substage', 'detail-next-action'],
+  ['detail-followup-provider', 'detail-next-action'],
+  ['detail-interview-provider', 'detail-next-action'],
+];
+
+/** Search's "Bring it in": the paste form, with its "Read it with" picker. */
+async function openPasteWithPicker(viewport: { width: number; height: number }): Promise<Page> {
+  const page = await open(TRACKER_AI, viewport);
+  await goTo(page, 'search');
+  await page.click('[data-testid="search-bring-in"]');
+  await page.waitForSelector('[data-testid="paste-job-provider"]');
+  return page;
+}
+
+const NEW_FORM_SELECTS: readonly SelectPair[] = [
+  ['new-status', 'new-location'],
+  ['new-salary-period', 'new-salary-currency'],
+];
+
+describe('Tracker drop-downs draw the same arrow as Search (L-467)', () => {
+  for (const viewport of [PHONE, { width: 768, height: 1024 }, { width: 1280, height: 800 }]) {
+    const label = `${String(viewport.width)}×${String(viewport.height)}`;
+    it(`at ${label} the card's, the paste form's and the new form's drop-downs draw one arrow, as tall as a text box`, async () => {
+      const card = await openInterviewingCard(viewport);
+      const detail = await trackerSelects(card, DETAIL_SELECTS);
+      console.log(`Tracker card drop-downs at ${label}: ${JSON.stringify(detail)}`);
+      assert.deepEqual(trackerSelectProblems(detail), []);
+      await card.context().close();
+
+      const paste = await openPasteWithPicker(viewport);
+      const reader = await trackerSelects(paste, [['paste-job-provider', 'paste-job-url']]);
+      console.log(`Paste form drop-down at ${label}: ${JSON.stringify(reader)}`);
+      assert.deepEqual(trackerSelectProblems(reader), []);
+
+      await paste.click('[data-testid="paste-job-manual"]');
+      await paste.waitForSelector('[data-testid="new-application-form"]');
+      const form = await trackerSelects(paste, NEW_FORM_SELECTS);
+      console.log(`New application drop-downs at ${label}: ${JSON.stringify(form)}`);
+      assert.deepEqual(trackerSelectProblems(form), []);
+      await paste.context().close();
+    });
+  }
+
+  it('"Pay period" that will not save draws the red edge, arrow and all', async () => {
+    const page = await openPasteWithPicker({ width: 1280, height: 800 });
+    await page.click('[data-testid="paste-job-manual"]');
+    await page.waitForSelector('[data-testid="new-application-form"]');
+    await page.fill('#new-title', 'Credit Risk Analyst');
+    await page.fill('#new-company', 'Lloyds Banking Group');
+    await page.fill('#new-salary-min', '45000');
+    await page.selectOption('#new-salary-period', '');
+    const edge = (id: string): Promise<string> =>
+      page.evaluate((each) => getComputedStyle(document.getElementById(each)!).borderTopColor, id);
+    const quiet = await edge('new-salary-period');
+    assert.equal(quiet, await edge('new-status'));
+    await page.click('[data-testid="new-application-form"] button[type="submit"]');
+    await page.waitForSelector('#new-salary-period-error');
+    const red = await edge('new-salary-period');
+    console.log(`Pay period edge: ${quiet}, then ${red} once it will not save`);
+    assert.notEqual(red, quiet);
+    assert.deepEqual(trackerSelectProblems(await trackerSelects(page, NEW_FORM_SELECTS)), []);
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: the browser look, a second arrow, an arrow that eats the press and a half-pixel box are reported', async () => {
+    const page = await openInterviewingCard({ width: 1280, height: 800 });
+    await page.evaluate(() => {
+      const stage = document.getElementById('detail-substage');
+      if (stage === null) throw new Error('no stage');
+      stage.style.appearance = 'auto';
+      const followUp = document.getElementById('detail-followup-provider');
+      const mark = followUp?.parentElement?.querySelector<HTMLElement>('span[aria-hidden="true"]');
+      if (mark === null || mark === undefined) throw new Error('no follow-up arrow');
+      mark.style.pointerEvents = 'auto';
+      mark.id = 'eats-the-press';
+      followUp!.parentElement!.append(mark.cloneNode(true));
+      document.getElementById('detail-interview-provider')!.style.height = '30.5px';
+    });
+    const problems = trackerSelectProblems(await trackerSelects(page, DETAIL_SELECTS));
+    for (const expected of [
+      "detail-substage draws the browser's own look",
+      'detail-followup-provider draws 2 arrows',
+      "a press on detail-followup-provider's arrow reaches eats-the-press",
+      'detail-interview-provider is 30.5px tall, not a whole pixel',
+      'detail-interview-provider is 30.5px tall, its text box',
+    ]) {
+      assert.ok(
+        problems.some((line) => line.startsWith(expected)),
+        `"${expected}" was not reported: ${JSON.stringify(problems)}`,
+      );
+    }
+    await page.context().close();
+  });
+});
+
+/**
  * Settings' folds draw the shared mark (L-462). Settings nests folds: the Reed
  * and Adzuna rows sit inside "Job-board keys". Only a real engine can say that
  * the built CSS turns the mark of an open fold and NOT the marks of the closed

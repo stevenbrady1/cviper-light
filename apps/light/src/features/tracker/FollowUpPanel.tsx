@@ -8,7 +8,8 @@ import {
 import { type Application, type Document, type IsoDate } from '@cviper/core-types';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
-import { FIELD } from '../../app/fields';
+import { SelectChevron } from '../../app/Chevrons';
+import { FIELD, FIELD_SELECT } from '../../app/fields';
 
 import { readAvailability as readRealAvailability } from '../analysis/availability';
 import { ConsentGate } from '../analysis/ConsentGate';
@@ -408,25 +409,28 @@ export function FollowUpPanel({
           >
             Draft it with
           </label>
-          <select
-            id="detail-followup-provider"
-            data-testid="detail-followup-provider"
-            value={optionKey ?? ''}
-            disabled={busy}
-            onChange={(event) => {
-              // Read the value NOW — React nulls `currentTarget` the moment
-              // this handler returns.
-              const key = event.currentTarget.value;
-              setOptionKey(key);
-            }}
-            className={`${FIELD} mt-1 w-full`}
-          >
-            {options.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <span className="relative mt-1 block">
+            <select
+              id="detail-followup-provider"
+              data-testid="detail-followup-provider"
+              value={optionKey ?? ''}
+              disabled={busy}
+              onChange={(event) => {
+                // Read the value NOW — React nulls `currentTarget` the moment
+                // this handler returns.
+                const key = event.currentTarget.value;
+                setOptionKey(key);
+              }}
+              className={`${FIELD_SELECT} w-full`}
+            >
+              {options.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <SelectChevron />
+          </span>
         </div>
       ) : null}
 

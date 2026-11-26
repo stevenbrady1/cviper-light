@@ -9,8 +9,8 @@ import {
 } from '@cviper/core-types';
 
 import { SECONDARY_BUTTON } from '../../app/buttons';
-import { FoldMark } from '../../app/Chevrons';
-import { FIELD } from '../../app/fields';
+import { FoldMark, SelectChevron } from '../../app/Chevrons';
+import { FIELD_SELECT } from '../../app/fields';
 import { todayIsoDate } from '../../lib/dates';
 
 import { ConsentGate } from '../analysis/ConsentGate';
@@ -338,25 +338,28 @@ export function InterviewPanel({
           >
             Prepare with
           </label>
-          <select
-            id="detail-interview-provider"
-            data-testid="detail-interview-provider"
-            value={optionKey ?? ''}
-            disabled={busy}
-            onChange={(event) => {
-              // Read the value NOW — React nulls `currentTarget` the moment
-              // this handler returns.
-              const key = event.currentTarget.value;
-              setOptionKey(key);
-            }}
-            className={`${FIELD} mt-1 w-full`}
-          >
-            {options.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <span className="relative mt-1 block">
+            <select
+              id="detail-interview-provider"
+              data-testid="detail-interview-provider"
+              value={optionKey ?? ''}
+              disabled={busy}
+              onChange={(event) => {
+                // Read the value NOW — React nulls `currentTarget` the moment
+                // this handler returns.
+                const key = event.currentTarget.value;
+                setOptionKey(key);
+              }}
+              className={`${FIELD_SELECT} w-full`}
+            >
+              {options.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <SelectChevron />
+          </span>
         </div>
       ) : selected === null ? null : (
         <p data-testid="detail-interview-provider-note" className="text-xs text-ink-faint">

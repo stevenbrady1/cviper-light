@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type ChatTransport } from '@cviper/ai-providers';
 
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
-import { FIELD } from '../../app/fields';
+import { SelectChevron } from '../../app/Chevrons';
+import { FIELD, FIELD_SELECT } from '../../app/fields';
 
 import { readAvailability as readRealAvailability } from '../analysis/availability';
 import { ConsentGate } from '../analysis/ConsentGate';
@@ -482,25 +483,28 @@ export function PasteJobForm({
           <label htmlFor="paste-job-provider" className="block text-xs font-medium text-ink-muted">
             Read it with
           </label>
-          <select
-            id="paste-job-provider"
-            data-testid="paste-job-provider"
-            value={optionKey ?? ''}
-            disabled={busy}
-            onChange={(event) => {
-              // Read the value NOW — React nulls `currentTarget` the moment
-              // this handler returns.
-              const key = event.currentTarget.value;
-              setOptionKey(key);
-            }}
-            className={`${FIELD} mt-1 w-full`}
-          >
-            {options.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <span className="relative mt-1 block">
+            <select
+              id="paste-job-provider"
+              data-testid="paste-job-provider"
+              value={optionKey ?? ''}
+              disabled={busy}
+              onChange={(event) => {
+                // Read the value NOW — React nulls `currentTarget` the moment
+                // this handler returns.
+                const key = event.currentTarget.value;
+                setOptionKey(key);
+              }}
+              className={`${FIELD_SELECT} w-full`}
+            >
+              {options.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <SelectChevron />
+          </span>
         </div>
       ) : selected === null ? null : (
         <p data-testid="paste-job-provider-note" className="text-xs text-ink-faint">

@@ -44,6 +44,13 @@ export const FIELD_SELECT =
   'appearance-none rounded-control border border-field-line bg-card py-1.5 pr-8 pl-2.5 text-ink';
 
 /**
+ * FIELD_SELECT with its edge in the danger red (L-467): a drop-down whose
+ * choice will not save (Tracker's "Pay period"). Same as FIELD_INVALID is to FIELD.
+ */
+export const FIELD_SELECT_INVALID =
+  'appearance-none rounded-control border border-danger bg-card py-1.5 pr-8 pl-2.5 text-ink';
+
+/**
  * A real drop-down drawn as a chip, inside a sentence of choices (L-442):
  * "Check [Your CV] using [Ollama]". `app/ChipSelect.tsx` wears it. The browser's
  * own look is switched off (`appearance-none`), so the chip is the grey fill,
