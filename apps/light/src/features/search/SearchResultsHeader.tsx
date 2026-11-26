@@ -47,12 +47,13 @@ export function SearchResultsHeader({
       className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1"
     >
       {cvText === undefined ? null : rankable ? (
-        <label className="flex items-center gap-2 text-ink-muted">
+        <label className="flex min-h-11 items-center gap-2 text-ink-muted md:min-h-0">
           <input
             type="checkbox"
             data-testid="search-sort-best"
             checked={bestFirst}
             onChange={(event) => onBestFirst(event.currentTarget.checked)}
+            className="size-4 accent-blue"
           />
           Best match first
         </label>

@@ -19,3 +19,22 @@ export function SelectChevron() {
     </span>
   );
 }
+
+/**
+ * A fold's drawn mark (L-462), first drawn on "Where to look" (L-437): points
+ * right when closed and turns down when its OWN fold is open. The fold's title
+ * switches the browser's mark off (`list-none [&::-webkit-details-marker]:hidden`)
+ * and puts this first. Not `group-open:`: Settings nests folds, and that would
+ * turn a closed row's mark whenever the fold around it is open.
+ */
+export function FoldMark({ testId }: { readonly testId?: string | undefined }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-testid={testId}
+      className="mr-2 inline-flex h-lh items-center align-top text-ink-muted [details[open]>summary>&]:rotate-90"
+    >
+      <Icon name="chevron" size={16} />
+    </span>
+  );
+}

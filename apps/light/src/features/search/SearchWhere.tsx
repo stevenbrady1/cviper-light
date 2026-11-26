@@ -2,7 +2,7 @@ import { type JobProviderId, type KeylessSourceId } from '@cviper/job-apis';
 
 import { type Board } from '../boards/model';
 import { type KeyState } from '../../status/environment';
-import { Icon } from '../../ui';
+import { FoldMark } from '../../app/Chevrons';
 
 import { KeylessBar } from './KeylessBar';
 import { type FeedChoice } from './feedDefaults';
@@ -77,15 +77,9 @@ export function WhereToLook({
       data-testid="search-where"
       className="mt-4 rounded-card border border-line bg-sunken px-4"
     >
-      <details data-testid="search-where-fold" className="group">
+      <details data-testid="search-where-fold">
         <summary className="min-h-11 cursor-pointer list-none py-2.5 [&::-webkit-details-marker]:hidden">
-          <span
-            aria-hidden="true"
-            data-testid="search-where-mark"
-            className="mr-2 inline-flex h-lh items-center align-top text-ink-muted group-open:rotate-90"
-          >
-            <Icon name="chevron" size={16} />
-          </span>
+          <FoldMark testId="search-where-mark" />
           <h2 id="search-where-heading" className="inline font-medium text-ink">
             Where to look
           </h2>
