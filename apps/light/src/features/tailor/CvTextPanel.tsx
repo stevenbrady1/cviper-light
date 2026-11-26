@@ -23,6 +23,7 @@ import { useState } from 'react';
 import { wordCount, type Cv } from '@cviper/core-types';
 
 import { QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
+import { FoldMark } from '../../app/Chevrons';
 import { FIELD } from '../../app/fields';
 
 import { MAX_CV_TEXT_CHARS, correctedCv, isCorrected, restoredCv } from './cvCorrection';
@@ -244,7 +245,10 @@ export function CvTextPanel({ cv, disabled, onSave }: CvTextPanelProps) {
 
       {corrected ? (
         <details data-testid="tailor-cv-changes" className="mt-2 text-xs">
-          <summary className="cursor-pointer font-medium text-ink">What you changed</summary>
+          <summary className="cursor-pointer list-none font-medium text-ink [&::-webkit-details-marker]:hidden">
+            <FoldMark />
+            What you changed
+          </summary>
           <p className="mt-2 text-ink-muted">
             Green lines are yours. Struck-through lines were in the file and you changed or removed
             them.

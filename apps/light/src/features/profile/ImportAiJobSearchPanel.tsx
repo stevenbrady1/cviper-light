@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { FoldMark } from '../../app/Chevrons';
 import { PRIMARY_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../../app/buttons';
 import { cardClasses, SectionHeading } from '../../ui';
 import { type FilePort } from '../../platform/files';
@@ -169,7 +170,10 @@ function ReviewPanel({ imported, onApply, onCancel }: ReviewPanelProps) {
       )}
 
       <details className="mt-3 text-sm">
-        <summary className="cursor-pointer text-ink-muted">What was read, and what was not</summary>
+        <summary className="cursor-pointer list-none text-ink-muted [&::-webkit-details-marker]:hidden">
+          <FoldMark />
+          What was read, and what was not
+        </summary>
         <ul
           data-testid="profile-import-notes"
           className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-ink-faint"

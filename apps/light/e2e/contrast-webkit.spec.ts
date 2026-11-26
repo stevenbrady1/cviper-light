@@ -10059,3 +10059,146 @@ describe('Settings folds draw the shared mark, and only an open fold turns it (L
     await page.context().close();
   });
 });
+
+/**
+ * The six remaining folds draw the shared mark (L-466). Two are reachable
+ * here: the Analysis sample's "Show where your CV says this" (`text-xs`) and
+ * the Tailor draft's "What changed against your original" (16px). Only a real
+ * engine can say that the browser's own mark is gone, that the mark turns with
+ * its own fold, and that the titles are whole pixels: the browser's ▶ made them
+ * 18.5px and 24.5px tall in WebKit (the L-364 half-pixel problem).
+ */
+const PROOF_FOLD = '[data-testid="analysis-sample"] [data-testid="analysis-proof"]';
+const DRAFT_FOLD = 'details:has([data-testid="tailor-diff"])';
+
+interface RestFoldMark {
+  readonly open: boolean;
+  readonly rotate: string;
+  readonly svgs: number;
+  readonly listStyle: string;
+  readonly height: number;
+  /** How far the mark starts inside its title's padding. A browser mark pushes it right. */
+  readonly indent: number;
+}
+
+async function restFoldMark(page: Page, selector: string): Promise<RestFoldMark> {
+  return page.evaluate((fold) => {
+    const details = document.querySelector<HTMLDetailsElement>(fold);
+    const summary = details?.querySelector<HTMLElement>(':scope > summary');
+    const mark = summary?.firstElementChild;
+    if (details == null || summary == null || !(mark instanceof HTMLElement)) {
+      throw new Error(`${fold} has no title mark`);
+    }
+    const style = getComputedStyle(summary);
+    return {
+      open: details.open,
+      rotate: getComputedStyle(mark).rotate,
+      svgs: summary.querySelectorAll('svg').length,
+      listStyle: style.listStyleType,
+      height: summary.getBoundingClientRect().height,
+      indent:
+        mark.getBoundingClientRect().left -
+        summary.getBoundingClientRect().left -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.borderLeftWidth),
+    };
+  }, selector);
+}
+
+/** What is wrong with one fold's mark. Empty means the house look. */
+function restFoldMarkProblems(name: string, seen: RestFoldMark): string[] {
+  const problems: string[] = [];
+  const want = seen.open ? '90deg' : 'none';
+  if (seen.rotate !== want) {
+    problems.push(
+      `${name} is ${seen.open ? 'open' : 'closed'} but its mark is turned ${seen.rotate}`,
+    );
+  }
+  if (seen.svgs !== 1) problems.push(`${name} draws ${String(seen.svgs)} marks`);
+  if (seen.listStyle !== 'none') problems.push(`${name} asks for a "${seen.listStyle}" mark`);
+  // A turned mark's box is turned too, so the indent is judged closed only.
+  if (!seen.open && Math.abs(seen.indent) > 0.5) {
+    problems.push(`${name}: something is drawn before our mark, ${String(seen.indent)}px in`);
+  }
+  if (Math.abs(seen.height - Math.round(seen.height)) > 0.01) {
+    problems.push(`${name}: title is ${String(seen.height)}px, not a whole pixel`);
+  }
+  return problems;
+}
+
+async function toggleFold(page: Page, selector: string, open: boolean): Promise<void> {
+  await page.click(`${selector} > summary`);
+  await page.waitForSelector(`${selector}${open ? '[open]' : ':not([open])'}`, {
+    state: 'attached',
+  });
+}
+
+describe('The remaining folds draw the shared mark, with whole-pixel titles (L-466)', () => {
+  for (const viewport of [PHONE, { width: 768, height: 1024 }, { width: 1280, height: 800 }]) {
+    const label = `${String(viewport.width)}×${String(viewport.height)}`;
+
+    it(`at ${label} the Analysis proof fold draws one mark, turns it open and back`, async () => {
+      const page = await openSample(viewport);
+      await page.waitForSelector(PROOF_FOLD, { state: 'attached' });
+      const closed = await restFoldMark(page, PROOF_FOLD);
+      console.log(`Analysis proof fold at ${label}: ${JSON.stringify(closed)}`);
+      assert.equal(closed.open, false);
+      assert.deepEqual(restFoldMarkProblems('analysis-proof', closed), []);
+
+      await toggleFold(page, PROOF_FOLD, true);
+      const opened = await restFoldMark(page, PROOF_FOLD);
+      assert.equal(opened.rotate, '90deg');
+      assert.deepEqual(restFoldMarkProblems('analysis-proof', opened), []);
+
+      await toggleFold(page, PROOF_FOLD, false);
+      assert.equal((await restFoldMark(page, PROOF_FOLD)).rotate, 'none');
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      await page.context().close();
+    });
+
+    it(`at ${label} the Tailor draft fold draws one mark, turns it open and back`, async () => {
+      const page = await tailorWithDraft(viewport, 'contact');
+      await page.waitForSelector(DRAFT_FOLD, { state: 'attached' });
+      const closed = await restFoldMark(page, DRAFT_FOLD);
+      console.log(`Tailor draft fold at ${label}: ${JSON.stringify(closed)}`);
+      assert.equal(closed.open, false);
+      assert.deepEqual(restFoldMarkProblems('tailor-draft-diff', closed), []);
+
+      await toggleFold(page, DRAFT_FOLD, true);
+      const opened = await restFoldMark(page, DRAFT_FOLD);
+      assert.equal(opened.rotate, '90deg');
+      assert.deepEqual(restFoldMarkProblems('tailor-draft-diff', opened), []);
+
+      await toggleFold(page, DRAFT_FOLD, false);
+      assert.equal((await restFoldMark(page, DRAFT_FOLD)).rotate, 'none');
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      await page.context().close();
+    });
+  }
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: the browser mark back, a turned closed mark and a half-pixel title are reported', async () => {
+    const page = await openSample({ width: 1280, height: 800 });
+    await page.waitForSelector(PROOF_FOLD, { state: 'attached' });
+    await page.evaluate((fold) => {
+      const summary = document.querySelector<HTMLElement>(`${fold} > summary`);
+      if (summary === null) throw new Error('no proof fold');
+      summary.style.listStyleType = 'disclosure-closed';
+      summary.style.display = 'list-item';
+      summary.style.minHeight = '18.5px';
+      (summary.firstElementChild as HTMLElement).style.rotate = '90deg';
+    }, PROOF_FOLD);
+    const problems = restFoldMarkProblems('analysis-proof', await restFoldMark(page, PROOF_FOLD));
+    for (const expected of [
+      'analysis-proof asks for a "disclosure-closed" mark',
+      'analysis-proof is closed but its mark is turned 90deg',
+      'analysis-proof: title is 18.5px, not a whole pixel',
+    ]) {
+      assert.ok(
+        problems.some((line) => line.startsWith(expected)),
+        `"${expected}" was not reported: ${JSON.stringify(problems)}`,
+      );
+    }
+    await page.context().close();
+  });
+});
