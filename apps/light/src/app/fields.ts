@@ -34,6 +34,16 @@ export const FIELD_COMPACT =
   'rounded-control border border-field-line bg-card px-2.5 py-1 text-ink';
 
 /**
+ * A real drop-down drawn like a text box (L-461): Search's Country and Contract
+ * type. Same edge, fill and text as FIELD; the browser's own arrow is switched
+ * off (`appearance-none`) and `pr-8` leaves room for the drawn one
+ * (`app/Chevrons.tsx`). Its own constant, not FIELD then `pr-8`: two padding
+ * classes on one box leave the winner to the stylesheet.
+ */
+export const FIELD_SELECT =
+  'appearance-none rounded-control border border-field-line bg-card py-1.5 pr-8 pl-2.5 text-ink';
+
+/**
  * A real drop-down drawn as a chip, inside a sentence of choices (L-442):
  * "Check [Your CV] using [Ollama]". `app/ChipSelect.tsx` wears it. The browser's
  * own look is switched off (`appearance-none`), so the chip is the grey fill,

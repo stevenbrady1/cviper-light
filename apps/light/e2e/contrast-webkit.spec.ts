@@ -9630,3 +9630,111 @@ describe('quiet buttons read as pressable: blue words, red Delete (L-458)', () =
     await page.context().close();
   });
 });
+
+/**
+ * Search's Country and Contract type draw the chips' arrow, not the browser's
+ * (L-461). Only a real engine can say whether `appearance: none` took, whether
+ * the drawn arrow is the only one, and whether a press on the arrow still lands
+ * on the `<select>` under it (`pointer-events: none`).
+ */
+const SEARCH_SELECTS = ['search-country', 'search-contract'] as const;
+
+interface SearchSelect {
+  readonly id: string;
+  readonly appearance: string;
+  readonly svgs: number;
+  /** The test id of what a press at the arrow's centre reaches. */
+  readonly hit: string | null;
+}
+
+async function searchSelects(page: Page): Promise<SearchSelect[]> {
+  return page.evaluate((ids) => {
+    return ids.map((id) => {
+      const select = document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+      if (select === null) throw new Error(`${id} is not in the page`);
+      const wrapper = select.parentElement!;
+      const svg = wrapper.querySelector('svg');
+      const mark = svg?.getBoundingClientRect();
+      const hit =
+        mark === undefined
+          ? null
+          : document.elementFromPoint(mark.left + mark.width / 2, mark.top + mark.height / 2);
+      return {
+        id,
+        appearance: getComputedStyle(select).appearance,
+        svgs: wrapper.querySelectorAll('svg').length,
+        hit: hit?.closest('[data-testid]')?.getAttribute('data-testid') ?? null,
+      };
+    });
+  }, SEARCH_SELECTS);
+}
+
+/** What is wrong with the two drop-downs. Empty means one drawn arrow each, that a press passes. */
+function searchSelectProblems(seen: readonly SearchSelect[]): string[] {
+  const problems: string[] = [];
+  for (const each of seen) {
+    if (each.appearance !== 'none') {
+      problems.push(`${each.id} draws the browser's own look (appearance ${each.appearance})`);
+    }
+    if (each.svgs !== 1) problems.push(`${each.id} draws ${String(each.svgs)} arrows`);
+    if (each.hit !== each.id) {
+      problems.push(`a press on ${each.id}'s arrow reaches ${String(each.hit)}`);
+    }
+  }
+  return problems;
+}
+
+describe('Search drop-downs draw the chips’ arrow (L-461)', () => {
+  for (const viewport of [PHONE, { width: 768, height: 1024 }, { width: 1280, height: 800 }]) {
+    const label = `${String(viewport.width)}×${String(viewport.height)}`;
+    it(`at ${label} Country and Contract type draw one arrow each, and a press on it reaches the drop-down`, async () => {
+      const page = await openTypedSearchFolded(viewport);
+      const seen = await searchSelects(page);
+      console.log(`Search drop-downs at ${label}: ${JSON.stringify(seen)}`);
+      assert.deepEqual(searchSelectProblems(seen), []);
+      assert.deepEqual(await sidewaysOverflow(page), []);
+      await page.context().close();
+    });
+  }
+
+  it('Tab reaches both drop-downs', async () => {
+    const page = await openTypedSearchFolded({ width: 1280, height: 800 });
+    const focused = (): Promise<string | null> =>
+      page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? null);
+    await page.focus('[data-testid="search-keywords"]');
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await focused(), 'search-country');
+    await page.focus('[data-testid="search-salary"]');
+    await page.keyboard.press('Tab');
+    assert.equal(await focused(), 'search-contract');
+    await page.context().close();
+  });
+
+  // NEGATIVE — a check that cannot fail is not a check.
+  it('the check can fail: the browser look, a second arrow and an arrow that eats the press are reported', async () => {
+    const page = await openTypedSearchFolded({ width: 1280, height: 800 });
+    await page.evaluate(() => {
+      const country = document.querySelector<HTMLElement>('[data-testid="search-country"]');
+      if (country === null) throw new Error('no country');
+      country.style.appearance = 'auto';
+      const contract = document.querySelector<HTMLElement>('[data-testid="search-contract"]');
+      const mark = contract?.parentElement?.querySelector<HTMLElement>('span[aria-hidden="true"]');
+      if (mark === null || mark === undefined) throw new Error('no contract arrow');
+      mark.style.pointerEvents = 'auto';
+      mark.dataset.testid = 'eats-the-press';
+      contract!.parentElement!.append(mark.cloneNode(true));
+    });
+    const problems = searchSelectProblems(await searchSelects(page));
+    for (const expected of [
+      "search-country draws the browser's own look",
+      'search-contract draws 2 arrows',
+      "a press on search-contract's arrow reaches eats-the-press",
+    ]) {
+      assert.ok(
+        problems.some((line) => line.startsWith(expected)),
+        `"${expected}" was not reported: ${JSON.stringify(problems)}`,
+      );
+    }
+    await page.context().close();
+  });
+});

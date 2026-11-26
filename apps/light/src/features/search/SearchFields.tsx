@@ -1,6 +1,7 @@
 import { distanceUnitFor } from '@cviper/job-apis';
 
-import { FIELD } from '../../app/fields';
+import { SelectChevron } from '../../app/Chevrons';
+import { FIELD, FIELD_SELECT } from '../../app/fields';
 
 import {
   CHOOSE_COUNTRY_REASON,
@@ -73,25 +74,29 @@ export function SearchFields({ form, errors, onField, country, onCountry }: Sear
           <label htmlFor="search-country" className="block text-xs font-medium text-ink-muted">
             Country
           </label>
-          <select
-            id="search-country"
-            data-testid="search-country"
-            required
-            value={country ?? ''}
-            aria-describedby={locked ? COUNTRY_REASON_ID : undefined}
-            onChange={(event) => {
-              const chosen = parseCountry(event.currentTarget.value);
-              if (chosen !== null) onCountry(chosen);
-            }}
-            className={`${FIELD} mt-1 h-11 w-full md:h-9.5`}
-          >
-            {locked ? <option value="">Choose a country</option> : null}
-            {COUNTRY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          {/* `mt-1` is on the wrapper, so the drawn arrow centres on the box (L-461). */}
+          <span className="relative mt-1 block">
+            <select
+              id="search-country"
+              data-testid="search-country"
+              required
+              value={country ?? ''}
+              aria-describedby={locked ? COUNTRY_REASON_ID : undefined}
+              onChange={(event) => {
+                const chosen = parseCountry(event.currentTarget.value);
+                if (chosen !== null) onCountry(chosen);
+              }}
+              className={`${FIELD_SELECT} h-11 w-full md:h-9.5`}
+            >
+              {locked ? <option value="">Choose a country</option> : null}
+              {COUNTRY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <SelectChevron />
+          </span>
           {locked ? (
             <p
               id={COUNTRY_REASON_ID}
@@ -151,23 +156,26 @@ export function SearchFields({ form, errors, onField, country, onCountry }: Sear
           <label htmlFor="search-contract" className="block text-xs font-medium text-ink-muted">
             Contract type
           </label>
-          <select
-            id="search-contract"
-            data-testid="search-contract"
-            value={form.contractType}
-            disabled={locked}
-            aria-describedby={locked ? COUNTRY_REASON_ID : undefined}
-            onChange={(event) =>
-              onField('contractType', event.currentTarget.value as ContractChoice)
-            }
-            className={`${FIELD} mt-1 h-11 w-full md:h-9.5`}
-          >
-            {CONTRACT_CHOICES.map((choice) => (
-              <option key={choice.value} value={choice.value}>
-                {choice.label}
-              </option>
-            ))}
-          </select>
+          <span className="relative mt-1 block">
+            <select
+              id="search-contract"
+              data-testid="search-contract"
+              value={form.contractType}
+              disabled={locked}
+              aria-describedby={locked ? COUNTRY_REASON_ID : undefined}
+              onChange={(event) =>
+                onField('contractType', event.currentTarget.value as ContractChoice)
+              }
+              className={`${FIELD_SELECT} h-11 w-full md:h-9.5`}
+            >
+              {CONTRACT_CHOICES.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {choice.label}
+                </option>
+              ))}
+            </select>
+            <SelectChevron />
+          </span>
         </div>
       </div>
     </>
