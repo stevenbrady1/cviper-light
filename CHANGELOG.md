@@ -8,6 +8,17 @@ All notable changes to CViper Light are recorded here. The format follows
 
 Changes waiting for the next release are in [`changes/unreleased/`](changes/unreleased/), one file per change, so two pull requests never edit the same lines here (L-303). `pnpm changelog:preview` shows them as they will appear; `pnpm changelog:release <version> <date>` writes them in below. See [CONTRIBUTING.md](CONTRIBUTING.md#the-changelog).
 
+## [0.18.0] — 2026-11-26
+
+Controls that match. Drop-downs and fold-out sections now use the same small arrow everywhere, tick boxes match, Tracker cards show progress with the same marks as the step bar, and a few small things on Analysis that looked like typos are fixed.
+
+### Changed
+
+- Tracker cards now show progress with the same marks as the step bar: a tick for done and a dot for the next step, so "Step 3 of 5" has its dot on step 3. The empty ring is also a little bigger, so it no longer looks like the letter "o" (L-464).
+- On Analysis, the "…" button that holds "Save as JSON Resume" now sits at the end of the line, after "Upload a CV", instead of in the middle of the sentence. In the note under the box, the "i" now comes after "(.json)" (L-463).
+- Settings and Search now use the same small arrow to open and close sections, and the "Best match first" tick box matches the others (L-462).
+- The Country and Contract type drop-downs on Search now have the same arrow as the other choices (L-461).
+
 ## [0.17.0] — 2026-11-25
 
 Clearer buttons. Buttons that are just words, like Show CV, Upload a CV, Save this search and Rename, are now blue, so it is clear you can press them, and Delete is red. Behind the scenes, some button settings that never took effect were removed.
@@ -770,7 +781,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.17.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.18.0...main
+[0.18.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.17.0...light-v0.18.0
 [0.17.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.16.0...light-v0.17.0
 [0.16.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.15.0...light-v0.16.0
 [0.15.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.14.1...light-v0.15.0
