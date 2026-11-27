@@ -98,13 +98,13 @@ export function UpdateCheck({ port, version }: UpdateCheckProps = {}) {
         {updateCheckNote(checksOnLaunch)}
       </p>
 
-      <label className="mt-2 flex items-start gap-2">
+      <label className="mt-2 flex min-h-11 items-start gap-2 md:min-h-0">
         <input
           type="checkbox"
           data-testid="settings-update-on-launch"
           checked={checksOnLaunch}
           onChange={(event) => onToggleLaunchCheck(event.target.checked)}
-          className="mt-1"
+          className="mt-1 size-4 accent-blue"
         />
         <span className="text-ink-muted">{UPDATE_CHECK_TOGGLE_LABEL}</span>
       </label>

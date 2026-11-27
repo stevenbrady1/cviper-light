@@ -260,7 +260,7 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
       </div>
 
       <div className="mt-3">
-        <label className="flex items-start gap-2 text-ink">
+        <label className="flex min-h-11 items-start gap-2 text-ink md:min-h-0">
           <input
             type="checkbox"
             data-testid="custom-service-own-network"
@@ -270,7 +270,7 @@ export function CustomServiceCard({ port: injected }: CustomServiceCardProps = {
               setOwnNetwork(event.currentTarget.checked);
               setKeyError(null);
             }}
-            className="mt-1"
+            className="mt-1 size-4 accent-blue"
           />
           <span>This runs on my own computer or network</span>
         </label>

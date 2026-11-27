@@ -223,7 +223,7 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
             data-testid={`board-row-${board.id}`}
             className="flex items-center gap-2 rounded-control border border-line bg-card px-3 py-1.5"
           >
-            <label className="flex min-w-0 flex-1 items-center gap-2">
+            <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 md:min-h-0">
               <input
                 type="checkbox"
                 data-testid={`board-toggle-${board.id}`}
@@ -231,6 +231,7 @@ export function BoardSettings({ port, focused = false, onFocused }: BoardSetting
                 onChange={(event) =>
                   void apply(setBoardEnabled(preferences, board.id, event.currentTarget.checked))
                 }
+                className="size-4 accent-blue"
               />
               <span className="min-w-0 truncate text-ink">{board.label}</span>
             </label>
