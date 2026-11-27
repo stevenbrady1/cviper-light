@@ -8,6 +8,17 @@ All notable changes to CViper Light are recorded here. The format follows
 
 Changes waiting for the next release are in [`changes/unreleased/`](changes/unreleased/), one file per change, so two pull requests never edit the same lines here (L-303). `pnpm changelog:preview` shows them as they will appear; `pnpm changelog:release <version> <date>` writes them in below. See [CONTRIBUTING.md](CONTRIBUTING.md#the-changelog).
 
+## [0.19.0] — 2026-11-27
+
+Every control matches. The last drop-downs, tick boxes and fold-out sections now look the same as the rest of the app, and a new check keeps them that way.
+
+### Changed
+
+- The last few tick boxes, in Settings and job boards, now match the rest of the app, and a new check keeps every drop-down, tick box and fold-out section looking the same from now on (L-469).
+- Drop-downs in Settings, job boards and Tailor now have the same arrow as the rest of the app (L-468).
+- Drop-downs on the Tracker, such as the stage and pay period, now have the same arrow as the rest of the app (L-467).
+- The small sections you can open and close, such as those on Analysis, Tailor, Profile and Tracker, now use the same arrow as the rest of the app (L-466).
+
 ## [0.18.0] — 2026-11-26
 
 Controls that match. Drop-downs and fold-out sections now use the same small arrow everywhere, tick boxes match, Tracker cards show progress with the same marks as the step bar, and a few small things on Analysis that looked like typos are fixed.
@@ -781,7 +792,8 @@ source of truth.
   the import preview and the delete confirmation now name them: "2 jobs, 1 CV,
   3 archived documents and your profile".
 
-[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.18.0...main
+[Unreleased]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.19.0...main
+[0.19.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.18.0...light-v0.19.0
 [0.18.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.17.0...light-v0.18.0
 [0.17.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.16.0...light-v0.17.0
 [0.16.0]: https://github.com/stevenbrady1/cviper-light/compare/light-v0.15.0...light-v0.16.0
